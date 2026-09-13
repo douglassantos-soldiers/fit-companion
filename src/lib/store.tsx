@@ -36,14 +36,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(emptyState);
   const [hydrated, setHydrated] = useState(false);
 
+  const deviceId = useRef("");
+  const skipPush = useRef(true);
+
   useEffect(() => {
-    setState(load());
+    const local = load();
+    setState(local);
     setHydrated(true);
+    deviceId.current = getDeviceId();
+
+    // Se o banco já tem dados deste aparelho, eles têm prioridade.
+    void pullState(deviceId.current)
+      .then((remote) => {
+        if (remote) {
+          skipPush.current = true;
+          setState(remote);
+        } else if (local.profile) {
+          void pushState(deviceId.current, local);
+        }
+      })
+      .catch((e) => console.error("Falha ao carregar dados do banco", e));
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     window.localStorage.setItem(KEY, JSON.stringify(state));
+    if (skipPush.current) {
+      skipPush.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void pushState(deviceId.current, state);
+    }, 700);
+    return () => window.clearTimeout(timer);
   }, [state, hydrated]);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
