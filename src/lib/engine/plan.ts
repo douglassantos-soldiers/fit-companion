@@ -117,7 +117,7 @@ export function buildWeeklyPlan(profile: Profile, sessions: SessionLog[] = []): 
 
     return {
       id: `dia-${i + 1}`,
-      weekday: weekdays[i],
+      weekday: weekdays![i] ?? 1,
       title: block.title,
       focus: block.focus,
       estimatedMin: 20 + exercises.length * (scheme.restSec > 100 ? 9 : 7),
