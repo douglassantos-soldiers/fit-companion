@@ -117,8 +117,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           chat: [...s.chat, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, text }],
         })),
       reset: () => {
+        skipPush.current = true;
         setState(emptyState);
         if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
+        void clearRemoteState(deviceId.current);
       },
     }),
     [state, hydrated, update],
