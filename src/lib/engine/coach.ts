@@ -62,7 +62,7 @@ export function coachReply(promptId: string, state: AppState): string {
       return `Dor muscular normal com ${st} dia(s) de streak é sinal de estímulo. Reduza a carga em 10% hoje, aumente a água e priorize sono. Se a dor for articular, pule o movimento e troque por uma variação sem dor.`;
     case "desafio": {
       const open = CHALLENGES.filter((c) => !state.challenges.includes(c.id));
-      const pick = open[0] ?? CHALLENGES[0];
+      const pick = open[0] ?? CHALLENGES[0]!;
       return `Entra no "${pick.title}": ${pick.description} Você já tem ${state.sessions.length} treino(s) registrados, então o ritmo ajuda.`;
     }
     default:
