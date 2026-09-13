@@ -42,7 +42,7 @@ export function coachReply(promptId: string, state: AppState): string {
           : "Encaixe os treinos que faltam nos próximos dias."
       }`;
     case "progresso": {
-      const weakest = [...dims].sort((a, b) => a.score - b.score)[0];
+      const weakest = [...dims].sort((a, b) => a.score - b.score)[0]!;
       return `Seu score de performance está em ${score}/100. O ponto mais fraco agora é ${weakest.label.toLowerCase()} (${weakest.score}). Vou priorizar isso nas próximas semanas.`;
     }
     case "suplemento": {
