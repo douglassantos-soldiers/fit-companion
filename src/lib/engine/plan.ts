@@ -95,11 +95,11 @@ function pickExercises(groups: MuscleGroup[], equipment: Profile["equipment"], c
 
 export function buildWeeklyPlan(profile: Profile, sessions: SessionLog[] = []): PlannedDay[] {
   const days = Math.min(6, Math.max(2, profile.daysPerWeek));
-  const split = SPLITS[days] ?? SPLITS[3];
-  const weekdays = WEEKDAY_MAP[days] ?? WEEKDAY_MAP[3];
+  const split = SPLITS[days] ?? SPLITS[3]!;
+  const weekdays = WEEKDAY_MAP[days] ?? WEEKDAY_MAP[3]!;
   const scheme = GOAL_SCHEME[profile.goal];
 
-  return split.map((block, i) => {
+  return split!.map((block, i) => {
     const count = profile.goal === "performance" ? 4 : 5;
     const exercises = pickExercises(block.groups, profile.equipment, count).map((ex) => {
       const base = ex.baseLoad * LEVEL_FACTOR[profile.level] * scheme.loadFactor;
