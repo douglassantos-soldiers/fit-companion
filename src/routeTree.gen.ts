@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as TreinoIndexRouteImport } from './routes/treino.index'
+import { Route as TreinoSessaoIdRouteImport } from './routes/treino.sessao.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const TreinoIndexRoute = TreinoIndexRouteImport.update({
   path: '/treino/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TreinoSessaoIdRoute = TreinoSessaoIdRouteImport.update({
+  id: '/treino/sessao/$id',
+  path: '/treino/sessao/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRoute
   '/treino/': typeof TreinoIndexRoute
+  '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRoute
   '/treino': typeof TreinoIndexRoute
+  '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/onboarding': typeof OnboardingRoute
   '/treino/': typeof TreinoIndexRoute
+  '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/onboarding' | '/treino/'
+  fullPaths: '/' | '/onboarding' | '/treino/' | '/treino/sessao/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/onboarding' | '/treino'
-  id: '__root__' | '/' | '/onboarding' | '/treino/'
+  to: '/' | '/onboarding' | '/treino' | '/treino/sessao/$id'
+  id: '__root__' | '/' | '/onboarding' | '/treino/' | '/treino/sessao/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OnboardingRoute: typeof OnboardingRoute
   TreinoIndexRoute: typeof TreinoIndexRoute
+  TreinoSessaoIdRoute: typeof TreinoSessaoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TreinoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/treino/sessao/$id': {
+      id: '/treino/sessao/$id'
+      path: '/treino/sessao/$id'
+      fullPath: '/treino/sessao/$id'
+      preLoaderRoute: typeof TreinoSessaoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OnboardingRoute: OnboardingRoute,
   TreinoIndexRoute: TreinoIndexRoute,
+  TreinoSessaoIdRoute: TreinoSessaoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
