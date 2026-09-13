@@ -87,7 +87,7 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
 export async function pushState(deviceId: string, state: AppState): Promise<void> {
   if (!deviceId) return;
 
-  const tasks: Array<Promise<unknown>> = [];
+  const tasks: Array<PromiseLike<unknown>> = [];
 
   if (state.profile) {
     tasks.push(
@@ -168,7 +168,7 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
     );
   }
 
-  const results = await Promise.all(tasks.map((t) => t.then((r) => r).catch((e) => ({ error: e }))));
+  const results = await Promise.all(tasks.map((t) => Promise.resolve(t).catch((e: unknown) => ({ error: e }))));
   for (const r of results) {
     const error = (r as { error?: unknown } | null)?.error;
     if (error) console.error("Falha ao sincronizar dados", error);
