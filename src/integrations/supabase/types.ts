@@ -14,7 +14,195 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_state: {
+        Row: {
+          challenges: string[]
+          chat: Json
+          created_at: string
+          device_id: string
+          supplement_routine: string[]
+          updated_at: string
+        }
+        Insert: {
+          challenges?: string[]
+          chat?: Json
+          created_at?: string
+          device_id: string
+          supplement_routine?: string[]
+          updated_at?: string
+        }
+        Update: {
+          challenges?: string[]
+          chat?: Json
+          created_at?: string
+          device_id?: string
+          supplement_routine?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_metrics: {
+        Row: {
+          created_at: string
+          date: string
+          device_id: string
+          meals: number
+          updated_at: string
+          water_ml: number
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          device_id: string
+          meals?: number
+          updated_at?: string
+          water_ml?: number
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          device_id?: string
+          meals?: number
+          updated_at?: string
+          water_ml?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          age: number
+          created_at: string
+          days_per_week: number
+          device_id: string
+          equipment: string
+          goal: string
+          height_cm: number
+          level: string
+          name: string
+          restrictions: string[]
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          age?: number
+          created_at?: string
+          days_per_week?: number
+          device_id: string
+          equipment?: string
+          goal?: string
+          height_cm?: number
+          level?: string
+          name?: string
+          restrictions?: string[]
+          updated_at?: string
+          weight_kg?: number
+        }
+        Update: {
+          age?: number
+          created_at?: string
+          days_per_week?: number
+          device_id?: string
+          equipment?: string
+          goal?: string
+          height_cm?: number
+          level?: string
+          name?: string
+          restrictions?: string[]
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          client_id: string
+          created_at: string
+          date: string
+          day_id: string
+          device_id: string
+          duration_min: number
+          exercises: Json
+          id: string
+          title: string
+          updated_at: string
+          volume_kg: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          date?: string
+          day_id?: string
+          device_id: string
+          duration_min?: number
+          exercises?: Json
+          id?: string
+          title?: string
+          updated_at?: string
+          volume_kg?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          date?: string
+          day_id?: string
+          device_id?: string
+          duration_min?: number
+          exercises?: Json
+          id?: string
+          title?: string
+          updated_at?: string
+          volume_kg?: number
+        }
+        Relationships: []
+      }
+      supplement_logs: {
+        Row: {
+          created_at: string
+          date: string
+          device_id: string
+          supplement_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          device_id: string
+          supplement_ids?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          device_id?: string
+          supplement_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weights: {
+        Row: {
+          created_at: string
+          date: string
+          device_id: string
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          device_id: string
+          updated_at?: string
+          weight_kg: number
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          device_id?: string
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
