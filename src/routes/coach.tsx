@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { askAiCoach, type CoachProvider } from "@/lib/coach.functions";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
+import { coachSystemPrompt } from "@/lib/engine/coach-context";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/coach")({
@@ -22,14 +26,37 @@ export const Route = createFileRoute("/coach")({
   component: CoachPage,
 });
 
+type Engine = "regras" | CoachProvider;
+
+const ENGINES: Array<{ id: Engine; label: string }> = [
+  { id: "regras", label: "Coach padrão" },
+  { id: "chatgpt", label: "ChatGPT" },
+  { id: "claude", label: "Claude" },
+];
+
+const ENGINE_KEY = "soldiers-coach-engine";
+
 function CoachPage() {
   const { state, hydrated, pushChat } = useStore();
+  const ask = useServerFn(askAiCoach);
+  const [engine, setEngine] = useState<Engine>("regras");
   const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const saved = window.localStorage.getItem(ENGINE_KEY) as Engine | null;
+    if (saved === "chatgpt" || saved === "claude" || saved === "regras") setEngine(saved);
+  }, []);
+
+  const chooseEngine = (next: Engine) => {
+    setEngine(next);
+    window.localStorage.setItem(ENGINE_KEY, next);
+  };
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [state.chat.length]);
+  }, [state.chat.length, loading]);
 
   useEffect(() => {
     if (hydrated && state.chat.length === 0 && state.profile) {
@@ -40,34 +67,81 @@ function CoachPage() {
     }
   }, [hydrated, state.chat.length, state.profile, pushChat]);
 
-  const ask = (promptId: string, label: string) => {
+  const answer = async (question: string, fallback: string) => {
+    if (engine === "regras") {
+      pushChat("coach", fallback);
+      return;
+    }
+    setLoading(true);
+    try {
+      const history = state.chat.slice(-8).map((m) => ({
+        role: m.role === "coach" ? ("assistant" as const) : ("user" as const),
+        content: m.text,
+      }));
+      const res = await ask({
+        data: {
+          provider: engine,
+          system: coachSystemPrompt(state),
+          messages: [...history, { role: "user" as const, content: question }],
+        },
+      });
+      pushChat("coach", res.text);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível falar com a IA agora.");
+      pushChat("coach", fallback);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const askPrompt = (promptId: string, label: string) => {
     pushChat("user", label);
-    pushChat("coach", coachReply(promptId, state));
+    void answer(label, coachReply(promptId, state));
   };
 
   const send = () => {
     const value = text.trim();
-    if (!value) return;
+    if (!value || loading) return;
     pushChat("user", value);
-    pushChat("coach", coachFreeform(value, state));
     setText("");
+    void answer(value, coachFreeform(value, state));
   };
 
   return (
     <AppShell title="Coach" subtitle="Respostas baseadas nos seus dados de treino">
+      <div className="mb-4 flex gap-2">
+        {ENGINES.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => chooseEngine(e.id)}
+            className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+              engine === e.id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:border-primary hover:text-primary"
+            }`}
+          >
+            {e.label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-3">
         {state.chat.map((m) => (
           <div
             key={m.id}
             className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-              m.role === "coach"
-                ? "bg-card text-foreground"
-                : "ml-auto bg-primary text-primary-foreground"
+              m.role === "coach" ? "bg-card text-foreground" : "ml-auto bg-primary text-primary-foreground"
             }`}
           >
             {m.text}
           </div>
         ))}
+        {loading ? (
+          <div className="flex max-w-[85%] items-center gap-2 rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Pensando...
+          </div>
+        ) : null}
         <div ref={endRef} />
       </div>
 
@@ -75,8 +149,9 @@ function CoachPage() {
         {COACH_PROMPTS.map((p) => (
           <button
             key={p.id}
-            onClick={() => ask(p.id, p.label)}
-            className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            disabled={loading}
+            onClick={() => askPrompt(p.id, p.label)}
+            className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
           >
             {p.label}
           </button>
@@ -91,8 +166,8 @@ function CoachPage() {
           placeholder="Pergunte algo ao coach"
           className="h-12"
         />
-        <Button size="icon" className="size-12" onClick={send} aria-label="Enviar">
-          <Send className="size-4" />
+        <Button size="icon" className="size-12" onClick={send} disabled={loading} aria-label="Enviar">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
         </Button>
       </div>
     </AppShell>
