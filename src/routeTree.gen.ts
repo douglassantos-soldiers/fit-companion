@@ -10,8 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CoachRouteImport } from './routes/coach'
+import { Route as DesafiosRouteImport } from './routes/desafios'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ProgressoRouteImport } from './routes/progresso'
+import { Route as SuplementosRouteImport } from './routes/suplementos'
 import { Route as TreinoIndexRouteImport } from './routes/treino.index'
 import { Route as TreinoSessaoIdRouteImport } from './routes/treino.sessao.$id'
 
@@ -20,14 +24,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CoachRoute = CoachRouteImport.update({
+  id: '/coach',
+  path: '/coach',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesafiosRoute = DesafiosRouteImport.update({
+  id: '/desafios',
+  path: '/desafios',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PerfilRoute = PerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressoRoute = ProgressoRouteImport.update({
   id: '/progresso',
   path: '/progresso',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuplementosRoute = SuplementosRouteImport.update({
+  id: '/suplementos',
+  path: '/suplementos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TreinoIndexRoute = TreinoIndexRouteImport.update({
@@ -43,45 +67,82 @@ const TreinoSessaoIdRoute = TreinoSessaoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/coach': typeof CoachRoute
+  '/desafios': typeof DesafiosRoute
   '/onboarding': typeof OnboardingRoute
+  '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/suplementos': typeof SuplementosRoute
   '/treino/': typeof TreinoIndexRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/coach': typeof CoachRoute
+  '/desafios': typeof DesafiosRoute
   '/onboarding': typeof OnboardingRoute
+  '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/suplementos': typeof SuplementosRoute
   '/treino': typeof TreinoIndexRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/coach': typeof CoachRoute
+  '/desafios': typeof DesafiosRoute
   '/onboarding': typeof OnboardingRoute
+  '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/suplementos': typeof SuplementosRoute
   '/treino/': typeof TreinoIndexRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/onboarding' | '/progresso' | '/treino/' | '/treino/sessao/$id'
+    | '/'
+    | '/coach'
+    | '/desafios'
+    | '/onboarding'
+    | '/perfil'
+    | '/progresso'
+    | '/suplementos'
+    | '/treino/'
+    | '/treino/sessao/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/onboarding' | '/progresso' | '/treino' | '/treino/sessao/$id'
+  to:
+    | '/'
+    | '/coach'
+    | '/desafios'
+    | '/onboarding'
+    | '/perfil'
+    | '/progresso'
+    | '/suplementos'
+    | '/treino'
+    | '/treino/sessao/$id'
   id:
     | '__root__'
     | '/'
+    | '/coach'
+    | '/desafios'
     | '/onboarding'
+    | '/perfil'
     | '/progresso'
+    | '/suplementos'
     | '/treino/'
     | '/treino/sessao/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CoachRoute: typeof CoachRoute
+  DesafiosRoute: typeof DesafiosRoute
   OnboardingRoute: typeof OnboardingRoute
+  PerfilRoute: typeof PerfilRoute
   ProgressoRoute: typeof ProgressoRoute
+  SuplementosRoute: typeof SuplementosRoute
   TreinoIndexRoute: typeof TreinoIndexRoute
   TreinoSessaoIdRoute: typeof TreinoSessaoIdRoute
 }
@@ -95,6 +156,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/coach': {
+      id: '/coach'
+      path: '/coach'
+      fullPath: '/coach'
+      preLoaderRoute: typeof CoachRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desafios': {
+      id: '/desafios'
+      path: '/desafios'
+      fullPath: '/desafios'
+      preLoaderRoute: typeof DesafiosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding': {
       id: '/onboarding'
       path: '/onboarding'
@@ -102,11 +177,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/perfil': {
+      id: '/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof PerfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/progresso': {
       id: '/progresso'
       path: '/progresso'
       fullPath: '/progresso'
       preLoaderRoute: typeof ProgressoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suplementos': {
+      id: '/suplementos'
+      path: '/suplementos'
+      fullPath: '/suplementos'
+      preLoaderRoute: typeof SuplementosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/treino/': {
@@ -128,8 +217,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CoachRoute: CoachRoute,
+  DesafiosRoute: DesafiosRoute,
   OnboardingRoute: OnboardingRoute,
+  PerfilRoute: PerfilRoute,
   ProgressoRoute: ProgressoRoute,
+  SuplementosRoute: SuplementosRoute,
   TreinoIndexRoute: TreinoIndexRoute,
   TreinoSessaoIdRoute: TreinoSessaoIdRoute,
 }
