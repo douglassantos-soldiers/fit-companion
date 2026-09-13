@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { clearRemoteState, getDeviceId, pullState, pushState } from "@/lib/sync";
 import { emptyState, todayKey, type AppState, type Profile, type SessionLog } from "@/lib/types";
 
 const KEY = "soldiers-os-v1";
