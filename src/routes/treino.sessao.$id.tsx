@@ -41,7 +41,7 @@ function SessionPage() {
       day.exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
         sets: Array.from({ length: ex.sets }, () => ({
-          reps: Number(ex.reps.split("-")[0].replace(/\D/g, "")) || 10,
+          reps: Number((ex.reps.split("-")[0] ?? "10").replace(/\D/g, "")) || 10,
           weightKg: ex.suggestedLoad,
           done: false,
         })),
