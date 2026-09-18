@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
-  emptyState,
   type AppState,
   type ChatMessage,
   type Equipment,
@@ -80,6 +79,95 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
     supplementRoutine: stateRes.data?.supplement_routine ?? [],
     challenges: stateRes.data?.challenges ?? [],
     chat: (stateRes.data?.chat as unknown as ChatMessage[]) ?? [],
+    theme: "dark",
+    dimensionSnapshots: [],
+    earnedBadges: [],
+    meals: [],
+    shareProgress: true,
+    sessionFx: true,
+    favoriteMealPresetIds: [],
+    remindersEnabled: false,
+    reminderHour: 18,
+    seenOnboardingTips: [],
+    ...retentionFromRow((stateRes.data as { retention?: unknown } | null)?.retention),
+  } as AppState;
+}
+
+function retentionFromRow(raw: unknown): Partial<AppState> {
+  if (!raw || typeof raw !== "object") {
+    return {
+      xpByDate: {},
+      streakFreezes: 1,
+      freezeUsedDates: [],
+      xpGoalMetDates: [],
+      dailyQuestIds: [],
+      dailyQuestDate: "",
+      dailyQuestProgress: {},
+      cosmeticBadges: [],
+      authUserId: null,
+      bio: "",
+      avatarUrl: null,
+      accessGranted: false,
+      accessEmail: null,
+      accessGrantedAt: null,
+      accessTier: "base",
+      purchaseProductIds: [],
+      restockEstimates: {},
+      routineFromPurchase: false,
+      routineFromPurchaseDismissed: false,
+      upsellShownDate: null,
+    };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    xpByDate: (r["xpByDate"] as Record<string, number>) ?? {},
+    streakFreezes: typeof r["streakFreezes"] === "number" ? r["streakFreezes"] : 1,
+    freezeUsedDates: Array.isArray(r["freezeUsedDates"]) ? (r["freezeUsedDates"] as string[]) : [],
+    xpGoalMetDates: Array.isArray(r["xpGoalMetDates"]) ? (r["xpGoalMetDates"] as string[]) : [],
+    dailyQuestIds: Array.isArray(r["dailyQuestIds"]) ? (r["dailyQuestIds"] as string[]) : [],
+    dailyQuestDate: typeof r["dailyQuestDate"] === "string" ? r["dailyQuestDate"] : "",
+    dailyQuestProgress: (r["dailyQuestProgress"] as Record<string, number>) ?? {},
+    cosmeticBadges: Array.isArray(r["cosmeticBadges"]) ? (r["cosmeticBadges"] as string[]) : [],
+    authUserId: typeof r["authUserId"] === "string" ? r["authUserId"] : null,
+    bio: typeof r["bio"] === "string" ? r["bio"] : "",
+    avatarUrl: typeof r["avatarUrl"] === "string" ? r["avatarUrl"] : null,
+    accessGranted: r["accessGranted"] === true,
+    accessEmail: typeof r["accessEmail"] === "string" ? r["accessEmail"] : null,
+    accessGrantedAt: typeof r["accessGrantedAt"] === "string" ? r["accessGrantedAt"] : null,
+    accessTier: r["accessTier"] === "performance" ? "performance" : "base",
+    purchaseProductIds: Array.isArray(r["purchaseProductIds"]) ? (r["purchaseProductIds"] as string[]) : [],
+    restockEstimates:
+      r["restockEstimates"] && typeof r["restockEstimates"] === "object"
+        ? (r["restockEstimates"] as AppState["restockEstimates"])
+        : {},
+    routineFromPurchase: r["routineFromPurchase"] === true,
+    routineFromPurchaseDismissed: r["routineFromPurchaseDismissed"] === true,
+    upsellShownDate: typeof r["upsellShownDate"] === "string" ? r["upsellShownDate"] : null,
+  };
+}
+
+function retentionPayload(state: AppState) {
+  return {
+    xpByDate: state.xpByDate ?? {},
+    streakFreezes: state.streakFreezes ?? 1,
+    freezeUsedDates: state.freezeUsedDates ?? [],
+    xpGoalMetDates: state.xpGoalMetDates ?? [],
+    dailyQuestIds: state.dailyQuestIds ?? [],
+    dailyQuestDate: state.dailyQuestDate ?? "",
+    dailyQuestProgress: state.dailyQuestProgress ?? {},
+    cosmeticBadges: state.cosmeticBadges ?? [],
+    authUserId: state.authUserId ?? null,
+    bio: state.bio ?? "",
+    avatarUrl: state.avatarUrl ?? null,
+    accessGranted: state.accessGranted === true,
+    accessEmail: state.accessEmail ?? null,
+    accessGrantedAt: state.accessGrantedAt ?? null,
+    accessTier: state.accessTier ?? "base",
+    purchaseProductIds: state.purchaseProductIds ?? [],
+    restockEstimates: state.restockEstimates ?? {},
+    routineFromPurchase: state.routineFromPurchase === true,
+    routineFromPurchaseDismissed: state.routineFromPurchaseDismissed === true,
+    upsellShownDate: state.upsellShownDate ?? null,
   };
 }
 
@@ -116,7 +204,9 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
         supplement_routine: state.supplementRoutine,
         challenges: state.challenges,
         chat: state.chat as unknown as never,
-      },
+        // retention column added in phase6; cast until types regenerate
+        ...( { retention: retentionPayload(state) } as Record<string, unknown>),
+      } as never,
       { onConflict: "device_id" },
     ),
   );
@@ -186,5 +276,3 @@ export async function clearRemoteState(deviceId: string): Promise<void> {
     supabase.from("profiles").delete().eq("device_id", deviceId),
   ]);
 }
-
-export const emptyRemoteState = emptyState;

@@ -1,4 +1,18 @@
-import { EXERCISES, exerciseById, type Exercise, type MuscleGroup } from "@/data/exercises";
+import {
+  EXERCISES,
+  matchesEquipment,
+  normalizeRestrictions,
+  respectsJoints,
+  type Exercise,
+  type MuscleGroup,
+} from "@/data/exercises";
+import { freshnessForGroups, sortGroupsByFreshness } from "@/lib/engine/recovery";
+import {
+  progressionForExercise,
+  roundLoad,
+  weekModifier,
+  type WeekMode,
+} from "@/lib/engine/progression";
 import type { Goal, Level, Profile, SessionLog } from "@/lib/types";
 
 export interface PlannedExercise {
@@ -9,15 +23,23 @@ export interface PlannedExercise {
   restSec: number;
   suggestedLoad: number;
   unit: Exercise["unit"];
+  reason?: string;
+  recoveryOk?: boolean;
 }
 
 export interface PlannedDay {
   id: string;
-  weekday: number; // 0 = domingo
+  weekday: number;
   title: string;
   focus: string;
   estimatedMin: number;
   exercises: PlannedExercise[];
+  recoveryScore?: number;
+}
+
+export interface WeeklyPlanResult {
+  days: PlannedDay[];
+  weekMode: WeekMode;
 }
 
 const SPLITS: Record<number, Array<{ title: string; focus: string; groups: MuscleGroup[] }>> = {
@@ -74,76 +96,117 @@ const LEVEL_FACTOR: Record<Level, number> = {
   avancado: 1.3,
 };
 
-function pickExercises(groups: MuscleGroup[], equipment: Profile["equipment"], count: number) {
+function pickExercises(
+  groups: MuscleGroup[],
+  equipment: Profile["equipment"],
+  restrictions: string[],
+  count: number,
+  sessions: SessionLog[],
+) {
+  const avoided = normalizeRestrictions(restrictions);
+  const orderedGroups = sortGroupsByFreshness(groups, sessions);
   const available = EXERCISES.filter(
-    (e) => e.equipment === "ambos" || e.equipment === equipment,
-  );
+    (e) => matchesEquipment(e, equipment) && respectsJoints(e, avoided),
+  ).sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+
   const picked: Exercise[] = [];
   let round = 0;
-  while (picked.length < count && round < 4) {
-    for (const group of groups) {
-      const candidate = available.find(
-        (e) => e.group === group && !picked.includes(e),
-      );
+  while (picked.length < count && round < 5) {
+    for (const group of orderedGroups) {
+      const candidate = available.find((e) => e.group === group && !picked.includes(e));
       if (candidate) picked.push(candidate);
       if (picked.length >= count) break;
+    }
+    // Fallback: any safe exercise not yet picked
+    if (picked.length < count) {
+      const any = available.find((e) => !picked.includes(e));
+      if (any) picked.push(any);
+      else break;
     }
     round += 1;
   }
   return picked;
 }
 
-export function buildWeeklyPlan(profile: Profile, sessions: SessionLog[] = []): PlannedDay[] {
+/** Mantém assinatura antiga: retorna só os dias. */
+export function buildWeeklyPlan(
+  profile: Profile,
+  sessions: SessionLog[] = [],
+  learningHint?: WeekMode | null,
+): PlannedDay[] {
+  return buildWeeklyPlanDetailed(profile, sessions, undefined, learningHint).days;
+}
+
+export function buildWeeklyPlanDetailed(
+  profile: Profile,
+  sessions: SessionLog[] = [],
+  equipmentOverride?: Profile["equipment"],
+  learningHint?: WeekMode | null,
+): WeeklyPlanResult {
   const days = Math.min(6, Math.max(2, profile.daysPerWeek));
   const split = SPLITS[days] ?? SPLITS[3]!;
   const weekdays = WEEKDAY_MAP[days] ?? WEEKDAY_MAP[3]!;
   const scheme = GOAL_SCHEME[profile.goal];
+  const equipment = equipmentOverride ?? profile.equipment;
+  const mode = weekModifier(sessions, 7, learningHint ?? null);
 
-  return split!.map((block, i) => {
+  const planned = split!.map((block, i) => {
+    const recoveryScore = freshnessForGroups(block.groups, sessions);
+    const recoveryOk = recoveryScore >= 35;
     const count = profile.goal === "performance" ? 4 : 5;
-    const exercises = pickExercises(block.groups, profile.equipment, count).map((ex) => {
+    // Volume reduzido se grupo principal ainda fatigado
+    const volumeFactor = recoveryOk ? 1 : 0.75;
+
+    const exercises = pickExercises(
+      block.groups,
+      equipment,
+      profile.restrictions,
+      count,
+      sessions,
+    ).map((ex) => {
       const base = ex.baseLoad * LEVEL_FACTOR[profile.level] * scheme.loadFactor;
-      const suggested = suggestLoad(ex.id, roundLoad(base), sessions);
+      const baseSets = Math.max(2, Math.round((ex.group === "cardio" ? 1 : scheme.sets) * volumeFactor));
+      const baseReps = ex.group === "cardio" ? "15 min" : ex.unit === "min" ? "45 s" : scheme.reps;
+      const prog = progressionForExercise(
+        ex,
+        roundLoad(base),
+        baseSets,
+        baseReps,
+        scheme.restSec,
+        profile.goal,
+        sessions,
+        mode,
+      );
+
       return {
         exerciseId: ex.id,
         name: ex.name,
-        sets: ex.group === "cardio" ? 1 : scheme.sets,
-        reps: ex.group === "cardio" ? "15 min" : ex.unit === "min" ? "45 s" : scheme.reps,
-        restSec: scheme.restSec,
-        suggestedLoad: suggested,
+        sets: ex.group === "cardio" || ex.unit === "min" ? 1 : prog.sets,
+        reps: prog.reps,
+        restSec: prog.restSec,
+        suggestedLoad: prog.load,
         unit: ex.unit,
+        reason: prog.reason,
+        recoveryOk,
       } satisfies PlannedExercise;
     });
 
     return {
       id: `dia-${i + 1}`,
       weekday: weekdays![i] ?? 1,
-      title: block.title,
-      focus: block.focus,
+      title: recoveryOk ? block.title : `${block.title} (leve)`,
+      focus: recoveryOk ? block.focus : `${block.focus} · recuperação baixa`,
       estimatedMin: 20 + exercises.length * (scheme.restSec > 100 ? 9 : 7),
       exercises,
+      recoveryScore,
     } satisfies PlannedDay;
   });
+
+  return { days: planned, weekMode: mode };
 }
 
-export function roundLoad(kg: number) {
-  if (kg <= 0) return 0;
-  return Math.max(2.5, Math.round(kg / 2.5) * 2.5);
-}
-
-/** Progressão simples: se na última sessão todas as séries foram concluídas, sobe a carga. */
-export function suggestLoad(exerciseId: string, fallback: number, sessions: SessionLog[]) {
-  const ordered = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
-  for (const session of ordered) {
-    const log = session.exercises.find((e) => e.exerciseId === exerciseId);
-    if (!log || log.sets.length === 0) continue;
-    const allDone = log.sets.every((s) => s.done);
-    const last = Math.max(...log.sets.map((s) => s.weightKg));
-    if (last <= 0) return fallback;
-    return roundLoad(allDone ? last + 2.5 : last);
-  }
-  return fallback;
-}
+export { roundLoad, weekModifier };
+export type { WeekMode };
 
 export function planDayForToday(plan: PlannedDay[], date = new Date()) {
   const weekday = date.getDay();
@@ -164,6 +227,26 @@ export function sessionVolume(exercises: SessionLog["exercises"]) {
 }
 
 function bodyLoad(exerciseId: string) {
-  const ex = exerciseById(exerciseId);
+  const ex = EXERCISES.find((e) => e.id === exerciseId);
   return ex && ex.unit !== "kg" ? 10 : 0;
+}
+
+/** Shortened day: keep first compounds, halve sets, ~8–12 min. */
+export function buildExpressSession(day: PlannedDay): PlannedDay {
+  const compounds = day.exercises.filter((e) => e.sets >= 3).slice(0, 4);
+  const base = compounds.length ? compounds : day.exercises.slice(0, 3);
+  const exercises = base.map((ex) => ({
+    ...ex,
+    sets: Math.max(1, Math.ceil(ex.sets * 0.5)),
+    restSec: Math.min(ex.restSec, 60),
+    reason: "Express · protege streak",
+  }));
+  return {
+    ...day,
+    id: `${day.id}-express`,
+    title: `${day.title} · Express`,
+    focus: `Express · ${day.focus}`,
+    estimatedMin: Math.min(12, Math.max(8, 6 + exercises.length * 2)),
+    exercises,
+  };
 }

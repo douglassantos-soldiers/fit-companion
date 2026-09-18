@@ -12,14 +12,174 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      activity_events: {
+        Row: {
+          created_at: string
+          device_id: string
+          display_name: string
+          id: string
+          kind: string
+          kudos_count: number
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          display_name?: string
+          id?: string
+          kind: string
+          kudos_count?: number
+          payload?: Json
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          display_name?: string
+          id?: string
+          kind?: string
+          kudos_count?: number
+          payload?: Json
+        }
+        Relationships: []
+      }
+      activity_kudos: {
+        Row: {
+          created_at: string
+          device_id: string
+          event_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          event_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          event_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_kudos_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_entitlements: {
+        Row: {
+          access_tier: string | null
+          device_id: string
+          email: string
+          granted_at: string
+          last_synced_at: string | null
+          order_count: number | null
+          product_ids: string[] | null
+          shopify_customer_id: string | null
+          source: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_tier?: string | null
+          device_id: string
+          email: string
+          granted_at?: string
+          last_synced_at?: string | null
+          order_count?: number | null
+          product_ids?: string[] | null
+          shopify_customer_id?: string | null
+          source?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_tier?: string | null
+          device_id?: string
+          email?: string
+          granted_at?: string
+          last_synced_at?: string | null
+          order_count?: number | null
+          product_ids?: string[] | null
+          shopify_customer_id?: string | null
+          source?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      app_entitlement_emails: {
+        Row: {
+          access_tier: string | null
+          created_at: string
+          email: string
+          last_order_at: string | null
+          magic_expires_at: string | null
+          magic_token_hash: string | null
+          order_snapshot: Json | null
+          product_ids: string[] | null
+          shopify_customer_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_tier?: string | null
+          created_at?: string
+          email: string
+          last_order_at?: string | null
+          magic_expires_at?: string | null
+          magic_token_hash?: string | null
+          order_snapshot?: Json | null
+          product_ids?: string[] | null
+          shopify_customer_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_tier?: string | null
+          created_at?: string
+          email?: string
+          last_order_at?: string | null
+          magic_expires_at?: string | null
+          magic_token_hash?: string | null
+          order_snapshot?: Json | null
+          product_ids?: string[] | null
+          shopify_customer_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       app_state: {
         Row: {
           challenges: string[]
           chat: Json
           created_at: string
           device_id: string
+          retention: Json
           supplement_routine: string[]
           updated_at: string
         }
@@ -28,6 +188,7 @@ export type Database = {
           chat?: Json
           created_at?: string
           device_id: string
+          retention?: Json
           supplement_routine?: string[]
           updated_at?: string
         }
@@ -36,8 +197,162 @@ export type Database = {
           chat?: Json
           created_at?: string
           device_id?: string
+          retention?: Json
           supplement_routine?: string[]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      challenge_entries: {
+        Row: {
+          challenge_id: string
+          device_id: string
+          joined_at: string
+        }
+        Insert: {
+          challenge_id: string
+          device_id: string
+          joined_at?: string
+        }
+        Update: {
+          challenge_id?: string
+          device_id?: string
+          joined_at?: string
+        }
+        Relationships: []
+      }
+      challenge_progress: {
+        Row: {
+          challenge_id: string
+          device_id: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          challenge_id: string
+          device_id: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          challenge_id?: string
+          device_id?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      club_league_weeks: {
+        Row: {
+          club_id: string
+          device_id: string
+          points: number
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          club_id: string
+          device_id: string
+          points?: number
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          club_id?: string
+          device_id?: string
+          points?: number
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_league_weeks_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_members: {
+        Row: {
+          club_id: string
+          device_id: string
+          joined_at: string
+        }
+        Insert: {
+          club_id: string
+          device_id: string
+          joined_at?: string
+        }
+        Update: {
+          club_id?: string
+          device_id?: string
+          joined_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_members_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_stories: {
+        Row: {
+          club_id: string
+          created_at: string
+          device_id: string
+          id: string
+          image_url: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          device_id: string
+          id?: string
+          image_url: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          device_id?: string
+          id?: string
+          image_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_stories_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clubs: {
+        Row: {
+          code: string
+          created_at: string
+          created_by_device_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by_device_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by_device_id?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -67,6 +382,74 @@ export type Database = {
           water_ml?: number
         }
         Relationships: []
+      }
+      engagement_events: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          name: string
+          props: Json
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          name: string
+          props?: Json
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          name?: string
+          props?: Json
+        }
+        Relationships: []
+      }
+      friend_quests: {
+        Row: {
+          club_id: string
+          created_at: string
+          device_a: string
+          device_b: string
+          id: string
+          progress_a: number
+          progress_b: number
+          target: number
+          week_start: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          device_a: string
+          device_b: string
+          id?: string
+          progress_a?: number
+          progress_b?: number
+          target?: number
+          week_start: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          device_a?: string
+          device_b?: string
+          id?: string
+          progress_a?: number
+          progress_b?: number
+          target?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "friend_quests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -152,6 +535,33 @@ export type Database = {
           title?: string
           updated_at?: string
           volume_kg?: number
+        }
+        Relationships: []
+      }
+      social_profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          device_id: string
+          display_name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          device_id: string
+          display_name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          device_id?: string
+          display_name?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -337,6 +747,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

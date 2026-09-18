@@ -16,7 +16,11 @@
     "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
-    "hooks": "@/hooks"
+    "hooks": "@/hooks",
+    "magicui": "@/components/magicui"
   },
-  "registries": {}
+  "registries": {
+    "@magicui": "https://magicui.design/r/{name}.json",
+    "@kibo-ui": "https://www.kibo-ui.com/r/{name}.json"
+  }
 }

@@ -1,3 +1,6 @@
+import { computeLearningInsights } from "@/lib/engine/learning";
+import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
+import { monthlyDoseAdherence } from "@/lib/engine/supplements";
 import type { AppState, Profile, SessionLog } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 
@@ -25,11 +28,15 @@ export function sessionsInLastDays(sessions: SessionLog[], days: number) {
   return sessions.filter((s) => new Date(s.date) >= limit);
 }
 
-export function streak(sessions: SessionLog[]) {
+export interface StreakOpts {
+  freezeUsedDates?: string[];
+}
+
+export function streak(sessions: SessionLog[], opts: StreakOpts = {}) {
   const dates = new Set(sessions.map((s) => s.date.slice(0, 10)));
+  for (const f of opts.freezeUsedDates ?? []) dates.add(f.slice(0, 10));
   let count = 0;
   const cursor = new Date();
-  // Permite que o streak conte a partir de ontem se hoje ainda não treinou.
   if (!dates.has(todayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
   while (dates.has(todayKey(cursor))) {
     count += 1;
@@ -45,11 +52,26 @@ export function performanceDimensions(state: AppState, profile: Profile): Dimens
   const consistency = planned ? (recent.length / planned) * 100 : 0;
 
   const cardioSessions = recent.filter((s) =>
-    s.exercises.some((e) => e.exerciseId.includes("corrida") || e.exerciseId.includes("hiit") || e.exerciseId.includes("corda") || e.exerciseId.includes("burpee")),
+    s.exercises.some(
+      (e) =>
+        e.exerciseId.includes("corrida") ||
+        e.exerciseId.includes("hiit") ||
+        e.exerciseId.includes("corda") ||
+        e.exerciseId.includes("burpee"),
+    ),
   ).length;
 
-  const supplementDays = Object.entries(state.supplementLogs).filter(([, v]) => v.length > 0).length;
   const waterDays = Object.values(state.days).filter((d) => d.waterMl >= 2000).length;
+  const insights = computeLearningInsights(state);
+  const goals = nutritionGoals(profile, insights);
+  const todayMeals = dayNutritionTotals(state.meals ?? []);
+  const proteinHit = Math.min(100, (todayMeals.proteinG / Math.max(1, goals.proteinG)) * 100);
+  const mealHit = Math.min(100, (todayMeals.count / Math.max(1, goals.mealsTarget)) * 100);
+
+  const routine = state.supplementRoutine;
+  const supplementScore = routine.length
+    ? monthlyDoseAdherence(state.supplementLogs, routine).pct
+    : Math.min(100, Object.entries(state.supplementLogs).filter(([, v]) => v.length > 0).length * 4);
 
   const base = profile.level === "avancado" ? 55 : profile.level === "intermediario" ? 40 : 25;
 
@@ -57,8 +79,16 @@ export function performanceDimensions(state: AppState, profile: Profile): Dimens
     { key: "forca", label: "Força", score: clamp(base + volume / 800) },
     { key: "resistencia", label: "Resistência", score: clamp(base * 0.8 + cardioSessions * 9) },
     { key: "consistencia", label: "Consistência", score: clamp(20 + consistency * 0.8) },
-    { key: "recuperacao", label: "Recuperação", score: clamp(35 + waterDays * 5 - Math.max(0, recent.length - planned) * 4) },
-    { key: "nutricao", label: "Nutrição", score: clamp(25 + supplementDays * 4) },
+    {
+      key: "recuperacao",
+      label: "Recuperação",
+      score: clamp(35 + waterDays * 5 - Math.max(0, recent.length - planned) * 4),
+    },
+    {
+      key: "nutricao",
+      label: "Nutrição",
+      score: clamp(proteinHit * 0.45 + mealHit * 0.25 + supplementScore * 0.3),
+    },
   ];
 }
 
@@ -101,4 +131,137 @@ export function personalRecords(sessions: SessionLog[]) {
     }
   }
   return [...records.entries()].map(([exerciseId, r]) => ({ exerciseId, ...r }));
+}
+
+export interface WeekOverWeek {
+  thisWeek: { volume: number; treinos: number; label: string };
+  prevWeek: { volume: number; treinos: number; label: string };
+  volumeDeltaPct: number | null;
+  treinosDelta: number;
+}
+
+/** Compare the last two buckets from weeklyVolumeSeries. */
+export function weekOverWeek(sessions: SessionLog[]): WeekOverWeek {
+  const series = weeklyVolumeSeries(sessions, 2);
+  const prev = series[0] ?? { label: "—", volume: 0, treinos: 0 };
+  const curr = series[1] ?? series[0] ?? { label: "—", volume: 0, treinos: 0 };
+  const volumeDeltaPct =
+    prev.volume > 0 ? Math.round(((curr.volume - prev.volume) / prev.volume) * 100) : curr.volume > 0 ? 100 : null;
+  return {
+    thisWeek: { volume: curr.volume, treinos: curr.treinos, label: curr.label },
+    prevWeek: { volume: prev.volume, treinos: prev.treinos, label: prev.label },
+    volumeDeltaPct,
+    treinosDelta: curr.treinos - prev.treinos,
+  };
+}
+
+export interface HeatmapCell {
+  date: string;
+  count: number;
+  volumeKg: number;
+  level: 0 | 1 | 2 | 3 | 4;
+}
+
+/** GitHub-style frequency grid for the last `weeks` weeks (Mon–Sun columns by week). */
+export function frequencyHeatmap(sessions: SessionLog[], weeks = 12): HeatmapCell[] {
+  const byDate = new Map<string, { count: number; volumeKg: number }>();
+  for (const s of sessions) {
+    const key = s.date.slice(0, 10);
+    const cur = byDate.get(key) ?? { count: 0, volumeKg: 0 };
+    cur.count += 1;
+    cur.volumeKg += s.volumeKg;
+    byDate.set(key, cur);
+  }
+
+  const end = new Date();
+  end.setHours(12, 0, 0, 0);
+  const daysBack = weeks * 7 - 1;
+  const start = new Date(end);
+  start.setDate(start.getDate() - daysBack);
+
+  const cells: HeatmapCell[] = [];
+  const volumes: number[] = [];
+  for (let i = 0; i <= daysBack; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = todayKey(d);
+    const raw = byDate.get(key);
+    const count = raw?.count ?? 0;
+    const volumeKg = Math.round(raw?.volumeKg ?? 0);
+    if (count > 0) volumes.push(volumeKg);
+    cells.push({ date: key, count, volumeKg, level: 0 });
+  }
+
+  const maxVol = volumes.length ? Math.max(...volumes) : 0;
+  return cells.map((c) => {
+    if (c.count === 0) return c;
+    if (maxVol <= 0) return { ...c, level: 1 as const };
+    const ratio = c.volumeKg / maxVol;
+    const level = (ratio < 0.25 ? 1 : ratio < 0.5 ? 2 : ratio < 0.75 ? 3 : 4) as 1 | 2 | 3 | 4;
+    return { ...c, level };
+  });
+}
+
+export interface ExerciseLoadPoint {
+  date: string;
+  label: string;
+  maxWeightKg: number;
+  volumeKg: number;
+}
+
+export function exerciseLoadSeries(sessions: SessionLog[], exerciseId: string): ExerciseLoadPoint[] {
+  const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+  const out: ExerciseLoadPoint[] = [];
+  for (const session of sorted) {
+    const ex = session.exercises.find((e) => e.exerciseId === exerciseId);
+    if (!ex) continue;
+    const done = ex.sets.filter((s) => s.done);
+    if (!done.length) continue;
+    const maxWeightKg = Math.max(...done.map((s) => s.weightKg));
+    const volumeKg = Math.round(done.reduce((sum, s) => sum + s.reps * s.weightKg, 0));
+    out.push({
+      date: session.date.slice(0, 10),
+      label: new Date(session.date.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
+      maxWeightKg,
+      volumeKg,
+    });
+  }
+  return out;
+}
+
+export function topExercisesBySessions(sessions: SessionLog[], limit = 8): string[] {
+  const counts = new Map<string, number>();
+  for (const session of sessions) {
+    for (const ex of session.exercises) {
+      if (!ex.sets.some((s) => s.done)) continue;
+      counts.set(ex.exerciseId, (counts.get(ex.exerciseId) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
+}
+
+/** All-time PRs whose record date falls in the current calendar week (Mon–Sun). */
+export function prsInCurrentWeek(sessions: SessionLog[]) {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // Mon=0
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - day);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const weekStart = todayKey(monday);
+  const weekEnd = todayKey(sunday);
+
+  return personalRecords(sessions).filter((r) => {
+    const d = r.date.slice(0, 10);
+    return d >= weekStart && d <= weekEnd;
+  });
 }

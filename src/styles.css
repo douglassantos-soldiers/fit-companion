@@ -1,6 +1,11 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@plugin "daisyui" {
+  themes: false;
+}
+@import "@heroui/styles";
+@import "@mantine/core/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -55,41 +60,87 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
-  --radius: 0.875rem;
-  --background: oklch(0.14 0 0);
+:root,
+.dark,
+html[data-theme="dark"] {
+  --radius: 1rem;
+  --background: oklch(0.11 0 0);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.19 0 0);
+  --card: oklch(0.17 0 0);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.19 0 0);
+  --popover: oklch(0.17 0 0);
   --popover-foreground: oklch(0.97 0 0);
   --primary: oklch(0.86 0.18 96);
   --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.25 0 0);
+  --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.24 0 0);
+  --muted: oklch(0.2 0 0);
   --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.28 0.02 96);
+  --accent: oklch(0.24 0.02 96);
   --accent-foreground: oklch(0.97 0 0);
   --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
   --success: oklch(0.72 0.17 150);
-  --border: oklch(0.28 0 0);
-  --input: oklch(0.3 0 0);
+  --border: oklch(0.26 0 0);
+  --input: oklch(0.28 0 0);
   --ring: oklch(0.86 0.18 96);
   --chart-1: oklch(0.86 0.18 96);
   --chart-2: oklch(0.72 0.17 150);
   --chart-3: oklch(0.68 0.14 250);
   --chart-4: oklch(0.6 0.22 25);
   --chart-5: oklch(0.75 0 0);
-  --sidebar: oklch(0.17 0 0);
+  --sidebar: oklch(0.14 0 0);
   --sidebar-foreground: oklch(0.97 0 0);
   --sidebar-primary: oklch(0.86 0.18 96);
   --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.24 0 0);
+  --sidebar-accent: oklch(0.2 0 0);
   --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(0.28 0 0);
+  --sidebar-border: oklch(0.26 0 0);
   --sidebar-ring: oklch(0.86 0.18 96);
+  /* Cinematic glass / glow */
+  --glow-primary: color-mix(in oklab, var(--primary) 45%, transparent);
+  --glass-bg: color-mix(in oklab, var(--card) 55%, transparent);
+  --glass-border: color-mix(in oklab, oklch(1 0 0) 12%, transparent);
+}
+
+.light,
+html[data-theme="light"] {
+  --background: oklch(0.97 0.005 96);
+  --foreground: oklch(0.18 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0 0);
+  --primary: oklch(0.82 0.17 96);
+  --primary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.94 0.01 96);
+  --secondary-foreground: oklch(0.22 0 0);
+  --muted: oklch(0.93 0.01 96);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.94 0.03 96);
+  --accent-foreground: oklch(0.18 0 0);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.55 0.15 150);
+  --border: oklch(0.88 0.01 96);
+  --input: oklch(0.9 0.01 96);
+  --ring: oklch(0.82 0.17 96);
+  --chart-1: oklch(0.82 0.17 96);
+  --chart-2: oklch(0.55 0.15 150);
+  --chart-3: oklch(0.55 0.14 250);
+  --chart-4: oklch(0.55 0.22 25);
+  --chart-5: oklch(0.45 0 0);
+  --sidebar: oklch(0.96 0.005 96);
+  --sidebar-foreground: oklch(0.18 0 0);
+  --sidebar-primary: oklch(0.82 0.17 96);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.94 0.02 96);
+  --sidebar-accent-foreground: oklch(0.18 0 0);
+  --sidebar-border: oklch(0.88 0.01 96);
+  --sidebar-ring: oklch(0.82 0.17 96);
+  --glow-primary: color-mix(in oklab, var(--primary) 25%, transparent);
+  --glass-bg: color-mix(in oklab, var(--card) 75%, transparent);
+  --glass-border: color-mix(in oklab, oklch(0 0 0) 8%, transparent);
 }
 
 @layer base {
@@ -121,10 +172,34 @@
   letter-spacing: 0.01em;
 }
 
+@utility eyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--color-primary);
+}
+
 @utility surface-card {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+}
+
+@utility surface-glass {
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+@utility glow-primary {
+  box-shadow: 0 0 24px var(--glow-primary), 0 0 4px var(--glow-primary);
+}
+
+@utility text-glow {
+  text-shadow: 0 0 18px var(--glow-primary);
 }
 
 @utility hide-scrollbar {
@@ -132,4 +207,95 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-primary {
+    box-shadow: none;
+  }
+}
+
+/*
+ * Bridge: DaisyUI v5 / HeroUI / Mantine consume Soldiers tokens.
+ * Daisy v5 uses --color-*; HeroUI uses --accent/--surface/--overlay (shared names).
+ * Keep shadcn --accent as muted surface; map HeroUI brand via --focus + surface tokens.
+ * Soft accent mixes use primary so Tabs/Chip soft states read Soldiers yellow.
+ */
+:root,
+.dark,
+html[data-theme="dark"] {
+  /* DaisyUI v5 */
+  --color-primary: var(--primary);
+  --color-primary-content: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-content: var(--secondary-foreground);
+  --color-accent: var(--primary);
+  --color-accent-content: var(--primary-foreground);
+  --color-neutral: var(--muted);
+  --color-neutral-content: var(--muted-foreground);
+  --color-base-100: var(--background);
+  --color-base-200: var(--card);
+  --color-base-300: var(--secondary);
+  --color-base-content: var(--foreground);
+  --color-success: var(--success);
+  --color-success-content: var(--primary-foreground);
+  --color-error: var(--destructive);
+  --color-error-content: var(--destructive-foreground);
+  --color-warning: var(--primary);
+  --color-warning-content: var(--primary-foreground);
+  --radius-box: var(--radius-xl);
+  --radius-field: var(--radius-md);
+  --radius-selector: var(--radius-md);
+
+  /* HeroUI dark surfaces (brand interactive = primary yellow via soft/focus) */
+  --surface: var(--card);
+  --surface-foreground: var(--card-foreground);
+  --surface-secondary: var(--secondary);
+  --surface-secondary-foreground: var(--secondary-foreground);
+  --surface-tertiary: var(--muted);
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: var(--card);
+  --overlay-foreground: var(--card-foreground);
+  --default: var(--secondary);
+  --default-foreground: var(--foreground);
+  --field-background: var(--muted);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted-foreground);
+  --focus: var(--primary);
+  --separator: var(--border);
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --accent-hover: color-mix(in oklab, var(--primary) 90%, var(--primary-foreground) 10%);
+  --accent-soft: color-mix(in oklab, var(--primary) 15%, transparent);
+  --accent-soft-foreground: color-mix(in oklab, var(--primary) 75%, var(--foreground) 25%);
+  --accent-soft-hover: color-mix(in oklab, var(--primary) 22%, transparent);
+}
+
+/* Mantine inputs + modal on Soldiers surfaces */
+.mantine-NumberInput-input,
+.mantine-Input-input {
+  background-color: var(--color-muted) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+}
+
+.mantine-Modal-content {
+  background-color: var(--color-card) !important;
+  border: 1px solid var(--color-border);
+  color: var(--color-foreground);
+}
+
+.mantine-Modal-header {
+  background-color: var(--color-card) !important;
+}
+
+.mantine-Modal-title {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.badge-soldiers {
+  @apply badge border-transparent bg-primary text-primary-foreground font-semibold;
 }

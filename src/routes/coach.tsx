@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { askAiCoach, type CoachProvider } from "@/lib/coach.functions";
+import { askAiCoach } from "@/lib/coach.functions";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
 import { coachSystemPrompt } from "@/lib/engine/coach-context";
 import { useStore } from "@/lib/store";
+import type { AppState, ChatMessage } from "@/lib/types";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/coach")({
   head: () => ({
@@ -26,37 +27,38 @@ export const Route = createFileRoute("/coach")({
   component: CoachPage,
 });
 
-type Engine = "regras" | CoachProvider;
-
-const ENGINES: Array<{ id: Engine; label: string }> = [
-  { id: "regras", label: "Coach padrão" },
-  { id: "chatgpt", label: "ChatGPT" },
-  { id: "claude", label: "Claude" },
-];
-
 const ENGINE_KEY = "soldiers-coach-engine";
 
+function mapChat(messages: ChatMessage[]): Array<{ role: "user" | "assistant"; content: string }> {
+  return messages
+    .filter((m) => m.text.trim())
+    .map((m) => ({
+      role: m.role === "coach" ? ("assistant" as const) : ("user" as const),
+      content: m.text,
+    }));
+}
+
 function CoachPage() {
-  const { state, hydrated, pushChat } = useStore();
-  const ask = useServerFn(askAiCoach);
-  const [engine, setEngine] = useState<Engine>("regras");
+  const { state, hydrated, pushChat, markQuestCoachOpened } = useStore();
+  const askAi = useServerFn(askAiCoach);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const offlineToastShown = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(ENGINE_KEY) as Engine | null;
-    if (saved === "chatgpt" || saved === "claude" || saved === "regras") setEngine(saved);
+    window.localStorage.removeItem(ENGINE_KEY);
   }, []);
 
-  const chooseEngine = (next: Engine) => {
-    setEngine(next);
-    window.localStorage.setItem(ENGINE_KEY, next);
-  };
+  useEffect(() => {
+    markQuestCoachOpened();
+  }, [markQuestCoachOpened]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [state.chat.length, loading]);
+  }, [state.chat.length]);
 
   useEffect(() => {
     if (hydrated && state.chat.length === 0 && state.profile) {
@@ -67,80 +69,87 @@ function CoachPage() {
     }
   }, [hydrated, state.chat.length, state.profile, pushChat]);
 
-  const answer = async (question: string, fallback: string) => {
-    if (engine === "regras") {
-      pushChat("coach", fallback);
-      return;
-    }
-    setLoading(true);
+  const notifyOfflineOnce = (reason?: string) => {
+    if (offlineToastShown.current) return;
+    offlineToastShown.current = true;
+    const msg =
+      reason === "unauthorized"
+        ? "Sessão expirada — libere o acesso de novo"
+        : reason === "rate_limited"
+          ? "Limite do coach atingido — tente mais tarde"
+          : reason === "not_configured"
+            ? "Coach em modo offline — configure OPENAI_API_KEY no servidor"
+            : reason === "upstream"
+              ? "Coach indisponível agora — usando respostas locais"
+              : "Coach em modo offline — respostas locais";
+    toast.message(msg);
+  };
+
+  const runAi = async (snapshot: AppState, userText: string, offlineReply: string) => {
     try {
-      const history = state.chat.slice(-8).map((m) => ({
-        role: m.role === "coach" ? ("assistant" as const) : ("user" as const),
-        content: m.text,
-      }));
-      const res = await ask({
+      const history = mapChat(snapshot.chat);
+      const messages = [...history, { role: "user" as const, content: userText }];
+      const result = await askAi({
         data: {
-          provider: engine,
-          system: coachSystemPrompt(state),
-          messages: [...history, { role: "user" as const, content: question }],
+          provider: "chatgpt",
+          context: coachSystemPrompt(snapshot),
+          messages,
         },
       });
-      pushChat("coach", res.text);
+      if (result?.error) {
+        return { text: offlineReply, offline: true, reason: result.error };
+      }
+      if (result?.text?.trim()) return { text: result.text.trim(), offline: false as const };
+      return { text: offlineReply, offline: true as const };
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível falar com a IA agora.");
-      pushChat("coach", fallback);
-    } finally {
-      setLoading(false);
+      console.warn("askAiCoach failed", e);
+      return { text: offlineReply, offline: true as const, reason: "upstream" };
     }
   };
 
   const askPrompt = (promptId: string, label: string) => {
+    if (busy) return;
+    const snapshot = stateRef.current;
     pushChat("user", label);
-    void answer(label, coachReply(promptId, state));
+    setBusy(true);
+    void runAi(snapshot, label, coachReply(promptId, snapshot)).then(({ text: reply, offline, reason }) => {
+      pushChat("coach", reply);
+      if (offline) notifyOfflineOnce(reason);
+      setBusy(false);
+    });
   };
 
   const send = () => {
     const value = text.trim();
-    if (!value || loading) return;
+    if (!value || busy) return;
+    const snapshot = stateRef.current;
     pushChat("user", value);
     setText("");
-    void answer(value, coachFreeform(value, state));
+    setBusy(true);
+    void runAi(snapshot, value, coachFreeform(value, snapshot)).then(({ text: reply, offline, reason }) => {
+      pushChat("coach", reply);
+      if (offline) notifyOfflineOnce(reason);
+      setBusy(false);
+    });
   };
 
   return (
-    <AppShell title="Coach" subtitle="Respostas baseadas nos seus dados de treino">
-      <div className="mb-4 flex gap-2">
-        {ENGINES.map((e) => (
-          <button
-            key={e.id}
-            onClick={() => chooseEngine(e.id)}
-            className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
-              engine === e.id
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-primary hover:text-primary"
-            }`}
-          >
-            {e.label}
-          </button>
-        ))}
-      </div>
-
+    <AppShell title="Coach" subtitle={busy ? "Pensando…" : "Treino, comida e suplementos com base nos seus dados"}>
       <div className="space-y-3">
         {state.chat.map((m) => (
           <div
             key={m.id}
             className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-              m.role === "coach" ? "bg-card text-foreground" : "ml-auto bg-primary text-primary-foreground"
+              m.role === "coach"
+                ? "surface-glass text-foreground"
+                : "ml-auto bg-primary text-primary-foreground glow-primary"
             }`}
           >
             {m.text}
           </div>
         ))}
-        {loading ? (
-          <div className="flex max-w-[85%] items-center gap-2 rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Pensando...
-          </div>
+        {busy ? (
+          <div className="surface-glass max-w-[85%] animate-pulse px-4 py-3 text-sm text-muted-foreground">…</div>
         ) : null}
         <div ref={endRef} />
       </div>
@@ -149,9 +158,9 @@ function CoachPage() {
         {COACH_PROMPTS.map((p) => (
           <button
             key={p.id}
-            disabled={loading}
+            disabled={busy}
             onClick={() => askPrompt(p.id, p.label)}
-            className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+            className="whitespace-nowrap rounded-full border border-primary/40 bg-card/40 px-3 py-2 text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary disabled:opacity-50"
           >
             {p.label}
           </button>
@@ -164,10 +173,11 @@ function CoachPage() {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder="Pergunte algo ao coach"
-          className="h-12"
+          className="h-12 rounded-full border-white/10 bg-card/40 backdrop-blur"
+          disabled={busy}
         />
-        <Button size="icon" className="size-12" onClick={send} disabled={loading} aria-label="Enviar">
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+        <Button size="icon" className="size-12 glow-primary" onClick={send} aria-label="Enviar" disabled={busy}>
+          <Send className="size-4" />
         </Button>
       </div>
     </AppShell>

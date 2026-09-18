@@ -10,18 +10,40 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AcessoRouteImport } from './routes/acesso'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ClubesRouteImport } from './routes/clubes'
 import { Route as CoachRouteImport } from './routes/coach'
 import { Route as DesafiosRouteImport } from './routes/desafios'
+import { Route as NutricaoRouteImport } from './routes/nutricao'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ProgressoRouteImport } from './routes/progresso'
+import { Route as SocialRouteImport } from './routes/social'
 import { Route as SuplementosRouteImport } from './routes/suplementos'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as TreinoIndexRouteImport } from './routes/treino.index'
+import { Route as ApiShopifyWebhookRouteImport } from './routes/api/shopify.webhook'
 import { Route as TreinoSessaoIdRouteImport } from './routes/treino.sessao.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcessoRoute = AcessoRouteImport.update({
+  id: '/acesso',
+  path: '/acesso',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClubesRoute = ClubesRouteImport.update({
+  id: '/clubes',
+  path: '/clubes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CoachRoute = CoachRouteImport.update({
@@ -32,6 +54,11 @@ const CoachRoute = CoachRouteImport.update({
 const DesafiosRoute = DesafiosRouteImport.update({
   id: '/desafios',
   path: '/desafios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NutricaoRoute = NutricaoRouteImport.update({
+  id: '/nutricao',
+  path: '/nutricao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -49,14 +76,29 @@ const ProgressoRoute = ProgressoRouteImport.update({
   path: '/progresso',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SocialRoute = SocialRouteImport.update({
+  id: '/social',
+  path: '/social',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SuplementosRoute = SuplementosRouteImport.update({
   id: '/suplementos',
   path: '/suplementos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TreinoIndexRoute = TreinoIndexRouteImport.update({
   id: '/treino/',
   path: '/treino/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShopifyWebhookRoute = ApiShopifyWebhookRouteImport.update({
+  id: '/api/shopify/webhook',
+  path: '/api/shopify/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TreinoSessaoIdRoute = TreinoSessaoIdRouteImport.update({
@@ -67,83 +109,132 @@ const TreinoSessaoIdRoute = TreinoSessaoIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/acesso': typeof AcessoRoute
+  '/admin': typeof AdminRoute
+  '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
+  '/welcome': typeof WelcomeRoute
   '/treino/': typeof TreinoIndexRoute
+  '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/acesso': typeof AcessoRoute
+  '/admin': typeof AdminRoute
+  '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
+  '/welcome': typeof WelcomeRoute
   '/treino': typeof TreinoIndexRoute
+  '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/acesso': typeof AcessoRoute
+  '/admin': typeof AdminRoute
+  '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
   '/progresso': typeof ProgressoRoute
+  '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
+  '/welcome': typeof WelcomeRoute
   '/treino/': typeof TreinoIndexRoute
+  '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/acesso'
+    | '/admin'
+    | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/nutricao'
     | '/onboarding'
     | '/perfil'
     | '/progresso'
+    | '/social'
     | '/suplementos'
+    | '/welcome'
     | '/treino/'
+    | '/api/shopify/webhook'
     | '/treino/sessao/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/acesso'
+    | '/admin'
+    | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/nutricao'
     | '/onboarding'
     | '/perfil'
     | '/progresso'
+    | '/social'
     | '/suplementos'
+    | '/welcome'
     | '/treino'
+    | '/api/shopify/webhook'
     | '/treino/sessao/$id'
   id:
     | '__root__'
     | '/'
+    | '/acesso'
+    | '/admin'
+    | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/nutricao'
     | '/onboarding'
     | '/perfil'
     | '/progresso'
+    | '/social'
     | '/suplementos'
+    | '/welcome'
     | '/treino/'
+    | '/api/shopify/webhook'
     | '/treino/sessao/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AcessoRoute: typeof AcessoRoute
+  AdminRoute: typeof AdminRoute
+  ClubesRoute: typeof ClubesRoute
   CoachRoute: typeof CoachRoute
   DesafiosRoute: typeof DesafiosRoute
+  NutricaoRoute: typeof NutricaoRoute
   OnboardingRoute: typeof OnboardingRoute
   PerfilRoute: typeof PerfilRoute
   ProgressoRoute: typeof ProgressoRoute
+  SocialRoute: typeof SocialRoute
   SuplementosRoute: typeof SuplementosRoute
+  WelcomeRoute: typeof WelcomeRoute
   TreinoIndexRoute: typeof TreinoIndexRoute
+  ApiShopifyWebhookRoute: typeof ApiShopifyWebhookRoute
   TreinoSessaoIdRoute: typeof TreinoSessaoIdRoute
 }
 
@@ -154,6 +245,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/acesso': {
+      id: '/acesso'
+      path: '/acesso'
+      fullPath: '/acesso'
+      preLoaderRoute: typeof AcessoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clubes': {
+      id: '/clubes'
+      path: '/clubes'
+      fullPath: '/clubes'
+      preLoaderRoute: typeof ClubesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/coach': {
@@ -168,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/desafios'
       fullPath: '/desafios'
       preLoaderRoute: typeof DesafiosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nutricao': {
+      id: '/nutricao'
+      path: '/nutricao'
+      fullPath: '/nutricao'
+      preLoaderRoute: typeof NutricaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -191,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgressoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/social': {
+      id: '/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof SocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/suplementos': {
       id: '/suplementos'
       path: '/suplementos'
@@ -198,11 +324,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuplementosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/treino/': {
       id: '/treino/'
       path: '/treino'
       fullPath: '/treino/'
       preLoaderRoute: typeof TreinoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/shopify/webhook': {
+      id: '/api/shopify/webhook'
+      path: '/api/shopify/webhook'
+      fullPath: '/api/shopify/webhook'
+      preLoaderRoute: typeof ApiShopifyWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/treino/sessao/$id': {
@@ -217,13 +357,20 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AcessoRoute: AcessoRoute,
+  AdminRoute: AdminRoute,
+  ClubesRoute: ClubesRoute,
   CoachRoute: CoachRoute,
   DesafiosRoute: DesafiosRoute,
+  NutricaoRoute: NutricaoRoute,
   OnboardingRoute: OnboardingRoute,
   PerfilRoute: PerfilRoute,
   ProgressoRoute: ProgressoRoute,
+  SocialRoute: SocialRoute,
   SuplementosRoute: SuplementosRoute,
+  WelcomeRoute: WelcomeRoute,
   TreinoIndexRoute: TreinoIndexRoute,
+  ApiShopifyWebhookRoute: ApiShopifyWebhookRoute,
   TreinoSessaoIdRoute: TreinoSessaoIdRoute,
 }
 export const routeTree = rootRouteImport

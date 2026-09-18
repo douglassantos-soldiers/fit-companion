@@ -1,84 +1,194 @@
-import { Link } from "@tanstack/react-router";
-import { Activity, CalendarCheck, Dumbbell, MessageSquare, Pill, TrendingUp, Trophy, User } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Tabs } from "@heroui/react";
+import {
+  CalendarCheck,
+  Dumbbell,
+  Flame,
+  MessageSquare,
+  TrendingUp,
+  User,
+  Users,
+  Utensils,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { SoldiersLogo } from "@/components/soldiers-logo";
+import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/", label: "Hoje", icon: CalendarCheck },
   { to: "/treino", label: "Treino", icon: Dumbbell },
-  { to: "/progresso", label: "Progresso", icon: TrendingUp },
-  { to: "/desafios", label: "Desafios", icon: Trophy },
+  { to: "/nutricao", label: "Nutrição", icon: Utensils },
+  { to: "/social", label: "Social", icon: Users },
   { to: "/coach", label: "Coach", icon: MessageSquare },
 ] as const;
+
+/** Routes that highlight the Social tab */
+const SOCIAL_PATHS = ["/social", "/desafios", "/clubes"];
+
+function resolveTabKey(pathname: string): string {
+  if (pathname === "/" || pathname === "") return "/";
+  if (SOCIAL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return "/social";
+  if (pathname.startsWith("/coach")) return "/coach";
+  const match = TABS.find((t) => t.to !== "/" && pathname.startsWith(t.to));
+  if (match) return match.to;
+  return "/";
+}
 
 export function AppShell({
   title,
   subtitle,
+  headerBadge,
+  hideTitle,
   children,
 }: {
   title: string;
   subtitle?: string;
+  headerBadge?: ReactNode;
+  hideTitle?: boolean;
   children: ReactNode;
 }) {
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const selected = resolveTabKey(pathname);
+
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
+    <div className="relative min-h-screen bg-background pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
+
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/70 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-md items-center gap-2 px-4 py-3">
           <SoldiersLogo />
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1.5">
+            {headerBadge ? (
+              <span className="badge badge-soldiers glow-primary gap-1 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wider">
+                <Flame className="size-3.5" />
+                {headerBadge}
+              </span>
+            ) : null}
             <Link
-              to="/suplementos"
-              className="rounded-full p-2 text-muted-foreground transition-colors hover:text-primary"
-              aria-label="Suplementos"
+              to="/progresso"
+              className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              aria-label="Progresso"
             >
-              <Pill className="size-5" />
+              <TrendingUp className="size-4" />
             </Link>
             <Link
               to="/perfil"
-              className="rounded-full p-2 text-muted-foreground transition-colors hover:text-primary"
+              className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
               aria-label="Perfil"
             >
-              <User className="size-5" />
+              <User className="size-4" />
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-md px-4 pt-5">
-        <div className="mb-5">
-          <h1 className="text-3xl font-black text-foreground">{title}</h1>
-          {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
-        </div>
+      <main className="relative mx-auto w-full max-w-md px-4 pt-5">
+        {!hideTitle ? (
+          <div className="mb-5">
+            <h1 className="text-3xl font-black text-foreground">{title}</h1>
+            {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
+          </div>
+        ) : null}
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto grid w-full max-w-md grid-cols-5">
-          {TABS.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              activeOptions={{ exact: to === "/" }}
-              className="flex flex-col items-center gap-1 py-3 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground transition-colors"
-              activeProps={{ className: "text-primary" }}
-            >
-              <Icon className="size-5" />
-              {label}
-            </Link>
-          ))}
+      <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+        <div className="surface-glass glow-primary mx-auto w-full max-w-md rounded-full border border-white/10 px-1.5 py-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
+          <Tabs
+            selectedKey={selected}
+            onSelectionChange={(key) => {
+              const to = String(key) as (typeof TABS)[number]["to"];
+              if (to === "/social") {
+                void navigate({ to, search: { tab: "desafios" } });
+                return;
+              }
+              void navigate({ to });
+            }}
+            className="w-full"
+            variant="secondary"
+          >
+            <Tabs.ListContainer className="w-full">
+              <Tabs.List
+                aria-label="Navegação principal"
+                className="grid w-full grid-cols-5 gap-0.5 bg-transparent p-0"
+              >
+                {TABS.map(({ to, label, icon: Icon }) => (
+                  <Tabs.Tab
+                    key={to}
+                    id={to}
+                    className="relative flex h-auto min-h-12 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground transition-all data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground data-[selected=true]:shadow-[0_0_20px_var(--glow-primary)]"
+                  >
+                    <Icon className="size-5" />
+                    {label}
+                    <Tabs.Indicator className="hidden" />
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+            </Tabs.ListContainer>
+          </Tabs>
         </div>
       </nav>
     </div>
   );
 }
 
-export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
+function EmptyIllustration({ variant }: { variant: "treino" | "progresso" | "social" | "default" }) {
+  const accent = "currentColor";
   return (
-    <div className="surface-card flex flex-col items-center gap-3 p-8 text-center">
-      <Activity className="size-8 text-primary" />
-      <h2 className="text-lg">{title}</h2>
-      <p className="text-sm text-muted-foreground">{description}</p>
-      {action}
+    <svg viewBox="0 0 120 96" className="size-24 text-primary" aria-hidden>
+      <rect x="8" y="12" width="104" height="72" rx="12" fill="currentColor" opacity="0.08" />
+      {variant === "treino" || variant === "default" ? (
+        <>
+          <rect x="42" y="28" width="14" height="48" rx="4" fill={accent} opacity="0.9" />
+          <rect x="64" y="28" width="14" height="48" rx="4" fill={accent} opacity="0.9" />
+          <circle cx="49" cy="22" r="6" fill={accent} />
+          <circle cx="71" cy="22" r="6" fill={accent} />
+        </>
+      ) : null}
+      {variant === "progresso" ? (
+        <>
+          <polyline
+            points="24,68 48,48 68,56 96,28"
+            fill="none"
+            stroke={accent}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="96" cy="28" r="5" fill={accent} />
+        </>
+      ) : null}
+      {variant === "social" ? (
+        <>
+          <circle cx="40" cy="44" r="14" fill={accent} opacity="0.85" />
+          <circle cx="72" cy="44" r="14" fill={accent} opacity="0.55" />
+          <circle cx="56" cy="62" r="12" fill={accent} opacity="0.7" />
+        </>
+      ) : null}
+    </svg>
+  );
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+  variant = "default",
+  className,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  variant?: "treino" | "progresso" | "social" | "default";
+  className?: string;
+}) {
+  return (
+    <div className={cn("surface-glass flex flex-col items-center px-6 py-10 text-center", className)}>
+      <EmptyIllustration variant={variant} />
+      <h2 className="mt-4 text-lg font-bold">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      {action ? <div className="mt-5 w-full">{action}</div> : null}
     </div>
   );
 }

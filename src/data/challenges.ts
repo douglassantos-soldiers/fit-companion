@@ -7,6 +7,8 @@ export interface Challenge {
   unit: string;
   durationDays: number;
   participants: number;
+  /** Requires accessTier performance */
+  requiresPerformance?: boolean;
 }
 
 export const CHALLENGES: Challenge[] = [
@@ -29,6 +31,7 @@ export const CHALLENGES: Challenge[] = [
     unit: "kg",
     durationDays: 30,
     participants: 962,
+    requiresPerformance: true,
   },
   {
     id: "semana-perfeita",
@@ -49,17 +52,8 @@ export const CHALLENGES: Challenge[] = [
     unit: "treinos",
     durationDays: 365,
     participants: 508,
+    requiresPerformance: true,
   },
-];
-
-export const RANKING_NAMES = [
-  "R. Almeida",
-  "M. Torres",
-  "J. Nakamura",
-  "C. Duarte",
-  "L. Batista",
-  "P. Vasques",
-  "A. Ferraz",
 ];
 
 export const challengeById = (id: string) => CHALLENGES.find((c) => c.id === id);
