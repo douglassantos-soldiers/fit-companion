@@ -35,8 +35,9 @@ import { reorderUrlForProduct } from "@/data/shopify-product-map";
 import { trackAppEvent } from "@/lib/shopify.functions";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import type { MealPreset } from "@/data/meal-presets";
-import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
+import { performanceDimensions, performanceScore, adherenceScore, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, topLearningInsight, learningWeekHint } from "@/lib/engine/learning";
+import { buildUserContext } from "@/lib/engine/context";
 import { buildLivingPlan } from "@/lib/engine/living-plan";
 import {
   buildDailyMealPlan,
@@ -182,7 +183,8 @@ function Today() {
 
   const profile = state.profile;
   const insights = computeLearningInsights(state);
-  const insightLine = topLearningInsight(state);
+  const userCtx = buildUserContext(state, state.userId);
+  const insightLine = userCtx.headline ?? topLearningInsight(state);
   const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state));
   const day = planDayForToday(plan);
   const expressDay = day ? buildExpressSession(day) : null;
@@ -191,6 +193,7 @@ function Today() {
   const taken = todaySupplements(state);
   const dims = performanceDimensions(state, profile);
   const score = performanceScore(dims);
+  const adhere = adherenceScore(dims);
   const st = streak(state.sessions, { freezeUsedDates: state.freezeUsedDates });
   const goals = nutritionGoals(profile, insights);
   const nutrition = dayNutritionTotals(state.meals ?? []);
@@ -396,6 +399,12 @@ function Today() {
 
       {insightLine ? (
         <p className="mb-3 px-1 text-xs text-muted-foreground">{insightLine}</p>
+      ) : null}
+      {userCtx.why.length > 1 ? (
+        <p className="mb-3 px-1 text-[11px] text-muted-foreground/80">
+          {userCtx.why.slice(1, 3).join(" · ")}
+          {adhere > 0 ? ` · Aderência ${adhere}` : ""}
+        </p>
       ) : null}
 
       <div className="mt-4">

@@ -25,6 +25,7 @@ import { joinHub as joinHubRemote, leaveHub as leaveHubRemote } from "@/lib/hubs
 import { clearRemoteState, getDeviceId, pullState, pushState } from "@/lib/sync";
 import { fetchEntitlement } from "@/lib/entitlements";
 import { establishAccessSession } from "@/lib/access.functions";
+import { ensureIdentityForDevice } from "@/lib/identity.functions";
 import { clearLocalReminders, scheduleLocalReminders } from "@/lib/notifications";
 import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
@@ -204,6 +205,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
+        // Identity Engine: ensure device has a persistent user (server-side)
+        let resolvedUserId: string | null = local.userId ?? null;
+        try {
+          const ident = await ensureIdentityForDevice({
+            data: { deviceId: id, platform: "web" },
+          });
+          if (ident.ok && ident.userId) resolvedUserId = ident.userId;
+        } catch (e) {
+          console.warn("ensureIdentityForDevice failed", e);
+        }
+
         const [remote, entitlement] = await Promise.all([pullState(id), fetchEntitlement(id)]);
         const accessFromRemote = entitlement
           ? {
@@ -249,6 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 ...new Set([...(remote.cosmeticBadges ?? []), ...(local.cosmeticBadges ?? [])]),
               ],
               authUserId: local.authUserId ?? remote.authUserId ?? null,
+              userId: resolvedUserId ?? local.userId ?? remote.userId ?? null,
               bio: local.bio || remote.bio || "",
               avatarUrl: local.avatarUrl ?? remote.avatarUrl ?? null,
               accessGranted:
@@ -706,16 +719,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         });
         try {
-          await establishAccessSession({
+          const session = await establishAccessSession({
             data: {
               email,
-              accessTier,
               deviceId: deviceId.current,
-              shopifyCustomerId: opts.shopifyCustomerId ?? null,
-              orderCount: opts.orderCount ?? 1,
-              productIds,
             },
           });
+          if (session.ok) {
+            update((s) => ({
+              ...s,
+              accessTier: session.tier,
+              purchaseProductIds: session.productIds?.length
+                ? session.productIds
+                : s.purchaseProductIds,
+              userId: session.userId ?? s.userId,
+              restockEstimates: session.restockEstimates
+                ? { ...s.restockEstimates, ...session.restockEstimates }
+                : s.restockEstimates,
+            }));
+          }
         } catch (e) {
           console.warn("establishAccessSession failed", e);
         }

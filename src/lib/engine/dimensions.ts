@@ -12,6 +12,7 @@ export interface Dimension {
 }
 
 const clamp = (n: number) => Math.max(5, Math.min(100, Math.round(n)));
+const clampAdherence = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
 export function last7Dates(): string[] {
   const out: string[] = [];
@@ -105,14 +106,30 @@ export function performanceDimensions(state: AppState, profile: Profile): Dimens
     { key: "recuperacao", label: "Recuperação", score: recoveryScore },
     { key: "sono", label: "Sono", score: sleepScore },
     { key: "nutricao", label: "Nutrição", score: clamp(proteinHit * 0.55 + mealHit * 0.45) },
-    { key: "suplementacao", label: "Suplementação", score: clamp(supplementScore || 40) },
+    // Supplementation is Adherence — not Performance. No artificial floor.
+    { key: "suplementacao", label: "Suplementação", score: clampAdherence(supplementScore) },
     { key: "habitos", label: "Hábitos", score: habits },
   ];
 }
 
+/**
+ * Performance score excludes supplementation (commerce/adherence must not inflate performance).
+ * Axes: treinamento, condicionamento, consistência, recuperação, sono.
+ */
 export function performanceScore(dims: Dimension[]) {
-  if (!dims.length) return 0;
-  return Math.round(dims.reduce((s, d) => s + d.score, 0) / dims.length);
+  const perfKeys = new Set(["forca", "resistencia", "consistencia", "recuperacao", "sono"]);
+  const perf = dims.filter((d) => perfKeys.has(d.key));
+  const use = perf.length ? perf : dims.filter((d) => d.key !== "suplementacao");
+  if (!use.length) return 0;
+  return Math.round(use.reduce((s, d) => s + d.score, 0) / use.length);
+}
+
+/** Nutrition + habits + supplementation as a separate adherence composite. */
+export function adherenceScore(dims: Dimension[]) {
+  const keys = new Set(["nutricao", "suplementacao", "habitos"]);
+  const use = dims.filter((d) => keys.has(d.key));
+  if (!use.length) return 0;
+  return Math.round(use.reduce((s, d) => s + d.score, 0) / use.length);
 }
 
 /** Weakest axis; prefers axes declining vs last snapshot. */

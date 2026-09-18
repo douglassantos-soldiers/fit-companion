@@ -126,7 +126,7 @@ export function resolveAccessTier(
   return "base";
 }
 
-/** Suggest onboarding goal from purchased products */
+/** @deprecated Do NOT use to set user goals. Products are commerce signals only — goals come from onboarding/behavior. */
 export function suggestGoalFromProducts(productIds: string[]): Goal {
   if (productIds.includes("termogenico")) return "gordura";
   if (productIds.includes("pre-treino") || productIds.includes("creatina")) return "performance";
@@ -140,16 +140,21 @@ export interface RestockEstimate {
   productId: string;
   daysLeft: number;
   quantity: number;
+  /** 0–1 confidence; purchase-only estimates start lower */
+  confidence?: number;
 }
 
 export function estimateRestock(
   productIds: string[],
   lineItems: ShopifyLineItemLike[],
   orderedAt: string | Date,
+  opts?: { consumptionLogDays?: number },
 ): Record<string, RestockEstimate> {
   const base = new Date(orderedAt);
   if (Number.isNaN(base.getTime())) return {};
   const out: Record<string, RestockEstimate> = {};
+  const logDays = opts?.consumptionLogDays ?? 0;
+  const confidence = Math.min(0.85, 0.4 + logDays * 0.025);
 
   for (const item of lineItems) {
     const matched = matchLineItem(item);
@@ -168,6 +173,7 @@ export function estimateRestock(
       emptyAt: empty.toISOString(),
       daysLeft: days,
       quantity: qty,
+      confidence,
     };
   }
 
@@ -184,8 +190,10 @@ export function estimateRestock(
       emptyAt: empty.toISOString(),
       daysLeft: days,
       quantity: 1,
+      confidence: Math.min(confidence, 0.35),
     };
   }
+
   return out;
 }
 

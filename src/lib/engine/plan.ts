@@ -209,12 +209,9 @@ export { roundLoad, weekModifier };
 export type { WeekMode };
 
 export function planDayForToday(plan: PlannedDay[], date = new Date()) {
-  const weekday = date.getDay();
-  return (
-    plan.find((d) => d.weekday === weekday) ??
-    plan.find((d) => d.weekday > weekday) ??
-    null
-  );
+  const weekday = date.getDay(); // JS: Sunday=0 … Saturday=6 (same as PlannedDay.weekday)
+  // Exact match only — rest days must return null (never "next workout" fallback).
+  return plan.find((d) => d.weekday === weekday) ?? null;
 }
 
 export function sessionVolume(exercises: SessionLog["exercises"]) {

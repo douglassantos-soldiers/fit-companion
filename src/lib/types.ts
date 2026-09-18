@@ -162,6 +162,8 @@ export interface AppState {
   cosmeticBadges: string[];
   /** Auth user id when logged in (Phase 4) */
   authUserId: string | null;
+  /** App identity user id (Identity Engine) — not device_id */
+  userId: string | null;
   bio: string;
   avatarUrl: string | null;
   /** Shopify purchase gate — permanent after any paid order */
@@ -175,7 +177,7 @@ export interface AppState {
   /** Restock estimates keyed by product id */
   restockEstimates: Record<
     string,
-    { emptyAt: string; productId: string; daysLeft: number; quantity: number }
+    { emptyAt: string; productId: string; daysLeft: number; quantity: number; confidence?: number }
   >;
   /** Banner "rotina da compra" dismissed */
   routineFromPurchase: boolean;
@@ -220,6 +222,7 @@ export const emptyState: AppState = {
   dailyQuestProgress: {},
   cosmeticBadges: [],
   authUserId: null,
+  userId: null,
   bio: "",
   avatarUrl: null,
   accessGranted: false,

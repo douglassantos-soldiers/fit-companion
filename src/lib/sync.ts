@@ -6,6 +6,9 @@ import {
   type ExerciseLog,
   type Goal,
   type Level,
+  type MealEntry,
+  type MealQuality,
+  type MealSlot,
 } from "@/lib/types";
 
 const DEVICE_KEY = "soldiers-device-id";
@@ -24,6 +27,35 @@ export function getDeviceId(): string {
 export async function pullState(deviceId: string): Promise<AppState | null> {
   if (!deviceId) return null;
 
+  const mealClient = supabase as unknown as {
+    from: (table: string) => {
+      select: (cols: string) => {
+        eq: (col: string, val: string) => {
+          order: (
+            col: string,
+            opts: { ascending: boolean },
+          ) => PromiseLike<{ data: Array<Record<string, unknown>> | null }>;
+        };
+      };
+      upsert: (
+        rows: unknown,
+        opts: { onConflict: string },
+      ) => PromiseLike<{ error: unknown }>;
+    };
+  };
+
+  let mealsRes: { data: Array<Record<string, unknown>> | null } = { data: null };
+  try {
+    const raw = await mealClient
+      .from("meal_entries")
+      .select("*")
+      .eq("device_id", deviceId)
+      .order("date", { ascending: true });
+    mealsRes = { data: raw?.data ?? null };
+  } catch {
+    mealsRes = { data: null };
+  }
+
   const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("device_id", deviceId).maybeSingle(),
     supabase.from("sessions").select("*").eq("device_id", deviceId).order("date", { ascending: false }),
@@ -39,11 +71,28 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
     (weightsRes.data?.length ?? 0) > 0 ||
     (daysRes.data?.length ?? 0) > 0 ||
     (supplementsRes.data?.length ?? 0) > 0 ||
-    stateRes.data;
+    stateRes.data ||
+    (mealsRes.data?.length ?? 0) > 0;
 
   if (!hasAnything) return null;
 
   const p = profileRes.data;
+
+  const meals: MealEntry[] = (mealsRes.data ?? []).map((row) => {
+    const payload = (row["payload"] as Record<string, unknown> | null) ?? {};
+    const entry: MealEntry = {
+      id: String(row["client_id"] || row["id"] || crypto.randomUUID()),
+      date: String(row["date"] ?? ""),
+      slot: (payload["slot"] as MealSlot) || ((row["meal_type"] as MealSlot) ?? "almoco"),
+      label: String(row["name"] || payload["label"] || "Refeição"),
+      proteinG: Number(row["protein_g"] ?? payload["proteinG"] ?? 0),
+      kcal: Number(row["kcal"] ?? payload["kcal"] ?? 0),
+      quality: (payload["quality"] as MealQuality) ?? "ok",
+    };
+    if (typeof payload["presetId"] === "string") entry.presetId = payload["presetId"];
+    if (typeof payload["servings"] === "number") entry.servings = payload["servings"];
+    return entry;
+  });
 
   return {
     profile: p
@@ -82,7 +131,7 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
     theme: "dark",
     dimensionSnapshots: [],
     earnedBadges: [],
-    meals: [],
+    meals,
     shareProgress: true,
     sessionFx: true,
     favoriteMealPresetIds: [],
@@ -105,6 +154,7 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       dailyQuestProgress: {},
       cosmeticBadges: [],
       authUserId: null,
+      userId: null,
       bio: "",
       avatarUrl: null,
       accessGranted: false,
@@ -131,6 +181,7 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     dailyQuestProgress: (r["dailyQuestProgress"] as Record<string, number>) ?? {},
     cosmeticBadges: Array.isArray(r["cosmeticBadges"]) ? (r["cosmeticBadges"] as string[]) : [],
     authUserId: typeof r["authUserId"] === "string" ? r["authUserId"] : null,
+    userId: typeof r["userId"] === "string" ? r["userId"] : null,
     bio: typeof r["bio"] === "string" ? r["bio"] : "",
     avatarUrl: typeof r["avatarUrl"] === "string" ? r["avatarUrl"] : null,
     accessGranted: r["accessGranted"] === true,
@@ -164,6 +215,7 @@ function retentionPayload(state: AppState) {
     dailyQuestProgress: state.dailyQuestProgress ?? {},
     cosmeticBadges: state.cosmeticBadges ?? [],
     authUserId: state.authUserId ?? null,
+    userId: state.userId ?? null,
     bio: state.bio ?? "",
     avatarUrl: state.avatarUrl ?? null,
     accessGranted: state.accessGranted === true,
@@ -263,6 +315,39 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
       supabase.from("supplement_logs").upsert(
         supplementDays.map(([date, ids]) => ({ device_id: deviceId, date, supplement_ids: ids })),
         { onConflict: "device_id,date" },
+      ),
+    );
+  }
+
+  if (state.meals?.length) {
+    const mealDb = supabase as unknown as {
+      from: (t: string) => {
+        upsert: (rows: unknown, opts: { onConflict: string }) => PromiseLike<unknown>;
+      };
+    };
+    tasks.push(
+      mealDb.from("meal_entries").upsert(
+        state.meals.map((m) => ({
+          device_id: deviceId,
+          client_id: m.id,
+          user_id: state.userId ?? null,
+          date: m.date.slice(0, 10),
+          name: m.label,
+          meal_type: m.slot,
+          protein_g: m.proteinG,
+          kcal: m.kcal,
+          payload: {
+            slot: m.slot,
+            label: m.label,
+            quality: m.quality,
+            presetId: m.presetId,
+            servings: m.servings,
+            proteinG: m.proteinG,
+            kcal: m.kcal,
+          },
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: "device_id,client_id" },
       ),
     );
   }

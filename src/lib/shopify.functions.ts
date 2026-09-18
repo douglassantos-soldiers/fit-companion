@@ -130,8 +130,6 @@ async function shopifyGet<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-const PAID = new Set(["paid", "partially_paid"]);
-
 type PaidOrder = {
   financial_status?: string;
   email?: string;
@@ -146,36 +144,21 @@ async function fetchPaidOrdersByEmail(email: string): Promise<{
   orders: PaidOrder[];
   customerId: string | null;
 }> {
-  let customerId: string | null = null;
-  try {
-    const customers = await shopifyGet<{
-      customers?: Array<{ id: number; email?: string }>;
-    }>(`/customers/search.json?query=${encodeURIComponent(`email:${email}`)}&limit=1`);
-    const c = customers.customers?.[0];
-    if (c) customerId = String(c.id);
-  } catch {
-    /* continue */
-  }
-
-  if (customerId) {
-    const orders = await shopifyGet<{ orders?: PaidOrder[] }>(
-      `/customers/${customerId}/orders.json?status=any&limit=50`,
-    );
-    const paid = (orders.orders ?? []).filter((o) => PAID.has(String(o.financial_status ?? "").toLowerCase()));
-    return { orders: paid, customerId };
-  }
-
-  const orders = await shopifyGet<{ orders?: PaidOrder[] }>(
-    `/orders.json?email=${encodeURIComponent(email)}&status=any&limit=50`,
-  );
-  const list = orders.orders ?? [];
-  const paid = list.filter((o) => PAID.has(String(o.financial_status ?? "").toLowerCase()));
-  const cid = list[0]?.customer?.id;
-  return { orders: paid, customerId: cid != null ? String(cid) : null };
+  const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
+  const result = await fetchPaidOrdersByEmailServer(email);
+  return {
+    orders: result.orders as PaidOrder[],
+    customerId: result.customerId,
+  };
 }
 
 function profileFromOrders(orders: PaidOrder[], customerId: string | null) {
-  const latest = orders[0];
+  const sorted = [...orders].sort((a, b) => {
+    const ta = new Date(a.processed_at || a.created_at || 0).getTime();
+    const tb = new Date(b.processed_at || b.created_at || 0).getTime();
+    return tb - ta;
+  });
+  const latest = sorted[0];
   const lineItems = latest?.line_items ?? [];
   const productIds = mapLineItemsToProductIds(
     orders.flatMap((o) => o.line_items ?? []).length
@@ -405,13 +388,13 @@ export const trackAppEvent = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     try {
-      const { insertEngagementEvent } = await import("@/lib/shopify.server");
-      await insertEngagementEvent({
+      const { trackUserEvent } = await import("@/lib/events/track");
+      return trackUserEvent({
         deviceId: data.deviceId,
-        kind: data.kind,
+        eventType: data.kind,
+        source: "app",
         payload: data.payload,
       });
-      return { ok: true };
     } catch (e) {
       console.warn("trackAppEvent failed", e);
       return { ok: false };

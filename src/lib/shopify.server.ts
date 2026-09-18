@@ -266,3 +266,74 @@ export async function insertEngagementEvent(opts: {
     console.warn("engagement_events insert skipped", e);
   }
 }
+
+/**
+ * Server-authoritative purchase profile for an email.
+ * Never trust client-sent tier/productIds — always resolve from entitlement row + Shopify Admin.
+ */
+export async function resolveAccessProfileForEmail(email: string): Promise<{
+  email: string;
+  customerId: string | null;
+  productIds: string[];
+  accessTier: AccessTier;
+  orderCount: number;
+  restockEstimates: Record<string, RestockEstimate>;
+} | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized.includes("@")) return null;
+
+  const row = await findEntitlementByEmail(normalized);
+
+  // Prefer live Admin API when configured
+  try {
+    const domain = (process.env["SHOPIFY_STORE_DOMAIN"] ?? "")
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
+    const token = process.env["SHOPIFY_ADMIN_ACCESS_TOKEN"] ?? "";
+    if (domain && token) {
+      const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
+      const { orders, customerId } = await fetchPaidOrdersByEmailServer(normalized);
+      if (orders.length > 0) {
+        const sorted = [...orders].sort((a, b) => {
+          const ta = new Date(a.processed_at || a.created_at || 0).getTime();
+          const tb = new Date(b.processed_at || b.created_at || 0).getTime();
+          return tb - ta;
+        });
+        const latest = sorted[0]!;
+        const allItems = orders.flatMap((o) => o.line_items ?? []);
+        const productIds = mapLineItemsToProductIds(allItems);
+        const tagStr = `${latest.tags ?? ""} ${latest.customer?.tags ?? ""}`;
+        const tags = tagStr
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const accessTier = resolveAccessTier(productIds, tags);
+        const orderedAt = latest.processed_at || latest.created_at || new Date().toISOString();
+        return {
+          email: normalized,
+          customerId: customerId ?? row?.customerId ?? null,
+          productIds,
+          accessTier,
+          orderCount: orders.length,
+          restockEstimates: estimateRestock(productIds, latest.line_items ?? [], orderedAt),
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("resolveAccessProfileForEmail Admin fetch failed", e);
+  }
+
+  if (row && (row.productIds.length > 0 || row.customerId || row.snapshot)) {
+    return {
+      email: normalized,
+      customerId: row.customerId,
+      productIds: row.productIds,
+      accessTier: row.accessTier,
+      orderCount: 1,
+      restockEstimates: row.snapshot?.restockEstimates ?? {},
+    };
+  }
+
+  return null;
+}
+
