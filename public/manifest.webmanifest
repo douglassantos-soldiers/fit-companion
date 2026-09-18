@@ -1,7 +1,7 @@
 {
-  "name": "Soldiers Performance OS",
+  "name": "Soldiers Training",
   "short_name": "Soldiers",
-  "description": "Treino, nutrição e progresso — Soldiers Performance",
+  "description": "Treino, nutrição e progresso — Soldiers Training",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

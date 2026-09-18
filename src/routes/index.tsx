@@ -67,12 +67,12 @@ import { DAILY_XP_GOAL, MEAL_SLOT_LABEL, todayKey, type MealQuality, type MealSl
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Hoje — Soldiers Performance OS" },
+      { title: "Hoje — Soldiers Training" },
       {
         name: "description",
         content: "Uma ação óbvia: iniciar o treino ou registrar a refeição.",
       },
-      { property: "og:title", content: "Soldiers Performance OS" },
+      { property: "og:title", content: "Soldiers Training" },
       { property: "og:description", content: "Treino personalizado, progresso e desafios sem burocracia." },
     ],
   }),

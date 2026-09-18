@@ -44,7 +44,7 @@ const ATALHOS = [
 export const Route = createFileRoute("/perfil")({
   head: () => ({
     meta: [
-      { title: "Perfil — Soldiers Performance OS" },
+      { title: "Perfil — Soldiers Training" },
       {
         name: "description",
         content: "Seus dados, objetivo, nível e preferências do plano de treino.",

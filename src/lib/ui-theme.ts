@@ -155,7 +155,7 @@ export const mantineTheme = createMantineTheme({
   },
   defaultRadius: "md",
   other: {
-    soldiersBrand: "Soldiers Performance OS",
+    soldiersBrand: "Soldiers Training",
   },
   components: {
     Modal: {

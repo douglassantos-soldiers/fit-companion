@@ -71,7 +71,7 @@ export function scheduleLocalReminders(opts: {
   const delayMain = msUntilHour(hour);
   timers.push(
     setTimeout(() => {
-      show("Soldiers Performance", `Hora do treino: ${dayLabel}`, "soldiers-daily");
+      show("Soldiers Training", `Hora do treino: ${dayLabel}`, "soldiers-daily");
       scheduleLocalReminders(opts);
     }, delayMain),
   );
@@ -85,7 +85,7 @@ export function scheduleLocalReminders(opts: {
             const freezeHint =
               (opts.streakFreezes ?? 0) > 0 ? " — use o freeze ou treine." : " — treine ou faça o Express.";
             const stHint = `Streak em risco${freezeHint}`;
-            show("Soldiers Performance", stHint, "soldiers-streak");
+            show("Soldiers Training", stHint, "soldiers-streak");
           }
         }, delayRisk),
       );
@@ -100,7 +100,7 @@ export function scheduleLocalReminders(opts: {
         const missing = DAILY_XP_GOAL - (opts.xpToday ?? 0);
         if (missing > 0) {
           show(
-            "Soldiers Performance",
+            "Soldiers Training",
             `Faltam ${missing} XP para a meta de hoje.`,
             "soldiers-xp",
           );

@@ -29,7 +29,7 @@ export const Route = createFileRoute("/hubs/$slug")({
     const hub = hubBySlug(params.slug);
     return {
       meta: [
-        { title: `${hub?.name ?? "Hub"} — Soldiers Performance OS` },
+        { title: `${hub?.name ?? "Hub"} — Soldiers Training` },
         {
           name: "description",
           content: hub?.tagline ?? "Performance Hub Soldiers",

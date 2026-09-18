@@ -37,7 +37,7 @@ export const Route = createFileRoute("/treino/sessao/$id")({
   }),
   head: () => ({
     meta: [
-      { title: "Sessão de treino — Soldiers Performance OS" },
+      { title: "Sessão de treino — Soldiers Training" },
       {
         name: "description",
         content: "Execute o treino com séries, cargas sugeridas e cronômetro de descanso.",

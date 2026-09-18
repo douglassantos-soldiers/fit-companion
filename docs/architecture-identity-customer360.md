@@ -1,8 +1,8 @@
-# Identity + Customer 360 — Fit Companion
+# Identity + Customer 360 — Soldiers Training
 
 ## Visão geral
 
-O Fit Companion evoluiu de identidade baseada em `device_id` (localStorage) para:
+O Soldiers Training evoluiu de identidade baseada em `device_id` (localStorage) para:
 
 ```
 SHOPIFY → Identity Engine → User → Customer 360 → Engines → Context → Learning → Coach → Hoje → Events → …

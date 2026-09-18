@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/clubes")({
   head: () => ({
     meta: [
-      { title: "Clubes — Soldiers Performance OS" },
+      { title: "Clubes — Soldiers Training" },
       {
         name: "description",
         content: "Feed de check-ins, ranking semanal e convite do seu clube Soldiers.",
@@ -132,7 +132,7 @@ function ClubsPage() {
   const shareOn = state.shareProgress !== false;
 
   const invite = async (club: ClubSummary) => {
-    const text = `Entre no clube ${club.name} · código ${club.code} · meu streak: ${myStreak}d — Soldiers Performance`;
+    const text = `Entre no clube ${club.name} · código ${club.code} · meu streak: ${myStreak}d — Soldiers Training`;
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ title: club.name, text });

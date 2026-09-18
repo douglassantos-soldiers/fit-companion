@@ -109,7 +109,7 @@ function safeJson(s: string): unknown {
 
 export function mealAiSystemPrompt(slot: MealSlot): string {
   return [
-    "Você estima macros de uma refeição para o app Soldiers Performance.",
+    "Você estima macros de uma refeição para o app Soldiers Training.",
     "Responda SOMENTE um JSON válido, sem markdown:",
     '{"label":"string","proteinG":number,"kcal":number,"quality":"verde"|"amarelo"|"laranja","confidence":0-1,"notes":"opcional"}',
     `Slot da refeição: ${slot}.`,

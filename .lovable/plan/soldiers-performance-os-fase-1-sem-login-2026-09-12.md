@@ -1,4 +1,4 @@
-# Soldiers Performance OS — Fase 1 (sem login)
+# Soldiers Training — Fase 1 (sem login)
 
 App mobile-first de performance com a identidade Soldiers (preto + amarelo, tipografia condensada em caixa alta), inspirado em MyFitnessPal, Strava, Noom, Freeletics, Fitbod e Nike Training Club.
 

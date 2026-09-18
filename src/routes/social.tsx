@@ -32,7 +32,7 @@ export const Route = createFileRoute("/social")({
   }),
   head: () => ({
     meta: [
-      { title: "Social — Soldiers Performance OS" },
+      { title: "Social — Soldiers Training" },
       {
         name: "description",
         content: "Desafios, clubes e feed — ranking e pressão saudável.",

@@ -38,7 +38,7 @@ export const ShareCardVisual = forwardRef<HTMLDivElement, ShareCardProps>(
           style={{ background: "radial-gradient(circle, #f5c518 0%, transparent 70%)" }}
         />
         <p className="text-[0.65rem] font-bold uppercase tracking-[0.25em] text-[#f5c518]">
-          Soldiers Performance
+          Soldiers Training
         </p>
         <p className="mt-3 text-display text-2xl leading-none" style={{ fontFamily: "Anton, sans-serif" }}>
           {session.title}
@@ -104,7 +104,7 @@ export function ShareCardActions({
             await navigator.share({
               files: [file],
               title: session.title,
-              text: `${athleteName} · ${Math.round(session.volumeKg)} kg — Soldiers Performance`,
+              text: `${athleteName} · ${Math.round(session.volumeKg)} kg — Soldiers Training`,
             });
             toast.success("Compartilhado");
             return;

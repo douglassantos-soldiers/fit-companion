@@ -20,7 +20,7 @@ import { getDeviceId } from "@/lib/sync";
 export const Route = createFileRoute("/suplementos")({
   head: () => ({
     meta: [
-      { title: "Suplementos — Soldiers Performance OS" },
+      { title: "Suplementos — Soldiers Training" },
       {
         name: "description",
         content: "Monte sua rotina de suplementação, marque as doses do dia e acompanhe a aderência.",

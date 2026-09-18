@@ -118,7 +118,7 @@ export function MuscleArt({
 
       <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-3 pt-8">
         <p className="text-display text-sm tracking-[0.25em] text-primary">{LABELS[group]}</p>
-        <p className="mt-0.5 text-[0.65rem] uppercase tracking-wider text-white/50">Soldiers Performance</p>
+        <p className="mt-0.5 text-[0.65rem] uppercase tracking-wider text-white/50">Soldiers Training</p>
       </div>
     </div>
   );

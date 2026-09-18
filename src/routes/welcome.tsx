@@ -10,7 +10,7 @@ const PERFORMANCE_URL = performanceUpgradeUrl();
 export const Route = createFileRoute("/welcome")({
   head: () => ({
     meta: [
-      { title: "Soldiers Performance OS" },
+      { title: "Soldiers Training" },
       {
         name: "description",
         content: "Treino, nutrição, coach e desafios — liberado com sua compra Soldiers.",
@@ -29,9 +29,9 @@ function WelcomePage() {
         <SoldiersLogo />
 
         <section className="mt-10">
-          <p className="eyebrow">Soldiers Nutrition</p>
+          <p className="eyebrow">Soldiers Training</p>
           <h1 className="mt-3 text-display text-4xl leading-none">
-            Performance OS
+            Soldiers Training
             <span className="mt-1 block text-primary text-glow">no seu bolso</span>
           </h1>
           <p className="mt-4 text-sm text-muted-foreground">

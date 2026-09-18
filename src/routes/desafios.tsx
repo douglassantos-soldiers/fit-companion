@@ -27,7 +27,7 @@ const PERFORMANCE_URL = performanceUpgradeUrl();
 export const Route = createFileRoute("/desafios")({
   head: () => ({
     meta: [
-      { title: "Desafios — Soldiers Performance OS" },
+      { title: "Desafios — Soldiers Training" },
       {
         name: "description",
         content: "Entre em desafios de consistência e volume, acompanhe o progresso e conquiste badges.",

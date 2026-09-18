@@ -71,7 +71,7 @@ SHOPIFY_STOREFRONT_TOKEN=  # opcional — aba Loja
 7. E-mail pós-compra (Liquid / Flow): inclua o link mágico. Se o webhook gravou o note attribute:
 
 ```liquid
-<a href="{{ order.note_attributes.companion_access_url }}">Abrir Soldiers Companion</a>
+<a href="{{ order.note_attributes.companion_access_url }}">Abrir Soldiers Training</a>
 ```
 
 Ou use a URL logada no servidor: `{APP_ORIGIN}/acesso?token=...`

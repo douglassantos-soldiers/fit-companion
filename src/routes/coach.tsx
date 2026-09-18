@@ -15,7 +15,7 @@ import { useServerFn } from "@tanstack/react-start";
 export const Route = createFileRoute("/coach")({
   head: () => ({
     meta: [
-      { title: "Coach — Soldiers Performance OS" },
+      { title: "Coach — Soldiers Training" },
       {
         name: "description",
         content: "Seu coach de performance responde com base nos seus treinos, peso e aderência.",

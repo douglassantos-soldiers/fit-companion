@@ -1,4 +1,4 @@
-﻿-- Soldiers Fit Companion — full schema deploy (idempotent where possible)
+﻿-- Soldiers Training — full schema deploy (idempotent where possible)
 -- Project: zphtvrsxlhfgltwgbreu
 -- Paste into Supabase SQL Editor → Run
 -- Generated: 2026-09-17T23:26:57.4233513-03:00

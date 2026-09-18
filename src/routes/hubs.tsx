@@ -10,7 +10,7 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/hubs")({
   head: () => ({
     meta: [
-      { title: "Hubs — Soldiers Performance OS" },
+      { title: "Hubs — Soldiers Training" },
       {
         name: "description",
         content: "Performance Hubs Soldiers — entre no desafio do creator e evolua com ranking relativo.",

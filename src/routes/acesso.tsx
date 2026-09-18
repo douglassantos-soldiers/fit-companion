@@ -21,7 +21,7 @@ export const Route = createFileRoute("/acesso")({
   }),
   head: () => ({
     meta: [
-      { title: "Liberar acesso — Soldiers Performance OS" },
+      { title: "Liberar acesso — Soldiers Training" },
       {
         name: "description",
         content: "Use o e-mail da sua compra na Soldiers para liberar o app.",

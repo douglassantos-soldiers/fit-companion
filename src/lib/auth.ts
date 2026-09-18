@@ -43,7 +43,7 @@ export function watchAuth(onUser: (userId: string | null) => void) {
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
     onUser(session?.user?.id ?? null);
     if (event === "SIGNED_IN") {
-      notifySocial("Soldiers Performance", "Conta vinculada — seu progresso fica seguro.", "soldiers-auth");
+      notifySocial("Soldiers Training", "Conta vinculada — seu progresso fica seguro.", "soldiers-auth");
     }
   });
   return () => data.subscription.unsubscribe();

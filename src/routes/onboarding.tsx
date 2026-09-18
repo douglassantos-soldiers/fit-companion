@@ -12,7 +12,7 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Monte seu perfil — Soldiers Performance OS" },
+      { title: "Monte seu perfil — Soldiers Training" },
       {
         name: "description",
         content: "Objetivo, rotina, sono e o que mais te impede — plano adaptativo em minutos.",
@@ -105,7 +105,7 @@ function Onboarding() {
         <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-between px-4 py-8">
           <SoldiersLogo />
           <div className="pb-8">
-            <p className="eyebrow">Soldiers Performance OS</p>
+            <p className="eyebrow">Soldiers Training</p>
             <h1 className="mt-3 text-display text-4xl leading-none">
               Seu plano de
               <span className="text-glow block text-primary"> performance</span>

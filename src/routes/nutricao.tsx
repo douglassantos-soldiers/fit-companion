@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/nutricao")({
   head: () => ({
     meta: [
-      { title: "Nutrição — Soldiers Performance OS" },
+      { title: "Nutrição — Soldiers Training" },
       {
         name: "description",
         content: "Diário alimentar com proteína, kcal e água — estilo MyFitnessPal.",

@@ -14,7 +14,7 @@ import { GOAL_LABEL, type Equipment } from "@/lib/types";
 export const Route = createFileRoute("/treino/")({
   head: () => ({
     meta: [
-      { title: "Treino — Soldiers Performance OS" },
+      { title: "Treino — Soldiers Training" },
       {
         name: "description",
         content: "Plano semanal gerado pelo seu perfil, com séries, repetições e progressão de carga.",

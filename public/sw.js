@@ -1,4 +1,4 @@
-/* Soldiers Performance — push bridge */
+/* Soldiers Training — push bridge */
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
@@ -8,7 +8,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Soldiers Performance", body: "Abra o app" };
+  let data = { title: "Soldiers Training", body: "Abra o app" };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
