@@ -856,12 +856,11 @@ export async function trackEngagementEvent(
   props: Record<string, unknown> = {},
 ) {
   try {
-    await supabase.from("engagement_events").insert({
-      device_id: deviceId,
-      name,
-      props: props as import("@/integrations/supabase/types").Json,
+    const { trackAppEvent } = await import("@/lib/shopify.functions");
+    await trackAppEvent({
+      data: { deviceId, kind: name, payload: props },
     });
   } catch {
-    /* optional table */
+    /* analytics best-effort */
   }
 }

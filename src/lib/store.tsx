@@ -26,7 +26,16 @@ import { clearRemoteState, getDeviceId, pullState, pushState } from "@/lib/sync"
 import { fetchEntitlement } from "@/lib/entitlements";
 import { establishAccessSession } from "@/lib/access.functions";
 import { ensureIdentityForDevice } from "@/lib/identity.functions";
+import { persistUserPatterns } from "@/lib/learning.functions";
+import { extractUserPatterns } from "@/lib/engine/learning";
+import { enrichRestockConfidence } from "@/data/shopify-product-map";
+import { trackAppEvent } from "@/lib/shopify.functions";
 import { clearLocalReminders, scheduleLocalReminders } from "@/lib/notifications";
+
+function emitAppEvent(deviceId: string, kind: string, payload: Record<string, unknown> = {}) {
+  if (!deviceId) return;
+  void trackAppEvent({ data: { deviceId, kind, payload } }).catch(() => undefined);
+}
 import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
 import { rollCosmeticReward } from "@/lib/engine/rewards";
@@ -229,6 +238,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
         if (remote) {
           skipPush.current = true;
+          const logsForConfidence =
+            Object.keys(local.supplementLogs ?? {}).length
+              ? local.supplementLogs
+              : remote.supplementLogs ?? {};
+          const restockBase = Object.keys(local.restockEstimates ?? {}).length
+            ? local.restockEstimates
+            : remote.restockEstimates ?? {};
           const merged = withQuests(
             {
               ...emptyState,
@@ -280,10 +296,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   : local.purchaseProductIds?.length
                     ? local.purchaseProductIds
                     : remote.purchaseProductIds ?? [],
-              restockEstimates:
-                Object.keys(local.restockEstimates ?? {}).length
-                  ? local.restockEstimates
-                  : remote.restockEstimates ?? {},
+              restockEstimates: enrichRestockConfidence(restockBase ?? {}, logsForConfidence),
+              supplementLogs: logsForConfidence,
               routineFromPurchase: local.routineFromPurchase || remote.routineFromPurchase || false,
               routineFromPurchaseDismissed:
                 local.routineFromPurchaseDismissed || remote.routineFromPurchaseDismissed || false,
@@ -294,6 +308,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
           setState(merged);
           applyTheme(merged.theme ?? "dark");
+
+          if (resolvedUserId) {
+            void persistUserPatterns({
+              data: {
+                userId: resolvedUserId,
+                patterns: extractUserPatterns(merged),
+              },
+            }).catch(() => undefined);
+          }
         } else {
           if (entitlement) {
             skipPush.current = true;
@@ -306,10 +329,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   accessGrantedAt: entitlement.grantedAt,
                   accessTier: entitlement.accessTier,
                   purchaseProductIds: entitlement.productIds,
+                  userId: resolvedUserId ?? s.userId,
+                  restockEstimates: enrichRestockConfidence(
+                    s.restockEstimates ?? {},
+                    s.supplementLogs,
+                  ),
                 },
                 id,
               ),
             );
+          } else if (resolvedUserId) {
+            setState((s) => ({ ...s, userId: resolvedUserId }));
+          }
+          if (resolvedUserId) {
+            const bootState = withQuests(
+              { ...emptyState, ...local, ...accessFromRemote, userId: resolvedUserId },
+              id,
+            );
+            void persistUserPatterns({
+              data: {
+                userId: resolvedUserId,
+                patterns: extractUserPatterns(bootState),
+              },
+            }).catch(() => undefined);
           }
           if (local.profile) {
             void pushState(id, withQuests({ ...emptyState, ...local, ...accessFromRemote }, id));
@@ -388,11 +430,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deviceId: deviceId.current,
       lastSessionXp,
       setProfile: (profile) => {
+        const wasFirst = !stateRef.current.profile;
         update((s) => withSnapshot(withQuests({ ...s, profile }, deviceId.current)));
         if (deviceId.current && state.shareProgress !== false) {
           void ensureSocialProfile(deviceId.current, profile.name).catch((err) =>
             console.warn("ensureSocialProfile failed", err),
           );
+        }
+        if (wasFirst && deviceId.current) {
+          emitAppEvent(deviceId.current, "onboarding_completed", { goal: profile.goal });
         }
       },
       addSession: (session, opts) => {
@@ -417,7 +463,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return next;
         });
       },
-      addWeight: (weightKg) =>
+      addWeight: (weightKg) => {
         update((s) =>
           withSnapshot({
             ...s,
@@ -426,7 +472,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ),
             profile: s.profile ? { ...s.profile, weightKg } : s.profile,
           }),
-        ),
+        );
+        emitAppEvent(deviceId.current, "weight_logged", { weightKg, date: todayKey() });
+      },
       addWater: (ml) =>
         update((s) => {
           const prev = withQuests(s, deviceId.current);
@@ -444,7 +492,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
           return next;
         }),
-      addMealEntry: (entry) =>
+      addMealEntry: (entry) => {
+        let mealId = "";
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           const date = entry.date ?? todayKey();
@@ -455,6 +504,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             servings,
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           };
+          mealId = full.id;
           let next = syncMealCount({ ...prev, meals: [...prev.meals, full] }, date);
           next = withSnapshot(next);
           const mealsBefore = prev.meals.filter((m) => m.date.slice(0, 10) === date).length;
@@ -463,7 +513,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             next = afterXpSideEffects(prev, awarded.state, deviceId.current);
           }
           return next;
-        }),
+        });
+        emitAppEvent(deviceId.current, "meal_logged", {
+          mealId,
+          date: entry.date ?? todayKey(),
+          proteinG: entry.proteinG,
+        });
+      },
       removeMealEntry: (id) =>
         update((s) => {
           const target = s.meals.find((m) => m.id === id);
@@ -511,12 +567,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const next = ids.includes(presetId) ? ids.filter((x) => x !== presetId) : [...ids, presetId];
           return { ...s, favoriteMealPresetIds: next };
         }),
-      toggleSupplement: (id) =>
+      toggleSupplement: (id) => {
+        let took = false;
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           const date = todayKey();
           const taken = prev.supplementLogs[date] ?? [];
           const nextTaken = taken.includes(id) ? taken.filter((t) => t !== id) : [...taken, id];
+          took = !taken.includes(id);
           let next = withSnapshot({
             ...prev,
             supplementLogs: { ...prev.supplementLogs, [date]: nextTaken },
@@ -528,7 +586,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             next = afterXpSideEffects(prev, awarded.state, deviceId.current);
           }
           return next;
-        }),
+        });
+        if (took) {
+          emitAppEvent(deviceId.current, "supplement_taken", { productId: id, date: todayKey() });
+        }
+      },
       setRoutine: (ids) => update((s) => ({ ...s, supplementRoutine: ids })),
       toggleChallenge: (id) => {
         const current = stateRef.current;
@@ -705,6 +767,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const applyRoutine = s.supplementRoutine.length === 0 && productIds.length > 0;
           const badges = new Set(s.cosmeticBadges ?? []);
           badges.add("cliente-soldiers");
+          const nextRestock = Object.keys(restockEstimates).length
+            ? enrichRestockConfidence(restockEstimates, s.supplementLogs)
+            : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs);
           return {
             ...s,
             accessGranted: true,
@@ -712,7 +777,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             accessGrantedAt: grantedAt,
             accessTier,
             purchaseProductIds: productIds.length ? productIds : s.purchaseProductIds,
-            restockEstimates: Object.keys(restockEstimates).length ? restockEstimates : s.restockEstimates,
+            restockEstimates: nextRestock,
             supplementRoutine: applyRoutine ? productIds : s.supplementRoutine,
             routineFromPurchase: applyRoutine || s.routineFromPurchase,
             cosmeticBadges: [...badges],
@@ -734,8 +799,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 : s.purchaseProductIds,
               userId: session.userId ?? s.userId,
               restockEstimates: session.restockEstimates
-                ? { ...s.restockEstimates, ...session.restockEstimates }
-                : s.restockEstimates,
+                ? enrichRestockConfidence(
+                    { ...s.restockEstimates, ...session.restockEstimates },
+                    s.supplementLogs,
+                  )
+                : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs),
             }));
           }
         } catch (e) {

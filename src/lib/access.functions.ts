@@ -11,6 +11,9 @@ import {
   readAdminSession,
   rateLimitKey,
 } from "@/lib/access-session.server";
+import { parseEstablishAccessInput } from "@/lib/access-parse";
+
+export { parseEstablishAccessInput } from "@/lib/access-parse";
 
 export const checkAccessSession = createServerFn({ method: "GET" }).handler(async () => {
   const session = readAccessSession();
@@ -23,28 +26,8 @@ export const clearAccessSession = createServerFn({ method: "POST" }).handler(asy
   return { ok: true as const };
 });
 
-function parseEstablish(input: unknown) {
-  const v = input as {
-    email?: string;
-    deviceId?: string;
-    /** @deprecated ignored — server recalculates */
-    accessTier?: string;
-    shopifyCustomerId?: string | null;
-    orderCount?: number;
-    productIds?: string[];
-  } | null;
-  const email = String(v?.email ?? "")
-    .trim()
-    .toLowerCase();
-  if (!email.includes("@")) throw new Error("E-mail inválido");
-  return {
-    email,
-    deviceId: String(v?.deviceId ?? "").trim(),
-  };
-}
-
 export const establishAccessSession = createServerFn({ method: "POST" })
-  .inputValidator(parseEstablish)
+  .inputValidator(parseEstablishAccessInput)
   .handler(async ({ data }) => {
     const {
       resolveAccessProfileForEmail,
@@ -120,6 +103,12 @@ export const establishAccessSession = createServerFn({ method: "POST" })
         await upsertOrdersFromPaidList({ userId, orders });
       } catch (e) {
         console.warn("establishAccessSession order sync skipped", e);
+      }
+
+      if (userId) {
+        void import("@/lib/customer360/recompute.server")
+          .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId!))
+          .catch((e) => console.warn("recomputeCustomerProfile skipped", e));
       }
     }
 

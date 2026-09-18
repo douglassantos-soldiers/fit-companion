@@ -197,6 +197,21 @@ export function estimateRestock(
   return out;
 }
 
+/** Recalculate restock confidence from local consumption log days (client-side). */
+export function enrichRestockConfidence(
+  estimates: Record<string, RestockEstimate>,
+  supplementLogs: Record<string, string[] | undefined> | null | undefined,
+): Record<string, RestockEstimate> {
+  const logDays = Object.values(supplementLogs ?? {}).filter((d) => Array.isArray(d) && d.length > 0).length;
+  if (!estimates || !Object.keys(estimates).length) return estimates ?? {};
+  const confidence = Math.min(0.85, 0.4 + logDays * 0.025);
+  const out: Record<string, RestockEstimate> = {};
+  for (const [id, est] of Object.entries(estimates)) {
+    out[id] = { ...est, confidence };
+  }
+  return out;
+}
+
 export function getStorefrontBaseUrl(): string {
   const base =
     (typeof import.meta !== "undefined" && import.meta.env?.["VITE_SHOPIFY_STOREFRONT_URL"]) ||

@@ -50,11 +50,12 @@ Camada de agregação em `src/lib/customer360/` + tabela derivada `customer_prof
 
 ## Context / Learning / Score
 
-- **Context Engine** (`src/lib/engine/context.ts`): sinais do dia + `why[]`
-- **Learning**: regras + `extractUserPatterns` (sem ML)
-- **Performance score**: média das dimensões de treino/recuperação/sono — **sem** suplementação
-- **Adherence score**: nutrição + suplementação + hábitos
+- **Context Engine** (`src/lib/engine/context.ts`): sinais do dia + `why[]` (também mesclado no Living Plan)
+- **Learning**: regras + `extractUserPatterns` → persistido em `user_patterns` no boot (best-effort)
+- **Performance score** = média(força, resistência, consistência, recuperação, sono) — **sem** suplementação
+- **Adherence score** = média(nutrição, suplementação, hábitos)
 - Suplementação sem piso artificial `|| 40`
+- Restock `confidence` sobe com dias de log de consumo (`enrichRestockConfidence`)
 
 ## Sync
 

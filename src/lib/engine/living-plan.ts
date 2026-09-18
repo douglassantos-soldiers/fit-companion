@@ -6,6 +6,7 @@ import {
   primaryBlockerDimension,
   trafficForScore,
 } from "@/lib/engine/dimensions";
+import { buildUserContext } from "@/lib/engine/context";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
 import { nutritionGoals } from "@/lib/engine/nutrition";
 import { buildExpressSession, buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
@@ -129,6 +130,20 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
   if (activeHub) {
     why.push(`Hub ativo: ${activeHub.name} (${activeHub.creatorName}).`);
   }
+
+  // Merge Context Engine explanations (dedupe, max 3 extras)
+  const ctxWhy = buildUserContext(state, state.userId).why;
+  let added = 0;
+  for (const line of ctxWhy) {
+    if (added >= 3) break;
+    const dup = why.some(
+      (w) => w === line || w.includes(line.slice(0, 24)) || line.includes(w.slice(0, 24)),
+    );
+    if (dup) continue;
+    why.push(line);
+    added += 1;
+  }
+
   if (!why.length) why.push("Sem sinais de alerta — plano padrão do dia.");
 
   const trainingScore =

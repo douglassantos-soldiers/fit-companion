@@ -1,8 +1,9 @@
 /**
- * Shopify Admin order fetch with cursor pagination.
+ * Shopify Admin order fetch with cursor pagination + persisted cursors.
  * Server-only.
  */
 import type { ShopifyLineItemLike } from "@/data/shopify-product-map";
+import { adminDbLoose } from "@/lib/db-admin";
 
 const PAID = new Set(["paid", "partially_paid"]);
 
@@ -67,19 +68,68 @@ export function parseNextPageUrl(linkHeader: string | null): string | null {
   return null;
 }
 
+/** Sort paid orders by processed_at || created_at descending. */
+export function sortOrdersByProcessedAtDesc(orders: PaidOrder[]): PaidOrder[] {
+  return [...orders].sort((a, b) => {
+    const ta = new Date(a.processed_at || a.created_at || 0).getTime();
+    const tb = new Date(b.processed_at || b.created_at || 0).getTime();
+    return tb - ta;
+  });
+}
+
+export function syncCursorKey(opts: { customerId?: string | null; email?: string }): string {
+  if (opts.customerId) return `shopify_orders:${opts.customerId}`;
+  return `shopify_orders:email:${(opts.email ?? "").trim().toLowerCase()}`;
+}
+
+export async function getSyncCursor(id: string): Promise<string | null> {
+  try {
+    const db = await adminDbLoose();
+    if (!db) return null;
+    const { data } = await db
+      .from("shopify_sync_cursors")
+      .select("cursor_value")
+      .eq("id", id)
+      .maybeSingle();
+    return (data?.cursor_value as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setSyncCursor(id: string, value: string | null): Promise<void> {
+  try {
+    const db = await adminDbLoose();
+    if (!db) return;
+    if (value == null || value === "") {
+      await db.from("shopify_sync_cursors").delete().eq("id", id);
+      return;
+    }
+    await db.from("shopify_sync_cursors").upsert({
+      id,
+      cursor_value: value,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn("setSyncCursor skipped", e);
+  }
+}
+
 const MAX_PAGES = 5; // 5 * 50 = 250 orders max per sync run
 const PAGE_LIMIT = 50;
 
 export async function fetchPaidOrdersByEmailServer(
   email: string,
-  opts?: { maxPages?: number },
-): Promise<{ orders: PaidOrder[]; customerId: string | null }> {
+  opts?: { maxPages?: number; resumeCursor?: boolean },
+): Promise<{ orders: PaidOrder[]; customerId: string | null; hasMore: boolean }> {
   const maxPages = opts?.maxPages ?? MAX_PAGES;
+  const resumeCursor = opts?.resumeCursor !== false;
   let customerId: string | null = null;
+  const normalized = email.trim().toLowerCase();
 
   try {
     const { json } = await shopifyGetRaw(
-      `/customers/search.json?query=${encodeURIComponent(`email:${email}`)}&limit=1`,
+      `/customers/search.json?query=${encodeURIComponent(`email:${normalized}`)}&limit=1`,
     );
     const customers = (json as { customers?: Array<{ id: number }> }).customers;
     const c = customers?.[0];
@@ -88,28 +138,23 @@ export async function fetchPaidOrdersByEmailServer(
     /* continue */
   }
 
+  const cursorId = syncCursorKey({ customerId, email: normalized });
+  const saved = resumeCursor ? await getSyncCursor(cursorId) : null;
+
   const all: PaidOrder[] = [];
+  let next: string | null;
+  let pages = 0;
 
   if (customerId) {
-    let next: string | null =
+    next =
+      saved ??
       `/customers/${customerId}/orders.json?status=any&limit=${PAGE_LIMIT}`;
-    let pages = 0;
-    while (next && pages < maxPages) {
-      const { json, link } = await shopifyGetRaw(next);
-      const batch = ((json as { orders?: PaidOrder[] }).orders ?? []).filter((o) =>
-        PAID.has(String(o.financial_status ?? "").toLowerCase()),
-      );
-      all.push(...batch);
-      next = parseNextPageUrl(link);
-      // If next is absolute URL, shopifyGetRaw handles it
-      pages += 1;
-    }
-    return { orders: all, customerId };
+  } else {
+    next =
+      saved ??
+      `/orders.json?email=${encodeURIComponent(normalized)}&status=any&limit=${PAGE_LIMIT}`;
   }
 
-  let next: string | null =
-    `/orders.json?email=${encodeURIComponent(email)}&status=any&limit=${PAGE_LIMIT}`;
-  let pages = 0;
   while (next && pages < maxPages) {
     const { json, link } = await shopifyGetRaw(next);
     const list = (json as { orders?: PaidOrder[] }).orders ?? [];
@@ -123,7 +168,18 @@ export async function fetchPaidOrdersByEmailServer(
     pages += 1;
   }
 
-  return { orders: all, customerId };
+  const hasMore = Boolean(next);
+  if (hasMore && next) {
+    await setSyncCursor(cursorId, next);
+  } else {
+    await setSyncCursor(cursorId, null);
+  }
+
+  return {
+    orders: sortOrdersByProcessedAtDesc(all),
+    customerId,
+    hasMore,
+  };
 }
 
 export { PAGE_LIMIT, MAX_PAGES, PAID };

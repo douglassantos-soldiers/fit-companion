@@ -27,6 +27,11 @@ export const Route = createFileRoute("/api/shopify/webhook")({
           appOriginFromEnv,
           sha256Hex,
         } = await import("@/lib/shopify.server");
+        const {
+          isCustomerTopic,
+          isRefundTopic,
+          webhookPayloadHashInput,
+        } = await import("@/lib/shopify-webhook-topics");
 
         if (!secret) {
           console.error("SHOPIFY_WEBHOOK_SECRET missing");
@@ -40,7 +45,7 @@ export const Route = createFileRoute("/api/shopify/webhook")({
         }
 
         // Idempotency
-        const payloadHash = await sha256Hex(`${topic}:${rawBody}`);
+        const payloadHash = await sha256Hex(webhookPayloadHashInput(topic, rawBody));
         const { claimWebhookEvent } = await import("@/lib/shopify-webhook-events.server");
         const claimed = await claimWebhookEvent({
           webhookId,
@@ -59,12 +64,12 @@ export const Route = createFileRoute("/api/shopify/webhook")({
           return new Response("bad json", { status: 400 });
         }
 
-        if (topic.startsWith("customers/")) {
+        if (isCustomerTopic(topic)) {
           await handleCustomerTopic(topic, payload);
           return Response.json({ ok: true, topic });
         }
 
-        if (topic.startsWith("refunds/")) {
+        if (isRefundTopic(topic)) {
           await handleRefundTopic(payload);
           return Response.json({ ok: true, topic });
         }

@@ -165,14 +165,15 @@ describe("Customer 360 + Context", () => {
 });
 
 describe("access session client payload contract", () => {
-  it("parseEstablish shape only needs email+deviceId (documented)", () => {
-    // Server ignores accessTier from client — validated by access.functions.ts design.
-    const clientPayload = {
+  it("parseEstablishAccessInput discards forged tier", async () => {
+    const { parseEstablishAccessInput } = await import("@/lib/access-parse");
+    const parsed = parseEstablishAccessInput({
       email: "x@y.com",
       deviceId: "device-uuid-here",
-      accessTier: "performance" as const, // must be ignored server-side
-    };
-    expect(clientPayload.accessTier).toBe("performance");
-    expect(Object.keys(clientPayload)).toContain("email");
+      accessTier: "performance",
+      productIds: ["pre-treino"],
+    });
+    expect(Object.keys(parsed).sort()).toEqual(["deviceId", "email"]);
+    expect(parsed.email).toBe("x@y.com");
   });
 });

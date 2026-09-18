@@ -152,6 +152,37 @@ async function fetchPaidOrdersByEmail(email: string): Promise<{
   };
 }
 
+/** Best-effort persist orders after verify (does not block grant). */
+async function persistOrdersBestEffort(
+  email: string,
+  orders: PaidOrder[],
+  shopifyCustomerId: string | null,
+): Promise<void> {
+  try {
+    const { resolveOrCreateUserByEmail, linkShopifyIdentity } = await import("@/lib/identity");
+    const { upsertOrdersFromPaidList } = await import("@/lib/orders.server");
+    const user = await resolveOrCreateUserByEmail(email);
+    if (user && shopifyCustomerId) {
+      await linkShopifyIdentity({
+        userId: user.id,
+        shopifyCustomerId,
+        externalEmail: email,
+      });
+    }
+    await upsertOrdersFromPaidList({
+      userId: user?.id ?? null,
+      orders: orders as import("@/lib/shopify-orders.server").PaidOrder[],
+    });
+    if (user) {
+      void import("@/lib/customer360/recompute.server")
+        .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(user.id))
+        .catch(() => undefined);
+    }
+  } catch (e) {
+    console.warn("persistOrdersBestEffort skipped", e);
+  }
+}
+
 function profileFromOrders(orders: PaidOrder[], customerId: string | null) {
   const sorted = [...orders].sort((a, b) => {
     const ta = new Date(a.processed_at || a.created_at || 0).getTime();
@@ -209,6 +240,9 @@ export const verifyShopifyPurchase = createServerFn({ method: "POST" })
                   restockEstimates: row.snapshot?.restockEstimates ?? {},
                   orderCount: 1,
                 };
+          if (orders.length > 0) {
+            void persistOrdersBestEffort(data.email, orders, fromOrders.customerId);
+          }
           return {
             ok: true,
             orderCount: fromOrders.orderCount,
@@ -228,6 +262,7 @@ export const verifyShopifyPurchase = createServerFn({ method: "POST" })
         return { ok: false, reason: "no_purchase" };
       }
       const profile = profileFromOrders(orders, customerId);
+      void persistOrdersBestEffort(data.email, orders, profile.customerId);
       console.info("Shopify verify: granted", maskEmail(data.email), "orders=", profile.orderCount);
       return {
         ok: true,

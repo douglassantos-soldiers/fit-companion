@@ -237,12 +237,14 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
   if (!deviceId) return;
 
   const tasks: Array<PromiseLike<unknown>> = [];
+  const userStamp = state.userId ? { user_id: state.userId } : {};
 
   if (state.profile) {
     tasks.push(
       supabase.from("profiles").upsert(
         {
           device_id: deviceId,
+          ...userStamp,
           name: state.profile.name,
           goal: state.profile.goal,
           level: state.profile.level,
@@ -252,7 +254,7 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
           weight_kg: state.profile.weightKg,
           equipment: state.profile.equipment,
           restrictions: state.profile.restrictions,
-        },
+        } as never,
         { onConflict: "device_id" },
       ),
     );
@@ -262,11 +264,12 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
     supabase.from("app_state").upsert(
       {
         device_id: deviceId,
+        ...userStamp,
         supplement_routine: state.supplementRoutine,
         challenges: state.challenges,
         chat: state.chat as unknown as never,
         // retention column added in phase6; cast until types regenerate
-        ...( { retention: retentionPayload(state) } as Record<string, unknown>),
+        ...({ retention: retentionPayload(state) } as Record<string, unknown>),
       } as never,
       { onConflict: "device_id" },
     ),
@@ -277,6 +280,7 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
       supabase.from("sessions").upsert(
         state.sessions.map((s) => ({
           device_id: deviceId,
+          ...userStamp,
           client_id: s.id,
           day_id: s.dayId,
           title: s.title,
@@ -284,7 +288,7 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
           duration_min: s.durationMin,
           exercises: s.exercises as unknown as never,
           volume_kg: s.volumeKg,
-        })),
+        })) as never,
         { onConflict: "device_id,client_id" },
       ),
     );
@@ -293,7 +297,12 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
   if (state.weights.length) {
     tasks.push(
       supabase.from("weights").upsert(
-        state.weights.map((w) => ({ device_id: deviceId, date: w.date, weight_kg: w.weightKg })),
+        state.weights.map((w) => ({
+          device_id: deviceId,
+          ...userStamp,
+          date: w.date,
+          weight_kg: w.weightKg,
+        })) as never,
         { onConflict: "device_id,date" },
       ),
     );
@@ -303,7 +312,13 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
   if (days.length) {
     tasks.push(
       supabase.from("daily_metrics").upsert(
-        days.map((d) => ({ device_id: deviceId, date: d.date, water_ml: d.waterMl, meals: d.meals })),
+        days.map((d) => ({
+          device_id: deviceId,
+          ...userStamp,
+          date: d.date,
+          water_ml: d.waterMl,
+          meals: d.meals,
+        })) as never,
         { onConflict: "device_id,date" },
       ),
     );
@@ -313,7 +328,12 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
   if (supplementDays.length) {
     tasks.push(
       supabase.from("supplement_logs").upsert(
-        supplementDays.map(([date, ids]) => ({ device_id: deviceId, date, supplement_ids: ids })),
+        supplementDays.map(([date, ids]) => ({
+          device_id: deviceId,
+          ...userStamp,
+          date,
+          supplement_ids: ids,
+        })) as never,
         { onConflict: "device_id,date" },
       ),
     );
