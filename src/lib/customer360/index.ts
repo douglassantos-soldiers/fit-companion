@@ -10,15 +10,17 @@ import { aggregateSupplements } from "@/lib/customer360/aggregators/supplements"
 import { aggregateBehavior } from "@/lib/customer360/aggregators/behavior";
 import { aggregateGoals } from "@/lib/customer360/aggregators/goals";
 import type { AppState } from "@/lib/types";
-import type {
-  Commerce360,
-  Customer360,
-  Behavior360,
-  Goals360,
-  Nutrition360,
-  Performance360,
-  Recovery360,
-  Supplements360,
+import {
+  buildDefaultLineage,
+  buildEstimatesFromCommerce,
+  type Commerce360,
+  type Customer360,
+  type Behavior360,
+  type Goals360,
+  type Nutrition360,
+  type Performance360,
+  type Recovery360,
+  type Supplements360,
 } from "@/lib/customer360/types";
 
 export type {
@@ -35,18 +37,22 @@ export type {
 /** Build Customer 360 from local AppState (client-safe, no secrets). */
 export function buildCustomer360FromState(
   state: AppState,
-  opts?: { userId?: string | null },
+  opts?: { userId?: string | null; shopifyCustomerId?: string | null },
 ): Customer360 {
   const performance = aggregatePerformance(state);
+  const commerce = aggregateCommerceFromState(state);
   return {
     userId: opts?.userId ?? null,
-    commerce: aggregateCommerceFromState(state),
+    shopifyCustomerId: opts?.shopifyCustomerId ?? null,
+    commerce,
     performance,
     nutrition: aggregateNutrition(state),
     recovery: aggregateRecovery(state, performance.avgRpeHardStreak),
     supplements: aggregateSupplements(state),
     behavior: aggregateBehavior(state),
     goals: aggregateGoals(state),
+    lineage: buildDefaultLineage(),
+    estimates: buildEstimatesFromCommerce(commerce),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -59,9 +65,11 @@ export function mergeCommerceInto360(
   base: Customer360,
   commerce: Partial<Commerce360>,
 ): Customer360 {
+  const merged = { ...base.commerce, ...commerce };
   return {
     ...base,
-    commerce: { ...base.commerce, ...commerce },
+    commerce: merged,
+    estimates: buildEstimatesFromCommerce(merged),
     updatedAt: new Date().toISOString(),
   };
 }

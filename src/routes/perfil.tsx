@@ -120,13 +120,8 @@ function ProfilePage() {
 
   const bindAuth = async (authUuid: string) => {
     setAuthUserId(authUuid);
-    const appUserId = state.userId;
-    if (appUserId) {
-      await linkAuthToSocial(getDeviceId(), p.name, appUserId, authUuid);
-    } else {
-      await linkAuthToSocial(getDeviceId(), p.name, authUuid);
-    }
-    void trackEngagementEvent(getDeviceId(), "auth_linked", { authUuid, appUserId });
+    await linkAuthToSocial(getDeviceId(), p.name, authUuid);
+    void trackEngagementEvent(getDeviceId(), "auth_linked", { authUuid });
   };
 
   const reverifyPurchase = async () => {

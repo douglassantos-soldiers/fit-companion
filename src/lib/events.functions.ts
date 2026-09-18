@@ -14,7 +14,7 @@ function parseTrack(input: unknown): {
   if (!eventType) throw new Error("eventType obrigatório");
   const deviceId = String(v?.deviceId ?? "").trim();
   if (!deviceId || deviceId.length < 8) throw new Error("deviceId obrigatório");
-  // Intentionally ignore client userId — resolve on server
+  // Ignore client userId entirely
   return {
     deviceId,
     eventType,

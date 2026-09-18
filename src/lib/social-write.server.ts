@@ -58,7 +58,6 @@ export type SocialWriteOp =
       op: "linkAuthSocial";
       deviceId: string;
       displayName: string;
-      appUserId: string;
       authUserId: string;
     };
 
@@ -69,8 +68,8 @@ function clubCode() {
   return out;
 }
 
-async function assertDevice(deviceId: string) {
-  const identity = await resolveTrustedIdentity({ deviceId });
+async function assertDevice(deviceId: string, requireAccess = true) {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess });
   if (!identity) throw new Error("Identidade inválida");
   return identity;
 }
@@ -81,27 +80,45 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
 
   switch (op.op) {
     case "ensureProfile": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
       const { error } = await db.from("social_profiles").upsert(
         {
           device_id: op.deviceId,
+          app_user_id: identity.userId,
           display_name: op.displayName || "Soldado",
           updated_at: new Date().toISOString(),
         },
         { onConflict: "device_id" },
       );
       if (error) throw error;
-      return { ok: true };
+      // Also upsert by app_user_id when unique index exists (best-effort second write)
+      try {
+        await db
+          .from("social_profiles")
+          .update({
+            app_user_id: identity.userId,
+            display_name: op.displayName || "Soldado",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("device_id", op.deviceId);
+      } catch {
+        /* ignore */
+      }
+      return { ok: true, userId: identity.userId };
     }
     case "joinChallenge": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
       await executeSocialWrite({
         op: "ensureProfile",
         deviceId: op.deviceId,
         displayName: op.displayName,
       });
       const { error } = await db.from("challenge_entries").upsert(
-        { device_id: op.deviceId, challenge_id: op.challengeId },
+        {
+          device_id: op.deviceId,
+          user_id: identity.userId,
+          challenge_id: op.challengeId,
+        },
         { onConflict: "device_id,challenge_id" },
       );
       if (error) throw error;
@@ -110,6 +127,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         const { error: progErr } = await db.from("challenge_progress").upsert(
           {
             device_id: op.deviceId,
+            user_id: identity.userId,
             challenge_id: op.challengeId,
             value: op.baseline,
             baseline_value: op.baseline,
@@ -140,7 +158,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       return { ok: true };
     }
     case "syncChallengeProgress": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
       await executeSocialWrite({
         op: "ensureProfile",
         deviceId: op.deviceId,
@@ -154,6 +172,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       const { error } = await db.from("challenge_progress").upsert(
         {
           device_id: op.deviceId,
+          user_id: identity.userId,
           challenge_id: op.challengeId,
           value: op.value,
           baseline_value: baseline,
@@ -402,23 +421,22 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       return { ok: true };
     }
     case "linkAuthSocial": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
       await executeSocialWrite({
         op: "ensureProfile",
         deviceId: op.deviceId,
         displayName: op.displayName,
       });
-      // Store app user id on social_profiles (not auth uuid)
       await db
         .from("social_profiles")
         .update({
-          user_id: op.appUserId,
+          app_user_id: identity.userId,
           updated_at: new Date().toISOString(),
         })
         .eq("device_id", op.deviceId);
       const { linkAuthUserId } = await import("@/lib/identity");
-      await linkAuthUserId({ userId: op.appUserId, authUserId: op.authUserId });
-      return { ok: true };
+      await linkAuthUserId({ userId: identity.userId, authUserId: op.authUserId });
+      return { ok: true, userId: identity.userId };
     }
     default:
       throw new Error("op inválida");

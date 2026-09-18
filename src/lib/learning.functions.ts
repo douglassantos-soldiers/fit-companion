@@ -1,5 +1,5 @@
 /**
- * Server fns for Learning Engine — resolve userId from device, never trust client claim.
+ * Server fns for Learning Engine — resolve userId from session/device, never trust client claim.
  */
 import { createServerFn } from "@tanstack/react-start";
 import type { AppState } from "@/lib/types";
@@ -20,12 +20,15 @@ function parseLoad(input: unknown): { deviceId: string } {
   return { deviceId };
 }
 
-/** Fire-and-forget from client boot after identity resolve. */
+/** Persist patterns for the session user (requireAccess). */
 export const persistUserPatterns = createServerFn({ method: "POST" })
   .inputValidator(parsePersist)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({
+      deviceId: data.deviceId,
+      requireAccess: true,
+    });
     if (!identity) return { ok: false as const };
     const { saveUserPatterns } = await import("@/lib/engine/learning-patterns.server");
     const ok = await saveUserPatterns(identity.userId, data.patterns);
@@ -44,7 +47,6 @@ export const loadUserPatternsFn = createServerFn({ method: "POST" })
     return { ok: true as const, patterns };
   });
 
-/** Convenience: extract + persist from AppState slice (server-side). */
 export async function persistPatternsForUser(
   userId: string,
   state: Pick<AppState, "sessions" | "meals">,

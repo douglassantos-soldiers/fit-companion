@@ -12,10 +12,23 @@ const MAX_AGE_SEC = 60 * 60 * 24 * 400; // ~400 days
 export type AccessSessionPayload = {
   email: string;
   tier: "base" | "performance";
-  /** App user id (public.users) when known */
+  /** App user id (public.users) — required after establishAccessSession */
   userId?: string;
   exp: number;
 };
+
+export function setAccessSessionCookie(
+  payload: Omit<AccessSessionPayload, "exp"> & { userId: string },
+) {
+  const value = encodeAccessToken(payload);
+  setCookie(ACCESS_COOKIE, value, {
+    httpOnly: true,
+    secure: process.env["NODE_ENV"] === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: MAX_AGE_SEC,
+  });
+}
 
 function secret(): string {
   const s =
@@ -75,17 +88,6 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
   } catch {
     return null;
   }
-}
-
-export function setAccessSessionCookie(payload: Omit<AccessSessionPayload, "exp">) {
-  const value = encodeAccessToken(payload);
-  setCookie(ACCESS_COOKIE, value, {
-    httpOnly: true,
-    secure: process.env["NODE_ENV"] === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: MAX_AGE_SEC,
-  });
 }
 
 export function clearAccessSessionCookie() {

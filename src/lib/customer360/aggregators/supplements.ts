@@ -14,6 +14,7 @@ export function aggregateSupplements(state: AppState): Supplements360 {
       emptyAt: r.emptyAt,
       daysLeft,
       confidence: typeof r.confidence === "number" ? r.confidence : 0.45,
+      kind: "estimate",
     };
   }
 

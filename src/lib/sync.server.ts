@@ -157,29 +157,59 @@ function mapSessions(rows: Row[]) {
   });
 }
 
-async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
+async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promise<AppState | null> {
   const db = await adminDbLoose();
-  if (!db || !deviceIds.length) return null;
+  if (!db || !userId) return null;
 
   const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
     await Promise.all([
-      db.from("profiles").select("*").in("device_id", deviceIds).order("updated_at", { ascending: false }).limit(1),
-      db.from("sessions").select("*").in("device_id", deviceIds).order("date", { ascending: false }),
-      db.from("weights").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
-      db.from("daily_metrics").select("*").in("device_id", deviceIds),
-      db.from("supplement_logs").select("*").in("device_id", deviceIds),
-      db.from("app_state").select("*").in("device_id", deviceIds),
-      db.from("meal_entries").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
+      db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+      db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
+      db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
+      db.from("daily_metrics").select("*").eq("user_id", userId),
+      db.from("supplement_logs").select("*").eq("user_id", userId),
+      db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
+      db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
     ]);
 
-  const profiles = (profileRes.data ?? []) as Row[];
-  const sessions = (sessionsRes.data ?? []) as Row[];
-  const weights = (weightsRes.data ?? []) as Row[];
-  const days = (daysRes.data ?? []) as Row[];
-  const supplements = (supplementsRes.data ?? []) as Row[];
-  const states = (stateRes.data ?? []) as Row[];
-  const meals = (mealsRes.data ?? []) as Row[];
+  const hasUserRows =
+    profileRes.data ||
+    (sessionsRes.data?.length ?? 0) > 0 ||
+    (weightsRes.data?.length ?? 0) > 0 ||
+    (daysRes.data?.length ?? 0) > 0 ||
+    (supplementsRes.data?.length ?? 0) > 0 ||
+    stateRes.data ||
+    (mealsRes.data?.length ?? 0) > 0;
 
+  if (hasUserRows) {
+    return assembleStateFromRows({
+      profiles: profileRes.data ? [profileRes.data as Row] : [],
+      sessions: (sessionsRes.data ?? []) as Row[],
+      weights: (weightsRes.data ?? []) as Row[],
+      days: (daysRes.data ?? []) as Row[],
+      supplements: (supplementsRes.data ?? []) as Row[],
+      states: stateRes.data ? [stateRes.data as Row] : [],
+      meals: (mealsRes.data ?? []) as Row[],
+    });
+  }
+
+  // Legacy fallback: merge device-scoped rows then stamp will happen on next push
+  if (fallbackDeviceIds.length) {
+    return pullForDeviceIds(fallbackDeviceIds);
+  }
+  return null;
+}
+
+function assembleStateFromRows(opts: {
+  profiles: Row[];
+  sessions: Row[];
+  weights: Row[];
+  days: Row[];
+  supplements: Row[];
+  states: Row[];
+  meals: Row[];
+}): AppState | null {
+  const { profiles, sessions, weights, days, supplements, states, meals } = opts;
   const hasAnything =
     profiles.length > 0 ||
     sessions.length > 0 ||
@@ -188,42 +218,30 @@ async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
     supplements.length > 0 ||
     states.length > 0 ||
     meals.length > 0;
-
   if (!hasAnything) return null;
 
-  // Prefer most recently updated app_state
   const stateRow = [...states].sort((a, b) =>
     String(b["updated_at"] ?? "").localeCompare(String(a["updated_at"] ?? "")),
   )[0];
-
   const p = profiles[0];
 
-  // Dedupe sessions by client_id (keep latest date)
   const sessionById = new Map<string, Row>();
   for (const s of sessions) {
     const cid = String(s["client_id"]);
     const prev = sessionById.get(cid);
     if (!prev || String(s["date"]) >= String(prev["date"])) sessionById.set(cid, s);
   }
-
-  // Dedupe weights by date (prefer higher weight as last write — or later device)
   const weightByDate = new Map<string, Row>();
-  for (const w of weights) {
-    weightByDate.set(String(w["date"]), w);
-  }
-
+  for (const w of weights) weightByDate.set(String(w["date"]), w);
   const dayByDate = new Map<string, Row>();
   for (const d of days) dayByDate.set(String(d["date"]), d);
-
   const suppByDate = new Map<string, Row>();
   for (const s of supplements) suppByDate.set(String(s["date"]), s);
-
   const mealByClient = new Map<string, Row>();
   for (const m of meals) {
     const cid = String(m["client_id"] || m["id"]);
     mealByClient.set(cid, m);
   }
-
   const retention = retentionFromRow(stateRow?.["retention"]);
 
   return {
@@ -272,18 +290,43 @@ async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
   } as AppState;
 }
 
-/** Pull state for device; if user has multiple devices, merge all. */
+async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
+  const db = await adminDbLoose();
+  if (!db || !deviceIds.length) return null;
+
+  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
+    await Promise.all([
+      db.from("profiles").select("*").in("device_id", deviceIds).order("updated_at", { ascending: false }).limit(1),
+      db.from("sessions").select("*").in("device_id", deviceIds).order("date", { ascending: false }),
+      db.from("weights").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
+      db.from("daily_metrics").select("*").in("device_id", deviceIds),
+      db.from("supplement_logs").select("*").in("device_id", deviceIds),
+      db.from("app_state").select("*").in("device_id", deviceIds),
+      db.from("meal_entries").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
+    ]);
+
+  return assembleStateFromRows({
+    profiles: (profileRes.data ?? []) as Row[],
+    sessions: (sessionsRes.data ?? []) as Row[],
+    weights: (weightsRes.data ?? []) as Row[],
+    days: (daysRes.data ?? []) as Row[],
+    supplements: (supplementsRes.data ?? []) as Row[],
+    states: (stateRes.data ?? []) as Row[],
+    meals: (mealsRes.data ?? []) as Row[],
+  });
+}
+
+/** Pull by user_id (primary); fallback merge legacy device rows. */
 export async function pullStateServer(deviceId: string): Promise<{
   state: AppState | null;
   userId: string | null;
 }> {
   const identity = await resolveTrustedIdentity({ deviceId });
   if (!identity) {
-    // Boot before identity: still allow pull of this device only via ensuring user
     const { ensureUserForDevice } = await import("@/lib/identity");
     const user = await ensureUserForDevice(deviceId);
     if (!user) return { state: null, userId: null };
-    const state = await pullForDeviceIds([deviceId]);
+    const state = await pullForUserId(user.id, [deviceId]);
     if (state) state.userId = user.id;
     return { state, userId: user.id };
   }
@@ -291,28 +334,30 @@ export async function pullStateServer(deviceId: string): Promise<{
   const { listDeviceIdsForUser } = await import("@/lib/identity");
   const deviceIds = await listDeviceIdsForUser(identity.userId);
   const ids = deviceIds.length ? deviceIds : [deviceId];
-  const state = await pullForDeviceIds(ids);
+  const state = await pullForUserId(identity.userId, ids);
   if (state) state.userId = identity.userId;
   return { state, userId: identity.userId };
 }
 
-export async function pushStateServer(deviceId: string, state: AppState): Promise<{ ok: boolean; userId: string | null }> {
-  const identity = await resolveTrustedIdentity({ deviceId });
+export async function pushStateServer(
+  deviceId: string,
+  state: AppState,
+): Promise<{ ok: boolean; userId: string | null }> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false, userId: null };
 
   const db = await adminDbLoose();
   if (!db) return { ok: false, userId: identity.userId };
 
   const userId = identity.userId;
-  const userStamp = { user_id: userId };
+  const channel = { user_id: userId, device_id: deviceId };
   const tasks: Array<PromiseLike<unknown>> = [];
 
   if (state.profile) {
     tasks.push(
       db.from("profiles").upsert(
         {
-          device_id: deviceId,
-          ...userStamp,
+          ...channel,
           name: state.profile.name,
           goal: state.profile.goal,
           level: state.profile.level,
@@ -324,7 +369,7 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
           restrictions: state.profile.restrictions,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "device_id" },
+        { onConflict: "user_id" },
       ),
     );
   }
@@ -332,15 +377,14 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
   tasks.push(
     db.from("app_state").upsert(
       {
-        device_id: deviceId,
-        ...userStamp,
+        ...channel,
         supplement_routine: state.supplementRoutine,
         challenges: state.challenges,
         chat: state.chat as unknown as never,
         retention: { ...retentionPayload(state), userId },
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "device_id" },
+      { onConflict: "user_id" },
     ),
   );
 
@@ -348,8 +392,7 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     tasks.push(
       db.from("sessions").upsert(
         state.sessions.map((s) => ({
-          device_id: deviceId,
-          ...userStamp,
+          ...channel,
           client_id: s.id,
           day_id: s.dayId,
           title: s.title,
@@ -357,12 +400,10 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
           duration_min: s.durationMin,
           exercises: s.exercises as unknown as never,
           volume_kg: s.volumeKg,
-          // Store rpe/express inside a meta-friendly shape if columns missing — embed in exercises wrapper via retention is wrong;
-          // use exercises JSON + optional columns when present
           ...(s.rpe != null ? { rpe: s.rpe } : {}),
           ...(s.express ? { express: true } : {}),
         })),
-        { onConflict: "device_id,client_id" },
+        { onConflict: "user_id,client_id" },
       ),
     );
   }
@@ -371,12 +412,11 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     tasks.push(
       db.from("weights").upsert(
         state.weights.map((w) => ({
-          device_id: deviceId,
-          ...userStamp,
+          ...channel,
           date: w.date,
           weight_kg: w.weightKg,
         })),
-        { onConflict: "device_id,date" },
+        { onConflict: "user_id,date" },
       ),
     );
   }
@@ -386,13 +426,12 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     tasks.push(
       db.from("daily_metrics").upsert(
         days.map((d) => ({
-          device_id: deviceId,
-          ...userStamp,
+          ...channel,
           date: d.date,
           water_ml: d.waterMl,
           meals: d.meals,
         })),
-        { onConflict: "device_id,date" },
+        { onConflict: "user_id,date" },
       ),
     );
   }
@@ -402,12 +441,11 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     tasks.push(
       db.from("supplement_logs").upsert(
         supplementDays.map(([date, ids]) => ({
-          device_id: deviceId,
-          ...userStamp,
+          ...channel,
           date,
           supplement_ids: ids,
         })),
-        { onConflict: "device_id,date" },
+        { onConflict: "user_id,date" },
       ),
     );
   }
@@ -416,9 +454,8 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     tasks.push(
       db.from("meal_entries").upsert(
         state.meals.map((m) => ({
-          device_id: deviceId,
+          ...channel,
           client_id: m.id,
-          user_id: userId,
           date: m.date.slice(0, 10),
           name: m.label,
           meal_type: m.slot,
@@ -435,7 +472,7 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
           },
           updated_at: new Date().toISOString(),
         })),
-        { onConflict: "device_id,client_id" },
+        { onConflict: "user_id,client_id" },
       ),
     );
   }
@@ -446,7 +483,6 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
     if (error) console.error("pushStateServer failed", error);
   }
 
-  // Best-effort: persist rpe into session row via update if column exists (ignore errors)
   for (const s of state.sessions) {
     if (s.rpe == null && !s.express) continue;
     try {
@@ -456,10 +492,10 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
           ...(s.rpe != null ? { rpe: s.rpe } : {}),
           ...(s.express ? { express: true } : {}),
         } as never)
-        .eq("device_id", deviceId)
+        .eq("user_id", userId)
         .eq("client_id", s.id);
     } catch {
-      /* columns may not exist — rpe also in retention via dayCheckIns path */
+      /* ignore */
     }
   }
 
@@ -467,12 +503,11 @@ export async function pushStateServer(deviceId: string, state: AppState): Promis
 }
 
 export async function clearRemoteStateServer(deviceId: string): Promise<{ ok: boolean }> {
-  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: false });
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false };
   const db = await adminDbLoose();
   if (!db) return { ok: false };
 
-  // Only clear rows for this device owned by trusted user
   const tables = [
     "sessions",
     "weights",
@@ -482,8 +517,6 @@ export async function clearRemoteStateServer(deviceId: string): Promise<{ ok: bo
     "profiles",
     "meal_entries",
   ] as const;
-  await Promise.all(
-    tables.map((t) => db.from(t).delete().eq("device_id", deviceId).eq("user_id", identity.userId)),
-  );
+  await Promise.all(tables.map((t) => db.from(t).delete().eq("user_id", identity.userId)));
   return { ok: true };
 }

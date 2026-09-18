@@ -40,13 +40,20 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       upsertEntitlementEmail,
       buildOrderSnapshot,
     } = await import("@/lib/shopify.server");
-    const { linkDeviceToShopifyUser } = await import("@/lib/identity");
+    const { resolveOrCreateUserByEmail, linkDeviceToShopifyUser } = await import("@/lib/identity");
     const { upsertOrdersFromPaidList } = await import("@/lib/orders.server");
 
     const profile = await resolveAccessProfileForEmail(data.email);
     if (!profile) {
       return { ok: false as const, reason: "no_entitlement" as const };
     }
+
+    // Always resolve app user by email BEFORE cookie (identity is user, not device)
+    const appUser = await resolveOrCreateUserByEmail(data.email);
+    if (!appUser) {
+      return { ok: false as const, reason: "no_entitlement" as const };
+    }
+    let userId: string = appUser.id;
 
     // Persist entitlement email snapshot for future resolves (best-effort)
     try {
@@ -73,7 +80,6 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       console.warn("establishAccessSession entitlement email upsert skipped", e);
     }
 
-    let userId: string | null = null;
     if (data.deviceId) {
       try {
         await upsertDeviceEntitlementAdmin({
@@ -94,30 +100,36 @@ export const establishAccessSession = createServerFn({ method: "POST" })
           email: data.email,
           shopifyCustomerId: profile.customerId,
         });
-        userId = user?.id ?? null;
+        if (user?.id) userId = user.id;
       } catch (e) {
         console.error("establishAccessSession identity link failed", e);
       }
-
-      try {
-        const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
-        const { orders } = await fetchPaidOrdersByEmailServer(data.email);
-        await upsertOrdersFromPaidList({ userId, orders });
-      } catch (e) {
-        console.warn("establishAccessSession order sync skipped", e);
-      }
-
-      if (userId) {
-        void import("@/lib/customer360/recompute.server")
-          .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId!))
-          .catch((e) => console.warn("recomputeCustomerProfile skipped", e));
-      }
+    } else if (profile.customerId) {
+      const { linkShopifyIdentity } = await import("@/lib/identity");
+      await linkShopifyIdentity({
+        userId,
+        shopifyCustomerId: profile.customerId,
+        externalEmail: data.email,
+      });
     }
 
+    try {
+      const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
+      const { orders } = await fetchPaidOrdersByEmailServer(data.email);
+      await upsertOrdersFromPaidList({ userId, orders });
+    } catch (e) {
+      console.warn("establishAccessSession order sync skipped", e);
+    }
+
+    void import("@/lib/customer360/recompute.server")
+      .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId))
+      .catch((e) => console.warn("recomputeCustomerProfile skipped", e));
+
+    // Cookie ALWAYS includes userId after access
     setAccessSessionCookie({
       email: data.email,
       tier: profile.accessTier,
-      ...(userId ? { userId } : {}),
+      userId,
     });
 
     return {

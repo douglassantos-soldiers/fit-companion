@@ -36,11 +36,23 @@ Fluxo:
 
 - `orders` + `order_items` — entidades transacionais (`UNIQUE shopify_order_id`)
 - Webhooks: `customers/*`, `orders/*`, `refunds/create` com HMAC + idempotência (`shopify_webhook_events`)
-- Paginação Admin API via `Link: rel="next"` (cap 5 páginas / 250 pedidos por run)
+- Paginação Admin API via `Link: rel="next"` — **até 20 páginas / 1000 pedidos por run**; sync completo = loops até `hasMore=false` (cursor em `shopify_sync_cursors`)
+- `orders.raw_snapshot` = único raw Shopify; restock derivado vive em `customer_profiles.restock_estimates` (não re-gravar no entitlement snapshot)
 
 ## Customer 360
 
 Camada de agregação em `src/lib/customer360/` + tabela derivada `customer_profiles`.
+
+**Recompute é DB-first:** `hydrateAppStateFromDb(userId)` monta `AppState` a partir de `profiles`, `sessions`, `meal_entries`, `weights`, `daily_metrics`, `supplement_logs`, `app_state` — **sem** fallback `emptyState` que zerava performance/nutrition.
+
+Callers (webhook, access, refund, store) podem chamar `recomputeCustomerProfile(userId)` sem enviar AppState.
+
+| Campo | Origem |
+|-------|--------|
+| commerce | `orders` / `order_items` (`loadCommerce360`) |
+| performance / nutrition / recovery / behavior | aggregators sobre state hidratado |
+| `shopifyCustomerId` | `customer_identities` (provider `shopify`) |
+| `lineage` + `estimates` | gravados em `metrics` JSON; LTV/next purchase/restock têm `kind: "estimate"` |
 
 **Objetivos NÃO vêm de produtos Shopify.** Produtos são sinal commerce; goal vem de onboarding/perfil.
 
@@ -60,11 +72,15 @@ Camada de agregação em `src/lib/customer360/` + tabela derivada `customer_prof
 ## Sync
 
 - Domain sync is **server-authoritative** (`sync.functions.ts` → service_role).
-- `user_id` is resolved from `devices`, never trusted from the client.
-- Multi-device pull merges rows for all `device_id`s of the same `user_id`.
-- `dayCheckIns` live in `app_state.retention`; session `rpe`/`express` columns when present.
-- Local = cache/offline; Supabase = source of truth when synchronized.
-- Identity: `ensureIdentityForDevice` on boot.
+- Ownership key = **`user_id`**. `device_id` is canal (last writer provenance).
+- Push requires access cookie (`requireAccess`).
+- Pull prefers `.eq("user_id")` with legacy device merge fallback.
+- Multi-device: all devices of a user share the same domain rows.
+
+## Session
+
+- Cookie `soldiers_access` always includes `userId` after `establishAccessSession`.
+- `resolveTrustedIdentity` is session-first; never trusts client `userId`.
 
 ## Safety / Recommendation
 
@@ -77,14 +93,17 @@ Camada de agregação em `src/lib/customer360/` + tabela derivada `customer_prof
 `supabase/migrations/20260919000000_identity_customer360.sql` — não destrutiva.
 `supabase/migrations/20260919120000_harden_domain_rls.sql` — domain/social writes service_role only.
 `supabase/migrations/20260919120100_session_rpe_express.sql` — rpe/express on sessions.
+`supabase/migrations/20260919130000_user_owned_domain.sql` — UNIQUE por user_id + RLS authenticated ownership.
+`supabase/migrations/20260919140000_customer360_lineage.sql` — `shopify_customer_id` + `supplement_adherence` em `customer_profiles` (métricas/lineage também em `metrics` JSON).
 
-Aplicar com `supabase db push` ou SQL Editor no projeto.
+Aplicar com `supabase db push` (conta com privilégio no projeto `zphtvrsxlhfgltwgbreu`) ou SQL Editor no dashboard.
 
 
 ## Arquivos-chave
 
 - `src/lib/identity/` — Identity Engine
-- `src/lib/customer360/` — aggregators + recompute
+- `src/lib/customer360/` — aggregators + hydrate + recompute
+- `src/lib/customer360/hydrate.server.ts` — AppState from DB
 - `src/lib/events/track.ts` — eventos
 - `src/lib/shopify-orders.server.ts` — paginação
 - `src/lib/orders.server.ts` — persistência de pedidos

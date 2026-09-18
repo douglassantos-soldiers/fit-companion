@@ -172,11 +172,15 @@ export async function upsertEntitlementEmail(opts: {
   if (!db) throw new Error("db");
   const hash = await sha256Hex(opts.magicTokenPlain);
   const now = new Date().toISOString();
+  // Persist entitlement without derived restock — SoT is customer_profiles.restock_estimates
+  // (and orders.raw_snapshot for raw Shopify). Keep restock on in-memory snapshot for access bootstrap.
+  const { restockEstimates: _omitRestock, ...snapshotForStore } = opts.snapshot;
+  void _omitRestock;
   const { error } = await db.from("app_entitlement_emails").upsert(
     {
       email: opts.snapshot.email,
       shopify_customer_id: opts.snapshot.customerId,
-      order_snapshot: JSON.parse(JSON.stringify(opts.snapshot)) as import("@/integrations/supabase/types").Json,
+      order_snapshot: JSON.parse(JSON.stringify(snapshotForStore)) as import("@/integrations/supabase/types").Json,
       magic_token_hash: hash,
       magic_expires_at: opts.magicExpiresAt,
       last_order_at: opts.snapshot.orderedAt,

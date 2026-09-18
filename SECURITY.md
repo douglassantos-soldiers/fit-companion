@@ -14,5 +14,7 @@ O client ainda guarda UX state (`accessGranted`), mas o `AccessGate` exige sess�
 
 ## Dados de domínio / social
 
-Writes de profiles/sessions/meals/social passam por server fns (`sync.functions`, `social-write.functions`) com `service_role`.
+Ownership canônica = `user_id` (public.users). `device_id` é apenas canal.
+Writes de profiles/sessions/meals/social passam por server fns com `service_role` e sessão cookie.
+RLS: anon sem acesso ao domínio; `authenticated` só vê/escreve rows do próprio `user_id` (via `auth_user_id`).
 Não reabrir policies `USING (true)` para `anon` nas tabelas de domínio.

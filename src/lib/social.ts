@@ -241,17 +241,15 @@ export async function fetchLeaderboard(challengeId: string, deviceId: string): P
 
   let query = supabase
     .from("challenge_progress")
-    .select("device_id, value, baseline_value, pct_value" as never)
+    .select("device_id, user_id, value, baseline_value, pct_value" as never)
     .eq("challenge_id", challengeId)
-    .limit(20);
+    .limit(40);
 
-  // Prefer pct for relative; fall back to value
   const { data, error } = relative
     ? await query.order("pct_value" as never, { ascending: false, nullsFirst: false })
     : await query.order("value", { ascending: false });
 
   if (error) {
-    // Fallback if columns not migrated yet
     const fallback = await supabase
       .from("challenge_progress")
       .select("device_id, value")
@@ -274,31 +272,47 @@ export async function fetchLeaderboard(challengeId: string, deviceId: string): P
     }));
   }
 
+  // Dedupe multi-device rows of the same user (keep best rank / first)
   type ProgRow = {
     device_id: string;
+    user_id?: string | null;
     value: number;
     baseline_value?: number | null;
     pct_value?: number | null;
   };
   const rows = (data ?? []) as unknown as ProgRow[];
-  const sorted = relative
-    ? [...rows].sort((a, b) => Number(b.pct_value ?? 0) - Number(a.pct_value ?? 0))
-    : rows;
+  const seenUsers = new Set<string>();
+  const deduped: ProgRow[] = [];
+  for (const r of rows) {
+    const key = r.user_id || r.device_id;
+    if (seenUsers.has(key)) continue;
+    seenUsers.add(key);
+    deduped.push(r);
+    if (deduped.length >= 20) break;
+  }
 
-  const ids = sorted.map((r) => r.device_id);
-  const { data: profiles } = await supabase.from("social_profiles").select("device_id, display_name").in("device_id", ids);
-  const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
+  const ids = deduped.map((r) => r.device_id);
+  const { data: profiles } = await supabase
+    .from("social_profiles")
+    .select("device_id, display_name, app_user_id" as never)
+    .in("device_id", ids);
+  const nameMap = new Map(
+    (profiles ?? []).map((p: { device_id: string; display_name: string }) => [
+      p.device_id,
+      p.display_name,
+    ]),
+  );
 
-  return sorted.map((r, i) => {
-    const row: LeaderboardRow = {
+  return deduped.map((r, i) => {
+    const value = relative ? Number(r.pct_value ?? 0) : Number(r.value);
+    return {
       deviceId: r.device_id,
       displayName: nameMap.get(r.device_id) || "Soldado",
-      value: relative ? Number(r.pct_value ?? 0) : Number(r.value),
+      value,
       rank: i + 1,
       isYou: r.device_id === deviceId,
+      ...(relative ? { pct: Number(r.pct_value ?? 0) } : {}),
     };
-    if (relative) row.pct = Number(r.pct_value ?? 0);
-    return row;
   });
 }
 

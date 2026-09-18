@@ -115,7 +115,8 @@ export async function setSyncCursor(id: string, value: string | null): Promise<v
   }
 }
 
-const MAX_PAGES = 5; // 5 * 50 = 250 orders max per sync run
+/** Max pages per sync run (20 × 50 = 1000). Full history = loop until hasMore=false via cursor. */
+const MAX_PAGES = 20;
 const PAGE_LIMIT = 50;
 
 export async function fetchPaidOrdersByEmailServer(

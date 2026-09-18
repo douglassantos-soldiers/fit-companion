@@ -208,6 +208,10 @@ async function handleCustomerTopic(topic: string, payload: Record<string, unknow
       externalEmail: email.includes("@") ? email : null,
     });
   }
+  if (user) {
+    const { recomputeCustomerProfile } = await import("@/lib/customer360/recompute.server");
+    void recomputeCustomerProfile(user.id).catch(() => undefined);
+  }
   void topic;
 }
 

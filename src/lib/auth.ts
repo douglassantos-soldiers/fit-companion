@@ -3,7 +3,7 @@ import { ensureSocialProfile } from "@/lib/social";
 import { socialWriteFn } from "@/lib/social-write.functions";
 import { notifySocial } from "@/lib/notifications";
 
-/** Magic-link auth. Links social_profiles.user_id when possible. */
+/** Magic-link auth. Links social_profiles when possible. */
 export async function signInWithMagicLink(email: string) {
   const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/perfil` : undefined;
   const { error } = await supabase.auth.signInWithOtp({
@@ -32,31 +32,19 @@ export async function getAuthUser() {
 }
 
 /**
- * Link Supabase Auth to app user + social profile.
- * @param appUserId — public.users.id (not auth uuid)
- * @param authUserId — auth.users.id
+ * Link Supabase Auth UUID to app user via server (session resolves userId).
+ * @param authUserId — auth.users.id from Supabase Auth
  */
-export async function linkAuthToSocial(
-  deviceId: string,
-  displayName: string,
-  appUserId: string,
-  authUserId?: string,
-) {
+export async function linkAuthToSocial(deviceId: string, displayName: string, authUserId: string) {
   await ensureSocialProfile(deviceId, displayName);
-  if (authUserId && appUserId) {
-    await socialWriteFn({
-      data: {
-        op: "linkAuthSocial",
-        deviceId,
-        displayName,
-        appUserId,
-        authUserId,
-      },
-    });
-    return;
-  }
+  if (!authUserId) return;
   await socialWriteFn({
-    data: { op: "ensureProfile", deviceId, displayName },
+    data: {
+      op: "linkAuthSocial",
+      deviceId,
+      displayName,
+      authUserId,
+    },
   });
 }
 
