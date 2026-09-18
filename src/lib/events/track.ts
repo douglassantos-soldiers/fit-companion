@@ -3,40 +3,11 @@
  * Prefer this over ad-hoc engagement_events inserts.
  */
 import { adminDbLoose } from "@/lib/db-admin";
+import { normalizeEventType, resolveMetadata } from "@/lib/events/normalize";
+import type { TrackUserEventInput, UserEventType } from "@/lib/events/types";
 
-export type UserEventType =
-  | "user_created"
-  | "onboarding_completed"
-  | "workout_started"
-  | "workout_completed"
-  | "workout_skipped"
-  | "meal_logged"
-  | "weight_logged"
-  | "supplement_taken"
-  | "supplement_skipped"
-  | "challenge_started"
-  | "challenge_completed"
-  | "coach_interaction"
-  | "product_viewed"
-  | "product_clicked"
-  | "purchase"
-  | "refund"
-  | "restock"
-  | "goal_changed"
-  | "access_granted"
-  | "auth_linked"
-  | "restock_cta_click"
-  | string;
-
-export type TrackUserEventInput = {
-  userId?: string | null;
-  deviceId?: string | null;
-  eventType: UserEventType;
-  source?: string;
-  payload?: Record<string, unknown>;
-  occurredAt?: string;
-  idempotencyKey?: string;
-};
+export type { TrackUserEventInput, UserEventType } from "@/lib/events/types";
+export type { UserEventRecord, EmitUserEventInput, CanonicalEventType } from "@/lib/events/types";
 
 /** Server-side track into user_events (+ legacy engagement_events when device present). */
 export async function trackUserEvent(input: TrackUserEventInput): Promise<{ ok: boolean }> {
@@ -50,14 +21,22 @@ export async function trackUserEvent(input: TrackUserEventInput): Promise<{ ok: 
       userId = await getUserIdForDevice(input.deviceId);
     }
 
+    const eventType = normalizeEventType(String(input.eventType ?? ""));
+    if (!eventType) return { ok: false };
+
+    const metadata = resolveMetadata(input);
+
     const row: Record<string, unknown> = {
       user_id: userId,
       device_id: input.deviceId ?? null,
-      event_type: input.eventType,
+      event_type: eventType,
       source: input.source ?? "app",
-      payload: input.payload ?? {},
+      payload: metadata,
+      metadata,
       occurred_at: input.occurredAt ?? new Date().toISOString(),
     };
+    if (input.entityType) row["entity_type"] = input.entityType;
+    if (input.entityId) row["entity_id"] = input.entityId;
     if (input.idempotencyKey) row["idempotency_key"] = input.idempotencyKey;
 
     const { error } = await db.from("user_events").insert(row);
@@ -74,8 +53,8 @@ export async function trackUserEvent(input: TrackUserEventInput): Promise<{ ok: 
       await db.from("engagement_events").insert({
         device_id: input.deviceId,
         user_id: userId,
-        name: input.eventType,
-        props: input.payload ?? {},
+        name: eventType,
+        props: metadata,
       });
     }
 

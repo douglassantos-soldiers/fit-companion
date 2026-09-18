@@ -3,7 +3,7 @@ import { lessonForToday } from "@/data/habit-lessons";
 import { PRODUCTS } from "@/data/products";
 import { performanceDimensions, performanceScore, sessionsInLastDays, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
-import { buildLivingPlan } from "@/lib/engine/living-plan";
+import { buildLivingPlan, buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { buildDailyMealPlan, dayNutritionTotals, nextSuggestedMeal, nutritionGoals } from "@/lib/engine/nutrition";
 import { buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
 import { WEEK_MODE_LABEL } from "@/lib/engine/progression";
@@ -18,6 +18,10 @@ export interface CoachPrompt {
 export const COACH_PROMPTS: CoachPrompt[] = [
   { id: "hoje", label: "Qual é o treino de hoje?" },
   { id: "por-que", label: "Por que meu plano mudou?" },
+  { id: "por-que-treino", label: "Por que meu treino mudou?" },
+  { id: "por-que-calorias", label: "Por que minhas calorias mudaram?" },
+  { id: "por-que-descanso", label: "Por que você recomenda descanso?" },
+  { id: "por-que-proteina", label: "Por que minha proteína mudou?" },
   { id: "plano", label: "Como está meu plano da semana?" },
   { id: "progresso", label: "Estou evoluindo?" },
   { id: "nutricao", label: "Como está minha nutrição?" },
@@ -27,6 +31,12 @@ export const COACH_PROMPTS: CoachPrompt[] = [
   { id: "dor", label: "Estou dolorido" },
   { id: "desafio", label: "Me sugere um desafio" },
 ];
+
+function whyFromChange(state: AppState, key: string): string | null {
+  const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+  const hit = living?.whyByChange?.find((w) => w.key === key);
+  return hit?.reason ?? null;
+}
 
 export function coachReply(promptId: string, state: AppState): string {
   const profile = state.profile;
@@ -57,6 +67,7 @@ export function coachReply(promptId: string, state: AppState): string {
   const dosesToday = dosesTakenToday(state.supplementLogs, routine);
   const monthAdh = monthlyDoseAdherence(state.supplementLogs, routine);
   const learnNote = insights?.reasons[0] ? ` Aprendizado: ${insights.reasons[0]}` : "";
+  const built = buildLivingPlanWithDecisions(state);
 
   const modeNote =
     weekMode === "deload"
@@ -69,7 +80,7 @@ export function coachReply(promptId: string, state: AppState): string {
     case "hoje": {
       const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
       if (living) {
-        return `Hoje: ${living.workout.title} (${living.workout.mode}, ~${living.workout.estimatedMin} min, volume ${Math.round(living.workout.volumeFactor * 100)}%). ${living.narrative}`;
+        return `Hoje: ${living.workout.title} (${living.workout.mode}, ~${living.workout.estimatedMin} min, volume ${Math.round(living.workout.volumeFactor * 100)}%). Hábito: ${living.habits.title}. ${living.narrative}`;
       }
       return today
         ? `Hoje é ${today.title} — ${today.focus}. ${today.exercises.length} exercícios, cerca de ${today.estimatedMin} minutos.${modeNote} Abra a aba Treino e comece pelo primeiro movimento.`
@@ -78,9 +89,47 @@ export function coachReply(promptId: string, state: AppState): string {
     case "por-que": {
       const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
       if (!living?.why.length) return `Ainda sem sinais fortes de adaptação.${modeNote}${learnNote}`;
-      return `Por que o plano de hoje: ${living.why.slice(0, 4).join(" ")}${
+      const byChange = living.whyByChange?.length
+        ? ` Detalhes: ${living.whyByChange.map((w) => `${w.label}: ${w.reason}`).join(" ")}`
+        : "";
+      return `Por que o plano de hoje: ${living.why.slice(0, 4).join(" ")}${byChange}${
         living.diffFromYesterday.length ? ` Diff vs ontem: ${living.diffFromYesterday.join("; ")}.` : ""
       }`;
+    }
+    case "por-que-treino": {
+      const reason =
+        whyFromChange(state, "training") ??
+        built?.decisions.decisions.find((d) => d.decisionType === "training_mode")?.explanation;
+      return reason
+        ? `Por que o treino mudou: ${reason}`
+        : `O treino de hoje segue o plano padrão da semana.${modeNote}`;
+    }
+    case "por-que-calorias": {
+      const reason =
+        whyFromChange(state, "calories") ??
+        built?.decisions.decisions.find((d) => d.decisionType === "nutrition_calorie_delta")
+          ?.explanation;
+      return reason
+        ? `Por que as calorias mudaram: ${reason}`
+        : "As calorias estão estáveis em relação à meta do perfil.";
+    }
+    case "por-que-descanso": {
+      const reason =
+        whyFromChange(state, "recovery") ??
+        whyFromChange(state, "training") ??
+        built?.decisions.decisions.find((d) => d.decisionType === "primary_action")?.explanation;
+      return reason
+        ? `Por que recomendo descanso: ${reason}`
+        : "Hoje não há sinal forte de descanso — o treino segue liberado.";
+    }
+    case "por-que-proteina": {
+      const reason =
+        whyFromChange(state, "protein") ??
+        built?.decisions.decisions.find((d) => d.decisionType === "nutrition_protein_bias")
+          ?.explanation;
+      return reason
+        ? `Por que a proteína mudou: ${reason}`
+        : "A meta de proteína segue o padrão do seu objetivo.";
     }
     case "plano":
       return `Seu plano tem ${plan.length} treinos por semana com foco em ${GOAL_LABEL[profile.goal].toLowerCase()}. Nos últimos 7 dias você fez ${recent.length} de ${profile.daysPerWeek}.${modeNote} ${
@@ -133,6 +182,26 @@ export function coachReply(promptId: string, state: AppState): string {
 
 export function coachFreeform(text: string, state: AppState) {
   const t = text.toLowerCase();
+  if (
+    (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
+    (t.includes("treino") || t.includes("volume") || t.includes("sessão") || t.includes("sessao"))
+  )
+    return coachReply("por-que-treino", state);
+  if (
+    (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
+    (t.includes("caloria") || t.includes("kcal") || t.includes("energia"))
+  )
+    return coachReply("por-que-calorias", state);
+  if (
+    (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
+    (t.includes("descans") || t.includes("recuper") || t.includes("sono"))
+  )
+    return coachReply("por-que-descanso", state);
+  if (
+    (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
+    (t.includes("proteína") || t.includes("proteina"))
+  )
+    return coachReply("por-que-proteina", state);
   if (
     (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
     (t.includes("mudou") || t.includes("plano") || t.includes("why"))

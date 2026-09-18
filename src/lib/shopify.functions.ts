@@ -413,22 +413,46 @@ export const fetchStorefrontCatalog = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/** @deprecated Prefer trackAppUserEvent / emitUserEvent — kept as thin wrapper. */
 export const trackAppEvent = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
-    const value = input as { deviceId?: string; kind?: string; payload?: Record<string, unknown> } | null;
+    const value = input as {
+      deviceId?: string;
+      kind?: string;
+      payload?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+      entityType?: string;
+      entityId?: string;
+      occurredAt?: string;
+      idempotencyKey?: string;
+    } | null;
     const deviceId = String(value?.deviceId ?? "").trim();
     const kind = String(value?.kind ?? "").trim();
     if (!deviceId || !kind) throw new Error("deviceId e kind obrigatórios");
-    return { deviceId, kind, payload: value?.payload ?? {} };
+    return {
+      deviceId,
+      kind,
+      payload: value?.metadata ?? value?.payload ?? {},
+      entityType: value?.entityType,
+      entityId: value?.entityId,
+      occurredAt: value?.occurredAt,
+      idempotencyKey: value?.idempotencyKey,
+    };
   })
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     try {
-      const { trackUserEvent } = await import("@/lib/events/track");
-      return trackUserEvent({
-        deviceId: data.deviceId,
-        eventType: data.kind,
-        source: "app",
-        payload: data.payload,
+      const { trackAppUserEvent } = await import("@/lib/events.functions");
+      return trackAppUserEvent({
+        data: {
+          deviceId: data.deviceId,
+          eventType: data.kind,
+          source: "app",
+          metadata: data.payload,
+          entityType: data.entityType,
+          entityId: data.entityId,
+          occurredAt: data.occurredAt,
+          idempotencyKey: data.idempotencyKey,
+        },
       });
     } catch (e) {
       console.warn("trackAppEvent failed", e);

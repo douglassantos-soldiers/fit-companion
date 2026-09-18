@@ -35,6 +35,14 @@ export interface DayCheckIn {
   energy: DayEnergy;
   availableMin: number;
   noEquipment?: boolean;
+  /** Muscle soreness 1–5 (optional; FASE 3) */
+  soreness?: number;
+  /** Stress 1–5 (optional; FASE 3) */
+  stress?: number;
+  /** Short free-text note (sanitized server-side) */
+  notes?: string;
+  /** Optimistic concurrency for multi-device sync */
+  version?: number;
 }
 
 export interface LivingPlanSnapshot {
@@ -46,6 +54,7 @@ export interface LivingPlanSnapshot {
     training: TrafficLight;
     nutrition: TrafficLight;
     recovery: TrafficLight;
+    consistency: TrafficLight;
   };
   workout: {
     mode: "full" | "express" | "deload" | "rest";
@@ -62,8 +71,11 @@ export interface LivingPlanSnapshot {
   };
   supplements: Array<{ id: string; name: string; timing: string }>;
   sleepTargetHours: number;
+  habits: { title: string; tip: string };
   narrative: string;
   why: string[];
+  /** Structured why per relevant change (treino, kcal, proteína, stims, recuperação). */
+  whyByChange: Array<{ key: string; label: string; reason: string }>;
   diffFromYesterday: string[];
 }
 

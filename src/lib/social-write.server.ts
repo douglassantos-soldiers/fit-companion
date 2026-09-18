@@ -149,6 +149,21 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           relative: c ? isRelativeChallenge(c) : false,
         },
       });
+      try {
+        const { trackUserEvent } = await import("@/lib/events/track");
+        await trackUserEvent({
+          deviceId: op.deviceId,
+          userId: identity.userId,
+          eventType: "challenge_joined",
+          source: "social",
+          entityType: "challenge",
+          entityId: op.challengeId,
+          metadata: { challengeId: op.challengeId },
+          idempotencyKey: `challenge:${op.challengeId}:challenge_joined`,
+        });
+      } catch {
+        /* best-effort */
+      }
       return { ok: true };
     }
     case "leaveChallenge": {
@@ -203,6 +218,21 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
             relative,
           },
         });
+        try {
+          const { trackUserEvent } = await import("@/lib/events/track");
+          await trackUserEvent({
+            deviceId: op.deviceId,
+            userId: identity.userId,
+            eventType: "challenge_completed",
+            source: "social",
+            entityType: "challenge",
+            entityId: op.challengeId,
+            metadata: { challengeId: op.challengeId, value: op.value },
+            idempotencyKey: `challenge:${op.challengeId}:challenge_completed`,
+          });
+        } catch {
+          /* best-effort */
+        }
       }
       return { ok: true, done };
     }

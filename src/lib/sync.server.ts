@@ -3,6 +3,8 @@
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
+import { nextVersion, shouldAcceptWrite } from "@/lib/sync/conflict";
+import { dayCheckInToRow, mergeDayCheckIns, rowToDayCheckIn } from "@/lib/sync/day-checkin";
 import {
   type AppState,
   type ChatMessage,
@@ -161,7 +163,7 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
   const db = await adminDbLoose();
   if (!db || !userId) return null;
 
-  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
+  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes, checkInsRes] =
     await Promise.all([
       db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
@@ -170,7 +172,14 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
       db.from("supplement_logs").select("*").eq("user_id", userId),
       db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
       db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
+      db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
     ]);
+
+  // day_checkins may be missing before migration — ignore table errors
+  const checkInRows =
+    checkInsRes && !("error" in checkInsRes && checkInsRes.error)
+      ? ((checkInsRes.data ?? []) as Row[])
+      : [];
 
   const hasUserRows =
     profileRes.data ||
@@ -179,7 +188,8 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
     (daysRes.data?.length ?? 0) > 0 ||
     (supplementsRes.data?.length ?? 0) > 0 ||
     stateRes.data ||
-    (mealsRes.data?.length ?? 0) > 0;
+    (mealsRes.data?.length ?? 0) > 0 ||
+    checkInRows.length > 0;
 
   if (hasUserRows) {
     return assembleStateFromRows({
@@ -190,6 +200,7 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
       supplements: (supplementsRes.data ?? []) as Row[],
       states: stateRes.data ? [stateRes.data as Row] : [],
       meals: (mealsRes.data ?? []) as Row[],
+      dayCheckIns: checkInRows,
     });
   }
 
@@ -208,8 +219,9 @@ function assembleStateFromRows(opts: {
   supplements: Row[];
   states: Row[];
   meals: Row[];
+  dayCheckIns?: Row[];
 }): AppState | null {
-  const { profiles, sessions, weights, days, supplements, states, meals } = opts;
+  const { profiles, sessions, weights, days, supplements, states, meals, dayCheckIns = [] } = opts;
   const hasAnything =
     profiles.length > 0 ||
     sessions.length > 0 ||
@@ -217,7 +229,8 @@ function assembleStateFromRows(opts: {
     days.length > 0 ||
     supplements.length > 0 ||
     states.length > 0 ||
-    meals.length > 0;
+    meals.length > 0 ||
+    dayCheckIns.length > 0;
   if (!hasAnything) return null;
 
   const stateRow = [...states].sort((a, b) =>
@@ -243,6 +256,8 @@ function assembleStateFromRows(opts: {
     mealByClient.set(cid, m);
   }
   const retention = retentionFromRow(stateRow?.["retention"]);
+  const tableCheckIns = dayCheckIns.map((r) => rowToDayCheckIn(r));
+  const mergedCheckIns = mergeDayCheckIns(retention.dayCheckIns ?? {}, tableCheckIns);
 
   return {
     profile: p
@@ -287,6 +302,7 @@ function assembleStateFromRows(opts: {
     reminderHour: 18,
     seenOnboardingTips: [],
     ...retention,
+    dayCheckIns: mergedCheckIns,
   } as AppState;
 }
 
@@ -342,7 +358,7 @@ export async function pullStateServer(deviceId: string): Promise<{
 export async function pushStateServer(
   deviceId: string,
   state: AppState,
-): Promise<{ ok: boolean; userId: string | null }> {
+): Promise<{ ok: boolean; userId: string | null; conflicts?: string[] }> {
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false, userId: null };
 
@@ -352,26 +368,43 @@ export async function pushStateServer(
   const userId = identity.userId;
   const channel = { user_id: userId, device_id: deviceId };
   const tasks: Array<PromiseLike<unknown>> = [];
+  const conflicts: string[] = [];
 
   if (state.profile) {
-    tasks.push(
-      db.from("profiles").upsert(
-        {
-          ...channel,
-          name: state.profile.name,
-          goal: state.profile.goal,
-          level: state.profile.level,
-          days_per_week: state.profile.daysPerWeek,
-          age: state.profile.age,
-          height_cm: state.profile.heightCm,
-          weight_kg: state.profile.weightKg,
-          equipment: state.profile.equipment,
-          restrictions: state.profile.restrictions,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      ),
-    );
+    const { data: remoteProfile } = await db
+      .from("profiles")
+      .select("version, updated_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const incomingVersion = Number((state.profile as { version?: number }).version ?? 1);
+    if (
+      shouldAcceptWrite(remoteProfile as { version?: number; updated_at?: string } | null, {
+        version: incomingVersion,
+        clientUpdatedAt: new Date().toISOString(),
+      })
+    ) {
+      tasks.push(
+        db.from("profiles").upsert(
+          {
+            ...channel,
+            name: state.profile.name,
+            goal: state.profile.goal,
+            level: state.profile.level,
+            days_per_week: state.profile.daysPerWeek,
+            age: state.profile.age,
+            height_cm: state.profile.heightCm,
+            weight_kg: state.profile.weightKg,
+            equipment: state.profile.equipment,
+            restrictions: state.profile.restrictions,
+            version: nextVersion((remoteProfile as { version?: number } | null)?.version),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        ),
+      );
+    } else {
+      conflicts.push("profile");
+    }
   }
 
   tasks.push(
@@ -389,23 +422,46 @@ export async function pushStateServer(
   );
 
   if (state.sessions.length) {
-    tasks.push(
-      db.from("sessions").upsert(
-        state.sessions.map((s) => ({
-          ...channel,
-          client_id: s.id,
-          day_id: s.dayId,
-          title: s.title,
-          date: s.date,
-          duration_min: s.durationMin,
-          exercises: s.exercises as unknown as never,
-          volume_kg: s.volumeKg,
-          ...(s.rpe != null ? { rpe: s.rpe } : {}),
-          ...(s.express ? { express: true } : {}),
-        })),
-        { onConflict: "user_id,client_id" },
-      ),
+    const { data: remoteSessions } = await db
+      .from("sessions")
+      .select("client_id, version, updated_at")
+      .eq("user_id", userId);
+    const remoteById = new Map(
+      ((remoteSessions ?? []) as Row[]).map((r) => [String(r["client_id"]), r]),
     );
+    const accepted = state.sessions.filter((s) => {
+      const remote = remoteById.get(s.id);
+      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
+        version: Number((s as { version?: number }).version ?? 1),
+        clientUpdatedAt: new Date().toISOString(),
+      });
+      if (!ok) conflicts.push(`session:${s.id}`);
+      return ok;
+    });
+    if (accepted.length) {
+      tasks.push(
+        db.from("sessions").upsert(
+          accepted.map((s) => {
+            const remote = remoteById.get(s.id);
+            return {
+              ...channel,
+              client_id: s.id,
+              day_id: s.dayId,
+              title: s.title,
+              date: s.date,
+              duration_min: s.durationMin,
+              exercises: s.exercises as unknown as never,
+              volume_kg: s.volumeKg,
+              version: nextVersion((remote as { version?: number } | undefined)?.version),
+              updated_at: new Date().toISOString(),
+              ...(s.rpe != null ? { rpe: s.rpe } : {}),
+              ...(s.express ? { express: true } : {}),
+            };
+          }),
+          { onConflict: "user_id,client_id" },
+        ),
+      );
+    }
   }
 
   if (state.weights.length) {
@@ -451,30 +507,88 @@ export async function pushStateServer(
   }
 
   if (state.meals?.length) {
-    tasks.push(
-      db.from("meal_entries").upsert(
-        state.meals.map((m) => ({
-          ...channel,
-          client_id: m.id,
-          date: m.date.slice(0, 10),
-          name: m.label,
-          meal_type: m.slot,
-          protein_g: m.proteinG,
-          kcal: m.kcal,
-          payload: {
-            slot: m.slot,
-            label: m.label,
-            quality: m.quality,
-            presetId: m.presetId,
-            servings: m.servings,
-            proteinG: m.proteinG,
-            kcal: m.kcal,
-          },
-          updated_at: new Date().toISOString(),
-        })),
-        { onConflict: "user_id,client_id" },
-      ),
+    const { data: remoteMeals } = await db
+      .from("meal_entries")
+      .select("client_id, version, updated_at")
+      .eq("user_id", userId);
+    const remoteById = new Map(
+      ((remoteMeals ?? []) as Row[]).map((r) => [String(r["client_id"]), r]),
     );
+    const accepted = state.meals.filter((m) => {
+      const remote = remoteById.get(m.id);
+      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
+        version: Number((m as { version?: number }).version ?? 1),
+        clientUpdatedAt: new Date().toISOString(),
+      });
+      if (!ok) conflicts.push(`meal:${m.id}`);
+      return ok;
+    });
+    if (accepted.length) {
+      tasks.push(
+        db.from("meal_entries").upsert(
+          accepted.map((m) => {
+            const remote = remoteById.get(m.id);
+            return {
+              ...channel,
+              client_id: m.id,
+              date: m.date.slice(0, 10),
+              name: m.label,
+              meal_type: m.slot,
+              protein_g: m.proteinG,
+              kcal: m.kcal,
+              payload: {
+                slot: m.slot,
+                label: m.label,
+                quality: m.quality,
+                presetId: m.presetId,
+                servings: m.servings,
+                proteinG: m.proteinG,
+                kcal: m.kcal,
+              },
+              version: nextVersion((remote as { version?: number } | undefined)?.version),
+              updated_at: new Date().toISOString(),
+            };
+          }),
+          { onConflict: "user_id,client_id" },
+        ),
+      );
+    }
+  }
+
+  // Dual-write structured day_checkins
+  const checkIns = Object.values(state.dayCheckIns ?? {});
+  if (checkIns.length) {
+    const { data: remoteChecks } = await db
+      .from("day_checkins")
+      .select("date, version, updated_at")
+      .eq("user_id", userId);
+    const remoteByDate = new Map(
+      ((remoteChecks ?? []) as Row[]).map((r) => [String(r["date"]).slice(0, 10), r]),
+    );
+    const accepted = checkIns.filter((c) => {
+      const remote = remoteByDate.get(c.date.slice(0, 10));
+      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
+        version: Number(c.version ?? 1),
+        clientUpdatedAt: new Date().toISOString(),
+      });
+      if (!ok) conflicts.push(`day_checkin:${c.date}`);
+      return ok;
+    });
+    if (accepted.length) {
+      tasks.push(
+        db.from("day_checkins").upsert(
+          accepted.map((c) => {
+            const remote = remoteByDate.get(c.date.slice(0, 10));
+            return dayCheckInToRow(
+              c,
+              channel,
+              nextVersion((remote as { version?: number } | undefined)?.version),
+            );
+          }),
+          { onConflict: "user_id,date" },
+        ),
+      );
+    }
   }
 
   const results = await Promise.all(tasks.map((t) => Promise.resolve(t).catch((e: unknown) => ({ error: e }))));
@@ -499,6 +613,53 @@ export async function pushStateServer(
     }
   }
 
+  return { ok: true, userId, ...(conflicts.length ? { conflicts } : {}) };
+}
+
+/** Granular day check-in upsert with version conflict. */
+export async function upsertDayCheckInServer(
+  deviceId: string,
+  checkIn: DayCheckIn,
+  incomingVersion = 1,
+): Promise<{ ok: boolean; conflict?: boolean; remote?: DayCheckIn; userId: string | null }> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity) return { ok: false, userId: null };
+
+  const db = await adminDbLoose();
+  if (!db) return { ok: false, userId: identity.userId };
+
+  const userId = identity.userId;
+  const date = checkIn.date.slice(0, 10);
+  const { data: remoteRow } = await db
+    .from("day_checkins")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .maybeSingle();
+
+  const remote = remoteRow as Row | null;
+  if (
+    remote &&
+    !shouldAcceptWrite(
+      { version: Number(remote["version"] ?? 0), updated_at: String(remote["updated_at"] ?? "") },
+      { version: incomingVersion, clientUpdatedAt: new Date().toISOString() },
+    )
+  ) {
+    return {
+      ok: false,
+      conflict: true,
+      remote: rowToDayCheckIn(remote),
+      userId,
+    };
+  }
+
+  const version = nextVersion(remote ? Number(remote["version"] ?? 0) : 0);
+  const row = dayCheckInToRow(checkIn, { user_id: userId, device_id: deviceId }, version);
+  const { error } = await db.from("day_checkins").upsert(row, { onConflict: "user_id,date" });
+  if (error) {
+    console.error("upsertDayCheckInServer failed", error);
+    return { ok: false, userId };
+  }
   return { ok: true, userId };
 }
 
@@ -516,6 +677,7 @@ export async function clearRemoteStateServer(deviceId: string): Promise<{ ok: bo
     "app_state",
     "profiles",
     "meal_entries",
+    "day_checkins",
   ] as const;
   await Promise.all(tables.map((t) => db.from(t).delete().eq("user_id", identity.userId)));
   return { ok: true };

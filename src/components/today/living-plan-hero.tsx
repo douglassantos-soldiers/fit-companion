@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { HelpCircle, Moon, Pill, Play, Utensils, Zap } from "lucide-react";
+import { BookOpen, HelpCircle, Moon, Pill, Play, Utensils, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import type { DayCheckIn, DayEnergy, LivingPlanSnapshot } from "@/lib/types";
@@ -12,16 +12,27 @@ const TRAFFIC: Record<"green" | "yellow" | "red", string> = {
   red: "bg-destructive",
 };
 
+export type LivingPlanPrimaryAction = {
+  id: string;
+  title: string;
+  reason: string;
+  href?: string;
+};
+
 export function LivingPlanHero({
   plan,
   doneToday,
   checkIn,
   onSaveCheckIn,
+  primaryAction,
+  onPrimaryAction,
 }: {
   plan: LivingPlanSnapshot;
   doneToday: boolean;
   checkIn: DayCheckIn | undefined;
   onSaveCheckIn: (c: Omit<DayCheckIn, "date">) => void;
+  primaryAction?: LivingPlanPrimaryAction | null;
+  onPrimaryAction?: () => void;
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(!checkIn);
@@ -29,6 +40,23 @@ export function LivingPlanHero({
   const [energy, setEnergy] = useState<DayEnergy>(checkIn?.energy ?? "ok");
   const [availableMin, setMin] = useState(checkIn?.availableMin ?? 60);
   const [noEquipment, setNoEq] = useState(checkIn?.noEquipment ?? false);
+  const [soreness, setSoreness] = useState(checkIn?.soreness ?? 3);
+  const [stress, setStress] = useState(checkIn?.stress ?? 3);
+  const [notes, setNotes] = useState(checkIn?.notes ?? "");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const primaryHref =
+    primaryAction?.href === "/treino"
+      ? "/treino"
+      : primaryAction?.href === "/nutricao"
+        ? "/nutricao"
+        : primaryAction?.href === "/suplementos"
+          ? "/suplementos"
+          : primaryAction?.href === "/coach"
+            ? "/coach"
+            : primaryAction?.href === "/"
+              ? "/"
+              : null;
 
   return (
     <>
@@ -97,6 +125,64 @@ export function LivingPlanHero({
               Sem equipamento
             </button>
           </div>
+          <button
+            type="button"
+            className="text-xs font-semibold text-primary"
+            onClick={() => setAdvancedOpen((v) => !v)}
+          >
+            {advancedOpen ? "Ocultar detalhes" : "Dor, estresse e notas (opcional)"}
+          </button>
+          {advancedOpen ? (
+            <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div>
+                <p className="mb-1.5 text-xs text-muted-foreground">Dor muscular (1–5)</p>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={`sore-${n}`}
+                      type="button"
+                      onClick={() => setSoreness(n)}
+                      className={cn(
+                        "size-8 rounded-full border text-xs font-semibold",
+                        soreness === n ? "border-primary bg-primary/15 text-primary" : "border-white/10",
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs text-muted-foreground">Estresse (1–5)</p>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={`stress-${n}`}
+                      type="button"
+                      onClick={() => setStress(n)}
+                      className={cn(
+                        "size-8 rounded-full border text-xs font-semibold",
+                        stress === n ? "border-primary bg-primary/15 text-primary" : "border-white/10",
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs text-muted-foreground">Notas</p>
+                <input
+                  type="text"
+                  value={notes}
+                  maxLength={280}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ex.: viagem, prova, dor no joelho…"
+                  className="h-10 w-full rounded-lg border border-white/10 bg-transparent px-3 text-sm outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+          ) : null}
           <Button
             className="h-11 w-full font-bold uppercase tracking-wide"
             onClick={() => {
@@ -105,6 +191,9 @@ export function LivingPlanHero({
                 energy,
                 availableMin,
                 ...(noEquipment ? { noEquipment: true } : {}),
+                soreness,
+                stress,
+                ...(notes.trim() ? { notes: notes.trim().slice(0, 280) } : {}),
               });
               setCheckOpen(false);
             }}
@@ -137,6 +226,7 @@ export function LivingPlanHero({
                   ["Treinamento", plan.traffic.training],
                   ["Nutrição", plan.traffic.nutrition],
                   ["Recuperação", plan.traffic.recovery],
+                  ["Consistência", plan.traffic.consistency],
                 ] as const
               ).map(([label, light]) => (
                 <div key={label} className="flex items-center justify-end gap-2">
@@ -164,6 +254,23 @@ export function LivingPlanHero({
             <HelpCircle className="size-3.5" /> Por quê?
           </button>
 
+          {primaryAction && primaryHref ? (
+            <Link
+              to={primaryHref}
+              className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3"
+              onClick={() => onPrimaryAction?.()}
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  O que fazer agora
+                </p>
+                <p className="truncate text-sm font-semibold text-foreground">{primaryAction.title}</p>
+                <p className="truncate text-xs text-muted-foreground">{primaryAction.reason}</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-primary">Ir</span>
+            </Link>
+          ) : null}
+
           <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
             <p className="eyebrow">O que fazer hoje</p>
 
@@ -177,7 +284,7 @@ export function LivingPlanHero({
                   {plan.workout.mode} · ~{plan.workout.estimatedMin} min · volume{" "}
                   {Math.round(plan.workout.volumeFactor * 100)}%
                 </p>
-                {!doneToday && plan.workout.dayId ? (
+                {!doneToday && plan.workout.dayId && plan.workout.mode !== "rest" ? (
                   <div className="mt-2 flex flex-col gap-2">
                     <Link
                       to="/treino/sessao/$id"
@@ -240,6 +347,14 @@ export function LivingPlanHero({
                 <p className="text-xs text-muted-foreground">Meta de hoje para fechar o loop.</p>
               </div>
             </div>
+
+            <div className="flex items-start gap-3">
+              <BookOpen className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">Hábito · {plan.habits.title}</p>
+                <p className="text-xs text-muted-foreground">{plan.habits.tip}</p>
+              </div>
+            </div>
           </div>
 
           {plan.diffFromYesterday.length ? (
@@ -251,6 +366,21 @@ export function LivingPlanHero({
       </section>
 
       <SoldiersOverlay open={whyOpen} onClose={() => setWhyOpen(false)} title="Por que o plano de hoje?">
+        {plan.whyByChange?.length ? (
+          <ul className="mb-4 space-y-2 text-sm text-muted-foreground">
+            {plan.whyByChange.map((item) => (
+              <li
+                key={item.key}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-foreground"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  {item.label}
+                </p>
+                <p className="mt-0.5">{item.reason}</p>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <ul className="space-y-2 text-sm text-muted-foreground">
           {plan.why.map((w) => (
             <li key={w} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-foreground">

@@ -1,17 +1,32 @@
 import { performanceDimensions, performanceScore, adherenceScore, sessionsInLastDays, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, learningWeekHint, extractUserPatterns, patternInsights } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
-import { buildLivingPlan } from "@/lib/engine/living-plan";
+import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { buildDailyMealPlan, dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
+import { evaluateSafety } from "@/lib/engine/safety";
 import { activeHubForState } from "@/data/hubs";
 import { BLOCKER_LABEL, GOAL_LABEL, LEVEL_LABEL, MEAL_SLOT_LABEL, todayKey, type AppState } from "@/lib/types";
 
-/** Resumo dos dados do usuário enviado ao modelo como contexto. */
-export function coachSystemPrompt(state: AppState): string {
+export type CoachContextBundle = {
+  contextText: string;
+  safetyNotice?: string;
+  why: string[];
+  decisions: Array<{ type: string; value: string | number | boolean; explanation: string }>;
+  livingSummary: string;
+};
+
+/** Build coach context from AppState (server-trusted when hydrated from DB). */
+export function buildCoachContextFromState(state: AppState): CoachContextBundle {
   const p = state.profile;
   if (!p) {
-    return "Você é o coach de performance do app Soldiers. O usuário ainda não preencheu o perfil. Responda em português do Brasil, de forma curta e direta, e incentive-o a completar o perfil.";
+    return {
+      contextText:
+        "O usuário ainda não preencheu o perfil. Incentive-o a completar o perfil.",
+      why: [],
+      decisions: [],
+      livingSummary: "indisponível",
+    };
   }
 
   const insights = computeLearningInsights(state);
@@ -23,12 +38,14 @@ export function coachSystemPrompt(state: AppState): string {
   const recent = sessionsInLastDays(state.sessions, 7);
   const metrics = state.days[todayKey()];
   const totals = dayNutritionTotals(state.meals ?? []);
-  const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+  const built = buildLivingPlanWithDecisions(state);
+  const living = state.livingPlans?.[todayKey()] ?? built?.plan ?? null;
   const checkIn = state.dayCheckIns?.[todayKey()];
   const activeHub = activeHubForState(state.joinedHubIds);
   const ctx = buildUserContext(state, state.userId);
   const patterns = extractUserPatterns(state);
   const patternLines = patternInsights(patterns);
+  const safety = evaluateSafety(state);
 
   const mealLines = mealPlan.slots
     .map((s) => {
@@ -44,23 +61,53 @@ export function coachSystemPrompt(state: AppState): string {
       ? [`Aprendizados recentes:`, ...insights.reasons.map((r) => `- ${r}`)]
       : ["Aprendizados recentes: nenhum ajuste automático no momento."];
 
-  const whyBlock = living?.why?.length
-    ? [`Por que o plano de hoje:`, ...living.why.map((r) => `- ${r}`)]
+  const why = living?.why?.length ? living.why : ctx.why;
+  const whyBlock = why.length ? [`Por que o plano de hoje:`, ...why.map((r) => `- ${r}`)] : [];
+
+  const whyByChangeBlock = living?.whyByChange?.length
+    ? ["Why por mudança:", ...living.whyByChange.map((w) => `- ${w.label}: ${w.reason}`)]
     : [];
 
   const contextBlock = ctx.why.length
     ? [`Contexto de hoje (Context Engine):`, ...ctx.why.map((r) => `- ${r}`)]
     : ["Contexto de hoje: estável."];
 
+  const reasonBlock = ctx.reasonCodes.length
+    ? [`Reason codes: ${ctx.reasonCodes.join(", ")}`]
+    : [];
+
+  const decisions =
+    built?.decisions.decisions.map((d) => ({
+      type: d.decisionType,
+      value: d.decisionValue,
+      explanation: d.explanation,
+    })) ?? [];
+
+  const decisionBlock = decisions.length
+    ? [
+        "Decisões de hoje (Decision Engine — NÃO recalcule volume/kcal/mode; apenas explique):",
+        ...built!.decisions.decisions.map(
+          (d) =>
+            `- ${d.decisionType}=${String(d.decisionValue)} | codes=[${d.reasonCodes.join(",")}] | conf=${d.confidence} | ${d.explanation}`,
+        ),
+      ]
+    : [];
+
   const patternBlock = patternLines.length
     ? [`Padrões observados:`, ...patternLines.map((r) => `- ${r}`)]
     : [];
 
-  return [
-    "Você é o coach de performance do app Soldiers (treino, nutrição e suplementação).",
-    "Responda sempre em português do Brasil, em tom direto e motivador, no máximo 6 frases.",
+  const safetyBlock = [
+    `Safety: escalate=${safety.escalateCare} | blockStims=${safety.blockStims} | light=${safety.preferLightTraining} | flags=${safety.flags.join(",")}`,
+    ...safety.reasons.map((r) => `- ${r}`),
+  ];
+
+  const livingSummary = living
+    ? `treino ${living.workout.mode} (${living.workout.title}, volume ${Math.round(living.workout.volumeFactor * 100)}%) | macros ${living.nutrition.proteinG}g / ${living.nutrition.kcal} kcal | sono meta ${living.sleepTargetHours}h | hábito ${living.habits.title} | freio ${living.blocker?.label ?? "—"}`
+    : "indisponível";
+
+  const contextText = [
     "Baseie-se nos dados abaixo. Nunca invente números. Não dê diagnóstico médico.",
-    "Quando perguntarem por que o plano mudou, use os blocos de contexto e 'Por que o plano de hoje'.",
     "Use os aprendizados e o plano alimentar sugerido quando falar de nutrição.",
     "Não assuma objetivo a partir de produtos comprados — objetivo vem do perfil.",
     "",
@@ -71,16 +118,16 @@ export function coachSystemPrompt(state: AppState): string {
     p.primaryBlocker ? `Bloqueio declarado: ${BLOCKER_LABEL[p.primaryBlocker]}` : "Sem bloqueio declarado",
     `Sono típico: ${p.typicalSleepHours ?? "—"} h | Pula café: ${p.skipBreakfast ? "sim" : "não"}`,
     checkIn
-      ? `Check-in hoje: sono ${checkIn.sleepHours}h | energia ${checkIn.energy} | ${checkIn.availableMin} min`
+      ? `Check-in hoje: sono ${checkIn.sleepHours}h | energia ${checkIn.energy} | ${checkIn.availableMin} min${checkIn.soreness != null ? ` | dor ${checkIn.soreness}` : ""}${checkIn.stress != null ? ` | stress ${checkIn.stress}` : ""}`
       : "Sem check-in de hoje",
     `Score de performance (sem suplementação): ${performanceScore(dims)}/100 | Aderência: ${adherenceScore(dims)}/100`,
     `Dimensões: ${dims.map((d) => `${d.label} ${d.score}`).join(", ")}`,
-    living
-      ? `Living plan: treino ${living.workout.mode} (${living.workout.title}, volume ${Math.round(living.workout.volumeFactor * 100)}%) | macros ${living.nutrition.proteinG}g / ${living.nutrition.kcal} kcal | sono meta ${living.sleepTargetHours}h | freio ${living.blocker?.label ?? "—"}`
-      : "Living plan: indisponível",
+    `Living plan: ${livingSummary}`,
     `Streak: ${streak(state.sessions)} dia(s) | Treinos nos últimos 7 dias: ${recent.length}`,
     `Treinos registrados no total: ${state.sessions.length}`,
-    today ? `Treino de hoje (semana): ${today.title} — ${today.focus} (${today.estimatedMin} min)` : "Hoje é descanso (sem treino agendado)",
+    today
+      ? `Treino de hoje (semana): ${today.title} — ${today.focus} (${today.estimatedMin} min)`
+      : "Hoje é descanso (sem treino agendado)",
     `Metas nutricionais (ajustadas): ${goals.proteinG} g proteína | ${goals.kcal} kcal | água ${goals.waterMl} ml`,
     `Nutrição hoje: ${totals.proteinG} g proteína | ${totals.kcal} kcal | ${totals.count} refeições`,
     `Plano alimentar de hoje: ${mealLines}`,
@@ -95,9 +142,25 @@ export function coachSystemPrompt(state: AppState): string {
       ? `Hub ativo: ${activeHub.name} (${activeHub.creatorName}) — challenges: ${activeHub.challengeIds.join(", ")}`
       : "Sem hub ativo",
     "",
+    ...safetyBlock,
     ...contextBlock,
+    ...reasonBlock,
+    ...decisionBlock,
     ...learningBlock,
     ...patternBlock,
     ...whyBlock,
+    ...whyByChangeBlock,
   ].join("\n");
+
+  const safetyNotice = safety.escalateCare
+    ? safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
+      "Há um sinal no check-in que merece atenção profissional — não trate como adaptação de treino."
+    : undefined;
+
+  return { contextText, safetyNotice, why, decisions, livingSummary };
+}
+
+/** Local/offline helper — same body as server context text. */
+export function coachSystemPrompt(state: AppState): string {
+  return buildCoachContextFromState(state).contextText;
 }

@@ -38,7 +38,7 @@ import type { MealPreset } from "@/data/meal-presets";
 import { performanceDimensions, performanceScore, adherenceScore, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, topLearningInsight, learningWeekHint } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
-import { buildLivingPlan } from "@/lib/engine/living-plan";
+import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { evaluateSafety } from "@/lib/engine/safety";
 import { rankRecommendations } from "@/lib/engine/recommendation";
 import { trackOutcome } from "@/lib/outcome";
@@ -140,6 +140,44 @@ function Today() {
     if (!hydrated || !state.profile) return;
     if (!state.livingPlans?.[todayKey()]) refreshLivingPlan();
   }, [hydrated, state.profile, state.livingPlans, refreshLivingPlan]);
+
+  useEffect(() => {
+    if (!hydrated || !state.profile) return;
+    const id = getDeviceId();
+    if (!id) return;
+    void trackAppEvent({
+      data: {
+        deviceId: id,
+        kind: "plan_viewed",
+        payload: { date: todayKey() },
+        entityType: "plan",
+        entityId: todayKey(),
+        idempotencyKey: `plan_viewed:${todayKey()}`,
+      },
+    }).catch(() => undefined);
+  }, [hydrated, state.profile]);
+
+  useEffect(() => {
+    if (!hydrated || !state.profile) return;
+    const estimates = Object.values(state.restockEstimates ?? {});
+    const soon = estimates.find((e) => {
+      const days = Math.ceil((new Date(e.emptyAt).getTime() - Date.now()) / 86_400_000);
+      return days <= 14;
+    });
+    if (!soon) return;
+    const id = getDeviceId();
+    if (!id) return;
+    void trackAppEvent({
+      data: {
+        deviceId: id,
+        kind: "restock_shown",
+        payload: { source: "home", productId: soon.productId },
+        entityType: "product",
+        entityId: soon.productId,
+        idempotencyKey: `restock_shown:${todayKey()}:${soon.productId}`,
+      },
+    }).catch(() => undefined);
+  }, [hydrated, state.profile, state.restockEstimates]);
 
   useEffect(() => {
     if (!club || !deviceId) {
@@ -265,14 +303,16 @@ function Today() {
     return q ? isQuestComplete(state, q) : false;
   }).length;
 
-  const living =
-    state.livingPlans?.[todayKey()] ?? buildLivingPlan(state, todayKey());
+  const livingBundle = buildLivingPlanWithDecisions(state, todayKey());
+  const living = livingBundle?.plan ?? state.livingPlans?.[todayKey()] ?? null;
   const todayCheckIn = state.dayCheckIns?.[todayKey()];
   const safety = evaluateSafety(state);
   const topRec = living
     ? rankRecommendations({
         livingPlan: living,
         safety,
+        context: userCtx,
+        decisions: livingBundle?.decisions ?? null,
         goal: profile.goal,
         purchaseProductIds: state.purchaseProductIds ?? [],
       })[0]
@@ -307,35 +347,21 @@ function Today() {
           checkIn={todayCheckIn}
           onSaveCheckIn={(c) => {
             saveDayCheckIn(c);
-            void trackOutcome(getDeviceId(), "checkin_sleep", {
-              sleepHours: c.sleepHours,
-              energy: c.energy,
-            });
             toast.success("Plano de hoje atualizado");
           }}
-        />
-      ) : null}
-
-      {topRec ? (
-        <Link
-          to={topRec.href === "/treino" ? "/treino" : topRec.href === "/nutricao" ? "/nutricao" : topRec.href === "/suplementos" ? "/suplementos" : topRec.href === "/coach" ? "/coach" : "/"}
-          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-4 py-3"
-          onClick={() =>
+          primaryAction={
+            topRec
+              ? { id: topRec.id, title: topRec.title, reason: topRec.reason, href: topRec.href }
+              : null
+          }
+          onPrimaryAction={() => {
+            if (!topRec) return;
             void trackOutcome(getDeviceId(), "living_plan_followed", {
               recommendationId: topRec.id,
               kind: topRec.kind,
-            })
-          }
-        >
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Próxima ação
-            </p>
-            <p className="truncate text-sm font-semibold text-foreground">{topRec.title}</p>
-            <p className="truncate text-xs text-muted-foreground">{topRec.reason}</p>
-          </div>
-          <span className="shrink-0 text-xs font-semibold text-primary">Ir</span>
-        </Link>
+            });
+          }}
+        />
       ) : null}
 
       {atRisk ? (
@@ -490,8 +516,19 @@ function Today() {
                     void trackAppEvent({
                       data: {
                         deviceId: id,
-                        kind: "restock_cta_click",
+                        kind: "restock_clicked",
                         payload: { source: "home", productId: soon.productId },
+                        entityType: "product",
+                        entityId: soon.productId,
+                      },
+                    });
+                    void trackAppEvent({
+                      data: {
+                        deviceId: id,
+                        kind: "product_clicked",
+                        payload: { source: "home", productId: soon.productId },
+                        entityType: "product",
+                        entityId: soon.productId,
                       },
                     });
                   }}

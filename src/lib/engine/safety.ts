@@ -1,7 +1,8 @@
 /**
  * Safety Engine — contraindications and soft guards before recommendations / AI.
- * Pure TypeScript; no network.
+ * Pure TypeScript; no network. Does not diagnose.
  */
+import { computeRecoveryV2 } from "@/lib/engine/recovery-v2";
 import type { AppState, Goal } from "@/lib/types";
 
 export type SafetyFlag =
@@ -10,7 +11,10 @@ export type SafetyFlag =
   | "hard_rpe_streak"
   | "stim_restriction"
   | "medical_disclaimer"
-  | "under_recovery";
+  | "under_recovery"
+  | "escalate_care"
+  | "pain_signal"
+  | "high_stress";
 
 export type SafetyVerdict = {
   ok: boolean;
@@ -19,10 +23,21 @@ export type SafetyVerdict = {
   blockStims: boolean;
   preferLightTraining: boolean;
   requireMedicalDisclaimer: boolean;
+  /** Serious signals — do not treat as routine training adaptation. */
+  escalateCare: boolean;
 };
+
+/** Non-diagnostic keyword scan for potentially serious check-in notes. */
+const ESCALATE_NOTE_RE =
+  /\b(dor\s+no\s+peito|dor\s+no\s+cora[cç][aã]o|falta\s+de\s+ar|n[aã]o\s+consigo\s+respirar|desmaio|desmaiei|tontura\s+forte|sangramento|peito\s+apertando|chest\s+pain|shortness\s+of\s+breath|fainted|seizure|convuls[aã]o)\b/i;
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+export function notesSuggestEscalation(notes: string | null | undefined): boolean {
+  if (!notes?.trim()) return false;
+  return ESCALATE_NOTE_RE.test(notes);
 }
 
 export function evaluateSafety(
@@ -36,6 +51,7 @@ export function evaluateSafety(
   const checkIn = state.dayCheckIns?.[todayKey()];
   let blockStims = false;
   let preferLightTraining = false;
+  let escalateCare = false;
 
   if (checkIn) {
     if (checkIn.sleepHours < 6) {
@@ -49,6 +65,47 @@ export function evaluateSafety(
       reasons.push("Energia baixa — priorize recuperação.");
       preferLightTraining = true;
     }
+    if (checkIn.soreness != null && checkIn.soreness >= 4) {
+      flags.push("under_recovery");
+      reasons.push("Dor muscular alta no check-in — priorize recuperação.");
+      preferLightTraining = true;
+    }
+    if (checkIn.soreness != null && checkIn.soreness >= 5) {
+      flags.push("pain_signal");
+      reasons.push(
+        "Sinal de dor intensa no check-in — não trate como ajuste de treino comum. Se a dor for aguda ou incomum, procure um profissional de saúde.",
+      );
+      escalateCare = true;
+      preferLightTraining = true;
+      blockStims = true;
+    }
+    if (checkIn.stress != null && checkIn.stress >= 5) {
+      flags.push("high_stress");
+      reasons.push("Estresse máximo no check-in — priorize descanso e sono.");
+      preferLightTraining = true;
+    }
+    if (
+      checkIn.soreness != null &&
+      checkIn.stress != null &&
+      checkIn.soreness >= 4 &&
+      checkIn.stress >= 4
+    ) {
+      escalateCare = true;
+      preferLightTraining = true;
+      if (!flags.includes("pain_signal")) flags.push("pain_signal");
+      reasons.push(
+        "Dor e estresse elevados juntos — foque em recuperação; não é só deload de volume.",
+      );
+    }
+    if (notesSuggestEscalation(checkIn.notes)) {
+      flags.push("escalate_care");
+      escalateCare = true;
+      preferLightTraining = true;
+      blockStims = true;
+      reasons.push(
+        "Seu check-in menciona um sinal que merece atenção profissional. Não é adaptação de treino — pause o estímulo intenso e procure avaliação adequada se os sintomas persistirem.",
+      );
+    }
   }
 
   const recent = [...(state.sessions ?? [])]
@@ -60,15 +117,33 @@ export function evaluateSafety(
     preferLightTraining = true;
   }
 
+  try {
+    const v2 = computeRecoveryV2(state as AppState);
+    if (v2.level === "low") {
+      flags.push("under_recovery");
+      reasons.push(v2.explanation);
+      preferLightTraining = true;
+      if (v2.reasonCodes.includes("sleep_low")) {
+        blockStims = true;
+      }
+    }
+  } catch {
+    /* incomplete state */
+  }
+
+  if (escalateCare) {
+    flags.push("escalate_care");
+  }
   if (blockStims) flags.push("stim_restriction");
 
   return {
-    ok: true,
+    ok: !escalateCare,
     flags: [...new Set(flags)],
     reasons,
     blockStims,
     preferLightTraining,
     requireMedicalDisclaimer: true,
+    escalateCare,
   };
 }
 

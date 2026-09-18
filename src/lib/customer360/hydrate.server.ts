@@ -157,7 +157,7 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
   const db = await adminDbLoose();
   if (!db) return base;
 
-  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
+  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes, checkInsRes] =
     await Promise.all([
       db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
@@ -166,10 +166,16 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
       db.from("supplement_logs").select("*").eq("user_id", userId),
       db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
       db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
+      db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
     ]);
 
   const stateRow = stateRes.data as Row | null;
   const retention = retentionFromRow(stateRow?.["retention"]);
+  const { mergeDayCheckIns, rowToDayCheckIn } = await import("@/lib/sync/day-checkin");
+  const tableChecks = !checkInsRes.error
+    ? ((checkInsRes.data ?? []) as Row[]).map((r) => rowToDayCheckIn(r))
+    : [];
+  const dayCheckIns = mergeDayCheckIns(retention.dayCheckIns ?? {}, tableChecks);
 
   const days: AppState["days"] = {};
   for (const d of (daysRes.data ?? []) as Row[]) {
@@ -214,6 +220,7 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     ...base,
     ...retention,
     userId,
+    dayCheckIns,
     profile,
     sessions: mapSessions((sessionsRes.data ?? []) as Row[]),
     weights: ((weightsRes.data ?? []) as Row[]).map((w) => ({

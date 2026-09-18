@@ -1,6 +1,7 @@
 import { PRODUCTS } from "@/data/products";
 import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { monthlyDoseAdherence } from "@/lib/engine/supplements";
+import { recentDayCheckIns } from "@/lib/sync/day-checkin";
 import { todayKey, type AppState, type Profile } from "@/lib/types";
 
 export interface LearningAdaptations {
@@ -120,6 +121,23 @@ export function computeLearningInsights(state: AppState): LearningInsights | nul
   if (sleepH != null && sleepH < 6) {
     weekHint = weekHint === "push" ? "deload" : weekHint ?? "deload";
     reasons.push(`Sono de ${sleepH}h — priorize recuperação e reduza volume.`);
+  }
+
+  const recentChecks = recentDayCheckIns(state.dayCheckIns, 7);
+  if (recentChecks.length >= 3) {
+    const avgSleep =
+      recentChecks.reduce((s, c) => s + c.sleepHours, 0) / recentChecks.length;
+    const highStress = recentChecks.filter((c) => (c.stress ?? 0) >= 4).length;
+    const highSoreness = recentChecks.filter((c) => (c.soreness ?? 0) >= 4).length;
+    if (avgSleep < 6.5) {
+      reasons.push(`Média de sono 7d: ${avgSleep.toFixed(1)}h — histórico de check-in aponta recuperação baixa.`);
+    }
+    if (highStress >= 2) {
+      reasons.push(`Estresse elevado em ${highStress}/7 check-ins — reduza intensidade mental do treino.`);
+    }
+    if (highSoreness >= 2) {
+      reasons.push(`Dor muscular alta em ${highSoreness}/7 check-ins — priorize mobilidade/deload.`);
+    }
   }
 
   return {

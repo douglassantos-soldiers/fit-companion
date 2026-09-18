@@ -1,12 +1,12 @@
 /**
  * Context Engine — "How is this person today?"
- * Engines compute; Context aggregates signals + why explanations.
+ * Builds from ContextSnapshot + reason codes (FASE 4).
  * Does NOT invent goals from Shopify products.
  */
-import { buildCustomer360FromState, type Customer360 } from "@/lib/customer360";
-import { computeLearningInsights } from "@/lib/engine/learning";
-import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
-import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
+import type { Customer360 } from "@/lib/customer360";
+import { buildCustomer360FromState } from "@/lib/customer360";
+import { buildContextSnapshot } from "@/lib/engine/context-snapshot";
+import { REASON_CODE_META, type ReasonCode } from "@/lib/engine/reason-codes";
 import { todayKey, type AppState } from "@/lib/types";
 
 export type ContextSignal = {
@@ -14,6 +14,7 @@ export type ContextSignal = {
   direction: "up" | "down" | "stable" | "risk";
   label: string;
   why: string;
+  reasonCode?: ReasonCode;
 };
 
 export type UserContext = {
@@ -24,66 +25,59 @@ export type UserContext = {
   customer360: Customer360;
   performanceScore: number | null;
   adherenceScore: number | null;
+  /** FASE 4: structured reason codes from snapshot */
+  reasonCodes: ReasonCode[];
 };
 
 export function buildUserContext(state: AppState, userId?: string | null): UserContext {
-  const c360 = buildCustomer360FromState(state, userId != null ? { userId } : undefined);
-  const insights = computeLearningInsights(state);
+  const date = todayKey();
+  const snapshot = buildContextSnapshot(state, date, userId);
+  const c360 =
+    snapshot != null
+      ? buildCustomer360FromState(state, userId != null ? { userId } : undefined)
+      : buildCustomer360FromState(state, userId != null ? { userId } : undefined);
+
+  if (!snapshot) {
+    return {
+      date,
+      signals: [],
+      headline: null,
+      why: [],
+      customer360: c360,
+      performanceScore: null,
+      adherenceScore: null,
+      reasonCodes: [],
+    };
+  }
+
   const signals: ContextSignal[] = [];
   const why: string[] = [];
 
-  if (c360.recovery.fatigueSignal) {
-    signals.push({
-      key: "recovery",
-      direction: "down",
-      label: "Recuperação",
-      why: "Sinais de fadiga (RPE alto e/ou sono baixo).",
-    });
-    why.push("Recuperação abaixo do seu padrão recente.");
-  }
-
-  if (insights && insights.proteinAdherence7d < 0.7) {
-    signals.push({
-      key: "protein",
-      direction: "down",
-      label: "Proteína",
-      why: `Aderência proteica 7d em ${Math.round(insights.proteinAdherence7d * 100)}%.`,
-    });
-    why.push("Proteína abaixo da meta nos últimos dias.");
-  }
-
-  if (insights?.adaptations.weekHint === "deload") {
-    signals.push({
-      key: "training_load",
-      direction: "up",
-      label: "Carga de treino",
-      why: "RPE difícil em sequência — deload sugerido.",
-    });
-    why.push("Carga de treino elevada; volume pode ser reduzido hoje.");
-  }
-
-  if (c360.nutrition.weightTrendKg7d != null && c360.nutrition.weightTrendKg7d <= -0.5) {
-    signals.push({
-      key: "weight_trend",
-      direction: "down",
-      label: "Peso",
-      why: `Tendência de ${c360.nutrition.weightTrendKg7d} kg em 7 dias.`,
-    });
-  }
-
-  for (const r of Object.values(c360.supplements.restockEstimates)) {
-    if (r.daysLeft <= 12) {
+  for (const code of snapshot.reasonSeeds) {
+    const meta = REASON_CODE_META[code];
+    if (!meta) continue;
+    // Skip positive noise for headline density except sleep_good as stable
+    if (code === "sleep_good" || code === "energy_high") {
       signals.push({
-        key: `restock_${r.productId}`,
-        direction: "risk",
-        label: "Reposição",
-        why: `Estoque estimado de ${r.productId}: ~${r.daysLeft} dias (confiança ${Math.round(r.confidence * 100)}%).`,
+        key: code,
+        direction: meta.direction,
+        label: meta.label,
+        why: `${meta.label}: ${meta.fragment}.`,
+        reasonCode: code,
       });
-      why.push(`Estoque estimado de ${r.productId} pode estar próximo do fim.`);
+      continue;
     }
+    signals.push({
+      key: code,
+      direction: meta.direction,
+      label: meta.label,
+      why: `${meta.label}: ${meta.fragment}.`,
+      reasonCode: code,
+    });
+    why.push(`${meta.label} — ${meta.fragment}.`);
   }
 
-  // Weekday skip pattern (simple learning feature)
+  // Weekday skip pattern (legacy signal for UI)
   const byWeekday = new Map<number, number>();
   for (const s of state.sessions) {
     const wd = new Date(s.date).getDay();
@@ -103,44 +97,22 @@ export function buildUserContext(state: AppState, userId?: string | null): UserC
     why.push("Você costuma pular treinos neste dia — sessão ajustada para ser mais curta ajuda.");
   }
 
-  const profile = state.profile;
-  let perfScore: number | null = null;
-  let adherenceScore: number | null = null;
-  if (profile) {
-    const dims = performanceDimensions(state, profile);
-    const perfDims = dims.filter((d) =>
-      ["forca", "resistencia", "consistencia", "recuperacao", "sono"].includes(d.key),
-    );
-    const adhereDims = dims.filter((d) =>
-      ["nutricao", "suplementacao", "habitos"].includes(d.key),
-    );
-    perfScore = performanceScore(perfDims);
-    adherenceScore = performanceScore(adhereDims);
-  }
-
-  if (profile) {
-    const goals = nutritionGoals(profile, insights);
-    const totals = dayNutritionTotals(state.meals ?? []);
-    if (totals.proteinG < goals.proteinG * 0.85 && totals.count > 0) {
-      why.push(`Ontem/hoje a proteína ficou abaixo da meta (${Math.round(totals.proteinG)}g vs ${goals.proteinG}g).`);
-    }
-  }
-
   const headline =
     why[0] ??
     (signals.length
       ? signals[0]!.why
-      : streak(state.sessions) > 0
-        ? `Sequência de ${streak(state.sessions)} dias — mantenha o ritmo.`
+      : snapshot.training.recentSessions7d > 0
+        ? `Sequência ativa — ${snapshot.training.recentSessions7d} treinos em 7 dias.`
         : null);
 
   return {
-    date: todayKey(),
+    date,
     signals,
     headline,
     why: why.slice(0, 5),
     customer360: c360,
-    performanceScore: perfScore,
-    adherenceScore,
+    performanceScore: snapshot.adherence.performanceScore,
+    adherenceScore: snapshot.adherence.adherenceScore,
+    reasonCodes: snapshot.reasonSeeds,
   };
 }

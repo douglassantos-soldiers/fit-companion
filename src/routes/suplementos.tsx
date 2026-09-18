@@ -155,8 +155,19 @@ function SupplementsPage() {
                                 void track({
                                   data: {
                                     deviceId: id,
-                                    kind: "restock_cta_click",
+                                    kind: "restock_clicked",
                                     payload: { source: "suplementos", productId: p.id },
+                                    entityType: "product",
+                                    entityId: p.id,
+                                  },
+                                });
+                                void track({
+                                  data: {
+                                    deviceId: id,
+                                    kind: "product_clicked",
+                                    payload: { source: "suplementos", productId: p.id },
+                                    entityType: "product",
+                                    entityId: p.id,
                                   },
                                 });
                               }
@@ -241,8 +252,19 @@ function SupplementsPage() {
                         void track({
                           data: {
                             deviceId: id,
-                            kind: "restock_cta_click",
+                            kind: "product_clicked",
                             payload: { source: "loja_tab", handle: sp.handle },
+                            entityType: "product",
+                            entityId: sp.handle,
+                          },
+                        });
+                        void track({
+                          data: {
+                            deviceId: id,
+                            kind: "product_viewed",
+                            payload: { source: "loja_tab", handle: sp.handle },
+                            entityType: "product",
+                            entityId: sp.handle,
                           },
                         });
                       }

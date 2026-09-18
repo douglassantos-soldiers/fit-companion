@@ -50,6 +50,11 @@ export type Recovery360 = {
   recoveryScore: number | null;
   sleepAvg7d: number | null;
   fatigueSignal: boolean;
+  /** FASE 5 Recovery v2 */
+  level?: "recovered" | "moderate" | "low" | null;
+  explanation?: string | null;
+  manualOnly?: boolean;
+  confidence?: number | null;
 };
 
 export type RestockEstimate360 = {

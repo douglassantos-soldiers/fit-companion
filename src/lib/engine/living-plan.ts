@@ -1,12 +1,15 @@
 import { PRODUCTS, productById } from "@/data/products";
 import { activeHubForState } from "@/data/hubs";
+import { lessonForToday } from "@/data/habit-lessons";
 import {
   performanceDimensions,
   performanceScore,
   primaryBlockerDimension,
   trafficForScore,
 } from "@/lib/engine/dimensions";
+import { buildContextSnapshot } from "@/lib/engine/context-snapshot";
 import { buildUserContext } from "@/lib/engine/context";
+import { computeDecisions, type DecisionBundle } from "@/lib/engine/decision";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
 import { nutritionGoals } from "@/lib/engine/nutrition";
 import { buildExpressSession, buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
@@ -24,8 +27,21 @@ function sleepHoursForDay(state: AppState, profile: Profile, date: string): numb
   return state.dayCheckIns?.[date]?.sleepHours ?? profile.typicalSleepHours ?? 7;
 }
 
+export type LivingPlanBuildResult = {
+  plan: LivingPlanSnapshot;
+  decisions: DecisionBundle;
+};
+
 /** Build integrated living plan for a given date (defaults to today). */
 export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanSnapshot | null {
+  return buildLivingPlanWithDecisions(state, date)?.plan ?? null;
+}
+
+/** Living Plan + Decision Engine bundle (FASE 4). */
+export function buildLivingPlanWithDecisions(
+  state: AppState,
+  date = todayKey(),
+): LivingPlanBuildResult | null {
   const profile = state.profile;
   if (!profile) return null;
 
@@ -36,7 +52,6 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
   const checkIn = state.dayCheckIns?.[date];
   const sleepH = sleepHoursForDay(state, profile, date);
   const energy = checkIn?.energy ?? "ok";
-  const availableMin = checkIn?.availableMin ?? 60;
   const noEquipment = checkIn?.noEquipment === true;
   const equipment = noEquipment ? ("casa" as const) : profile.equipment;
 
@@ -49,41 +64,42 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
   );
   const day = planDayForToday(plan, new Date(`${date}T12:00:00`));
 
-  const sleepStress = sleepH < 6 || energy === "baixa";
+  const snapshot = buildContextSnapshot(state, date, state.userId);
+  if (!snapshot) return null;
+
   const safety = evaluateSafety(state);
-  const timeTight = availableMin < 40;
-  let volumeFactor = 1;
-  let mode: LivingPlanSnapshot["workout"]["mode"] = day ? "full" : "rest";
-  let estimatedMin = day?.estimatedMin ?? 0;
+  const bundle = computeDecisions(snapshot, safety, {
+    plannedMinutes: day?.estimatedMin ?? 0,
+    hasTrainingDay: Boolean(day),
+  });
+
+  const mode = bundle.trainingMode;
+  const volumeFactor = bundle.trainingVolume;
+  let estimatedMin = bundle.sessionDuration;
   let title = day?.title ?? "Descanso ativo";
 
-  if (!day) {
-    mode = "rest";
-  } else if (weekMode === "deload" || sleepStress || safety.preferLightTraining) {
-    mode = "deload";
-    volumeFactor = sleepH < 5.5 || safety.preferLightTraining ? 0.55 : 0.7;
-    estimatedMin = Math.round(day.estimatedMin * volumeFactor);
+  if (mode === "rest") {
+    title = "Descanso ativo";
+    estimatedMin = 0;
+  } else if (mode === "deload" && day) {
     title = `${day.title} (leve)`;
-  } else if (timeTight || availableMin < day.estimatedMin * 0.7) {
-    mode = "express";
-    volumeFactor = 0.65;
+    estimatedMin = Math.round(day.estimatedMin * volumeFactor);
+  } else if (mode === "express" && day) {
     const express = buildExpressSession(day);
-    estimatedMin = express?.estimatedMin ?? Math.min(35, availableMin);
+    estimatedMin = express?.estimatedMin ?? Math.min(35, snapshot.availableTimeMin ?? 35);
     title = express?.title ?? `${day.title} express`;
   }
 
   const goals = nutritionGoals(profile, insights);
-  let kcal = goals.kcal;
+  let kcal = goals.kcal + bundle.calorieDelta;
   let proteinG = goals.proteinG;
-  if (sleepStress) {
-    // Slight protein priority, avoid aggressive deficit when recovering
+  if (bundle.proteinBias === "up") {
     proteinG = Math.round(proteinG * 1.05);
-    if (profile.goal !== "gordura") kcal = Math.round(kcal + 50);
   }
   if (profile.skipBreakfast) {
-    // Redistribute: keep protein, slight kcal nudge toward later meals (informational)
     proteinG = Math.round(proteinG);
   }
+  kcal = Math.max(1400, Math.round(kcal));
 
   const routineIds =
     state.supplementRoutine.length > 0
@@ -97,13 +113,13 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .map((p) => ({ id: p.id, name: p.name, timing: p.timing }));
 
-  // Prefer creatine + protein on training days; drop stim if sleep poor or Safety blocks
+  const sleepStress = sleepH < 6 || energy === "baixa";
   const filteredSupplements =
-    mode === "rest" || sleepStress || safety.blockStims
+    mode === "rest" || sleepStress || bundle.blockStims || safety.blockStims
       ? supplements.filter((s) => {
           const id = s.id.toLowerCase();
           if (
-            (sleepStress || safety.blockStims) &&
+            (sleepStress || bundle.blockStims || safety.blockStims) &&
             (id.includes("pre") || id.includes("termo") || id.includes("cafe"))
           ) {
             return false;
@@ -112,25 +128,26 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
         })
       : supplements;
 
+  // WHY from Decision Engine explanations (structured), plus light extras
   const why: string[] = [];
-  if (insights?.reasons.length) why.push(...insights.reasons);
-  if (safety.preferLightTraining) {
-    why.push("Safety Engine: treino leve recomendado hoje.");
+  for (const d of bundle.decisions) {
+    if (
+      d.decisionType === "training_mode" ||
+      d.decisionType === "training_volume" ||
+      d.decisionType === "primary_action" ||
+      d.decisionType === "block_stims" ||
+      (d.decisionType === "nutrition_calorie_delta" && Number(d.decisionValue) !== 0) ||
+      (d.decisionType === "nutrition_protein_bias" && d.decisionValue === "up")
+    ) {
+      if (!why.includes(d.explanation)) why.push(d.explanation);
+    }
   }
-  if (sleepH < 6) {
-    why.push(`Sono de ${sleepH}h — volume de treino reduzido e stims evitados.`);
-  } else if (sleepH < 7) {
-    why.push(`Sono de ${sleepH}h — recuperação no radar; mantenha o plano leve se sentir fadiga.`);
-  }
-  if (energy === "baixa") why.push("Energia baixa no check-in — priorizei estímulo sustentável.");
-  if (timeTight && day) why.push(`Só ${availableMin} min disponíveis — sessão express.`);
-  if (noEquipment) why.push("Sem equipamento hoje — plano casa/peso corporal.");
-  if (weekMode === "deload") why.push("Semana em modo deload (RPE recente).");
-  if (weekMode === "push") why.push("Semana em modo push — RPE recentes fáceis.");
   if (profile.primaryBlocker) {
     why.push(`Bloqueio declarado: ${BLOCKER_LABEL[profile.primaryBlocker]}.`);
   }
-  if (profile.skipBreakfast) why.push("Você pula o café — proteína redistribuída nas outras refeições.");
+  if (profile.skipBreakfast && bundle.mealDistribution === "rebalanced") {
+    why.push("Você pula o café — proteína redistribuída nas outras refeições.");
+  }
   if (blockerDim && blockerDim.score < 55) {
     why.push(`Eixo mais fraco agora: ${blockerDim.label} (${blockerDim.score}/100).`);
   }
@@ -139,11 +156,10 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
     why.push(`Hub ativo: ${activeHub.name} (${activeHub.creatorName}).`);
   }
 
-  // Merge Context Engine explanations (dedupe, max 3 extras)
   const ctxWhy = buildUserContext(state, state.userId).why;
   let added = 0;
   for (const line of ctxWhy) {
-    if (added >= 3) break;
+    if (added >= 2) break;
     const dup = why.some(
       (w) => w === line || w.includes(line.slice(0, 24)) || line.includes(w.slice(0, 24)),
     );
@@ -154,6 +170,13 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
 
   if (!why.length) why.push("Sem sinais de alerta — plano padrão do dia.");
 
+  if (safety.escalateCare) {
+    why.unshift(
+      safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
+        "Há um sinal que merece atenção — priorizei recuperação, não adaptação de volume.",
+    );
+  }
+
   const trainingScore =
     dims.find((d) => d.key === "forca")?.score ??
     dims.find((d) => d.key === "consistencia")?.score ??
@@ -163,10 +186,67 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
     dims.find((d) => d.key === "recuperacao")?.score ??
     dims.find((d) => d.key === "sono")?.score ??
     50;
+  const consistencyScore = dims.find((d) => d.key === "consistencia")?.score ?? 50;
+
+  const habit = lessonForToday(new Date(`${date}T12:00:00`));
+
+  const whyByChange: LivingPlanSnapshot["whyByChange"] = [];
+  const modeDecision = bundle.decisions.find((d) => d.decisionType === "training_mode");
+  const volDecision = bundle.decisions.find((d) => d.decisionType === "training_volume");
+  const kcalDecision = bundle.decisions.find((d) => d.decisionType === "nutrition_calorie_delta");
+  const proteinDecision = bundle.decisions.find((d) => d.decisionType === "nutrition_protein_bias");
+  const stimDecision = bundle.decisions.find((d) => d.decisionType === "block_stims");
+  const primaryDecision = bundle.decisions.find((d) => d.decisionType === "primary_action");
+
+  if (modeDecision && (modeDecision.decisionValue !== "full" || safety.escalateCare)) {
+    whyByChange.push({
+      key: "training",
+      label: "Treino",
+      reason: modeDecision.explanation,
+    });
+  } else if (volDecision && Number(volDecision.decisionValue) < 1) {
+    whyByChange.push({
+      key: "training",
+      label: "Volume",
+      reason: volDecision.explanation,
+    });
+  }
+  if (kcalDecision && Number(kcalDecision.decisionValue) !== 0) {
+    whyByChange.push({
+      key: "calories",
+      label: "Calorias",
+      reason: kcalDecision.explanation,
+    });
+  }
+  if (proteinDecision && proteinDecision.decisionValue === "up") {
+    whyByChange.push({
+      key: "protein",
+      label: "Proteína",
+      reason: proteinDecision.explanation,
+    });
+  }
+  if (stimDecision && stimDecision.decisionValue === true) {
+    whyByChange.push({
+      key: "stims",
+      label: "Suplementação",
+      reason: stimDecision.explanation,
+    });
+  }
+  if (
+    primaryDecision &&
+    (primaryDecision.decisionValue === "rest" || primaryDecision.decisionValue === "sleep")
+  ) {
+    whyByChange.push({
+      key: "recovery",
+      label: "Recuperação",
+      reason: primaryDecision.explanation,
+    });
+  }
 
   const hubSuffix = activeHub ? ` Hub: ${activeHub.name}.` : "";
-  const narrative =
-    mode === "rest"
+  const narrative = safety.escalateCare
+    ? `Hoje o foco é cuidado e recuperação — não estímulo intenso. ${blockerDim?.label ? `Freio monitorado: ${blockerDim.label}.` : ""}${hubSuffix}`
+    : mode === "rest"
       ? `Hoje é recuperação ativa. Seu maior freio agora é ${blockerDim?.label ?? "consistência"} — use o dia para sono e proteína.${hubSuffix}`
       : sleepStress
         ? `Você não está recuperado o bastante para ir pesado. Mantive o estímulo de ${title}, mas com volume ~${Math.round(volumeFactor * 100)}%.${hubSuffix}`
@@ -174,7 +254,7 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
 
   const sleepTargetHours = sleepH < 7 ? 8 : Math.max(7.5, profile.typicalSleepHours ?? 7.5);
 
-  const snapshot: LivingPlanSnapshot = {
+  const livingSnapshot: LivingPlanSnapshot = {
     date,
     generatedAt: new Date().toISOString(),
     score,
@@ -185,6 +265,7 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
       training: trafficForScore(trainingScore),
       nutrition: trafficForScore(nutritionScore),
       recovery: trafficForScore(recoveryScore),
+      consistency: trafficForScore(consistencyScore),
     },
     workout: {
       mode,
@@ -201,32 +282,34 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
     },
     supplements: filteredSupplements,
     sleepTargetHours,
+    habits: { title: habit.title, tip: habit.tip },
     narrative,
-    why,
+    why: why.slice(0, 8),
+    whyByChange,
     diffFromYesterday: [],
   };
 
   const prev = state.livingPlans?.[yesterdayKey(date)];
   if (prev) {
     const diffs: string[] = [];
-    if (prev.workout.mode !== snapshot.workout.mode) {
-      diffs.push(`Treino: ${prev.workout.mode} → ${snapshot.workout.mode}`);
+    if (prev.workout.mode !== livingSnapshot.workout.mode) {
+      diffs.push(`Treino: ${prev.workout.mode} → ${livingSnapshot.workout.mode}`);
     }
-    if (Math.abs(prev.nutrition.kcal - snapshot.nutrition.kcal) >= 50) {
-      diffs.push(`Kcal: ${prev.nutrition.kcal} → ${snapshot.nutrition.kcal}`);
+    if (Math.abs(prev.nutrition.kcal - livingSnapshot.nutrition.kcal) >= 50) {
+      diffs.push(`Kcal: ${prev.nutrition.kcal} → ${livingSnapshot.nutrition.kcal}`);
     }
-    if (Math.abs(prev.workout.volumeFactor - snapshot.workout.volumeFactor) >= 0.05) {
+    if (Math.abs(prev.workout.volumeFactor - livingSnapshot.workout.volumeFactor) >= 0.05) {
       diffs.push(
-        `Volume: ${Math.round(prev.workout.volumeFactor * 100)}% → ${Math.round(snapshot.workout.volumeFactor * 100)}%`,
+        `Volume: ${Math.round(prev.workout.volumeFactor * 100)}% → ${Math.round(livingSnapshot.workout.volumeFactor * 100)}%`,
       );
     }
-    if (prev.blocker?.key !== snapshot.blocker?.key) {
-      diffs.push(`Bloqueio: ${prev.blocker?.label ?? "—"} → ${snapshot.blocker?.label ?? "—"}`);
+    if (prev.blocker?.key !== livingSnapshot.blocker?.key) {
+      diffs.push(`Bloqueio: ${prev.blocker?.label ?? "—"} → ${livingSnapshot.blocker?.label ?? "—"}`);
     }
-    snapshot.diffFromYesterday = diffs;
+    livingSnapshot.diffFromYesterday = diffs;
   }
 
-  return snapshot;
+  return { plan: livingSnapshot, decisions: bundle };
 }
 
 export function livingPlanForDate(state: AppState, date = todayKey()): LivingPlanSnapshot | null {

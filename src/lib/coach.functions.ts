@@ -2,16 +2,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { rateLimitKey, readAccessSession } from "@/lib/access-session.server";
 import {
   buildCoachSystemPrompt,
+  buildStructuredCoachReply,
+  detectCoachIntent,
   parseCoachInput,
   type CoachProvider,
+  type CoachStructuredReply,
 } from "@/lib/coach-contract";
+import { buildCoachContextFromState } from "@/lib/engine/coach-context";
 
-export type { CoachProvider };
+export type { CoachProvider, CoachStructuredReply };
 export { parseCoachInput, buildCoachSystemPrompt };
 
 /**
- * AI Coach — system prompt is built server-side from a short context string (not free-form client system).
- * Requires access session cookie. Rate-limited per email.
+ * AI Coach 2.0 — context built server-side from authenticated user + DB hydrate.
+ * Client must NOT send critical context (ignored if present).
  */
 export const askAiCoach = createServerFn({ method: "POST" })
   .inputValidator(parseCoachInput)
@@ -25,11 +29,58 @@ export const askAiCoach = createServerFn({ method: "POST" })
       return { text: "", error: "rate_limited" as const };
     }
 
-    const system = buildCoachSystemPrompt(data.context);
+    const deviceId = data.deviceId?.trim() || "";
+    if (!deviceId || deviceId.length < 8) {
+      return { text: "", error: "unauthorized" as const };
+    }
+
+    const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
+    const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+    if (!identity?.userId) {
+      return { text: "", error: "unauthorized" as const };
+    }
+
+    const { hydrateAppStateFromDb } = await import("@/lib/customer360/hydrate.server");
+    let state = await hydrateAppStateFromDb(identity.userId);
+    state = { ...state, userId: identity.userId };
+
+    try {
+      const { loadCustomerProfile } = await import("@/lib/customer360/recompute.server");
+      const c360 = await loadCustomerProfile(identity.userId);
+      if (c360?.commerce) {
+        state = {
+          ...state,
+          purchaseProductIds:
+            state.purchaseProductIds?.length
+              ? state.purchaseProductIds
+              : (c360.commerce.productIds ?? state.purchaseProductIds ?? []),
+        };
+      }
+    } catch {
+      /* C360 optional enrichment */
+    }
+
+    const bundle = buildCoachContextFromState(state);
+    const system = buildCoachSystemPrompt(bundle.contextText, bundle.safetyNotice);
+
+    const lastUser = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const intent = detectCoachIntent(lastUser);
+    const structured: CoachStructuredReply = buildStructuredCoachReply({
+      kind: intent,
+      summary:
+        intent === "today"
+          ? `Hoje: ${bundle.livingSummary}`
+          : intent === "why"
+            ? bundle.why[0] ?? "O plano reflete as decisões do Decision Engine para o seu contexto de hoje."
+            : bundle.livingSummary,
+      why: bundle.why,
+      decisions: bundle.decisions,
+      safetyNotice: bundle.safetyNotice,
+    });
 
     if (data.provider === "chatgpt") {
       const key = process.env["OPENAI_API_KEY"];
-      if (!key) return { text: "", error: "not_configured" as const };
+      if (!key) return { text: "", structured, error: "not_configured" as const };
 
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -44,17 +95,18 @@ export const askAiCoach = createServerFn({ method: "POST" })
       if (!res.ok) {
         const detail = await res.text();
         console.error("OpenAI error", res.status, detail.slice(0, 200));
-        return { text: "", error: "upstream" as const };
+        return { text: "", structured, error: "upstream" as const };
       }
 
       const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
       return {
         text: json.choices?.[0]?.message?.content?.trim() || "Não consegui responder agora.",
+        structured,
       };
     }
 
     const key = process.env["ANTHROPIC_API_KEY"];
-    if (!key) return { text: "", error: "not_configured" as const };
+    if (!key) return { text: "", structured, error: "not_configured" as const };
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -74,10 +126,10 @@ export const askAiCoach = createServerFn({ method: "POST" })
     if (!res.ok) {
       const detail = await res.text();
       console.error("Anthropic error", res.status, detail.slice(0, 200));
-      return { text: "", error: "upstream" as const };
+      return { text: "", structured, error: "upstream" as const };
     }
 
     const json = (await res.json()) as { content?: Array<{ text?: string }> };
     const text = json.content?.map((c) => c.text ?? "").join("").trim();
-    return { text: text || "Não consegui responder agora." };
+    return { text: text || "Não consegui responder agora.", structured };
   });

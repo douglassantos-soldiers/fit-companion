@@ -4,9 +4,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { AppState } from "@/lib/types";
 import type { UserPatterns } from "@/lib/engine/learning";
+import type { PatternsBlobV2 } from "@/lib/engine/learned-patterns";
 
-function parsePersist(input: unknown): { deviceId: string; patterns: UserPatterns } {
-  const v = input as { deviceId?: string; userId?: string; patterns?: UserPatterns } | null;
+function parsePersist(input: unknown): {
+  deviceId: string;
+  patterns: UserPatterns | PatternsBlobV2;
+} {
+  const v = input as {
+    deviceId?: string;
+    userId?: string;
+    patterns?: UserPatterns | PatternsBlobV2;
+  } | null;
   const deviceId = String(v?.deviceId ?? "").trim();
   if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
   if (!v?.patterns || typeof v.patterns !== "object") throw new Error("patterns obrigatório");
@@ -20,7 +28,7 @@ function parseLoad(input: unknown): { deviceId: string } {
   return { deviceId };
 }
 
-/** Persist patterns for the session user (requireAccess). */
+/** Persist patterns for the session user (requireAccess). Accepts flat or blob v2. */
 export const persistUserPatterns = createServerFn({ method: "POST" })
   .inputValidator(parsePersist)
   .handler(async ({ data }) => {
@@ -35,24 +43,29 @@ export const persistUserPatterns = createServerFn({ method: "POST" })
     return { ok };
   });
 
-/** Load persisted patterns for the device's user. */
+/** Load persisted patterns blob (v2) for the device's user. */
 export const loadUserPatternsFn = createServerFn({ method: "POST" })
   .inputValidator(parseLoad)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
     const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
-    if (!identity) return { ok: false as const, patterns: null };
-    const { loadUserPatterns } = await import("@/lib/engine/learning-patterns.server");
-    const patterns = await loadUserPatterns(identity.userId);
-    return { ok: true as const, patterns };
+    if (!identity) return { ok: false as const, patterns: null, blob: null };
+    const { loadPatternsBlob } = await import("@/lib/engine/learning-patterns.server");
+    const blob = await loadPatternsBlob(identity.userId);
+    return {
+      ok: true as const,
+      patterns: blob?.legacy ?? null,
+      blob,
+    };
   });
 
 export async function persistPatternsForUser(
   userId: string,
-  state: Pick<AppState, "sessions" | "meals">,
+  state: Pick<AppState, "sessions" | "meals" | "dayCheckIns" | "profile">,
+  priorBlob?: PatternsBlobV2 | null,
 ): Promise<boolean> {
-  const { extractUserPatterns } = await import("@/lib/engine/learning");
-  const { saveUserPatterns } = await import("@/lib/engine/learning-patterns.server");
-  const patterns = extractUserPatterns(state as AppState);
-  return saveUserPatterns(userId, patterns);
+  const { buildPatternsBlobV2 } = await import("@/lib/engine/learned-patterns");
+  const { savePatternsBlob } = await import("@/lib/engine/learning-patterns.server");
+  const blob = buildPatternsBlobV2(state as AppState, priorBlob ?? null);
+  return savePatternsBlob(userId, blob);
 }

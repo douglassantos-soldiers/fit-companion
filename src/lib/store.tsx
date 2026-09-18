@@ -27,14 +27,25 @@ import { fetchEntitlement } from "@/lib/entitlements";
 import { establishAccessSession } from "@/lib/access.functions";
 import { ensureIdentityForDevice } from "@/lib/identity.functions";
 import { persistUserPatterns } from "@/lib/learning.functions";
-import { extractUserPatterns } from "@/lib/engine/learning";
+import { buildPatternsBlobV2 } from "@/lib/engine/learned-patterns";
 import { enrichRestockConfidence } from "@/data/shopify-product-map";
-import { trackAppEvent } from "@/lib/shopify.functions";
+import { emitAppEventCompat } from "@/lib/events/emit";
+import { enqueueEntity, ensureOutboxListeners, flushOutbox } from "@/lib/sync/outbox";
+import {
+  persistDecisionsBestEffort,
+  recordNextDayCheckInBestEffort,
+  recordSessionOutcomeBestEffort,
+} from "@/lib/decision-client";
 import { clearLocalReminders, scheduleLocalReminders } from "@/lib/notifications";
 
-function emitAppEvent(deviceId: string, kind: string, payload: Record<string, unknown> = {}) {
+function emitAppEvent(
+  deviceId: string,
+  kind: string,
+  payload: Record<string, unknown> = {},
+  opts?: { entityType?: string; entityId?: string },
+) {
   if (!deviceId) return;
-  void trackAppEvent({ data: { deviceId, kind, payload } }).catch(() => undefined);
+  emitAppEventCompat(deviceId, kind, payload, opts);
 }
 import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
@@ -210,10 +221,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deviceId.current = id;
     setState(withQuests({ ...emptyState, ...local }, id));
     applyTheme(local.theme ?? "dark");
-    setHydrated(true);
+        setHydrated(true);
 
     void (async () => {
       try {
+        ensureOutboxListeners();
+        void flushOutbox().catch(() => undefined);
+
         // Identity Engine: ensure device has a persistent user (server-side)
         let resolvedUserId: string | null = local.userId ?? null;
         try {
@@ -313,7 +327,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             void persistUserPatterns({
               data: {
                 deviceId: id,
-                patterns: extractUserPatterns(merged),
+                patterns: buildPatternsBlobV2(merged),
               },
             }).catch(() => undefined);
           }
@@ -349,7 +363,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             void persistUserPatterns({
               data: {
                 deviceId: id,
-                patterns: extractUserPatterns(bootState),
+                patterns: buildPatternsBlobV2(bootState),
               },
             }).catch(() => undefined);
           }
@@ -480,6 +494,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               console.warn("syncAllJoinedChallenges failed", err),
             );
           }
+          if (deviceId.current) {
+            const vol = next.livingPlans?.[session.date.slice(0, 10)]?.workout.volumeFactor ?? null;
+            recordSessionOutcomeBestEffort(deviceId.current, session, vol);
+            void persistUserPatterns({
+              data: {
+                deviceId: deviceId.current,
+                patterns: buildPatternsBlobV2(next),
+              },
+            }).catch(() => undefined);
+          }
           return next;
         });
       },
@@ -493,7 +517,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             profile: s.profile ? { ...s.profile, weightKg } : s.profile,
           }),
         );
-        emitAppEvent(deviceId.current, "weight_logged", { weightKg, date: todayKey() });
+        emitAppEvent(deviceId.current, "weight_logged", { weightKg, date: todayKey() }, {
+          entityType: "weight",
+          entityId: todayKey(),
+        });
       },
       addWater: (ml) =>
         update((s) => {
@@ -538,16 +565,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           mealId,
           date: entry.date ?? todayKey(),
           proteinG: entry.proteinG,
-        });
+        }, { entityType: "meal", entityId: mealId });
       },
-      removeMealEntry: (id) =>
+      removeMealEntry: (id) => {
+        const target = stateRef.current.meals.find((m) => m.id === id);
         update((s) => {
-          const target = s.meals.find((m) => m.id === id);
           const meals = s.meals.filter((m) => m.id !== id);
           const next = target ? syncMealCount({ ...s, meals }, target.date) : { ...s, meals };
           return withSnapshot(next);
-        }),
-      updateMealEntry: (id, patch) =>
+        });
+        if (target) {
+          emitAppEvent(
+            deviceId.current,
+            "meal_deleted",
+            { mealId: id, date: target.date.slice(0, 10) },
+            { entityType: "meal", entityId: id },
+          );
+        }
+      },
+      updateMealEntry: (id, patch) => {
         update((s) => {
           const meals = s.meals.map((m) => {
             if (m.id !== id) return m;
@@ -580,7 +616,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const target = meals.find((m) => m.id === id);
           const base = target ? syncMealCount({ ...s, meals }, target.date) : { ...s, meals };
           return withSnapshot(base);
-        }),
+        });
+        emitAppEvent(
+          deviceId.current,
+          "meal_updated",
+          { mealId: id, date: todayKey() },
+          { entityType: "meal", entityId: id },
+        );
+      },
       toggleFavoriteMeal: (presetId) =>
         update((s) => {
           const ids = s.favoriteMealPresetIds ?? [];
@@ -608,7 +651,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return next;
         });
         if (took) {
-          emitAppEvent(deviceId.current, "supplement_taken", { productId: id, date: todayKey() });
+          emitAppEvent(
+            deviceId.current,
+            "supplement_taken",
+            { productId: id, date: todayKey() },
+            { entityType: "supplement", entityId: id },
+          );
+        } else {
+          emitAppEvent(
+            deviceId.current,
+            "supplement_skipped",
+            { productId: id, date: todayKey() },
+            { entityType: "supplement", entityId: id },
+          );
         }
       },
       setRoutine: (ids) => update((s) => ({ ...s, supplementRoutine: ids })),
@@ -633,6 +688,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             challengeBaselines: nextBaselines,
           };
         });
+        if (joining) {
+          emitAppEvent(
+            deviceId.current,
+            "challenge_joined",
+            { challengeId: id },
+            { entityType: "challenge", entityId: id },
+          );
+        }
         if (!deviceId.current || !current.profile || current.shareProgress === false) return;
         const name = current.profile.name;
         if (joining && challenge) {
@@ -850,22 +913,90 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dismissRoutineFromPurchase: () =>
         update((s) => ({ ...s, routineFromPurchaseDismissed: true })),
       markUpsellShown: () => update((s) => ({ ...s, upsellShownDate: todayKey() })),
-      saveDayCheckIn: (checkIn) =>
-        update((s) => {
-          const date = checkIn.date ?? todayKey();
-          const full: DayCheckIn = {
+      saveDayCheckIn: (checkIn) => {
+        const date = checkIn.date ?? todayKey();
+        const prevVersion = stateRef.current.dayCheckIns?.[date]?.version ?? 0;
+        const full: DayCheckIn = {
+          date,
+          sleepHours: checkIn.sleepHours,
+          energy: checkIn.energy,
+          availableMin: checkIn.availableMin,
+          version: prevVersion + 1,
+          ...(checkIn.noEquipment ? { noEquipment: true } : {}),
+          ...(checkIn.soreness != null ? { soreness: checkIn.soreness } : {}),
+          ...(checkIn.stress != null ? { stress: checkIn.stress } : {}),
+          ...(checkIn.notes ? { notes: checkIn.notes.slice(0, 280) } : {}),
+        };
+        const nextState = withSnapshot({
+          ...stateRef.current,
+          dayCheckIns: { ...(stateRef.current.dayCheckIns ?? {}), [date]: full },
+        });
+        update(() => nextState);
+        if (nextState.livingPlans?.[date]?.workout.mode === "rest") {
+          emitAppEvent(
+            deviceId.current,
+            "workout_skipped",
+            { date, reason: "rest_day" },
+            { entityType: "workout", entityId: date },
+          );
+        }
+        emitAppEvent(
+          deviceId.current,
+          "checkin_completed",
+          {
             date,
-            sleepHours: checkIn.sleepHours,
-            energy: checkIn.energy,
-            availableMin: checkIn.availableMin,
-            ...(checkIn.noEquipment ? { noEquipment: true } : {}),
-          };
-          return withSnapshot({
-            ...s,
-            dayCheckIns: { ...(s.dayCheckIns ?? {}), [date]: full },
+            sleepHours: full.sleepHours,
+            energy: full.energy,
+            availableMin: full.availableMin,
+            ...(full.soreness != null ? { soreness: full.soreness } : {}),
+            ...(full.stress != null ? { stress: full.stress } : {}),
+          },
+          { entityType: "day_checkin", entityId: date },
+        );
+        emitAppEvent(
+          deviceId.current,
+          "plan_modified",
+          { date, reason: "checkin" },
+          { entityType: "plan", entityId: date },
+        );
+        if (deviceId.current) {
+          enqueueEntity({
+            opId: `day_checkin:${date}`,
+            kind: "entity",
+            createdAt: new Date().toISOString(),
+            deviceId: deviceId.current,
+            entity: "day_checkin",
+            payload: { ...full },
+            version: full.version ?? 1,
           });
-        }),
-      refreshLivingPlan: () => update((s) => withSnapshot(s)),
+          void flushOutbox().catch(() => undefined);
+          persistDecisionsBestEffort(deviceId.current, nextState, date);
+          recordNextDayCheckInBestEffort(deviceId.current, {
+            date,
+            energy: full.energy,
+            sleepHours: full.sleepHours,
+          });
+          void persistUserPatterns({
+            data: {
+              deviceId: deviceId.current,
+              patterns: buildPatternsBlobV2(nextState),
+            },
+          }).catch(() => undefined);
+        }
+      },
+      refreshLivingPlan: () => {
+        update((s) => {
+          const next = withSnapshot(s);
+          if (deviceId.current) persistDecisionsBestEffort(deviceId.current, next);
+          return next;
+        });
+        emitAppEvent(
+          deviceId.current,
+          "plan_modified",
+          { date: todayKey(), reason: "refresh" },
+          { entityType: "plan", entityId: todayKey() },
+        );
+      },
       reset: () => {
         skipPush.current = true;
         setState(emptyState);

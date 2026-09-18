@@ -5,9 +5,8 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { askAiCoach } from "@/lib/coach.functions";
+import { askAiCoach, type CoachStructuredReply } from "@/lib/coach.functions";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
-import { coachSystemPrompt } from "@/lib/engine/coach-context";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import type { AppState, ChatMessage } from "@/lib/types";
@@ -37,6 +36,18 @@ function mapChat(messages: ChatMessage[]): Array<{ role: "user" | "assistant"; c
       role: m.role === "coach" ? ("assistant" as const) : ("user" as const),
       content: m.text,
     }));
+}
+
+function formatCoachReply(text: string, structured?: CoachStructuredReply | null): string {
+  if (!structured?.why?.length && !structured?.safetyNotice) return text;
+  const parts = [text];
+  if (structured.safetyNotice) {
+    parts.push(`\n\nAtenção: ${structured.safetyNotice}`);
+  }
+  if (structured.kind === "why" && structured.why.length) {
+    parts.push(`\n\nPor quê:\n${structured.why.slice(0, 4).map((w) => `• ${w}`).join("\n")}`);
+  }
+  return parts.join("");
 }
 
 function CoachPage() {
@@ -90,24 +101,38 @@ function CoachPage() {
     try {
       const history = mapChat(snapshot.chat);
       const messages = [...history, { role: "user" as const, content: userText }];
+      const deviceId = getDeviceId();
       const result = await askAi({
         data: {
           provider: "chatgpt",
-          context: coachSystemPrompt(snapshot),
+          deviceId: deviceId || undefined,
           messages,
         },
       });
       if (result?.error) {
-        return { text: offlineReply, offline: true, reason: result.error };
+        return {
+          text: formatCoachReply(offlineReply, result.structured),
+          offline: true,
+          reason: result.error,
+        };
       }
-      if (result?.text?.trim()) return { text: result.text.trim(), offline: false as const };
+      if (result?.text?.trim()) {
+        return {
+          text: formatCoachReply(result.text.trim(), result.structured),
+          offline: false as const,
+        };
+      }
       return { text: offlineReply, offline: true as const };
     } catch (e) {
       console.warn("askAiCoach failed", e);
       return { text: offlineReply, offline: true as const, reason: "upstream" };
     } finally {
       void import("@/lib/outcome").then(({ trackOutcome }) =>
-        trackOutcome(getDeviceId(), "coach_interaction", { offline: false }),
+        trackOutcome(getDeviceId(), "coach_interaction", {
+          offline: false,
+          entityType: "coach",
+          entityId: "chat",
+        }),
       );
     }
   };
@@ -144,7 +169,7 @@ function CoachPage() {
         {state.chat.map((m) => (
           <div
             key={m.id}
-            className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+            className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
               m.role === "coach"
                 ? "surface-glass text-foreground"
                 : "ml-auto bg-primary text-primary-foreground glow-primary"

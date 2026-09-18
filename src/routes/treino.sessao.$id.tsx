@@ -69,19 +69,25 @@ function SessionPage() {
 
   useEffect(() => {
     if (!hydrated || !id) return;
+    const deviceId = getDeviceId();
     void track({
       data: {
-        deviceId: getDeviceId(),
+        deviceId,
         kind: "workout_started",
         payload: { dayId: id, express: express === true },
+        entityType: "workout",
+        entityId: id,
+        idempotencyKey: `workout:${id}:workout_started`,
       },
     }).catch(() => undefined);
     if (express) {
       void track({
         data: {
-          deviceId: getDeviceId(),
+          deviceId,
           kind: "express_chosen",
           payload: { dayId: id },
+          entityType: "workout",
+          entityId: id,
         },
       }).catch(() => undefined);
     }
@@ -237,6 +243,18 @@ function SessionPage() {
             },
       ),
     );
+    const deviceId = getDeviceId();
+    if (deviceId && id) {
+      void track({
+        data: {
+          deviceId,
+          kind: "workout_modified",
+          payload: { dayId: id, fromExerciseId: current?.exerciseId, toExerciseId: newId },
+          entityType: "workout",
+          entityId: id,
+        },
+      }).catch(() => undefined);
+    }
     setLogs((prev) =>
       prev.map((l, i) =>
         i !== exIdx
@@ -289,7 +307,10 @@ function SessionPage() {
         data: {
           deviceId,
           kind: "workout_completed",
-          payload: { sessionId: session.id, express: !!express, volumeKg: volume },
+          payload: { sessionId: session.id, dayId: id, express: !!express, volumeKg: volume },
+          entityType: "workout",
+          entityId: session.id,
+          idempotencyKey: `workout:${session.id}:workout_completed`,
         },
       });
     }
@@ -602,8 +623,19 @@ function SessionPage() {
             void track({
               data: {
                 deviceId,
-                kind: "restock_cta_click",
+                kind: "restock_clicked",
                 payload: { source: "post_workout", productId: upsell.productId },
+                entityType: "product",
+                entityId: upsell.productId,
+              },
+            });
+            void track({
+              data: {
+                deviceId,
+                kind: "product_clicked",
+                payload: { source: "post_workout", productId: upsell.productId },
+                entityType: "product",
+                entityId: upsell.productId,
               },
             });
           }

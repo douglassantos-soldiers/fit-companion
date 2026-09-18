@@ -34,6 +34,8 @@ export async function pushState(deviceId: string, state: AppState): Promise<void
   if (!deviceId) return;
   try {
     await pushStateFn({ data: { deviceId, state } });
+    const { flushOutbox } = await import("@/lib/sync/outbox");
+    void flushOutbox().catch(() => undefined);
   } catch (e) {
     console.error("Falha ao sincronizar dados", e);
   }

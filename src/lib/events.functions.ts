@@ -1,30 +1,41 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { TrackUserEventInput } from "@/lib/events/track";
+import type { TrackUserEventInput } from "@/lib/events/types";
+import { normalizeEventType, resolveMetadata } from "@/lib/events/normalize";
 
 function parseTrack(input: unknown): {
   deviceId: string;
   eventType: string;
   source?: string;
-  payload?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  entityType?: string;
+  entityId?: string;
   occurredAt?: string;
   idempotencyKey?: string;
 } {
-  const v = input as TrackUserEventInput | null;
-  const eventType = String(v?.eventType ?? "").trim();
-  if (!eventType) throw new Error("eventType obrigatório");
+  const v = input as TrackUserEventInput & { kind?: string } | null;
+  const rawType = String(v?.eventType ?? (v as { kind?: string } | null)?.kind ?? "").trim();
+  if (!rawType) throw new Error("eventType obrigatório");
   const deviceId = String(v?.deviceId ?? "").trim();
   if (!deviceId || deviceId.length < 8) throw new Error("deviceId obrigatório");
-  // Ignore client userId entirely
+
+  const metadata = resolveMetadata({
+    metadata: v?.metadata,
+    payload: v?.payload,
+  });
+
   return {
     deviceId,
-    eventType,
+    eventType: normalizeEventType(rawType),
     source: v?.source ?? "app",
-    payload: v?.payload && typeof v.payload === "object" ? v.payload : {},
+    metadata,
+    ...(v?.entityType ? { entityType: String(v.entityType) } : {}),
+    ...(v?.entityId ? { entityId: String(v.entityId) } : {}),
     ...(v?.occurredAt ? { occurredAt: v.occurredAt } : {}),
     ...(v?.idempotencyKey ? { idempotencyKey: v.idempotencyKey } : {}),
   };
 }
 
+/** Trusted ingest: never trusts client userId; resolves via session/device. */
 export const trackAppUserEvent = createServerFn({ method: "POST" })
   .inputValidator(parseTrack)
   .handler(async ({ data }) => {
@@ -36,7 +47,9 @@ export const trackAppUserEvent = createServerFn({ method: "POST" })
       userId: identity?.userId ?? null,
       eventType: data.eventType,
       source: data.source,
-      payload: data.payload,
+      metadata: data.metadata,
+      entityType: data.entityType,
+      entityId: data.entityId,
       occurredAt: data.occurredAt,
       idempotencyKey: data.idempotencyKey,
     });

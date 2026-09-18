@@ -114,5 +114,76 @@ describe("buildLivingPlan — adaptação pós check-in de sono", () => {
     expect(after!.workout.mode).toBe("deload");
     expect(after!.why.some((w) => /sono/i.test(w) && /volume/i.test(w))).toBe(true);
     expect(after!.narrative).toMatch(/recuperado|volume/i);
+    expect(after!.habits.title.length).toBeGreaterThan(0);
+    expect(after!.traffic.consistency).toMatch(/green|yellow|red/);
+    expect(after!.whyByChange.some((w) => w.key === "training")).toBe(true);
+  });
+
+  it("cenário multi-dia: sono ruim → volume↓ → sono ok → volume sobe", () => {
+    const date = todayKey();
+    const d = new Date(`${date}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    const yesterday = todayKey(d);
+
+    const goodSleep = stateWith(
+      { ...baseProfile, typicalSleepHours: 8 },
+      {
+        dayCheckIns: {
+          [date]: { date, sleepHours: 8, energy: "alta", availableMin: 60 },
+        },
+      },
+    );
+    const badSleep = stateWith(
+      { ...baseProfile, typicalSleepHours: 8 },
+      {
+        dayCheckIns: {
+          [date]: { date, sleepHours: 5, energy: "baixa", availableMin: 60 },
+        },
+      },
+    );
+
+    const planBad = buildLivingPlan(badSleep, date)!;
+    const planGood = buildLivingPlan(goodSleep, date)!;
+    expect(planBad.workout.volumeFactor).toBeLessThan(planGood.workout.volumeFactor);
+
+    // Diff vs yesterday when previous plan exists
+    const recovered = buildLivingPlan(
+      {
+        ...goodSleep,
+        livingPlans: { [yesterday]: planBad },
+      },
+      date,
+    )!;
+    expect(recovered.diffFromYesterday.length).toBeGreaterThan(0);
+  });
+});
+
+describe("buildLivingPlan — Why por mudança", () => {
+  it("explica proteína e calorias quando bias/delta ativos", () => {
+    const date = todayKey();
+    const state = stateWith(
+      { ...baseProfile, goal: "massa", typicalSleepHours: 5 },
+      {
+        dayCheckIns: {
+          [date]: { date, sleepHours: 5, energy: "baixa", availableMin: 45 },
+        },
+        meals: [
+          {
+            id: "m1",
+            date,
+            slot: "almoco",
+            label: "Leve",
+            proteinG: 10,
+            kcal: 300,
+            quality: "laranja",
+          },
+        ],
+      },
+    );
+    const plan = buildLivingPlan(state, date)!;
+    expect(plan.whyByChange.length).toBeGreaterThan(0);
+    expect(
+      plan.whyByChange.some((w) => w.key === "training" || w.key === "protein" || w.key === "calories"),
+    ).toBe(true);
   });
 });
