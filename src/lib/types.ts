@@ -5,6 +5,9 @@ export type Theme = "dark" | "light";
 export type SessionRpe = "facil" | "ok" | "dificil";
 export type MealSlot = "cafe" | "almoco" | "lanche" | "jantar";
 export type MealQuality = "verde" | "amarelo" | "laranja";
+export type PrimaryBlocker = "sono" | "alimentacao" | "consistencia" | "tempo" | "equipamento";
+export type DayEnergy = "baixa" | "ok" | "alta";
+export type TrafficLight = "green" | "yellow" | "red";
 
 export interface Profile {
   name: string;
@@ -17,6 +20,51 @@ export interface Profile {
   equipment: Equipment;
   restrictions: string[];
   createdAt: string;
+  /** Typical nightly sleep hours (baseline) */
+  typicalSleepHours?: number;
+  /** What most blocks progress right now */
+  primaryBlocker?: PrimaryBlocker;
+  /** Behavioral meal prefs */
+  skipBreakfast?: boolean;
+  lunchOutOften?: boolean;
+}
+
+export interface DayCheckIn {
+  date: string;
+  sleepHours: number;
+  energy: DayEnergy;
+  availableMin: number;
+  noEquipment?: boolean;
+}
+
+export interface LivingPlanSnapshot {
+  date: string;
+  generatedAt: string;
+  score: number;
+  blocker: { key: string; label: string; score: number } | null;
+  traffic: {
+    training: TrafficLight;
+    nutrition: TrafficLight;
+    recovery: TrafficLight;
+  };
+  workout: {
+    mode: "full" | "express" | "deload" | "rest";
+    title: string;
+    estimatedMin: number;
+    dayId: string | null;
+    volumeFactor: number;
+  };
+  nutrition: {
+    proteinG: number;
+    kcal: number;
+    waterMl: number;
+    skipBreakfast: boolean;
+  };
+  supplements: Array<{ id: string; name: string; timing: string }>;
+  sleepTargetHours: number;
+  narrative: string;
+  why: string[];
+  diffFromYesterday: string[];
 }
 
 export interface SetLog {
@@ -125,12 +173,23 @@ export interface AppState {
   /** PRODUCTS.id mapped from last paid order */
   purchaseProductIds: string[];
   /** Restock estimates keyed by product id */
-  restockEstimates: Record<string, { emptyAt: string; productId: string; daysLeft: number; quantity: number }>;
+  restockEstimates: Record<
+    string,
+    { emptyAt: string; productId: string; daysLeft: number; quantity: number }
+  >;
   /** Banner "rotina da compra" dismissed */
   routineFromPurchase: boolean;
   routineFromPurchaseDismissed: boolean;
   /** YYYY-MM-DD last post-workout upsell shown */
   upsellShownDate: string | null;
+  /** Manual daily state check-ins keyed by date */
+  dayCheckIns: Record<string, DayCheckIn>;
+  /** Living plan snapshots keyed by date */
+  livingPlans: Record<string, LivingPlanSnapshot>;
+  /** Baseline metric at challenge join (for relative % evolution) */
+  challengeBaselines: Record<string, number>;
+  /** Hub ids the user joined (Creator OS MVP) */
+  joinedHubIds: string[];
 }
 
 export const emptyState: AppState = {
@@ -172,6 +231,10 @@ export const emptyState: AppState = {
   routineFromPurchase: false,
   routineFromPurchaseDismissed: false,
   upsellShownDate: null,
+  dayCheckIns: {},
+  livingPlans: {},
+  challengeBaselines: {},
+  joinedHubIds: [],
 };
 
 export const DAILY_XP_GOAL = 20;
@@ -187,6 +250,14 @@ export const LEVEL_LABEL: Record<Level, string> = {
   iniciante: "Iniciante",
   intermediario: "Intermediário",
   avancado: "Avançado",
+};
+
+export const BLOCKER_LABEL: Record<PrimaryBlocker, string> = {
+  sono: "Sono / recuperação",
+  alimentacao: "Alimentação",
+  consistencia: "Consistência",
+  tempo: "Falta de tempo",
+  equipamento: "Equipamento limitado",
 };
 
 export const MEAL_SLOT_LABEL: Record<MealSlot, string> = {

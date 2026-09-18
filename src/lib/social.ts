@@ -1,4 +1,4 @@
-import { challengeById } from "@/data/challenges";
+import { challengeById, isRelativeChallenge, type Challenge } from "@/data/challenges";
 import { sessionsInLastDays } from "@/lib/engine/dimensions";
 import { supabase } from "@/integrations/supabase/client";
 import type { AppState, SessionLog } from "@/lib/types";
@@ -11,7 +11,8 @@ export type ActivityKind =
   | "xp_goal"
   | "league_rank"
   | "friend_quest_complete"
-  | "freeze_used";
+  | "freeze_used"
+  | "proof";
 
 export interface LeaderboardRow {
   deviceId: string;
@@ -19,6 +20,84 @@ export interface LeaderboardRow {
   value: number;
   rank: number;
   isYou: boolean;
+  /** Present for relative challenges */
+  pct?: number;
+}
+
+export interface ChallengeProgress {
+  /** Raw metric in the challenge window */
+  current: number;
+  /** Baseline at join (relative only; absolute uses 0) */
+  baseline: number;
+  /** % evolution vs baseline */
+  pct: number;
+  /** 0–100 bar fill toward completion */
+  barPct: number;
+  /** Whether challenge target is met */
+  complete: boolean;
+  /** Display value for UI (kg/sessions or %) */
+  displayValue: number;
+  displayTarget: number;
+  displayUnit: string;
+}
+
+/** Raw metric for a challenge (sessions count or volume kg in window). */
+export function challengeRawValue(challenge: Challenge, sessions: SessionLog[]) {
+  const recent = sessionsInLastDays(sessions, challenge.durationDays);
+  if (challenge.metric === "volume") return Math.round(recent.reduce((s, x) => s + x.volumeKg, 0));
+  if (challenge.metric === "dias") {
+    return new Set(recent.map((s) => s.date.slice(0, 10))).size;
+  }
+  return recent.length;
+}
+
+export function challengeValue(challengeId: string, sessions: SessionLog[]) {
+  const c = challengeById(challengeId);
+  if (!c) return 0;
+  return challengeRawValue(c, sessions);
+}
+
+/** Unified progress: absolute or relative (% vs baseline). */
+export function challengeProgress(
+  challenge: Challenge,
+  sessions: SessionLog[],
+  baseline?: number,
+): ChallengeProgress {
+  const current = challengeRawValue(challenge, sessions);
+  if (isRelativeChallenge(challenge)) {
+    const base = Math.max(0, baseline ?? 0);
+    const pct = ((current - base) / Math.max(base, 1)) * 100;
+    const targetPct = challenge.targetPct ?? challenge.target;
+    const barPct = Math.min(100, Math.max(0, (pct / Math.max(targetPct, 1)) * 100));
+    return {
+      current,
+      baseline: base,
+      pct: Math.round(pct * 10) / 10,
+      barPct,
+      complete: pct >= targetPct,
+      displayValue: Math.round(pct * 10) / 10,
+      displayTarget: targetPct,
+      displayUnit: "%",
+    };
+  }
+  const barPct = Math.min(100, (current / Math.max(challenge.target, 1)) * 100);
+  return {
+    current,
+    baseline: 0,
+    pct: 0,
+    barPct,
+    complete: current >= challenge.target,
+    displayValue: current,
+    displayTarget: challenge.target,
+    displayUnit: challenge.unit,
+  };
+}
+
+export function challengeProgressFromState(challengeId: string, state: AppState): ChallengeProgress | null {
+  const c = challengeById(challengeId);
+  if (!c) return null;
+  const baseline = state.challengeBaselines?.[challengeId];
+  return challengeProgress(c, state.sessions, baseline);
 }
 
 export interface ClubSummary {
@@ -85,14 +164,6 @@ function weekStartMonday(d = new Date()): string {
   return monday.toISOString().slice(0, 10);
 }
 
-export function challengeValue(challengeId: string, sessions: SessionLog[]) {
-  const c = challengeById(challengeId);
-  if (!c) return 0;
-  const recent = sessionsInLastDays(sessions, c.durationDays);
-  if (c.metric === "volume") return Math.round(recent.reduce((s, x) => s + x.volumeKg, 0));
-  return recent.length;
-}
-
 export async function ensureSocialProfile(deviceId: string, displayName: string) {
   if (!deviceId) return;
   const { error } = await supabase.from("social_profiles").upsert(
@@ -102,14 +173,38 @@ export async function ensureSocialProfile(deviceId: string, displayName: string)
   if (error) throw error;
 }
 
-export async function joinChallengeRemote(deviceId: string, challengeId: string, displayName: string) {
+export async function joinChallengeRemote(
+  deviceId: string,
+  challengeId: string,
+  displayName: string,
+  baseline?: number,
+) {
   await ensureSocialProfile(deviceId, displayName);
   const { error } = await supabase.from("challenge_entries").upsert(
     { device_id: deviceId, challenge_id: challengeId },
     { onConflict: "device_id,challenge_id" },
   );
   if (error) throw error;
-  await publishEvent(deviceId, displayName, "challenge_join", { challengeId, title: challengeById(challengeId)?.title });
+  const c = challengeById(challengeId);
+  if (c && isRelativeChallenge(c) && baseline !== undefined) {
+    const { error: progErr } = await supabase.from("challenge_progress").upsert(
+      {
+        device_id: deviceId,
+        challenge_id: challengeId,
+        value: baseline,
+        baseline_value: baseline,
+        pct_value: 0,
+        updated_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "device_id,challenge_id" },
+    );
+    if (progErr) throw progErr;
+  }
+  await publishEvent(deviceId, displayName, "challenge_join", {
+    challengeId,
+    title: c?.title,
+    relative: c ? isRelativeChallenge(c) : false,
+  });
 }
 
 export async function leaveChallengeRemote(deviceId: string, challengeId: string) {
@@ -122,25 +217,44 @@ export async function syncChallengeProgress(
   challengeId: string,
   value: number,
   displayName: string,
+  opts?: { baseline?: number; pct?: number; complete?: boolean },
 ) {
   await ensureSocialProfile(deviceId, displayName);
+  const c = challengeById(challengeId);
+  const relative = c ? isRelativeChallenge(c) : false;
+  const baseline = opts?.baseline ?? 0;
+  const pct =
+    opts?.pct ??
+    (relative ? ((value - baseline) / Math.max(baseline, 1)) * 100 : null);
+
   const { error } = await supabase.from("challenge_progress").upsert(
     {
       device_id: deviceId,
       challenge_id: challengeId,
       value,
+      baseline_value: baseline,
+      pct_value: pct,
       updated_at: new Date().toISOString(),
-    },
+    } as never,
     { onConflict: "device_id,challenge_id" },
   );
   if (error) throw error;
 
-  const c = challengeById(challengeId);
-  if (c && value >= c.target) {
+  const done =
+    opts?.complete ??
+    (c
+      ? relative
+        ? (pct ?? 0) >= (c.targetPct ?? c.target)
+        : value >= c.target
+      : false);
+
+  if (c && done) {
     await publishEvent(deviceId, displayName, "challenge_complete", {
       challengeId,
       title: c.title,
       value,
+      pct: pct ?? undefined,
+      relative,
     });
   }
 }
@@ -149,9 +263,15 @@ export async function syncAllJoinedChallenges(state: AppState, deviceId: string)
   if (!state.shareProgress || !state.profile) return;
   const name = state.profile.name;
   for (const id of state.challenges) {
-    const value = challengeValue(id, state.sessions);
+    const c = challengeById(id);
+    if (!c) continue;
+    const progress = challengeProgress(c, state.sessions, state.challengeBaselines?.[id]);
     try {
-      await syncChallengeProgress(deviceId, id, value, name);
+      await syncChallengeProgress(deviceId, id, progress.current, name, {
+        baseline: progress.baseline,
+        pct: progress.pct,
+        complete: progress.complete,
+      });
     } catch (e) {
       console.error("Falha ao sincronizar progresso do desafio", id, e);
     }
@@ -168,25 +288,78 @@ export async function fetchParticipantCount(challengeId: string): Promise<number
 }
 
 export async function fetchLeaderboard(challengeId: string, deviceId: string): Promise<LeaderboardRow[] | null> {
-  const { data, error } = await supabase
-    .from("challenge_progress")
-    .select("device_id, value")
-    .eq("challenge_id", challengeId)
-    .order("value", { ascending: false })
-    .limit(20);
-  if (error) return null;
+  const c = challengeById(challengeId);
+  const relative = c ? isRelativeChallenge(c) : false;
 
-  const ids = (data ?? []).map((r) => r.device_id);
+  let query = supabase
+    .from("challenge_progress")
+    .select("device_id, value, baseline_value, pct_value" as never)
+    .eq("challenge_id", challengeId)
+    .limit(20);
+
+  // Prefer pct for relative; fall back to value
+  const { data, error } = relative
+    ? await query.order("pct_value" as never, { ascending: false, nullsFirst: false })
+    : await query.order("value", { ascending: false });
+
+  if (error) {
+    // Fallback if columns not migrated yet
+    const fallback = await supabase
+      .from("challenge_progress")
+      .select("device_id, value")
+      .eq("challenge_id", challengeId)
+      .order("value", { ascending: false })
+      .limit(20);
+    if (fallback.error) return null;
+    const ids = (fallback.data ?? []).map((r) => r.device_id);
+    const { data: profiles } = await supabase
+      .from("social_profiles")
+      .select("device_id, display_name")
+      .in("device_id", ids);
+    const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
+    return (fallback.data ?? []).map((r, i) => ({
+      deviceId: r.device_id,
+      displayName: nameMap.get(r.device_id) || "Soldado",
+      value: Number(r.value),
+      rank: i + 1,
+      isYou: r.device_id === deviceId,
+    }));
+  }
+
+  type ProgRow = {
+    device_id: string;
+    value: number;
+    baseline_value?: number | null;
+    pct_value?: number | null;
+  };
+  const rows = (data ?? []) as unknown as ProgRow[];
+  const sorted = relative
+    ? [...rows].sort((a, b) => Number(b.pct_value ?? 0) - Number(a.pct_value ?? 0))
+    : rows;
+
+  const ids = sorted.map((r) => r.device_id);
   const { data: profiles } = await supabase.from("social_profiles").select("device_id, display_name").in("device_id", ids);
   const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
 
-  return (data ?? []).map((r, i) => ({
-    deviceId: r.device_id,
-    displayName: nameMap.get(r.device_id) || "Soldado",
-    value: Number(r.value),
-    rank: i + 1,
-    isYou: r.device_id === deviceId,
-  }));
+  return sorted.map((r, i) => {
+    const row: LeaderboardRow = {
+      deviceId: r.device_id,
+      displayName: nameMap.get(r.device_id) || "Soldado",
+      value: relative ? Number(r.pct_value ?? 0) : Number(r.value),
+      rank: i + 1,
+      isYou: r.device_id === deviceId,
+    };
+    if (relative) row.pct = Number(r.pct_value ?? 0);
+    return row;
+  });
+}
+
+export async function publishProofEvent(
+  deviceId: string,
+  displayName: string,
+  payload: Record<string, unknown>,
+) {
+  await publishEvent(deviceId, displayName, "proof", payload);
 }
 
 export async function createClub(deviceId: string, name: string, displayName: string): Promise<ClubSummary> {

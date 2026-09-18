@@ -3,12 +3,17 @@ export interface Challenge {
   title: string;
   description: string;
   metric: "sessoes" | "volume" | "dias";
+  /** Absolute target (sessions/kg). Used when rankingMode is absolute. */
   target: number;
   unit: string;
   durationDays: number;
   participants: number;
   /** Requires accessTier performance */
   requiresPerformance?: boolean;
+  /** absolute = raw value; relative = % evolution vs baseline at join */
+  rankingMode?: "absolute" | "relative";
+  /** For relative challenges: complete when pct evolution >= this */
+  targetPct?: number;
 }
 
 export const CHALLENGES: Challenge[] = [
@@ -21,6 +26,7 @@ export const CHALLENGES: Challenge[] = [
     unit: "treinos",
     durationDays: 21,
     participants: 1840,
+    rankingMode: "absolute",
   },
   {
     id: "volume-50k",
@@ -32,6 +38,7 @@ export const CHALLENGES: Challenge[] = [
     durationDays: 30,
     participants: 962,
     requiresPerformance: true,
+    rankingMode: "absolute",
   },
   {
     id: "semana-perfeita",
@@ -42,6 +49,7 @@ export const CHALLENGES: Challenge[] = [
     unit: "treinos",
     durationDays: 7,
     participants: 3120,
+    rankingMode: "absolute",
   },
   {
     id: "maratona-100",
@@ -53,7 +61,49 @@ export const CHALLENGES: Challenge[] = [
     durationDays: 365,
     participants: 508,
     requiresPerformance: true,
+    rankingMode: "absolute",
+  },
+  {
+    id: "evolucao-volume-21",
+    title: "Evolução de volume +20%",
+    description: "Aumente seu volume de treino em 20% em 21 dias — ranking por % vs seu baseline.",
+    metric: "volume",
+    target: 20,
+    unit: "%",
+    durationDays: 21,
+    participants: 420,
+    rankingMode: "relative",
+    targetPct: 20,
+    requiresPerformance: true,
+  },
+  {
+    id: "evolucao-consistencia-14",
+    title: "Consistência +50%",
+    description: "Suba em 50% a frequência de treinos em 14 dias. Compete por evolução, não por total bruto.",
+    metric: "sessoes",
+    target: 50,
+    unit: "%",
+    durationDays: 14,
+    participants: 680,
+    rankingMode: "relative",
+    targetPct: 50,
+  },
+  {
+    id: "hub-massa-60",
+    title: "Projeto Massa — evolução 60d",
+    description: "Em 60 dias, aumente seu volume de treino em 25% vs baseline. Ranking relativo do hub.",
+    metric: "volume",
+    target: 25,
+    unit: "%",
+    durationDays: 60,
+    participants: 210,
+    rankingMode: "relative",
+    targetPct: 25,
   },
 ];
 
 export const challengeById = (id: string) => CHALLENGES.find((c) => c.id === id);
+
+export function isRelativeChallenge(c: Challenge) {
+  return (c.rankingMode ?? "absolute") === "relative";
+}

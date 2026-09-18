@@ -116,6 +116,8 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       routineFromPurchase: false,
       routineFromPurchaseDismissed: false,
       upsellShownDate: null,
+      challengeBaselines: {},
+      joinedHubIds: [],
     };
   }
   const r = raw as Record<string, unknown>;
@@ -143,6 +145,11 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     routineFromPurchase: r["routineFromPurchase"] === true,
     routineFromPurchaseDismissed: r["routineFromPurchaseDismissed"] === true,
     upsellShownDate: typeof r["upsellShownDate"] === "string" ? r["upsellShownDate"] : null,
+    challengeBaselines:
+      r["challengeBaselines"] && typeof r["challengeBaselines"] === "object"
+        ? (r["challengeBaselines"] as Record<string, number>)
+        : {},
+    joinedHubIds: Array.isArray(r["joinedHubIds"]) ? (r["joinedHubIds"] as string[]) : [],
   };
 }
 
@@ -168,6 +175,8 @@ function retentionPayload(state: AppState) {
     routineFromPurchase: state.routineFromPurchase === true,
     routineFromPurchaseDismissed: state.routineFromPurchaseDismissed === true,
     upsellShownDate: state.upsellShownDate ?? null,
+    challengeBaselines: state.challengeBaselines ?? {},
+    joinedHubIds: state.joinedHubIds ?? [],
   };
 }
 

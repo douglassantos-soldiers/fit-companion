@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { NumberInput } from "@mantine/core";
-import { Star } from "lucide-react";
+import { Camera, Mic, Square, Star } from "lucide-react";
+import { toast } from "sonner";
 import { MEAL_PRESETS, type MealPreset } from "@/data/meal-presets";
 import { QUALITY_LABEL, recentMealPresets, scalePreset } from "@/lib/engine/nutrition";
+import { analyzeMealAi } from "@/lib/meal-ai.functions";
+import type { MealAiSuggestion } from "@/lib/meal-ai-contract";
 import { useStore } from "@/lib/store";
-import { MEAL_SLOT_LABEL, type MealSlot } from "@/lib/types";
+import { MEAL_SLOT_LABEL, type MealQuality, type MealSlot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,22 +16,66 @@ import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import { MealPresetThumb } from "@/components/meal-preset-thumb";
 import { cn } from "@/lib/utils";
 
-type PickerTab = "buscar" | "recentes" | "favoritos";
+type PickerTab = "buscar" | "recentes" | "favoritos" | "foto" | "voz";
+
+async function fileToBase64(file: Blob): Promise<{ base64: string; mimeType: string }> {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return { base64: btoa(binary), mimeType: file.type || "application/octet-stream" };
+}
+
+async function compressImage(file: File, maxSide = 1280): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  return new Promise((resolve) => {
+    canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.82);
+  });
+}
 
 export function MealPickerSheet({
   slot,
   onClose,
   onPick,
+  onPickCustom,
 }: {
   slot: MealSlot;
   onClose: () => void;
   onPick: (preset: MealPreset, servings: number) => void;
+  /** AI / custom meal (no presetId) */
+  onPickCustom?: (meal: {
+    label: string;
+    proteinG: number;
+    kcal: number;
+    quality: MealQuality;
+  }) => void;
 }) {
   const { state, toggleFavoriteMeal } = useStore();
+  const analyze = useServerFn(analyzeMealAi);
   const [tab, setTab] = useState<PickerTab>("buscar");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<MealPreset | null>(null);
   const [servings, setServings] = useState(1);
+  const [aiDraft, setAiDraft] = useState<MealAiSuggestion | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const favorites = state.favoriteMealPresetIds ?? [];
   const recent = useMemo(() => recentMealPresets(state.meals ?? [], 8), [state.meals]);
@@ -54,15 +102,171 @@ export function MealPickerSheet({
     onPick(selected, servings);
   };
 
+  const confirmAi = () => {
+    if (!aiDraft || !onPickCustom) return;
+    onPickCustom({
+      label: aiDraft.label,
+      proteinG: aiDraft.proteinG,
+      kcal: aiDraft.kcal,
+      quality: aiDraft.quality,
+    });
+  };
+
+  const runPhoto = async (file: File) => {
+    setAiBusy(true);
+    setAiDraft(null);
+    try {
+      const compressed = await compressImage(file);
+      const { base64, mimeType } = await fileToBase64(compressed);
+      const res = await analyze({
+        data: { mode: "photo", slot, mediaBase64: base64, mimeType },
+      });
+      if (res.error) {
+        toast.error(
+          res.error === "unauthorized"
+            ? "Faça login / desbloqueie o acesso para usar foto"
+            : res.error === "rate_limited"
+              ? "Limite de análises atingido — tente mais tarde"
+              : res.error === "not_configured"
+                ? "IA de refeição não configurada no servidor"
+                : "Não consegui analisar a foto",
+        );
+        return;
+      }
+      if (res.suggestion) setAiDraft(res.suggestion);
+    } catch {
+      toast.error("Falha ao analisar a foto");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        void runVoice(blob);
+      };
+      mediaRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      toast.error("Microfone indisponível");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRef.current?.stop();
+    setRecording(false);
+  };
+
+  const runVoice = async (blob: Blob) => {
+    setAiBusy(true);
+    setAiDraft(null);
+    setTranscript(null);
+    try {
+      const { base64, mimeType } = await fileToBase64(blob);
+      const res = await analyze({
+        data: { mode: "voice", slot, mediaBase64: base64, mimeType },
+      });
+      if (res.error) {
+        toast.error(
+          res.error === "unauthorized"
+            ? "Faça login / desbloqueie o acesso para usar voz"
+            : res.error === "rate_limited"
+              ? "Limite de análises atingido — tente mais tarde"
+              : "Não consegui entender o áudio",
+        );
+        return;
+      }
+      if (res.transcript) setTranscript(res.transcript);
+      if (res.suggestion) setAiDraft(res.suggestion);
+    } catch {
+      toast.error("Falha ao analisar o áudio");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <SoldiersOverlay
       open
       onClose={onClose}
       title={MEAL_SLOT_LABEL[slot]}
-      description={selected ? "Ajuste a porção" : "Busque, recentes ou favoritos"}
+      description={
+        aiDraft
+          ? "Confirme ou ajuste os macros"
+          : selected
+            ? "Ajuste a porção"
+            : "Busque, foto ou voz"
+      }
       panelClassName="max-h-[80vh]"
     >
-      {selected ? (
+      {aiDraft ? (
+        <div className="space-y-4">
+          {transcript ? (
+            <p className="text-xs text-muted-foreground">Ouvi: “{transcript}”</p>
+          ) : null}
+          <Input
+            value={aiDraft.label}
+            onChange={(e) => setAiDraft({ ...aiDraft, label: e.target.value })}
+            placeholder="Nome da refeição"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <NumberInput
+              label="Proteína (g)"
+              value={aiDraft.proteinG}
+              onChange={(v) =>
+                setAiDraft({ ...aiDraft, proteinG: typeof v === "number" ? v : aiDraft.proteinG })
+              }
+              min={0}
+              max={200}
+            />
+            <NumberInput
+              label="Kcal"
+              value={aiDraft.kcal}
+              onChange={(v) =>
+                setAiDraft({ ...aiDraft, kcal: typeof v === "number" ? v : aiDraft.kcal })
+              }
+              min={0}
+              max={3000}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Qualidade: {QUALITY_LABEL[aiDraft.quality]} · confiança{" "}
+            {Math.round(aiDraft.confidence * 100)}%
+            {aiDraft.notes ? ` · ${aiDraft.notes}` : ""}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => {
+                setAiDraft(null);
+                setTranscript(null);
+              }}
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={!onPickCustom}
+              onClick={confirmAi}
+            >
+              Confirmar
+            </Button>
+          </div>
+        </div>
+      ) : selected ? (
         <div className="space-y-4">
           <div>
             <p className="text-display text-lg">{selected.label}</p>
@@ -98,14 +302,20 @@ export function MealPickerSheet({
       ) : (
         <div className="space-y-3">
           <Tabs value={tab} onValueChange={(v) => setTab(v as PickerTab)}>
-            <TabsList className="w-full">
-              <TabsTrigger value="buscar" className="flex-1">
+            <TabsList className="w-full flex-wrap h-auto gap-1">
+              <TabsTrigger value="buscar" className="flex-1 min-w-[4.5rem]">
                 Buscar
               </TabsTrigger>
-              <TabsTrigger value="recentes" className="flex-1">
+              <TabsTrigger value="foto" className="flex-1 min-w-[4.5rem]">
+                Foto
+              </TabsTrigger>
+              <TabsTrigger value="voz" className="flex-1 min-w-[4.5rem]">
+                Voz
+              </TabsTrigger>
+              <TabsTrigger value="recentes" className="flex-1 min-w-[4.5rem]">
                 Recentes
               </TabsTrigger>
-              <TabsTrigger value="favoritos" className="flex-1">
+              <TabsTrigger value="favoritos" className="flex-1 min-w-[4.5rem]">
                 Favoritos
               </TabsTrigger>
             </TabsList>
@@ -126,6 +336,57 @@ export function MealPickerSheet({
                   setServings(1);
                 }}
               />
+            </TabsContent>
+
+            <TabsContent value="foto" className="mt-3 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Tire uma foto do prato — a IA estima proteína e kcal. Você confirma antes de salvar.
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void runPhoto(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                className="h-12 w-full gap-2"
+                disabled={aiBusy}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Camera className="size-4" />
+                {aiBusy ? "Analisando…" : "Fotografar / galeria"}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="voz" className="mt-3 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Diga o que comeu, ex.: “dois bifes, arroz, feijão e salada”.
+              </p>
+              <Button
+                type="button"
+                className="h-12 w-full gap-2"
+                variant={recording ? "destructive" : "default"}
+                disabled={aiBusy && !recording}
+                onClick={() => (recording ? stopRecording() : void startRecording())}
+              >
+                {recording ? (
+                  <>
+                    <Square className="size-4" /> Parar
+                  </>
+                ) : (
+                  <>
+                    <Mic className="size-4" />
+                    {aiBusy ? "Analisando…" : "Gravar"}
+                  </>
+                )}
+              </Button>
             </TabsContent>
 
             <TabsContent value="recentes" className="mt-3">

@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
 import { NumberInput, Modal } from "@mantine/core";
 import { Chip } from "@heroui/react";
 import {
@@ -10,14 +9,12 @@ import {
   Droplets,
   Flame,
   Pill,
-  Play,
   Plus,
   Scale,
   TrendingUp,
   Users,
   Utensils,
   X,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
@@ -31,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActivityFeed } from "@/components/social/activity-feed";
 import { DailyQuestsCard, XpBar } from "@/components/today/engagement-cards";
+import { LivingPlanHero } from "@/components/today/living-plan-hero";
 import { WeekPath } from "@/components/today/week-path";
 import { PRODUCTS } from "@/data/products";
 import { reorderUrlForProduct } from "@/data/shopify-product-map";
@@ -39,6 +37,7 @@ import { isQuestComplete, questById } from "@/data/daily-quests";
 import type { MealPreset } from "@/data/meal-presets";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, topLearningInsight, learningWeekHint } from "@/lib/engine/learning";
+import { buildLivingPlan } from "@/lib/engine/living-plan";
 import {
   buildDailyMealPlan,
   dayNutritionTotals,
@@ -62,7 +61,7 @@ import {
 import { useClubSocialFeed } from "@/hooks/use-club-social-feed";
 import { todayMetrics, todaySupplements, useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
-import { DAILY_XP_GOAL, MEAL_SLOT_LABEL, todayKey, type MealSlot } from "@/lib/types";
+import { DAILY_XP_GOAL, MEAL_SLOT_LABEL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -104,6 +103,8 @@ function Today() {
     markTipSeen,
     useStreakFreeze,
     markQuestKudos,
+    saveDayCheckIn,
+    refreshLivingPlan,
   } = useStore();
   const [mealSlot, setMealSlot] = useState<MealSlot | null>(null);
   const [weightOpen, setWeightOpen] = useState(false);
@@ -130,6 +131,11 @@ function Today() {
   useEffect(() => {
     if (hydrated && !state.profile) navigate({ to: "/onboarding" });
   }, [hydrated, state.profile, navigate]);
+
+  useEffect(() => {
+    if (!hydrated || !state.profile) return;
+    if (!state.livingPlans?.[todayKey()]) refreshLivingPlan();
+  }, [hydrated, state.profile, state.livingPlans, refreshLivingPlan]);
 
   useEffect(() => {
     if (!club || !deviceId) {
@@ -207,6 +213,24 @@ function Today() {
     toast.success(`${preset.label} registrado`);
   };
 
+  const onPickMealCustom = (meal: {
+    label: string;
+    proteinG: number;
+    kcal: number;
+    quality: MealQuality;
+  }) => {
+    const slot = mealSlot ?? suggestSlot();
+    addMealEntry({
+      slot,
+      label: meal.label,
+      proteinG: meal.proteinG,
+      kcal: meal.kcal,
+      quality: meal.quality,
+    });
+    setMealSlot(null);
+    toast.success(`${meal.label} registrado`);
+  };
+
   const applySuggestedMeal = () => {
     if (!nextMeal?.preset) return;
     addMealEntry(addMealFromPreset(nextMeal.preset, nextMeal.slot, 1));
@@ -235,6 +259,10 @@ function Today() {
     return q ? isQuestComplete(state, q) : false;
   }).length;
 
+  const living =
+    state.livingPlans?.[todayKey()] ?? buildLivingPlan(state, todayKey());
+  const todayCheckIn = state.dayCheckIns?.[todayKey()];
+
   return (
     <AppShell
       title={`Bom treino, ${profile.name.split(" ")[0]}`}
@@ -248,7 +276,7 @@ function Today() {
             Olá, <span className="font-semibold text-foreground">{profile.name.split(" ")[0]}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Score {score}/100 · streak {st}d
+            Score {living?.score ?? score}/100 · streak {st}d
             {leagueMe ? ` · Liga #${leagueMe.rank}` : ""}
           </p>
         </div>
@@ -256,6 +284,18 @@ function Today() {
           <TrendingUp className="size-3.5" /> Progresso
         </Link>
       </div>
+
+      {living ? (
+        <LivingPlanHero
+          plan={living}
+          doneToday={doneToday}
+          checkIn={todayCheckIn}
+          onSaveCheckIn={(c) => {
+            saveDayCheckIn(c);
+            toast.success("Plano de hoje atualizado");
+          }}
+        />
+      ) : null}
 
       {atRisk ? (
         <div className="surface-glass mb-4 flex flex-col gap-3 border-primary/30 px-4 py-3">
@@ -288,65 +328,10 @@ function Today() {
         </div>
       ) : null}
 
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="surface-glass relative overflow-hidden"
-      >
-        <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="relative space-y-4 p-5">
-          <p className="eyebrow">Plano de hoje</p>
-          <div>
-            {doneToday ? (
-              <>
-                <h2 className="text-display text-3xl leading-none">Treino concluído</h2>
-                <p className="mt-2 text-sm text-muted-foreground">Recuperação: água, proteína e sono.</p>
-                <Link to="/progresso" className="mt-4 block">
-                  <Button size="lg" className="h-12 w-full glow-primary font-bold uppercase tracking-wide">
-                    Ver progresso
-                  </Button>
-                </Link>
-              </>
-            ) : day ? (
-              <>
-                <h2 className="text-display text-3xl leading-none">{day.title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {day.focus} · {day.exercises.length} exercícios · ~{day.estimatedMin} min
-                </p>
-                <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false }} className="mt-4 block">
-                  <Button size="lg" className="h-12 w-full glow-primary font-bold uppercase tracking-wide">
-                    <Play className="size-4" /> Iniciar treino
-                  </Button>
-                </Link>
-                {expressDay ? (
-                  <Link
-                    to="/treino/sessao/$id"
-                    params={{ id: day.id }}
-                    search={{ express: true }}
-                    className="mt-2 block"
-                  >
-                    <Button size="lg" variant="secondary" className="h-11 w-full font-bold uppercase tracking-wide">
-                      <Zap className="size-4" /> Express (~{expressDay.estimatedMin} min)
-                    </Button>
-                  </Link>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <h2 className="text-display text-3xl leading-none">Descanso ativo</h2>
-                <p className="mt-2 text-sm text-muted-foreground">20–30 min de caminhada e mobilidade.</p>
-                <Link to="/treino" className="mt-4 block">
-                  <Button size="lg" variant="secondary" className="h-12 w-full font-bold uppercase tracking-wide">
-                    Ver semana
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
-
-          <div className="border-t border-white/10 pt-3">
-            <p className="eyebrow">Comida</p>
+      {/* Legacy detailed plan card removed — Living Plan hero above */}
+      <section className="surface-glass mb-4 space-y-3 p-4">
+          <div className="border-0">
+            <p className="eyebrow">Comida agora</p>
             {nextMeal?.preset ? (
               <div className="mt-2 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -356,7 +341,8 @@ function Today() {
                       {MEAL_SLOT_LABEL[nextMeal.slot]} · {nextMeal.preset.label}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {nextMeal.preset.proteinG} g · {nutrition.proteinG}/{goals.proteinG} g hoje
+                      {nextMeal.preset.proteinG} g · {nutrition.proteinG}/{living?.nutrition.proteinG ?? goals.proteinG}{" "}
+                      g hoje
                     </p>
                   </div>
                 </div>
@@ -406,15 +392,11 @@ function Today() {
               </div>
             </div>
           ) : null}
+      </section>
 
-          {insightLine ? (
-            <div className="border-t border-white/10 pt-3">
-              <p className="eyebrow">Aprendizado</p>
-              <p className="mt-1 text-sm text-muted-foreground">{insightLine}</p>
-            </div>
-          ) : null}
-        </div>
-      </motion.section>
+      {insightLine ? (
+        <p className="mb-3 px-1 text-xs text-muted-foreground">{insightLine}</p>
+      ) : null}
 
       <div className="mt-4">
         <button
@@ -675,7 +657,14 @@ function Today() {
         ) : null}
       </div>
 
-      {mealSlot ? <MealPickerSheet slot={mealSlot} onClose={() => setMealSlot(null)} onPick={onPickMeal} /> : null}
+      {mealSlot ? (
+        <MealPickerSheet
+          slot={mealSlot}
+          onClose={() => setMealSlot(null)}
+          onPick={onPickMeal}
+          onPickCustom={onPickMealCustom}
+        />
+      ) : null}
 
       <Modal
         opened={weightOpen}

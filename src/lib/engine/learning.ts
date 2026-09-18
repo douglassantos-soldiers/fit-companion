@@ -115,6 +115,13 @@ export function computeLearningInsights(state: AppState): LearningInsights | nul
     reasons.push(`${easyStreak} treinos seguidos com RPE fácil — semana aponta para push.`);
   }
 
+  const todayCheck = state.dayCheckIns?.[todayKey()];
+  const sleepH = todayCheck?.sleepHours ?? profile.typicalSleepHours;
+  if (sleepH != null && sleepH < 6) {
+    weekHint = weekHint === "push" ? "deload" : weekHint ?? "deload";
+    reasons.push(`Sono de ${sleepH}h — priorize recuperação e reduza volume.`);
+  }
+
   return {
     proteinAdherence7d: proteinAdherence,
     weightTrendKg7d: trend,

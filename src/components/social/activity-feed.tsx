@@ -19,6 +19,11 @@ export function formatActivityEvent(e: ActivityEvent) {
   if (e.kind === "freeze_used") return `${e.displayName} usou um freeze`;
   if (e.kind === "friend_quest_complete") return `${e.displayName} completou a missão em dupla`;
   if (e.kind === "league_rank") return `${e.displayName} · liga #${String(e.payload["rank"] ?? "?")}`;
+  if (e.kind === "proof") {
+    const narrative =
+      typeof e.payload["narrative"] === "string" ? e.payload["narrative"] : "Proof of Performance";
+    return `${e.displayName} · ${narrative}`;
+  }
   return `${e.displayName} · ${e.kind}`;
 }
 

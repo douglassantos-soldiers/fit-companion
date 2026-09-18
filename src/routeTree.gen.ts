@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ClubesRouteImport } from './routes/clubes'
 import { Route as CoachRouteImport } from './routes/coach'
 import { Route as DesafiosRouteImport } from './routes/desafios'
+import { Route as HubsRouteImport } from './routes/hubs'
 import { Route as NutricaoRouteImport } from './routes/nutricao'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PerfilRouteImport } from './routes/perfil'
@@ -22,6 +23,7 @@ import { Route as ProgressoRouteImport } from './routes/progresso'
 import { Route as SocialRouteImport } from './routes/social'
 import { Route as SuplementosRouteImport } from './routes/suplementos'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as HubsSlugRouteImport } from './routes/hubs.$slug'
 import { Route as TreinoIndexRouteImport } from './routes/treino.index'
 import { Route as ApiShopifyWebhookRouteImport } from './routes/api/shopify.webhook'
 import { Route as TreinoSessaoIdRouteImport } from './routes/treino.sessao.$id'
@@ -54,6 +56,11 @@ const CoachRoute = CoachRouteImport.update({
 const DesafiosRoute = DesafiosRouteImport.update({
   id: '/desafios',
   path: '/desafios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HubsRoute = HubsRouteImport.update({
+  id: '/hubs',
+  path: '/hubs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NutricaoRoute = NutricaoRouteImport.update({
@@ -91,6 +98,11 @@ const WelcomeRoute = WelcomeRouteImport.update({
   path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HubsSlugRoute = HubsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => HubsRoute,
+} as any)
 const TreinoIndexRoute = TreinoIndexRouteImport.update({
   id: '/treino/',
   path: '/treino/',
@@ -114,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
@@ -121,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
   '/welcome': typeof WelcomeRoute
+  '/hubs/$slug': typeof HubsSlugRoute
   '/treino/': typeof TreinoIndexRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
@@ -132,6 +146,7 @@ export interface FileRoutesByTo {
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
@@ -139,6 +154,7 @@ export interface FileRoutesByTo {
   '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
   '/welcome': typeof WelcomeRoute
+  '/hubs/$slug': typeof HubsSlugRoute
   '/treino': typeof TreinoIndexRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
@@ -151,6 +167,7 @@ export interface FileRoutesById {
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
@@ -158,6 +175,7 @@ export interface FileRoutesById {
   '/social': typeof SocialRoute
   '/suplementos': typeof SuplementosRoute
   '/welcome': typeof WelcomeRoute
+  '/hubs/$slug': typeof HubsSlugRoute
   '/treino/': typeof TreinoIndexRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
@@ -171,6 +189,7 @@ export interface FileRouteTypes {
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
@@ -178,6 +197,7 @@ export interface FileRouteTypes {
     | '/social'
     | '/suplementos'
     | '/welcome'
+    | '/hubs/$slug'
     | '/treino/'
     | '/api/shopify/webhook'
     | '/treino/sessao/$id'
@@ -189,6 +209,7 @@ export interface FileRouteTypes {
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
@@ -196,6 +217,7 @@ export interface FileRouteTypes {
     | '/social'
     | '/suplementos'
     | '/welcome'
+    | '/hubs/$slug'
     | '/treino'
     | '/api/shopify/webhook'
     | '/treino/sessao/$id'
@@ -207,6 +229,7 @@ export interface FileRouteTypes {
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
@@ -214,6 +237,7 @@ export interface FileRouteTypes {
     | '/social'
     | '/suplementos'
     | '/welcome'
+    | '/hubs/$slug'
     | '/treino/'
     | '/api/shopify/webhook'
     | '/treino/sessao/$id'
@@ -226,6 +250,7 @@ export interface RootRouteChildren {
   ClubesRoute: typeof ClubesRoute
   CoachRoute: typeof CoachRoute
   DesafiosRoute: typeof DesafiosRoute
+  HubsRoute: typeof HubsRouteWithChildren
   NutricaoRoute: typeof NutricaoRoute
   OnboardingRoute: typeof OnboardingRoute
   PerfilRoute: typeof PerfilRoute
@@ -282,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesafiosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hubs': {
+      id: '/hubs'
+      path: '/hubs'
+      fullPath: '/hubs'
+      preLoaderRoute: typeof HubsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/nutricao': {
       id: '/nutricao'
       path: '/nutricao'
@@ -331,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hubs/$slug': {
+      id: '/hubs/$slug'
+      path: '/$slug'
+      fullPath: '/hubs/$slug'
+      preLoaderRoute: typeof HubsSlugRouteImport
+      parentRoute: typeof HubsRoute
+    }
     '/treino/': {
       id: '/treino/'
       path: '/treino'
@@ -355,6 +394,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface HubsRouteChildren {
+  HubsSlugRoute: typeof HubsSlugRoute
+}
+
+const HubsRouteChildren: HubsRouteChildren = {
+  HubsSlugRoute: HubsSlugRoute,
+}
+
+const HubsRouteWithChildren = HubsRoute._addFileChildren(HubsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcessoRoute: AcessoRoute,
@@ -362,6 +411,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClubesRoute: ClubesRoute,
   CoachRoute: CoachRoute,
   DesafiosRoute: DesafiosRoute,
+  HubsRoute: HubsRouteWithChildren,
   NutricaoRoute: NutricaoRoute,
   OnboardingRoute: OnboardingRoute,
   PerfilRoute: PerfilRoute,

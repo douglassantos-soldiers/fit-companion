@@ -227,18 +227,96 @@ export type Database = {
           device_id: string
           updated_at: string
           value: number
+          baseline_value: number
+          pct_value: number | null
         }
         Insert: {
           challenge_id: string
           device_id: string
           updated_at?: string
           value?: number
+          baseline_value?: number
+          pct_value?: number | null
         }
         Update: {
           challenge_id?: string
           device_id?: string
           updated_at?: string
           value?: number
+          baseline_value?: number
+          pct_value?: number | null
+        }
+        Relationships: []
+      }
+      hubs: {
+        Row: {
+          id: string
+          slug: string
+          name: string
+          tagline: string
+          creator_name: string
+          avatar_url: string | null
+          cover_url: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          name: string
+          tagline?: string
+          creator_name?: string
+          avatar_url?: string | null
+          cover_url?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          name?: string
+          tagline?: string
+          creator_name?: string
+          avatar_url?: string | null
+          cover_url?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      hub_challenges: {
+        Row: {
+          hub_id: string
+          challenge_id: string
+          sort: number
+        }
+        Insert: {
+          hub_id: string
+          challenge_id: string
+          sort?: number
+        }
+        Update: {
+          hub_id?: string
+          challenge_id?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      hub_members: {
+        Row: {
+          hub_id: string
+          device_id: string
+          joined_at: string
+        }
+        Insert: {
+          hub_id: string
+          device_id: string
+          joined_at?: string
+        }
+        Update: {
+          hub_id?: string
+          device_id?: string
+          joined_at?: string
         }
         Relationships: []
       }

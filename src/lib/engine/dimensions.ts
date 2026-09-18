@@ -1,7 +1,8 @@
+import { isQuestComplete, questById } from "@/data/daily-quests";
 import { computeLearningInsights } from "@/lib/engine/learning";
 import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { monthlyDoseAdherence } from "@/lib/engine/supplements";
-import type { AppState, Profile, SessionLog } from "@/lib/types";
+import type { AppState, Profile, SessionLog, TrafficLight } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 
 export interface Dimension {
@@ -73,28 +74,86 @@ export function performanceDimensions(state: AppState, profile: Profile): Dimens
     ? monthlyDoseAdherence(state.supplementLogs, routine).pct
     : Math.min(100, Object.entries(state.supplementLogs).filter(([, v]) => v.length > 0).length * 4);
 
+  const sleepEntries = Object.values(state.dayCheckIns ?? {})
+    .filter((c) => c.sleepHours > 0)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, 7);
+  const sleepAvg = sleepEntries.length
+    ? sleepEntries.reduce((s, c) => s + c.sleepHours, 0) / sleepEntries.length
+    : (profile.typicalSleepHours ?? 7);
+  const sleepScore = clamp((sleepAvg / 8) * 100 - (sleepAvg < 6 ? 15 : 0));
+
+  const checkIn = state.dayCheckIns?.[todayKey()];
+  const energyPenalty = checkIn?.energy === "baixa" ? 18 : checkIn?.energy === "ok" ? 0 : -5;
+  const recoveryScore = clamp(
+    30 + waterDays * 4 + sleepScore * 0.35 - Math.max(0, recent.length - planned) * 4 - energyPenalty,
+  );
+
+  const questIds = state.dailyQuestIds ?? [];
+  const habitsDone = questIds.filter((id) => {
+    const q = questById(id);
+    return q ? isQuestComplete(state, q) : false;
+  }).length;
+  const habits = questIds.length ? clamp(25 + (habitsDone / questIds.length) * 75) : 45;
+
   const base = profile.level === "avancado" ? 55 : profile.level === "intermediario" ? 40 : 25;
 
   return [
-    { key: "forca", label: "Força", score: clamp(base + volume / 800) },
-    { key: "resistencia", label: "Resistência", score: clamp(base * 0.8 + cardioSessions * 9) },
+    { key: "forca", label: "Treinamento", score: clamp(base + volume / 800) },
+    { key: "resistencia", label: "Condicionamento", score: clamp(base * 0.8 + cardioSessions * 9) },
     { key: "consistencia", label: "Consistência", score: clamp(20 + consistency * 0.8) },
-    {
-      key: "recuperacao",
-      label: "Recuperação",
-      score: clamp(35 + waterDays * 5 - Math.max(0, recent.length - planned) * 4),
-    },
-    {
-      key: "nutricao",
-      label: "Nutrição",
-      score: clamp(proteinHit * 0.45 + mealHit * 0.25 + supplementScore * 0.3),
-    },
+    { key: "recuperacao", label: "Recuperação", score: recoveryScore },
+    { key: "sono", label: "Sono", score: sleepScore },
+    { key: "nutricao", label: "Nutrição", score: clamp(proteinHit * 0.55 + mealHit * 0.45) },
+    { key: "suplementacao", label: "Suplementação", score: clamp(supplementScore || 40) },
+    { key: "habitos", label: "Hábitos", score: habits },
   ];
 }
 
 export function performanceScore(dims: Dimension[]) {
   if (!dims.length) return 0;
   return Math.round(dims.reduce((s, d) => s + d.score, 0) / dims.length);
+}
+
+/** Weakest axis; prefers axes declining vs last snapshot. */
+export function primaryBlockerDimension(state: AppState, profile: Profile): Dimension | null {
+  const dims = performanceDimensions(state, profile);
+  if (!dims.length) return null;
+
+  const prev = [...(state.dimensionSnapshots ?? [])]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .find((s) => s.date !== todayKey());
+
+  let best: Dimension | null = null;
+  let bestRank = Infinity;
+  for (const d of dims) {
+    const trend = prev?.scores[d.key] != null ? d.score - (prev.scores[d.key] as number) : 0;
+    const rank = d.score - Math.min(0, trend) * 0.5;
+    if (rank < bestRank) {
+      bestRank = rank;
+      best = d;
+    }
+  }
+
+  if (profile.primaryBlocker && best) {
+    const map: Record<string, string[]> = {
+      sono: ["sono", "recuperacao"],
+      alimentacao: ["nutricao"],
+      consistencia: ["consistencia", "habitos"],
+      tempo: ["consistencia", "habitos"],
+      equipamento: ["forca", "resistencia"],
+    };
+    const keys = map[profile.primaryBlocker] ?? [];
+    const biased = dims.find((d) => keys.includes(d.key) && d.score <= best!.score + 8);
+    if (biased) return biased;
+  }
+  return best;
+}
+
+export function trafficForScore(score: number): TrafficLight {
+  if (score >= 70) return "green";
+  if (score >= 50) return "yellow";
+  return "red";
 }
 
 export function weeklyVolumeSeries(sessions: SessionLog[], weeks = 8) {

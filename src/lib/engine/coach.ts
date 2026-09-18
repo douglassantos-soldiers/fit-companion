@@ -3,6 +3,7 @@ import { lessonForToday } from "@/data/habit-lessons";
 import { PRODUCTS } from "@/data/products";
 import { performanceDimensions, performanceScore, sessionsInLastDays, streak } from "@/lib/engine/dimensions";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
+import { buildLivingPlan } from "@/lib/engine/living-plan";
 import { buildDailyMealPlan, dayNutritionTotals, nextSuggestedMeal, nutritionGoals } from "@/lib/engine/nutrition";
 import { buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
 import { WEEK_MODE_LABEL } from "@/lib/engine/progression";
@@ -16,6 +17,7 @@ export interface CoachPrompt {
 
 export const COACH_PROMPTS: CoachPrompt[] = [
   { id: "hoje", label: "Qual é o treino de hoje?" },
+  { id: "por-que", label: "Por que meu plano mudou?" },
   { id: "plano", label: "Como está meu plano da semana?" },
   { id: "progresso", label: "Estou evoluindo?" },
   { id: "nutricao", label: "Como está minha nutrição?" },
@@ -64,10 +66,22 @@ export function coachReply(promptId: string, state: AppState): string {
         : "";
 
   switch (promptId) {
-    case "hoje":
+    case "hoje": {
+      const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+      if (living) {
+        return `Hoje: ${living.workout.title} (${living.workout.mode}, ~${living.workout.estimatedMin} min, volume ${Math.round(living.workout.volumeFactor * 100)}%). ${living.narrative}`;
+      }
       return today
         ? `Hoje é ${today.title} — ${today.focus}. ${today.exercises.length} exercícios, cerca de ${today.estimatedMin} minutos.${modeNote} Abra a aba Treino e comece pelo primeiro movimento.`
         : `Hoje é dia de descanso ativo: 20 a 30 minutos de caminhada e mobilidade já bastam.${modeNote}`;
+    }
+    case "por-que": {
+      const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+      if (!living?.why.length) return `Ainda sem sinais fortes de adaptação.${modeNote}${learnNote}`;
+      return `Por que o plano de hoje: ${living.why.slice(0, 4).join(" ")}${
+        living.diffFromYesterday.length ? ` Diff vs ontem: ${living.diffFromYesterday.join("; ")}.` : ""
+      }`;
+    }
     case "plano":
       return `Seu plano tem ${plan.length} treinos por semana com foco em ${GOAL_LABEL[profile.goal].toLowerCase()}. Nos últimos 7 dias você fez ${recent.length} de ${profile.daysPerWeek}.${modeNote} ${
         recent.length >= profile.daysPerWeek
@@ -119,6 +133,11 @@ export function coachReply(promptId: string, state: AppState): string {
 
 export function coachFreeform(text: string, state: AppState) {
   const t = text.toLowerCase();
+  if (
+    (t.includes("por que") || t.includes("porque") || t.includes("porquê")) &&
+    (t.includes("mudou") || t.includes("plano") || t.includes("why"))
+  )
+    return coachReply("por-que", state);
   if (t.includes("treino") && (t.includes("hoje") || t.includes("agora"))) return coachReply("hoje", state);
   if (t.includes("suplement") || t.includes("whey") || t.includes("creatina")) return coachReply("suplemento", state);
   if (

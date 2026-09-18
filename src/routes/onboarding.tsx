@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SoldiersLogo } from "@/components/soldiers-logo";
 import { performanceDimensions, performanceScore } from "@/lib/engine/dimensions";
-import { emptyState, GOAL_LABEL, LEVEL_LABEL, type Equipment, type Goal, type Level, type Profile } from "@/lib/types";
+import { emptyState, GOAL_LABEL, LEVEL_LABEL, BLOCKER_LABEL, type Equipment, type Goal, type Level, type PrimaryBlocker, type Profile } from "@/lib/types";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/onboarding")({
@@ -15,16 +15,17 @@ export const Route = createFileRoute("/onboarding")({
       { title: "Monte seu perfil — Soldiers Performance OS" },
       {
         name: "description",
-        content: "Responda 6 passos e receba um plano de treino personalizado com progressão de carga.",
+        content: "Objetivo, rotina, sono e o que mais te impede — plano adaptativo em minutos.",
       },
       { property: "og:title", content: "Monte seu perfil de performance" },
-      { property: "og:description", content: "Objetivo, nível, dias por semana e equipamento em 6 passos." },
+      { property: "og:description", content: "Descobrimos o que te impede, não só o objetivo." },
     ],
   }),
   component: Onboarding,
 });
 
 const RESTRICTIONS = ["Joelho", "Ombro", "Lombar", "Punho", "Nenhuma"];
+const BLOCKERS = Object.keys(BLOCKER_LABEL) as PrimaryBlocker[];
 
 function Onboarding() {
   const navigate = useNavigate();
@@ -49,11 +50,15 @@ function Onboarding() {
   const [weightKg, setWeight] = useState(80);
   const [equipment, setEquipment] = useState<Equipment>("academia");
   const [restrictions, setRestrictions] = useState<string[]>([]);
+  const [typicalSleepHours, setTypicalSleepHours] = useState(7);
+  const [primaryBlocker, setPrimaryBlocker] = useState<PrimaryBlocker>("consistencia");
+  const [skipBreakfast, setSkipBreakfast] = useState(false);
+  const [lunchOutOften, setLunchOutOften] = useState(false);
   const [readyProfile, setReadyProfile] = useState<Profile | null>(null);
 
-  const steps = ["Objetivo", "Nível", "Rotina", "Corpo", "Limites", "Perfil"];
-  const collectLast = step === 4;
-  const resultStep = step === 5;
+  const steps = ["Objetivo", "Nível", "Rotina", "Corpo", "Limites", "Contexto", "Perfil"];
+  const collectLast = step === 5;
+  const resultStep = step === 6;
 
   const dims = useMemo(() => {
     if (!readyProfile) return [];
@@ -72,6 +77,10 @@ function Onboarding() {
     weightKg,
     equipment,
     restrictions,
+    typicalSleepHours,
+    primaryBlocker,
+    skipBreakfast,
+    lunchOutOften,
     createdAt: new Date().toISOString(),
   });
 
@@ -80,7 +89,7 @@ function Onboarding() {
     const profile = buildProfile();
     setReadyProfile(profile);
     setProfile(profile);
-    setStep(5);
+    setStep(6);
   };
 
   const canContinueFromStep0 = name.trim().length >= 2;
@@ -102,7 +111,7 @@ function Onboarding() {
               <span className="text-glow block text-primary"> performance</span>
             </h1>
             <p className="mt-4 text-sm text-muted-foreground">
-              Treino, nutrição e coach em um sistema — comece em menos de 2 minutos.
+              Não só o objetivo — descobrimos o que te impede de chegar lá.
             </p>
             <Button
               size="lg"
@@ -275,11 +284,55 @@ function Onboarding() {
           </section>
         )}
 
+        {step === 5 && (
+          <section className="mt-3">
+            <h1 className="text-3xl">O que mais te impede?</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              O plano adapta a isso — não só ao objetivo.
+            </p>
+            <div className="mt-5 space-y-2">
+              {BLOCKERS.map((b) => (
+                <OptionCard
+                  key={b}
+                  selected={primaryBlocker === b}
+                  onClick={() => setPrimaryBlocker(b)}
+                  title={BLOCKER_LABEL[b]}
+                />
+              ))}
+            </div>
+            <h2 className="mt-8 text-xl">Sono típico</h2>
+            <div className="mt-3">
+              <NumberField
+                label="Horas por noite"
+                value={typicalSleepHours}
+                onChange={(n) => setTypicalSleepHours(Math.min(12, Math.max(4, n)))}
+                unit="h"
+              />
+            </div>
+            <h2 className="mt-8 text-xl">Alimentação</h2>
+            <div className="mt-3 space-y-2">
+              <OptionCard
+                selected={skipBreakfast}
+                onClick={() => setSkipBreakfast((v) => !v)}
+                title="Pulo o café da manhã"
+                hint="Redistribuímos proteína no resto do dia"
+              />
+              <OptionCard
+                selected={lunchOutOften}
+                onClick={() => setLunchOutOften((v) => !v)}
+                title="Almoço fora com frequência"
+                hint="Priorizamos presets práticos no almoço"
+              />
+            </div>
+          </section>
+        )}
+
         {resultStep && readyProfile && (
           <section className="mt-3">
             <h1 className="text-3xl">Perfil de Performance</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Baseline inicial para {readyProfile.name}. Evolui com treinos, água e suplementação.
+              Baseline para {readyProfile.name}. Bloqueio atual:{" "}
+              {readyProfile.primaryBlocker ? BLOCKER_LABEL[readyProfile.primaryBlocker] : "—"}.
             </p>
             <div className="surface-glass mt-5 p-5">
               <p className="text-display text-glow text-4xl text-primary">{score}</p>
@@ -305,7 +358,7 @@ function Onboarding() {
         )}
 
         <div className="mt-10 flex gap-3">
-          {step > 0 && step < 5 && (
+          {step > 0 && step < 6 && (
             <Button variant="secondary" className="h-12 flex-1" onClick={() => setStep((s) => s - 1)}>
               <ArrowLeft className="size-4" /> Voltar
             </Button>

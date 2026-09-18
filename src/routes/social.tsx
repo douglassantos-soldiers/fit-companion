@@ -7,11 +7,11 @@ import { ActivityFeed } from "@/components/social/activity-feed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CHALLENGES, challengeById } from "@/data/challenges";
+import { CHALLENGES, challengeById, isRelativeChallenge } from "@/data/challenges";
 import { performanceUpgradeUrl } from "@/data/shopify-product-map";
-import { sessionsInLastDays } from "@/lib/engine/dimensions";
 import { useClubSocialFeed } from "@/hooks/use-club-social-feed";
 import {
+  challengeProgress,
   createClub,
   joinClubByCode,
   listMyClubs,
@@ -44,10 +44,8 @@ export const Route = createFileRoute("/social")({
 
 function progressFor(challengeId: string, state: AppState) {
   const challenge = challengeById(challengeId);
-  if (!challenge) return 0;
-  const sessions = sessionsInLastDays(state.sessions, challenge.durationDays);
-  if (challenge.metric === "volume") return Math.round(sessions.reduce((s, x) => s + x.volumeKg, 0));
-  return sessions.length;
+  if (!challenge) return null;
+  return challengeProgress(challenge, state.sessions, state.challengeBaselines?.[challengeId]);
 }
 
 function SocialHubPage() {
@@ -120,20 +118,34 @@ function SocialHubPage() {
         </TabsList>
 
         <TabsContent value="desafios" className="mt-0 space-y-3">
+          <Link to="/hubs" className="block">
+            <article className="surface-glass mb-1 flex items-center justify-between gap-3 border-primary/25 p-4">
+              <div>
+                <p className="eyebrow">Creator OS</p>
+                <p className="text-sm font-semibold">Performance Hubs</p>
+                <p className="text-xs text-muted-foreground">Entre no hub Soldiers e dispute por % evolução.</p>
+              </div>
+              <Button size="sm" variant="secondary">
+                Ver hubs
+              </Button>
+            </article>
+          </Link>
           <p className="px-1 text-xs text-muted-foreground">
             Ativos: {joined.length} · Badges: {(state.earnedBadges ?? []).length}
           </p>
           {CHALLENGES.map((c) => {
             const active = joined.includes(c.id);
-            const value = progressFor(c.id, state);
-            const pct = Math.min(100, (value / c.target) * 100);
+            const progress = progressFor(c.id, state);
+            const relative = isRelativeChallenge(c);
             const locked =
               c.requiresPerformance === true && (state.accessTier ?? "base") !== "performance";
             return (
               <article key={c.id} className={`surface-glass p-4 ${locked ? "opacity-80" : ""}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="eyebrow">{c.requiresPerformance ? "Performance" : c.metric}</p>
+                    <p className="eyebrow">
+                      {relative ? "% evolução" : c.requiresPerformance ? "Performance" : c.metric}
+                    </p>
                     <h2 className="mt-0.5 text-display text-xl">{c.title}</h2>
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{c.description}</p>
                   </div>
@@ -142,12 +154,19 @@ function SocialHubPage() {
                 <div className="mt-3">
                   <div className="flex justify-between text-[0.65rem] text-muted-foreground">
                     <span>
-                      {value.toLocaleString("pt-BR")} / {c.target.toLocaleString("pt-BR")} {c.unit}
+                      {progress
+                        ? relative
+                          ? `${progress.displayValue >= 0 ? "+" : ""}${progress.displayValue}% / +${progress.displayTarget}%`
+                          : `${progress.displayValue.toLocaleString("pt-BR")} / ${progress.displayTarget.toLocaleString("pt-BR")} ${progress.displayUnit}`
+                        : "—"}
                     </span>
                     <span>{c.durationDays}d</span>
                   </div>
                   <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted/60">
-                    <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                    <div
+                      className="h-2 rounded-full bg-primary transition-all"
+                      style={{ width: `${progress?.barPct ?? 0}%` }}
+                    />
                   </div>
                 </div>
                 <div className="mt-3 flex justify-end">

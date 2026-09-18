@@ -4,20 +4,21 @@ import { Heart, Medal, Radio, Trophy, Users, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, EmptyState } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { CHALLENGES, challengeById, type Challenge } from "@/data/challenges";
-import { sessionsInLastDays } from "@/lib/engine/dimensions";
+import { CHALLENGES, challengeById, isRelativeChallenge, type Challenge } from "@/data/challenges";
 import {
+  challengeProgress,
   fetchFeed,
   fetchLeaderboard,
   fetchParticipantCount,
   giveKudos,
+  publishProofEvent,
   syncAllJoinedChallenges,
   type ActivityEvent,
   type LeaderboardRow,
 } from "@/lib/social";
+import { buildProofOfPerformance } from "@/lib/engine/proof-of-performance";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
-import type { AppState } from "@/lib/types";
 import { performanceUpgradeUrl } from "@/data/shopify-product-map";
 import { formatActivityEvent } from "@/components/social/activity-feed";
 
@@ -38,15 +39,10 @@ export const Route = createFileRoute("/desafios")({
   component: ChallengesPage,
 });
 
-function progressFor(challenge: Challenge, state: AppState) {
-  const sessions = sessionsInLastDays(state.sessions, challenge.durationDays);
-  if (challenge.metric === "volume") return Math.round(sessions.reduce((s, x) => s + x.volumeKg, 0));
-  return sessions.length;
-}
-
 function ChallengesPage() {
   const { state, hydrated, toggleChallenge, earnBadge } = useStore();
   const awarded = useRef(new Set<string>());
+  const suggestedProof = useRef(new Set<string>());
   const [tab, setTab] = useState<"desafios" | "feed">("desafios");
   const [boards, setBoards] = useState<Record<string, LeaderboardRow[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -59,12 +55,38 @@ function ChallengesPage() {
     for (const id of state.challenges) {
       const c = challengeById(id);
       if (!c) continue;
-      const value = progressFor(c, state);
-      if (value >= c.target && !state.earnedBadges.includes(id) && !awarded.current.has(id)) {
+      const progress = challengeProgress(c, state.sessions, state.challengeBaselines?.[id]);
+      if (progress.complete && !state.earnedBadges.includes(id) && !awarded.current.has(id)) {
         awarded.current.add(id);
         if (earnBadge(id)) {
           toast.success(`Badge conquistado: ${c.title}`);
         }
+      }
+      if (
+        progress.complete &&
+        isRelativeChallenge(c) &&
+        !suggestedProof.current.has(id) &&
+        state.shareProgress &&
+        state.profile
+      ) {
+        suggestedProof.current.add(id);
+        const proof = buildProofOfPerformance(state, c.durationDays);
+        toast.message("Proof of Performance", {
+          description: "Desafio relativo concluído — quer compartilhar sua evolução?",
+          action: {
+            label: "Compartilhar",
+            onClick: () => {
+              void publishProofEvent(getDeviceId(), state.profile!.name, {
+                title: "Proof of Performance",
+                narrative: proof.narrative,
+                scoreDelta: proof.scoreDelta,
+                volumeDeltaPct: proof.volumeDeltaPct,
+                periodDays: proof.periodDays,
+                challengeId: id,
+              }).then(() => toast.success("Proof publicado no feed"));
+            },
+          },
+        });
       }
     }
   }, [hydrated, state, earnBadge]);
@@ -193,7 +215,11 @@ function ChallengesPage() {
                 className="shrink-0 gap-1"
                 onClick={() => {
                   void giveKudos(e.id, e.kudosCount)
-                    .then(() => setFeed((prev) => prev.map((x) => (x.id === e.id ? { ...x, kudosCount: x.kudosCount + 1 } : x))))
+                    .then(() =>
+                      setFeed((prev) =>
+                        prev.map((x) => (x.id === e.id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
+                      ),
+                    )
                     .catch(() => toast.error("Não foi possível enviar kudos"));
                 }}
               >
@@ -233,9 +259,8 @@ function ChallengesPage() {
           <div className="space-y-4">
             {CHALLENGES.map((c) => {
               const active = joined.includes(c.id);
-              const value = progressFor(c, state);
-              const pct = Math.min(100, (value / c.target) * 100);
-              const complete = value >= c.target;
+              const progress = challengeProgress(c, state.sessions, state.challengeBaselines?.[c.id]);
+              const relative = isRelativeChallenge(c);
               const hasBadge = state.earnedBadges.includes(c.id);
               const board = boards[c.id] ?? [];
               const participants = counts[c.id] ?? c.participants;
@@ -247,7 +272,13 @@ function ChallengesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="eyebrow">
-                        {c.requiresPerformance ? "Performance" : c.metric === "volume" ? "Volume" : "Frequência"}
+                        {relative
+                          ? "% evolução"
+                          : c.requiresPerformance
+                            ? "Performance"
+                            : c.metric === "volume"
+                              ? "Volume"
+                              : "Frequência"}
                       </p>
                       <h2 className="mt-1 text-display text-2xl">{c.title}</h2>
                       <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
@@ -257,7 +288,7 @@ function ChallengesPage() {
                         </p>
                       ) : null}
                     </div>
-                    {hasBadge || (complete && active) ? (
+                    {hasBadge || (progress.complete && active) ? (
                       <span className="flex flex-col items-center text-primary">
                         <Medal className="size-7" />
                         <span className="text-[0.6rem] font-bold uppercase">Badge</span>
@@ -270,16 +301,24 @@ function ChallengesPage() {
                   <div className="mt-4">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
-                        {value.toLocaleString("pt-BR")} / {c.target.toLocaleString("pt-BR")} {c.unit}
+                        {relative
+                          ? `${progress.displayValue >= 0 ? "+" : ""}${progress.displayValue}% / +${progress.displayTarget}%`
+                          : `${progress.displayValue.toLocaleString("pt-BR")} / ${progress.displayTarget.toLocaleString("pt-BR")} ${progress.displayUnit}`}
                       </span>
                       <span>{c.durationDays} dias</span>
                     </div>
                     <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-muted/60">
                       <div
                         className="h-2.5 rounded-full bg-primary shadow-[0_0_12px_var(--glow-primary)] transition-all"
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${progress.barPct}%` }}
                       />
                     </div>
+                    {relative && active ? (
+                      <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                        Baseline {progress.baseline.toLocaleString("pt-BR")} → agora{" "}
+                        {progress.current.toLocaleString("pt-BR")} {c.metric === "volume" ? "kg" : "treinos"}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -312,7 +351,9 @@ function ChallengesPage() {
 
                   {active ? (
                     <div className="mt-4 border-t border-border pt-3">
-                      <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">Ranking</p>
+                      <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">
+                        Ranking{relative ? " (% evolução)" : ""}
+                      </p>
                       <ul className="mt-2 space-y-1 text-sm">
                         {board.length > 0 ? (
                           board.slice(0, 8).map((row) => (
@@ -323,13 +364,21 @@ function ChallengesPage() {
                               <span>
                                 {row.rank}. {row.isYou ? "Você" : row.displayName}
                               </span>
-                              <span>{row.value.toLocaleString("pt-BR")}</span>
+                              <span>
+                                {relative
+                                  ? `${row.value >= 0 ? "+" : ""}${Number(row.value).toFixed(1)}%`
+                                  : row.value.toLocaleString("pt-BR")}
+                              </span>
                             </li>
                           ))
                         ) : (
                           <li className="flex justify-between font-semibold text-foreground">
                             <span>Você</span>
-                            <span>{value.toLocaleString("pt-BR")}</span>
+                            <span>
+                              {relative
+                                ? `${progress.displayValue >= 0 ? "+" : ""}${progress.displayValue}%`
+                                : progress.displayValue.toLocaleString("pt-BR")}
+                            </span>
                           </li>
                         )}
                       </ul>

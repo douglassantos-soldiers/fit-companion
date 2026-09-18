@@ -2,11 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { allQuestsComplete, bumpManualQuest, ensureDailyQuests } from "@/data/daily-quests";
 import { presetById } from "@/data/meal-presets";
 import { performanceDimensions } from "@/lib/engine/dimensions";
+import { buildLivingPlan } from "@/lib/engine/living-plan";
 import { scalePreset } from "@/lib/engine/nutrition";
 import { applyXpAward, dailyXpGoalMet, supplementsComplete, waterGoalReached, XP } from "@/lib/engine/xp";
 import {
   bumpFriendQuestOnSession,
-  challengeValue,
+  challengeProgress,
+  challengeRawValue,
   ensureSocialProfile,
   joinChallengeRemote,
   leaveChallengeRemote,
@@ -17,6 +19,9 @@ import {
   syncChallengeProgress,
   syncLeaguePoints,
 } from "@/lib/social";
+import { challengeById } from "@/data/challenges";
+import { hubById } from "@/data/hubs";
+import { joinHub as joinHubRemote, leaveHub as leaveHubRemote } from "@/lib/hubs";
 import { clearRemoteState, getDeviceId, pullState, pushState } from "@/lib/sync";
 import { fetchEntitlement } from "@/lib/entitlements";
 import { establishAccessSession } from "@/lib/access.functions";
@@ -28,6 +33,7 @@ import {
   emptyState,
   todayKey,
   type AppState,
+  type DayCheckIn,
   type MealEntry,
   type Profile,
   type SessionLog,
@@ -54,6 +60,7 @@ interface Store {
   toggleSupplement: (id: string) => void;
   setRoutine: (ids: string[]) => void;
   toggleChallenge: (id: string) => void;
+  toggleHub: (hubId: string) => void;
   pushChat: (role: "coach" | "user", text: string) => void;
   setTheme: (theme: Theme) => void;
   setShareProgress: (share: boolean) => void;
@@ -83,6 +90,8 @@ interface Store {
   revokeAccessLocal: () => void;
   dismissRoutineFromPurchase: () => void;
   markUpsellShown: () => void;
+  saveDayCheckIn: (checkIn: Omit<DayCheckIn, "date"> & { date?: string }) => void;
+  refreshLivingPlan: () => void;
   lastSessionXp: number;
   reset: () => void;
 }
@@ -114,7 +123,20 @@ function withSnapshot(s: AppState): AppState {
   const dims = performanceDimensions(s, s.profile);
   const scores = Object.fromEntries(dims.map((d) => [d.key, d.score]));
   const rest = s.dimensionSnapshots.filter((x) => x.date !== date);
-  return { ...s, dimensionSnapshots: [...rest, { date, scores }].sort((a, b) => (a.date < b.date ? -1 : 1)) };
+  const withDims: AppState = {
+    ...s,
+    dayCheckIns: s.dayCheckIns ?? {},
+    livingPlans: s.livingPlans ?? {},
+    challengeBaselines: s.challengeBaselines ?? {},
+    joinedHubIds: s.joinedHubIds ?? [],
+    dimensionSnapshots: [...rest, { date, scores }].sort((a, b) => (a.date < b.date ? -1 : 1)),
+  };
+  const plan = buildLivingPlan(withDims, date);
+  if (!plan) return withDims;
+  return {
+    ...withDims,
+    livingPlans: { ...withDims.livingPlans, [date]: plan },
+  };
 }
 
 function syncMealCount(s: AppState, date: string): AppState {
@@ -498,20 +520,94 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toggleChallenge: (id) => {
         const current = stateRef.current;
         const joining = !current.challenges.includes(id);
-        update((s) => ({
-          ...s,
-          challenges: joining ? [...s.challenges, id] : s.challenges.filter((c) => c !== id),
-        }));
+        const challenge = challengeById(id);
+        const baseline = challenge ? challengeRawValue(challenge, current.sessions) : 0;
+        update((s) => {
+          if (joining) {
+            return {
+              ...s,
+              challenges: [...s.challenges, id],
+              challengeBaselines: { ...(s.challengeBaselines ?? {}), [id]: baseline },
+            };
+          }
+          const nextBaselines = { ...(s.challengeBaselines ?? {}) };
+          delete nextBaselines[id];
+          return {
+            ...s,
+            challenges: s.challenges.filter((c) => c !== id),
+            challengeBaselines: nextBaselines,
+          };
+        });
         if (!deviceId.current || !current.profile || current.shareProgress === false) return;
         const name = current.profile.name;
-        if (joining) {
-          void joinChallengeRemote(deviceId.current, id, name)
-            .then(() => syncChallengeProgress(deviceId.current, id, challengeValue(id, current.sessions), name))
+        if (joining && challenge) {
+          const progress = challengeProgress(challenge, current.sessions, baseline);
+          void joinChallengeRemote(deviceId.current, id, name, baseline)
+            .then(() =>
+              syncChallengeProgress(deviceId.current, id, progress.current, name, {
+                baseline: progress.baseline,
+                pct: progress.pct,
+                complete: progress.complete,
+              }),
+            )
             .catch((e) => console.error("Falha ao entrar no desafio remoto", e));
         } else {
           void leaveChallengeRemote(deviceId.current, id).catch((e) =>
             console.error("Falha ao sair do desafio remoto", e),
           );
+        }
+      },
+      toggleHub: (hubId) => {
+        const current = stateRef.current;
+        const hub = hubById(hubId);
+        if (!hub) return;
+        const joining = !(current.joinedHubIds ?? []).includes(hubId);
+        const name = current.profile?.name ?? "Soldado";
+
+        if (joining) {
+          const baselines = { ...(current.challengeBaselines ?? {}) };
+          const challenges = [...current.challenges];
+          for (const cid of hub.challengeIds) {
+            if (challenges.includes(cid)) continue;
+            const challenge = challengeById(cid);
+            if (!challenge) continue;
+            challenges.push(cid);
+            baselines[cid] = challengeRawValue(challenge, current.sessions);
+          }
+          update((s) => ({
+            ...s,
+            joinedHubIds: [...(s.joinedHubIds ?? []), hubId],
+            challenges,
+            challengeBaselines: baselines,
+          }));
+          if (deviceId.current && current.shareProgress !== false) {
+            void joinHubRemote(deviceId.current, hubId, name)
+              .then(async () => {
+                for (const cid of hub.challengeIds) {
+                  const challenge = challengeById(cid);
+                  if (!challenge) continue;
+                  const baseline = baselines[cid] ?? challengeRawValue(challenge, current.sessions);
+                  const progress = challengeProgress(challenge, current.sessions, baseline);
+                  await joinChallengeRemote(deviceId.current, cid, name, baseline).catch(() => undefined);
+                  await syncChallengeProgress(deviceId.current, cid, progress.current, name, {
+                    baseline: progress.baseline,
+                    pct: progress.pct,
+                    complete: progress.complete,
+                  }).catch(() => undefined);
+                }
+              })
+              .catch((e) => console.error("Falha ao entrar no hub remoto", e));
+          }
+        } else {
+          update((s) => ({
+            ...s,
+            joinedHubIds: (s.joinedHubIds ?? []).filter((id) => id !== hubId),
+          }));
+          if (deviceId.current) {
+            void leaveHubRemote(deviceId.current, hubId).catch((e) =>
+              console.error("Falha ao sair do hub remoto", e),
+            );
+          }
         }
       },
       pushChat: (role, text) =>
@@ -644,6 +740,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dismissRoutineFromPurchase: () =>
         update((s) => ({ ...s, routineFromPurchaseDismissed: true })),
       markUpsellShown: () => update((s) => ({ ...s, upsellShownDate: todayKey() })),
+      saveDayCheckIn: (checkIn) =>
+        update((s) => {
+          const date = checkIn.date ?? todayKey();
+          const full: DayCheckIn = {
+            date,
+            sleepHours: checkIn.sleepHours,
+            energy: checkIn.energy,
+            availableMin: checkIn.availableMin,
+            ...(checkIn.noEquipment ? { noEquipment: true } : {}),
+          };
+          return withSnapshot({
+            ...s,
+            dayCheckIns: { ...(s.dayCheckIns ?? {}), [date]: full },
+          });
+        }),
+      refreshLivingPlan: () => update((s) => withSnapshot(s)),
       reset: () => {
         skipPush.current = true;
         setState(emptyState);

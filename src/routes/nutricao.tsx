@@ -241,6 +241,17 @@ function NutritionPage() {
           slot={pickerSlot}
           onClose={() => setPickerSlot(null)}
           onPick={(p, servings) => addPreset(p, pickerSlot, servings)}
+          onPickCustom={(meal) => {
+            addMealEntry({
+              slot: pickerSlot,
+              label: meal.label,
+              proteinG: meal.proteinG,
+              kcal: meal.kcal,
+              quality: meal.quality,
+            });
+            setPickerSlot(null);
+            toast.success("Refeição adicionada");
+          }}
         />
       ) : null}
 

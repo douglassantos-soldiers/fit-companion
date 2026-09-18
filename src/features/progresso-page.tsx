@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { ArrowDownRight, ArrowUpRight, Minus, Share2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -13,10 +13,12 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
-import { ArrowDownRight, ArrowUpRight, Minus, Share2 } from "lucide-react";
+import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 import { AppShell, EmptyState } from "@/components/app-shell";
 import { MetricRing } from "@/components/metric-ring";
 import { ShareCardActions } from "@/components/progress/share-card";
+import { ProofCard } from "@/components/social/proof-card";
 import { Button } from "@/components/ui/button";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
@@ -34,9 +36,12 @@ import {
   weekOverWeek,
   weeklyVolumeSeries,
 } from "@/lib/engine/dimensions";
+import { buildProofOfPerformance } from "@/lib/engine/proof-of-performance";
 import { nutritionGoals, weeklyNutritionSeries } from "@/lib/engine/nutrition";
 import { weeklySupplementAdherence } from "@/lib/engine/supplements";
+import { publishProofEvent } from "@/lib/social";
 import { useStore } from "@/lib/store";
+import { getDeviceId } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 
 const DIM_KEYS = [
@@ -66,11 +71,14 @@ export function ProgressPage() {
   const { state, hydrated } = useStore();
   const [loadExId, setLoadExId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [proofSharing, setProofSharing] = useState(false);
 
   const latestSession = useMemo(() => {
     if (!state.sessions.length) return null;
     return [...state.sessions].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
   }, [state.sessions]);
+
+  const proof = useMemo(() => buildProofOfPerformance(state, 21), [state]);
 
   if (!hydrated || !state.profile) {
     return (
@@ -124,6 +132,30 @@ export function ProgressPage() {
 
   return (
     <AppShell title="Progresso" subtitle="Semana · força · corpo">
+      <ProofCard
+        className="mb-4"
+        proof={proof}
+        name={state.profile.name}
+        sharing={proofSharing}
+        onShare={() => {
+          if (!state.shareProgress) {
+            toast.error("Ative progresso público no Perfil para compartilhar");
+            return;
+          }
+          setProofSharing(true);
+          void publishProofEvent(getDeviceId(), state.profile!.name, {
+            title: "Proof of Performance",
+            narrative: proof.narrative,
+            scoreDelta: proof.scoreDelta,
+            volumeDeltaPct: proof.volumeDeltaPct,
+            periodDays: proof.periodDays,
+          })
+            .then(() => toast.success("Proof publicado no feed"))
+            .catch(() => toast.error("Não foi possível publicar"))
+            .finally(() => setProofSharing(false));
+        }}
+      />
+
       {score < 40 ? (
         <section className="surface-glass mb-4 border-primary/30 p-5">
           <p className="eyebrow">Próxima ação</p>

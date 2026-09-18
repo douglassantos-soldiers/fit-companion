@@ -1,7 +1,8 @@
--- Soldiers Fit Companion — full schema deploy
+﻿-- Soldiers Fit Companion — full schema deploy (idempotent where possible)
 -- Project: zphtvrsxlhfgltwgbreu
 -- Paste into Supabase SQL Editor → Run
--- Generated: 2026-09-17T19:02:06.9551036-03:00
+-- Generated: 2026-09-17T23:26:57.4233513-03:00
+
 
 
 -- ========== 20260913001917_d8e39ee3-454b-4a4e-94f6-35ffa13963a2.sql ==========
@@ -115,13 +116,13 @@ REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM anon, authenticated, PUBLIC
 -- Phase 5 social (device_id identity, no auth)
 --
 -- APPLY (manual): cole este arquivo no SQL Editor do projeto Supabase
---   ref: zphtvrsxlhfgltwgbreu  (Dashboard → SQL → New query → Run)
--- Client já degrada offline se as tabelas não existirem.
+--   ref: zphtvrsxlhfgltwgbreu  (Dashboard â†’ SQL â†’ New query â†’ Run)
+-- Client jÃ¡ degrada offline se as tabelas nÃ£o existirem.
 --
--- Smoke checklist (2 devices / 2 abas anônimas):
---   1. Perfil: ativar "compartilhar progresso" → social_profiles recebe device_id
---   2. Desafios: entrar em um desafio → ranking mostra entries de ambos
---   3. Clubes: criar clube → copiar código → segundo device entra com o código
+-- Smoke checklist (2 devices / 2 abas anÃ´nimas):
+--   1. Perfil: ativar "compartilhar progresso" â†’ social_profiles recebe device_id
+--   2. Desafios: entrar em um desafio â†’ ranking mostra entries de ambos
+--   3. Clubes: criar clube â†’ copiar cÃ³digo â†’ segundo device entra com o cÃ³digo
 -- Sem Auth: identidade = device_id local.
 
 CREATE TABLE IF NOT EXISTS public.social_profiles (
@@ -371,7 +372,7 @@ ALTER TABLE public.app_entitlements
 -- ========== 20260917200000_harden_rls_entitlements.sql ==========
 
 -- Harden RLS: entitlements service_role only; social SELECT public, writes require matching device_id claim interim
--- Device-scoped writes still spoofable without JWT — access gate cookie is primary entitlement control.
+-- Device-scoped writes still spoofable without JWT â€” access gate cookie is primary entitlement control.
 -- Apply: supabase db push / SQL Editor zphtvrsxlhfgltwgbreu
 
 -- ===== Entitlements / emails: revoke anon =====
@@ -380,7 +381,7 @@ GRANT ALL ON TABLE public.app_entitlements TO service_role;
 ALTER TABLE public.app_entitlements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "app_entitlements_all" ON public.app_entitlements;
 DROP POLICY IF EXISTS app_entitlements_access ON public.app_entitlements;
--- No policies for anon/authenticated → deny by default when RLS on
+-- No policies for anon/authenticated â†’ deny by default when RLS on
 
 DO $$
 BEGIN
@@ -423,7 +424,7 @@ BEGIN
         t || '_select',
         t
       );
-      -- insert/update still allowed for companion (device_id identity) — tighten when Auth lands
+      -- insert/update still allowed for companion (device_id identity) â€” tighten when Auth lands
       EXECUTE format(
         'CREATE POLICY %I ON public.%I FOR INSERT TO anon, authenticated WITH CHECK (true)',
         t || '_insert',
@@ -460,4 +461,104 @@ BEGIN
 EXCEPTION WHEN undefined_table THEN
   NULL;
 END $$;
+
+
+-- ========== 20260918000000_challenge_relative_progress.sql ==========
+
+-- Relative challenge progress: baseline at join + % evolution for leaderboards
+ALTER TABLE public.challenge_progress
+  ADD COLUMN IF NOT EXISTS baseline_value NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pct_value NUMERIC;
+
+CREATE INDEX IF NOT EXISTS challenge_progress_challenge_pct_idx
+  ON public.challenge_progress (challenge_id, pct_value DESC NULLS LAST);
+
+
+-- ========== 20260918010000_creator_hubs.sql ==========
+
+-- Creator Hubs MVP (consumer): seeded Performance Hubs
+CREATE TABLE IF NOT EXISTS public.hubs (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  tagline TEXT NOT NULL DEFAULT '',
+  creator_name TEXT NOT NULL DEFAULT 'Soldiers',
+  avatar_url TEXT,
+  cover_url TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hubs TO anon, authenticated;
+GRANT ALL ON public.hubs TO service_role;
+ALTER TABLE public.hubs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS hubs_access ON public.hubs;
+CREATE POLICY hubs_access ON public.hubs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS public.hub_challenges (
+  hub_id UUID NOT NULL REFERENCES public.hubs(id) ON DELETE CASCADE,
+  challenge_id TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (hub_id, challenge_id)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hub_challenges TO anon, authenticated;
+GRANT ALL ON public.hub_challenges TO service_role;
+ALTER TABLE public.hub_challenges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS hub_challenges_access ON public.hub_challenges;
+CREATE POLICY hub_challenges_access ON public.hub_challenges FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE INDEX IF NOT EXISTS hub_challenges_challenge_idx ON public.hub_challenges (challenge_id);
+
+CREATE TABLE IF NOT EXISTS public.hub_members (
+  hub_id UUID NOT NULL REFERENCES public.hubs(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL,
+  joined_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  PRIMARY KEY (hub_id, device_id)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hub_members TO anon, authenticated;
+GRANT ALL ON public.hub_members TO service_role;
+ALTER TABLE public.hub_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS hub_members_access ON public.hub_members;
+CREATE POLICY hub_members_access ON public.hub_members FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE INDEX IF NOT EXISTS hub_members_device_idx ON public.hub_members (device_id);
+
+-- Seed: Soldiers Performance Hub
+INSERT INTO public.hubs (id, slug, name, tagline, creator_name, active)
+VALUES (
+  'a1000000-0000-4000-8000-000000000001',
+  'soldiers-performance',
+  'Soldiers Performance Hub',
+  'ConsistÃªncia e evoluÃ§Ã£o com a marca Soldiers â€” ranking por %.',
+  'Soldiers',
+  true
+)
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  tagline = EXCLUDED.tagline,
+  creator_name = EXCLUDED.creator_name,
+  active = EXCLUDED.active;
+
+INSERT INTO public.hub_challenges (hub_id, challenge_id, sort) VALUES
+  ('a1000000-0000-4000-8000-000000000001', 'evolucao-consistencia-14', 0),
+  ('a1000000-0000-4000-8000-000000000001', 'consistencia-21', 1)
+ON CONFLICT DO NOTHING;
+
+-- Seed: Projeto Massa 60d
+INSERT INTO public.hubs (id, slug, name, tagline, creator_name, active)
+VALUES (
+  'a1000000-0000-4000-8000-000000000002',
+  'projeto-massa-60',
+  'Projeto Massa 60d',
+  '60 dias de hipertrofia com ranking relativo â€” hub seed Soldiers.',
+  'Soldiers Coach',
+  true
+)
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  tagline = EXCLUDED.tagline,
+  creator_name = EXCLUDED.creator_name,
+  active = EXCLUDED.active;
+
+INSERT INTO public.hub_challenges (hub_id, challenge_id, sort) VALUES
+  ('a1000000-0000-4000-8000-000000000002', 'hub-massa-60', 0),
+  ('a1000000-0000-4000-8000-000000000002', 'evolucao-volume-21', 1)
+ON CONFLICT DO NOTHING;
 
