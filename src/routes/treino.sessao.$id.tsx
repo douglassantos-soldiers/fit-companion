@@ -67,6 +67,26 @@ function SessionPage() {
   const track = useServerFn(trackAppEvent);
   const fxOn = state.sessionFx !== false;
 
+  useEffect(() => {
+    if (!hydrated || !id) return;
+    void track({
+      data: {
+        deviceId: getDeviceId(),
+        kind: "workout_started",
+        payload: { dayId: id, express: express === true },
+      },
+    }).catch(() => undefined);
+    if (express) {
+      void track({
+        data: {
+          deviceId: getDeviceId(),
+          kind: "express_chosen",
+          payload: { dayId: id },
+        },
+      }).catch(() => undefined);
+    }
+  }, [hydrated, id, express, track]);
+
   const [logs, setLogs] = useState<ExerciseLog[]>([]);
   const [planned, setPlanned] = useState<PlannedExercise[]>([]);
   const [startedAt] = useState(() => Date.now());

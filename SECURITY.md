@@ -9,5 +9,10 @@
 
 ## Gate de acesso
 
-Após compra verificada, o servidor grava cookie HttpOnly `soldiers_access` (HMAC).
+Após compra verificada, o servidor grava cookie HttpOnly `soldiers_access` (HMAC), incluindo `userId` quando conhecido.
 O client ainda guarda UX state (`accessGranted`), mas o `AccessGate` exige sessão válida no server.
+
+## Dados de domínio / social
+
+Writes de profiles/sessions/meals/social passam por server fns (`sync.functions`, `social-write.functions`) com `service_role`.
+Não reabrir policies `USING (true)` para `anon` nas tabelas de domínio.

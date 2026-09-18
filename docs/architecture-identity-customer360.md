@@ -59,19 +59,27 @@ Camada de agregação em `src/lib/customer360/` + tabela derivada `customer_prof
 
 ## Sync
 
-- `meal_entries` persiste refeições detalhadas (antes `pullState` zerava `meals`)
-- Local = cache/offline; Supabase = source of truth quando sincronizado
-- Identity: `ensureIdentityForDevice` no boot
+- Domain sync is **server-authoritative** (`sync.functions.ts` → service_role).
+- `user_id` is resolved from `devices`, never trusted from the client.
+- Multi-device pull merges rows for all `device_id`s of the same `user_id`.
+- `dayCheckIns` live in `app_state.retention`; session `rpe`/`express` columns when present.
+- Local = cache/offline; Supabase = source of truth when synchronized.
+- Identity: `ensureIdentityForDevice` on boot.
 
-## Weekday
+## Safety / Recommendation
 
-`planDayForToday` usa `Date.getDay()` (Dom=0) e retorna **apenas** match exato — dias de descanso retornam `null` (não o próximo treino).
+- **Safety Engine** (`engine/safety.ts`): sleep/energy/RPE guards → Living Plan + stim filter.
+- **Recommendation Engine** (`engine/recommendation.ts`): ranks next actions for Hoje.
+- **Outcome helpers** (`outcome.ts`): learning-loop event names.
 
 ## Migration
 
 `supabase/migrations/20260919000000_identity_customer360.sql` — não destrutiva.
+`supabase/migrations/20260919120000_harden_domain_rls.sql` — domain/social writes service_role only.
+`supabase/migrations/20260919120100_session_rpe_express.sql` — rpe/express on sessions.
 
 Aplicar com `supabase db push` ou SQL Editor no projeto.
+
 
 ## Arquivos-chave
 

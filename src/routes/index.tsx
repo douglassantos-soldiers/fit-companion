@@ -39,6 +39,9 @@ import { performanceDimensions, performanceScore, adherenceScore, streak } from 
 import { computeLearningInsights, topLearningInsight, learningWeekHint } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
 import { buildLivingPlan } from "@/lib/engine/living-plan";
+import { evaluateSafety } from "@/lib/engine/safety";
+import { rankRecommendations } from "@/lib/engine/recommendation";
+import { trackOutcome } from "@/lib/outcome";
 import {
   buildDailyMealPlan,
   dayNutritionTotals,
@@ -265,6 +268,15 @@ function Today() {
   const living =
     state.livingPlans?.[todayKey()] ?? buildLivingPlan(state, todayKey());
   const todayCheckIn = state.dayCheckIns?.[todayKey()];
+  const safety = evaluateSafety(state);
+  const topRec = living
+    ? rankRecommendations({
+        livingPlan: living,
+        safety,
+        goal: profile.goal,
+        purchaseProductIds: state.purchaseProductIds ?? [],
+      })[0]
+    : null;
 
   return (
     <AppShell
@@ -295,9 +307,35 @@ function Today() {
           checkIn={todayCheckIn}
           onSaveCheckIn={(c) => {
             saveDayCheckIn(c);
+            void trackOutcome(getDeviceId(), "checkin_sleep", {
+              sleepHours: c.sleepHours,
+              energy: c.energy,
+            });
             toast.success("Plano de hoje atualizado");
           }}
         />
+      ) : null}
+
+      {topRec ? (
+        <Link
+          to={topRec.href === "/treino" ? "/treino" : topRec.href === "/nutricao" ? "/nutricao" : topRec.href === "/suplementos" ? "/suplementos" : topRec.href === "/coach" ? "/coach" : "/"}
+          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/40 px-4 py-3"
+          onClick={() =>
+            void trackOutcome(getDeviceId(), "living_plan_followed", {
+              recommendationId: topRec.id,
+              kind: topRec.kind,
+            })
+          }
+        >
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Próxima ação
+            </p>
+            <p className="truncate text-sm font-semibold text-foreground">{topRec.title}</p>
+            <p className="truncate text-xs text-muted-foreground">{topRec.reason}</p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-primary">Ir</span>
+        </Link>
       ) : null}
 
       {atRisk ? (

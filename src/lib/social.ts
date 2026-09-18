@@ -1,6 +1,7 @@
 import { challengeById, isRelativeChallenge, type Challenge } from "@/data/challenges";
 import { sessionsInLastDays } from "@/lib/engine/dimensions";
 import { supabase } from "@/integrations/supabase/client";
+import { socialWriteFn } from "@/lib/social-write.functions";
 import type { AppState, SessionLog } from "@/lib/types";
 
 export type ActivityKind =
@@ -149,13 +150,6 @@ export interface ClubStory {
   createdAt: string;
 }
 
-function clubCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 6; i += 1) out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return out;
-}
-
 function weekStartMonday(d = new Date()): string {
   const day = (d.getDay() + 6) % 7;
   const monday = new Date(d);
@@ -166,11 +160,9 @@ function weekStartMonday(d = new Date()): string {
 
 export async function ensureSocialProfile(deviceId: string, displayName: string) {
   if (!deviceId) return;
-  const { error } = await supabase.from("social_profiles").upsert(
-    { device_id: deviceId, display_name: displayName || "Soldado", updated_at: new Date().toISOString() },
-    { onConflict: "device_id" },
-  );
-  if (error) throw error;
+  await socialWriteFn({
+    data: { op: "ensureProfile", deviceId, displayName: displayName || "Soldado" },
+  });
 }
 
 export async function joinChallengeRemote(
@@ -179,37 +171,19 @@ export async function joinChallengeRemote(
   displayName: string,
   baseline?: number,
 ) {
-  await ensureSocialProfile(deviceId, displayName);
-  const { error } = await supabase.from("challenge_entries").upsert(
-    { device_id: deviceId, challenge_id: challengeId },
-    { onConflict: "device_id,challenge_id" },
-  );
-  if (error) throw error;
-  const c = challengeById(challengeId);
-  if (c && isRelativeChallenge(c) && baseline !== undefined) {
-    const { error: progErr } = await supabase.from("challenge_progress").upsert(
-      {
-        device_id: deviceId,
-        challenge_id: challengeId,
-        value: baseline,
-        baseline_value: baseline,
-        pct_value: 0,
-        updated_at: new Date().toISOString(),
-      } as never,
-      { onConflict: "device_id,challenge_id" },
-    );
-    if (progErr) throw progErr;
-  }
-  await publishEvent(deviceId, displayName, "challenge_join", {
-    challengeId,
-    title: c?.title,
-    relative: c ? isRelativeChallenge(c) : false,
+  await socialWriteFn({
+    data: {
+      op: "joinChallenge",
+      deviceId,
+      challengeId,
+      displayName,
+      ...(baseline !== undefined ? { baseline } : {}),
+    },
   });
 }
 
 export async function leaveChallengeRemote(deviceId: string, challengeId: string) {
-  await supabase.from("challenge_entries").delete().eq("device_id", deviceId).eq("challenge_id", challengeId);
-  await supabase.from("challenge_progress").delete().eq("device_id", deviceId).eq("challenge_id", challengeId);
+  await socialWriteFn({ data: { op: "leaveChallenge", deviceId, challengeId } });
 }
 
 export async function syncChallengeProgress(
@@ -219,44 +193,18 @@ export async function syncChallengeProgress(
   displayName: string,
   opts?: { baseline?: number; pct?: number; complete?: boolean },
 ) {
-  await ensureSocialProfile(deviceId, displayName);
-  const c = challengeById(challengeId);
-  const relative = c ? isRelativeChallenge(c) : false;
-  const baseline = opts?.baseline ?? 0;
-  const pct =
-    opts?.pct ??
-    (relative ? ((value - baseline) / Math.max(baseline, 1)) * 100 : null);
-
-  const { error } = await supabase.from("challenge_progress").upsert(
-    {
-      device_id: deviceId,
-      challenge_id: challengeId,
-      value,
-      baseline_value: baseline,
-      pct_value: pct,
-      updated_at: new Date().toISOString(),
-    } as never,
-    { onConflict: "device_id,challenge_id" },
-  );
-  if (error) throw error;
-
-  const done =
-    opts?.complete ??
-    (c
-      ? relative
-        ? (pct ?? 0) >= (c.targetPct ?? c.target)
-        : value >= c.target
-      : false);
-
-  if (c && done) {
-    await publishEvent(deviceId, displayName, "challenge_complete", {
+  await socialWriteFn({
+    data: {
+      op: "syncChallengeProgress",
+      deviceId,
       challengeId,
-      title: c.title,
       value,
-      pct: pct ?? undefined,
-      relative,
-    });
-  }
+      displayName,
+      baseline: opts?.baseline,
+      pct: opts?.pct,
+      complete: opts?.complete,
+    },
+  });
 }
 
 export async function syncAllJoinedChallenges(state: AppState, deviceId: string) {
@@ -363,28 +311,21 @@ export async function publishProofEvent(
 }
 
 export async function createClub(deviceId: string, name: string, displayName: string): Promise<ClubSummary> {
-  await ensureSocialProfile(deviceId, displayName);
-  const code = clubCode();
-  const { data, error } = await supabase
-    .from("clubs")
-    .insert({ name: name.trim() || "Clube Soldiers", code, created_by_device_id: deviceId })
-    .select("id, name, code")
-    .single();
-  if (error || !data) throw error ?? new Error("Não foi possível criar o clube");
-
-  await supabase.from("club_members").insert({ club_id: data.id, device_id: deviceId });
-  return { id: data.id, name: data.name, code: data.code, memberCount: 1, members: [{ deviceId, displayName }] };
+  const res = await socialWriteFn({
+    data: { op: "createClub", deviceId, name, displayName },
+  });
+  const club = res.club as ClubSummary | undefined;
+  if (!club) throw new Error("Não foi possível criar o clube");
+  return club;
 }
 
 export async function joinClubByCode(deviceId: string, code: string, displayName: string): Promise<ClubSummary> {
-  await ensureSocialProfile(deviceId, displayName);
-  const normalized = code.trim().toUpperCase();
-  const { data: club, error } = await supabase.from("clubs").select("id, name, code").eq("code", normalized).maybeSingle();
-  if (error) throw error;
-  if (!club) throw new Error("Código inválido");
-
-  await supabase.from("club_members").upsert({ club_id: club.id, device_id: deviceId }, { onConflict: "club_id,device_id" });
-  return (await listMyClubs(deviceId)).find((c) => c.id === club.id)!;
+  const res = await socialWriteFn({
+    data: { op: "joinClub", deviceId, code, displayName },
+  });
+  const clubId = res.clubId as string | undefined;
+  if (!clubId) throw new Error("Código inválido");
+  return (await listMyClubs(deviceId)).find((c) => c.id === clubId)!;
 }
 
 export async function listMyClubs(deviceId: string): Promise<ClubSummary[]> {
@@ -421,13 +362,9 @@ export async function publishEvent(
   kind: ActivityKind,
   payload: Record<string, unknown> = {},
 ) {
-  const { error } = await supabase.from("activity_events").insert({
-    device_id: deviceId,
-    display_name: displayName || "Soldado",
-    kind,
-    payload: payload as never,
+  await socialWriteFn({
+    data: { op: "publishEvent", deviceId, displayName: displayName || "Soldado", kind, payload },
   });
-  if (error) console.error("Falha ao publicar evento", error);
 }
 
 export async function fetchFeed(limit = 30): Promise<ActivityEvent[] | null> {
@@ -449,11 +386,10 @@ export async function fetchFeed(limit = 30): Promise<ActivityEvent[] | null> {
 }
 
 export async function giveKudos(eventId: string, current: number) {
-  const { error } = await supabase
-    .from("activity_events")
-    .update({ kudos_count: current + 1 })
-    .eq("id", eventId);
-  if (error) throw error;
+  // Prefer giveKudosServer with deviceId — this path needs device context
+  void eventId;
+  void current;
+  throw new Error("Use giveKudosServer(eventId, current, deviceId)");
 }
 
 function kudosKey(deviceId: string, eventId: string) {
@@ -473,7 +409,7 @@ export function hasGivenKudos(deviceId: string, eventId: string) {
 export async function giveKudosOnce(eventId: string, current: number, deviceId: string) {
   if (!deviceId) throw new Error("Dispositivo inválido");
   if (hasGivenKudos(deviceId, eventId)) throw new Error("Você já reagiu a este check-in");
-  await giveKudos(eventId, current);
+  await socialWriteFn({ data: { op: "giveKudos", eventId, current, deviceId } });
   try {
     window.localStorage.setItem(kudosKey(deviceId, eventId), "1");
   } catch {
@@ -590,31 +526,9 @@ export async function publishRetentionEvent(
 /** Upsert weekly league points for all clubs the device belongs to. */
 export async function syncLeaguePoints(deviceId: string, displayName: string, pointsDeltaOrToday: number) {
   if (!deviceId) return;
-  await ensureSocialProfile(deviceId, displayName);
-  const clubs = await listMyClubs(deviceId);
-  const weekStart = weekStartMonday();
-  for (const club of clubs) {
-    const { data: existing } = await supabase
-      .from("club_league_weeks")
-      .select("points")
-      .eq("club_id", club.id)
-      .eq("week_start", weekStart)
-      .eq("device_id", deviceId)
-      .maybeSingle();
-    const prev = Number(existing?.points ?? 0);
-    const points = Math.max(prev, pointsDeltaOrToday);
-    const { error } = await supabase.from("club_league_weeks").upsert(
-      {
-        club_id: club.id,
-        week_start: weekStart,
-        device_id: deviceId,
-        points,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "club_id,week_start,device_id" },
-    );
-    if (error) console.error("Falha ao sincronizar liga", error);
-  }
+  await socialWriteFn({
+    data: { op: "syncLeague", deviceId, displayName, points: pointsDeltaOrToday },
+  });
 }
 
 export async function fetchClubLeague(
@@ -677,92 +591,52 @@ export async function ensureFriendQuest(
 ): Promise<FriendQuest | null> {
   if (!deviceId || club.members.length < 2) return null;
   const weekStart = weekStartMonday();
-  const { data: existing } = await supabase
-    .from("friend_quests")
-    .select("*")
-    .eq("club_id", club.id)
-    .eq("week_start", weekStart)
-    .or(`device_a.eq.${deviceId},device_b.eq.${deviceId}`)
-    .maybeSingle();
-
-  if (existing) {
-    const nameMap = new Map(club.members.map((m) => [m.deviceId, m.displayName]));
-    return {
-      id: existing.id,
-      clubId: existing.club_id,
-      weekStart: existing.week_start,
-      deviceA: existing.device_a,
-      deviceB: existing.device_b,
-      nameA: nameMap.get(existing.device_a) || "Soldado",
-      nameB: nameMap.get(existing.device_b) || "Soldado",
-      target: existing.target ?? 4,
-      progressA: existing.progress_a ?? 0,
-      progressB: existing.progress_b ?? 0,
-    };
-  }
-
   const others = club.members.filter((m) => m.deviceId !== deviceId);
   if (!others.length) return null;
   const partner = others[Math.floor(Math.random() * others.length)]!;
-  await ensureSocialProfile(deviceId, displayName);
-  const { data, error } = await supabase
-    .from("friend_quests")
-    .insert({
-      club_id: club.id,
-      week_start: weekStart,
-      device_a: deviceId,
-      device_b: partner.deviceId,
-      target: 4,
-      progress_a: 0,
-      progress_b: 0,
-    })
-    .select("*")
-    .single();
-  if (error || !data) {
-    console.error("Falha ao criar friend quest", error);
-    return null;
-  }
+  const nameMap = new Map(club.members.map((m) => [m.deviceId, m.displayName]));
+
+  const res = await socialWriteFn({
+    data: {
+      op: "ensureFriendQuest",
+      deviceId,
+      clubId: club.id,
+      weekStart,
+      partnerDeviceId: partner.deviceId,
+      displayName,
+    },
+  });
+  const quest = res.quest as
+    | {
+        id: string;
+        clubId: string;
+        weekStart: string;
+        deviceA: string;
+        deviceB: string;
+        target: number;
+        progressA: number;
+        progressB: number;
+      }
+    | undefined;
+  if (!quest) return null;
   return {
-    id: data.id,
-    clubId: data.club_id,
-    weekStart: data.week_start,
-    deviceA: data.device_a,
-    deviceB: data.device_b,
-    nameA: displayName,
-    nameB: partner.displayName,
-    target: data.target ?? 4,
-    progressA: 0,
-    progressB: 0,
+    id: quest.id,
+    clubId: quest.clubId,
+    weekStart: quest.weekStart,
+    deviceA: quest.deviceA,
+    deviceB: quest.deviceB,
+    nameA: nameMap.get(quest.deviceA) || displayName,
+    nameB: nameMap.get(quest.deviceB) || partner.displayName,
+    target: quest.target,
+    progressA: quest.progressA,
+    progressB: quest.progressB,
   };
 }
 
 export async function bumpFriendQuestOnSession(deviceId: string) {
   if (!deviceId) return;
   const weekStart = weekStartMonday();
-  const { data: rows } = await supabase
-    .from("friend_quests")
-    .select("*")
-    .eq("week_start", weekStart)
-    .or(`device_a.eq.${deviceId},device_b.eq.${deviceId}`);
-  for (const row of rows ?? []) {
-    const isA = row.device_a === deviceId;
-    const patch = isA
-      ? { progress_a: (row.progress_a ?? 0) + 1 }
-      : { progress_b: (row.progress_b ?? 0) + 1 };
-    await supabase.from("friend_quests").update(patch).eq("id", row.id);
-    const a = isA ? patch.progress_a! : row.progress_a ?? 0;
-    const b = !isA ? patch.progress_b! : row.progress_b ?? 0;
-    if (a + b >= (row.target ?? 4) && (row.progress_a ?? 0) + (row.progress_b ?? 0) < (row.target ?? 4)) {
-      const { data: profile } = await supabase
-        .from("social_profiles")
-        .select("display_name")
-        .eq("device_id", deviceId)
-        .maybeSingle();
-      await publishRetentionEvent(deviceId, profile?.display_name || "Soldado", "friend_quest_complete", {
-        questId: row.id,
-      });
-    }
-  }
+  await socialWriteFn({ data: { op: "bumpFriendQuest", deviceId, weekStart } });
 }
 
 export async function uploadCheckinImage(deviceId: string, file: File): Promise<string | null> {
@@ -817,32 +691,21 @@ export async function fetchClubStories(clubId: string): Promise<ClubStory[]> {
 }
 
 export async function publishClubStory(clubId: string, deviceId: string, imageUrl: string) {
-  const { error } = await supabase.from("club_stories").insert({
-    club_id: clubId,
-    device_id: deviceId,
-    image_url: imageUrl,
-  });
-  if (error) throw error;
+  await socialWriteFn({ data: { op: "publishClubStory", clubId, deviceId, imageUrl } });
 }
 
 /** Server-side kudos dedupe via activity_kudos table; falls back to localStorage. */
 export async function giveKudosServer(eventId: string, current: number, deviceId: string) {
   if (!deviceId) throw new Error("Dispositivo inválido");
   if (hasGivenKudos(deviceId, eventId)) throw new Error("Você já reagiu a este check-in");
-
-  const { error: insertErr } = await supabase.from("activity_kudos").insert({
-    event_id: eventId,
-    device_id: deviceId,
-  });
-  if (insertErr && !String(insertErr.message || "").includes("duplicate") && insertErr.code !== "23505") {
+  try {
+    await socialWriteFn({ data: { op: "giveKudos", eventId, current, deviceId } });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("já reagiu")) throw e;
     await giveKudosOnce(eventId, current, deviceId);
     return;
   }
-  if (insertErr && (insertErr.code === "23505" || String(insertErr.message || "").includes("duplicate"))) {
-    throw new Error("Você já reagiu a este check-in");
-  }
-
-  await giveKudos(eventId, current);
   try {
     window.localStorage.setItem(kudosKey(deviceId, eventId), "1");
   } catch {

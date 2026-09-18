@@ -312,7 +312,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (resolvedUserId) {
             void persistUserPatterns({
               data: {
-                userId: resolvedUserId,
+                deviceId: id,
                 patterns: extractUserPatterns(merged),
               },
             }).catch(() => undefined);
@@ -348,7 +348,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             );
             void persistUserPatterns({
               data: {
-                userId: resolvedUserId,
+                deviceId: id,
                 patterns: extractUserPatterns(bootState),
               },
             }).catch(() => undefined);
@@ -375,6 +375,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 700);
     return () => window.clearTimeout(timer);
   }, [state, hydrated]);
+
+  // Customer 360 recompute — throttled (not every keystroke push)
+  useEffect(() => {
+    if (!hydrated || !state.userId || !deviceId.current) return;
+    const timer = window.setTimeout(() => {
+      void import("@/lib/customer360.functions")
+        .then(({ recomputeCustomer360Fn }) =>
+          recomputeCustomer360Fn({ data: { deviceId: deviceId.current, state } }),
+        )
+        .catch(() => undefined);
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [
+    hydrated,
+    state.userId,
+    state.sessions.length,
+    state.meals.length,
+    state.weights.length,
+    Object.keys(state.dayCheckIns ?? {}).length,
+  ]);
 
   useEffect(() => {
     if (!hydrated) return;

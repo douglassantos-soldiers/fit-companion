@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ensureSocialProfile } from "@/lib/social";
+import { socialWriteFn } from "@/lib/social-write.functions";
 import { notifySocial } from "@/lib/notifications";
 
 /** Magic-link auth. Links social_profiles.user_id when possible. */
@@ -30,12 +31,33 @@ export async function getAuthUser() {
   return data.user ?? null;
 }
 
-export async function linkAuthToSocial(deviceId: string, displayName: string, userId: string) {
+/**
+ * Link Supabase Auth to app user + social profile.
+ * @param appUserId — public.users.id (not auth uuid)
+ * @param authUserId — auth.users.id
+ */
+export async function linkAuthToSocial(
+  deviceId: string,
+  displayName: string,
+  appUserId: string,
+  authUserId?: string,
+) {
   await ensureSocialProfile(deviceId, displayName);
-  await supabase
-    .from("social_profiles")
-    .update({ user_id: userId, updated_at: new Date().toISOString() })
-    .eq("device_id", deviceId);
+  if (authUserId && appUserId) {
+    await socialWriteFn({
+      data: {
+        op: "linkAuthSocial",
+        deviceId,
+        displayName,
+        appUserId,
+        authUserId,
+      },
+    });
+    return;
+  }
+  await socialWriteFn({
+    data: { op: "ensureProfile", deviceId, displayName },
+  });
 }
 
 /** Subscribe to auth and optionally fire a welcome local notification. */

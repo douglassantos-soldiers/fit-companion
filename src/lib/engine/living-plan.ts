@@ -10,6 +10,7 @@ import { buildUserContext } from "@/lib/engine/context";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
 import { nutritionGoals } from "@/lib/engine/nutrition";
 import { buildExpressSession, buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
+import { evaluateSafety } from "@/lib/engine/safety";
 import type { AppState, LivingPlanSnapshot, Profile } from "@/lib/types";
 import { BLOCKER_LABEL, todayKey } from "@/lib/types";
 
@@ -49,6 +50,7 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
   const day = planDayForToday(plan, new Date(`${date}T12:00:00`));
 
   const sleepStress = sleepH < 6 || energy === "baixa";
+  const safety = evaluateSafety(state);
   const timeTight = availableMin < 40;
   let volumeFactor = 1;
   let mode: LivingPlanSnapshot["workout"]["mode"] = day ? "full" : "rest";
@@ -57,9 +59,9 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
 
   if (!day) {
     mode = "rest";
-  } else if (weekMode === "deload" || sleepStress) {
+  } else if (weekMode === "deload" || sleepStress || safety.preferLightTraining) {
     mode = "deload";
-    volumeFactor = sleepH < 5.5 ? 0.55 : 0.7;
+    volumeFactor = sleepH < 5.5 || safety.preferLightTraining ? 0.55 : 0.7;
     estimatedMin = Math.round(day.estimatedMin * volumeFactor);
     title = `${day.title} (leve)`;
   } else if (timeTight || availableMin < day.estimatedMin * 0.7) {
@@ -95,12 +97,15 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
     .map((p) => ({ id: p.id, name: p.name, timing: p.timing }));
 
-  // Prefer creatine + protein on training days; drop stim if sleep poor
+  // Prefer creatine + protein on training days; drop stim if sleep poor or Safety blocks
   const filteredSupplements =
-    mode === "rest" || sleepStress
+    mode === "rest" || sleepStress || safety.blockStims
       ? supplements.filter((s) => {
           const id = s.id.toLowerCase();
-          if (sleepStress && (id.includes("pre") || id.includes("termo") || id.includes("cafe"))) {
+          if (
+            (sleepStress || safety.blockStims) &&
+            (id.includes("pre") || id.includes("termo") || id.includes("cafe"))
+          ) {
             return false;
           }
           return true;
@@ -109,6 +114,9 @@ export function buildLivingPlan(state: AppState, date = todayKey()): LivingPlanS
 
   const why: string[] = [];
   if (insights?.reasons.length) why.push(...insights.reasons);
+  if (safety.preferLightTraining) {
+    why.push("Safety Engine: treino leve recomendado hoje.");
+  }
   if (sleepH < 6) {
     why.push(`Sono de ${sleepH}h — volume de treino reduzido e stims evitados.`);
   } else if (sleepH < 7) {

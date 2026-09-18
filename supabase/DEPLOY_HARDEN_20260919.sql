@@ -1,0 +1,9 @@
+-- Deploy harden (2026-09-19)
+-- Run the following migration files in order in the Supabase SQL Editor
+-- (project zphtvrsxlhfgltwgbreu), or use: supabase db push
+--
+-- 1) supabase/migrations/20260919120000_harden_domain_rls.sql
+-- 2) supabase/migrations/20260919120100_session_rpe_express.sql
+--
+-- After apply: domain/social writes require service_role (server fns).
+-- Client anon can still SELECT social leaderboards/feeds.

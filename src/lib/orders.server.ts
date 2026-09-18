@@ -134,11 +134,59 @@ export async function upsertOrdersFromPaidList(opts: {
 export async function markOrderRefunded(shopifyOrderId: string): Promise<void> {
   const db = await adminDbLoose();
   if (!db) return;
+  const oid = String(shopifyOrderId);
   await db
     .from("orders")
     .update({
       financial_status: "refunded",
       updated_at: new Date().toISOString(),
     })
-    .eq("shopify_order_id", String(shopifyOrderId));
+    .eq("shopify_order_id", oid);
+
+  // Revoke entitlements when no other paid orders remain for the user
+  const { data: order } = await db
+    .from("orders")
+    .select("user_id, email")
+    .eq("shopify_order_id", oid)
+    .maybeSingle();
+
+  const userId = (order?.user_id as string | null) ?? null;
+  if (!userId) return;
+
+  const { data: paid } = await db
+    .from("orders")
+    .select("id, financial_status")
+    .eq("user_id", userId);
+
+  const stillPaid = (paid ?? []).some((o) => {
+    const s = String(o.financial_status ?? "").toLowerCase();
+    return s === "paid" || s === "partially_paid";
+  });
+
+  if (stillPaid) {
+    void import("@/lib/customer360/recompute.server")
+      .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId))
+      .catch(() => undefined);
+    return;
+  }
+
+  // Soft-revoke: clear device + email entitlement rows
+  const { data: devices } = await db.from("devices").select("device_id").eq("user_id", userId);
+  for (const d of devices ?? []) {
+    await db.from("app_entitlements").delete().eq("device_id", d.device_id);
+  }
+
+  const { data: user } = await db.from("users").select("email").eq("id", userId).maybeSingle();
+  const email = (user?.email as string | null) ?? (order?.email as string | null);
+  if (email) {
+    try {
+      await db.from("app_entitlement_emails").delete().eq("email", email.toLowerCase());
+    } catch {
+      /* table may use different key */
+    }
+  }
+
+  void import("@/lib/customer360/recompute.server")
+    .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId))
+    .catch(() => undefined);
 }

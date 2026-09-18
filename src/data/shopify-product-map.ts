@@ -18,6 +18,8 @@ export interface ShopifyMapEntry {
   /** Keywords matched against title/sku (lowercase) */
   keywords: string[];
   exactSkus?: string[];
+  /** Canonical Shopify Admin product GIDs or numeric IDs */
+  shopifyProductIds?: string[];
   shopifyHandle: string;
   servingsPerContainer: number;
   servingsPerDay: number;
@@ -96,6 +98,16 @@ export function matchLineItem(item: ShopifyLineItemLike): ShopifyMapEntry | null
     .trim()
     .toLowerCase();
   const title = `${item.title ?? ""} ${item.name ?? ""}`.toLowerCase();
+  const shopifyId = item.product_id != null ? String(item.product_id) : "";
+
+  // Prefer canonical Shopify product id when mapped
+  if (shopifyId) {
+    for (const entry of SHOPIFY_PRODUCT_MAP) {
+      if (entry.shopifyProductIds?.some((id) => id === shopifyId || id.endsWith(`/${shopifyId}`))) {
+        return entry;
+      }
+    }
+  }
 
   for (const entry of SHOPIFY_PRODUCT_MAP) {
     if (entry.exactSkus?.some((s) => s.toLowerCase() === sku)) return entry;
@@ -113,7 +125,8 @@ export function mapLineItemsToProductIds(items: ShopifyLineItemLike[]): string[]
     const matched = matchLineItem(item);
     if (matched && !ids.includes(matched.productId)) ids.push(matched.productId);
   }
-  return ids.slice(0, 5);
+  // No hard cap of 5 — return all unique matched products
+  return ids;
 }
 
 export function resolveAccessTier(

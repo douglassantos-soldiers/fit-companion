@@ -5,6 +5,7 @@ import {
   fetchLeaderboard,
   type LeaderboardRow,
 } from "@/lib/social";
+import { socialWriteFn } from "@/lib/social-write.functions";
 
 export type Hub = HubSeed & { memberCount?: number };
 
@@ -115,20 +116,11 @@ export async function listMyHubIds(deviceId: string): Promise<string[]> {
 
 export async function joinHub(deviceId: string, hubId: string, displayName: string) {
   await ensureSocialProfile(deviceId, displayName);
-  const { error } = await supabase.from("hub_members" as never).upsert(
-    { hub_id: hubId, device_id: deviceId } as never,
-    { onConflict: "hub_id,device_id" },
-  );
-  if (error) throw error;
+  await socialWriteFn({ data: { op: "hubJoin", deviceId, hubId } });
 }
 
 export async function leaveHub(deviceId: string, hubId: string) {
-  const { error } = await supabase
-    .from("hub_members" as never)
-    .delete()
-    .eq("hub_id", hubId)
-    .eq("device_id", deviceId);
-  if (error) throw error;
+  await socialWriteFn({ data: { op: "hubLeave", deviceId, hubId } });
 }
 
 export async function fetchHubLeaderboard(

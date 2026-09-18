@@ -18,7 +18,12 @@ export { parseEstablishAccessInput } from "@/lib/access-parse";
 export const checkAccessSession = createServerFn({ method: "GET" }).handler(async () => {
   const session = readAccessSession();
   if (!session) return { ok: false as const };
-  return { ok: true as const, email: session.email, tier: session.tier };
+  return {
+    ok: true as const,
+    email: session.email,
+    tier: session.tier,
+    userId: session.userId ?? null,
+  };
 });
 
 export const clearAccessSession = createServerFn({ method: "POST" }).handler(async () => {
@@ -42,8 +47,6 @@ export const establishAccessSession = createServerFn({ method: "POST" })
     if (!profile) {
       return { ok: false as const, reason: "no_entitlement" as const };
     }
-
-    setAccessSessionCookie({ email: data.email, tier: profile.accessTier });
 
     // Persist entitlement email snapshot for future resolves (best-effort)
     try {
@@ -96,7 +99,6 @@ export const establishAccessSession = createServerFn({ method: "POST" })
         console.error("establishAccessSession identity link failed", e);
       }
 
-      // Sync orders into transactional tables (paginated)
       try {
         const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
         const { orders } = await fetchPaidOrdersByEmailServer(data.email);
@@ -111,6 +113,12 @@ export const establishAccessSession = createServerFn({ method: "POST" })
           .catch((e) => console.warn("recomputeCustomerProfile skipped", e));
       }
     }
+
+    setAccessSessionCookie({
+      email: data.email,
+      tier: profile.accessTier,
+      ...(userId ? { userId } : {}),
+    });
 
     return {
       ok: true as const,

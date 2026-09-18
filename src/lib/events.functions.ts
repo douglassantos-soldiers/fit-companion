@@ -1,25 +1,43 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { TrackUserEventInput } from "@/lib/events/track";
 
-function parseTrack(input: unknown): TrackUserEventInput {
+function parseTrack(input: unknown): {
+  deviceId: string;
+  eventType: string;
+  source?: string;
+  payload?: Record<string, unknown>;
+  occurredAt?: string;
+  idempotencyKey?: string;
+} {
   const v = input as TrackUserEventInput | null;
   const eventType = String(v?.eventType ?? "").trim();
   if (!eventType) throw new Error("eventType obrigatório");
-  const out: TrackUserEventInput = {
+  const deviceId = String(v?.deviceId ?? "").trim();
+  if (!deviceId || deviceId.length < 8) throw new Error("deviceId obrigatório");
+  // Intentionally ignore client userId — resolve on server
+  return {
+    deviceId,
     eventType,
     source: v?.source ?? "app",
     payload: v?.payload && typeof v.payload === "object" ? v.payload : {},
+    ...(v?.occurredAt ? { occurredAt: v.occurredAt } : {}),
+    ...(v?.idempotencyKey ? { idempotencyKey: v.idempotencyKey } : {}),
   };
-  if (v?.userId != null) out.userId = v.userId;
-  if (v?.deviceId != null) out.deviceId = v.deviceId;
-  if (v?.occurredAt) out.occurredAt = v.occurredAt;
-  if (v?.idempotencyKey) out.idempotencyKey = v.idempotencyKey;
-  return out;
 }
 
 export const trackAppUserEvent = createServerFn({ method: "POST" })
   .inputValidator(parseTrack)
   .handler(async ({ data }) => {
+    const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
     const { trackUserEvent } = await import("@/lib/events/track");
-    return trackUserEvent(data);
+    return trackUserEvent({
+      deviceId: data.deviceId,
+      userId: identity?.userId ?? null,
+      eventType: data.eventType,
+      source: data.source,
+      payload: data.payload,
+      occurredAt: data.occurredAt,
+      idempotencyKey: data.idempotencyKey,
+    });
   });

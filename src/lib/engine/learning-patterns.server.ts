@@ -27,3 +27,16 @@ export async function saveUserPatterns(
   }
   return true;
 }
+
+export async function loadUserPatterns(userId: string): Promise<UserPatterns | null> {
+  if (!userId) return null;
+  const db = await adminDbLoose();
+  if (!db) return null;
+  const { data, error } = await db
+    .from("user_patterns")
+    .select("patterns")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data?.patterns) return null;
+  return data.patterns as unknown as UserPatterns;
+}

@@ -148,3 +148,93 @@ export async function recomputeCustomerProfile(
 
   return c360;
 }
+
+/** Load persisted customer_profiles row (server). */
+export async function loadCustomerProfile(userId: string): Promise<Customer360 | null> {
+  const db = await adminDbLoose();
+  if (!db || !userId) return null;
+  const { data, error } = await db
+    .from("customer_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  const metrics = (data.metrics as Record<string, unknown> | null) ?? {};
+  const commerce = await loadCommerce360(userId);
+  const perf = (metrics.performance as Partial<Customer360["performance"]> | undefined) ?? {};
+  const nutri = (metrics.nutrition as Partial<Customer360["nutrition"]> | undefined) ?? {};
+  const rec = (metrics.recovery as Partial<Customer360["recovery"]> | undefined) ?? {};
+  const beh = (metrics.behavior as Partial<Customer360["behavior"]> | undefined) ?? {};
+
+  return {
+    userId,
+    updatedAt: String(data.updated_at ?? new Date().toISOString()),
+    commerce: {
+      ...commerce,
+      firstPurchaseAt: (data.first_purchase_at as string | null) ?? commerce.firstPurchaseAt,
+      lastPurchaseAt: (data.last_purchase_at as string | null) ?? commerce.lastPurchaseAt,
+      totalOrders: Number(data.total_orders ?? commerce.totalOrders),
+      totalSpend: Number(data.total_spend ?? commerce.totalSpend),
+      averageOrderValue:
+        data.average_order_value != null
+          ? Number(data.average_order_value)
+          : commerce.averageOrderValue,
+      purchaseFrequencyDays:
+        data.purchase_frequency_days != null
+          ? Number(data.purchase_frequency_days)
+          : commerce.purchaseFrequencyDays,
+      favoriteProducts: (data.favorite_products as string[]) ?? commerce.favoriteProducts,
+      productIds: commerce.productIds,
+      estimatedLtv:
+        data.estimated_ltv != null ? Number(data.estimated_ltv) : commerce.estimatedLtv,
+      estimatedNextPurchase:
+        (data.estimated_next_purchase as string | null) ?? commerce.estimatedNextPurchase,
+    },
+    performance: {
+      sessions28d: Number(perf.sessions28d ?? 0),
+      volume28d: Number(perf.volume28d ?? 0),
+      trainingFrequency: Number(data.training_frequency ?? perf.trainingFrequency ?? 0),
+      avgRpeHardStreak: Number(perf.avgRpeHardStreak ?? 0),
+      performanceLevel:
+        (data.performance_level as Customer360["performance"]["performanceLevel"]) ??
+        perf.performanceLevel ??
+        null,
+    },
+    nutrition: {
+      proteinAdherence7d:
+        data.nutrition_adherence != null
+          ? Number(data.nutrition_adherence)
+          : (nutri.proteinAdherence7d ?? null),
+      mealsLogged7d: Number(nutri.mealsLogged7d ?? 0),
+      weightTrendKg7d: nutri.weightTrendKg7d ?? null,
+      latestWeightKg: nutri.latestWeightKg ?? null,
+    },
+    recovery: {
+      recoveryScore:
+        data.recovery_score != null ? Number(data.recovery_score) : (rec.recoveryScore ?? null),
+      sleepAvg7d: rec.sleepAvg7d ?? null,
+      fatigueSignal: rec.fatigueSignal === true,
+    },
+    supplements: {
+      routineIds: [],
+      adherence30d: null,
+      restockEstimates:
+        (data.restock_estimates as Customer360["supplements"]["restockEstimates"]) ?? {},
+    },
+    behavior: {
+      workoutsCompleted: Number(beh.workoutsCompleted ?? 0),
+      mealsLogged: Number(beh.mealsLogged ?? 0),
+      weightLogs: Number(beh.weightLogs ?? 0),
+      supplementDays: Number(beh.supplementDays ?? 0),
+      coachMessages: Number(beh.coachMessages ?? 0),
+      streak: Number(beh.streak ?? 0),
+    },
+    goals: {
+      currentGoal: (data.current_goal as Customer360["goals"]["currentGoal"]) ?? null,
+      level: (data.performance_level as Customer360["goals"]["level"]) ?? null,
+      daysPerWeek: null,
+      source: data.current_goal ? "profile" : "none",
+    },
+  };
+}

@@ -12,16 +12,22 @@ const MAX_AGE_SEC = 60 * 60 * 24 * 400; // ~400 days
 export type AccessSessionPayload = {
   email: string;
   tier: "base" | "performance";
+  /** App user id (public.users) when known */
+  userId?: string;
   exp: number;
 };
 
 function secret(): string {
-  return (
+  const s =
     process.env["ACCESS_SESSION_SECRET"] ||
     process.env["SHOPIFY_WEBHOOK_SECRET"] ||
-    process.env["OPENAI_API_KEY"] ||
-    "dev-only-change-me"
-  );
+    "";
+  if (s) return s;
+  if (process.env["NODE_ENV"] === "production") {
+    console.error("ACCESS_SESSION_SECRET missing in production");
+  }
+  // Dev-only fallback — never reuse API keys as signing secrets
+  return "dev-only-change-me";
 }
 
 function b64url(buf: Buffer | string) {
@@ -39,6 +45,7 @@ export function encodeAccessToken(payload: Omit<AccessSessionPayload, "exp"> & {
     tier: payload.tier === "performance" ? "performance" : "base",
     exp: payload.exp ?? Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
   };
+  if (payload.userId) body.userId = payload.userId;
   const data = b64url(JSON.stringify(body));
   const sig = signRaw(data);
   return `${data}.${sig}`;
@@ -63,6 +70,7 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
       email: String(json.email).toLowerCase(),
       tier: json.tier === "performance" ? "performance" : "base",
       exp: Number(json.exp),
+      ...(typeof json.userId === "string" && json.userId.length >= 8 ? { userId: json.userId } : {}),
     };
   } catch {
     return null;

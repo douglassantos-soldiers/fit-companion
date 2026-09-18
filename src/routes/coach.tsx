@@ -9,6 +9,7 @@ import { askAiCoach } from "@/lib/coach.functions";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
 import { coachSystemPrompt } from "@/lib/engine/coach-context";
 import { useStore } from "@/lib/store";
+import { getDeviceId } from "@/lib/sync";
 import type { AppState, ChatMessage } from "@/lib/types";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -104,6 +105,10 @@ function CoachPage() {
     } catch (e) {
       console.warn("askAiCoach failed", e);
       return { text: offlineReply, offline: true as const, reason: "upstream" };
+    } finally {
+      void import("@/lib/outcome").then(({ trackOutcome }) =>
+        trackOutcome(getDeviceId(), "coach_interaction", { offline: false }),
+      );
     }
   };
 

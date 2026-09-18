@@ -88,11 +88,19 @@ export async function createAnonymousUser(): Promise<AppUser | null> {
   };
 }
 
-/** Attach device to user; if device exists under another user and email merge applies, re-link. */
-export async function attachDevice(opts: {
+/**
+ * Attach device to user.
+ * Safe by default: will not steal a device already owned by a different email user.
+ * Use allowReassignFromAnonymous when merging Shopify email onto an anon device.
+ */
+export async function attachDeviceSafe(opts: {
   deviceId: string;
   userId: string;
   platform?: string;
+  /** Allow re-link when current owner has no email (anonymous). */
+  allowReassignFromAnonymous?: boolean;
+  /** Force re-link (only after verified email ownership of both sides). */
+  force?: boolean;
 }): Promise<{ userId: string; deviceId: string } | null> {
   const db = await adminDb();
   if (!db) return null;
@@ -106,6 +114,23 @@ export async function attachDevice(opts: {
     .maybeSingle();
 
   if (existing) {
+    const currentOwnerId = existing.user_id as string;
+    if (currentOwnerId !== opts.userId) {
+      if (!opts.force) {
+        const { data: owner } = await db
+          .from("users")
+          .select("email")
+          .eq("id", currentOwnerId)
+          .maybeSingle();
+        const ownerEmail = (owner?.email as string | null) ?? null;
+        const canReassign =
+          opts.allowReassignFromAnonymous === true && (!ownerEmail || !ownerEmail.includes("@"));
+        if (!canReassign) {
+          console.warn("attachDeviceSafe blocked reassign", { deviceId, currentOwnerId });
+          return { userId: currentOwnerId, deviceId };
+        }
+      }
+    }
     await db
       .from("devices")
       .update({
@@ -127,10 +152,19 @@ export async function attachDevice(opts: {
   });
 
   if (error) {
-    console.error("attachDevice failed", error);
+    console.error("attachDeviceSafe failed", error);
     return null;
   }
   return { userId: opts.userId, deviceId };
+}
+
+/** @deprecated Prefer attachDeviceSafe */
+export async function attachDevice(opts: {
+  deviceId: string;
+  userId: string;
+  platform?: string;
+}): Promise<{ userId: string; deviceId: string } | null> {
+  return attachDeviceSafe({ ...opts, allowReassignFromAnonymous: true });
 }
 
 /** Ensure device has a user; creates anonymous user if needed. */
@@ -181,7 +215,7 @@ export async function ensureUserForDevice(
 
   const user = await createAnonymousUser();
   if (!user) return null;
-  await attachDevice({ deviceId: id, userId: user.id, platform });
+  await attachDeviceSafe({ deviceId: id, userId: user.id, platform, allowReassignFromAnonymous: true });
   return user;
 }
 
@@ -238,7 +272,11 @@ export async function linkDeviceToShopifyUser(opts: {
   if (!user) return null;
 
   if (opts.deviceId) {
-    await attachDevice({ deviceId: opts.deviceId, userId: user.id });
+    await attachDeviceSafe({
+      deviceId: opts.deviceId,
+      userId: user.id,
+      allowReassignFromAnonymous: true,
+    });
     // Stamp user_id on domain rows for this device (best-effort)
     await stampUserIdOnDeviceRows(opts.deviceId, user.id);
   }
@@ -276,6 +314,44 @@ async function stampUserIdOnDeviceRows(deviceId: string, userId: string): Promis
       }
     }),
   );
+}
+
+/** Bind Supabase Auth UUID to public.users.auth_user_id for the given app user. */
+export async function linkAuthUserId(opts: {
+  userId: string;
+  authUserId: string;
+}): Promise<boolean> {
+  const db = await adminDb();
+  if (!db) return false;
+  const userId = opts.userId.trim();
+  const authUserId = opts.authUserId.trim();
+  if (!userId || !authUserId) return false;
+
+  // Clear previous binding if auth uuid already linked elsewhere
+  await db
+    .from("users")
+    .update({ auth_user_id: null, updated_at: nowIso() })
+    .eq("auth_user_id", authUserId)
+    .neq("id", userId);
+
+  const { error } = await db
+    .from("users")
+    .update({ auth_user_id: authUserId, updated_at: nowIso() })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("linkAuthUserId failed", error);
+    return false;
+  }
+  return true;
+}
+
+/** List device_ids belonging to a user (for multi-device pull). */
+export async function listDeviceIdsForUser(userId: string): Promise<string[]> {
+  const db = await adminDb();
+  if (!db) return [];
+  const { data } = await db.from("devices").select("device_id").eq("user_id", userId);
+  return (data ?? []).map((r) => String(r.device_id)).filter(Boolean);
 }
 
 export async function findUserByShopifyCustomerId(
