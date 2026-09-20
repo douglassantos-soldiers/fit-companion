@@ -22,6 +22,15 @@ export const REASON_CODES = [
   "escalate_care",
   "pain_signal",
   "high_stress",
+  "plateau_detected",
+  "progression_ready",
+  "low_muscle_fatigue",
+  "excessive_muscle_load",
+  "undertrained_muscle",
+  "pr_opportunity",
+  "nutrition_adherence_low",
+  "weekend_adherence_pattern",
+  "express_high_adherence",
 ] as const;
 
 export type ReasonCode = (typeof REASON_CODES)[number];
@@ -101,8 +110,8 @@ export const REASON_CODE_META: Record<
     direction: "risk",
   },
   restock_risk: {
-    label: "Risco de reposição",
-    fragment: "há risco de acabar suplemento",
+    label: "Estoque estimado baixo",
+    fragment: "o estoque estimado de suplemento está chegando ao fim",
     direction: "risk",
   },
   escalate_care: {
@@ -120,6 +129,67 @@ export const REASON_CODE_META: Record<
     fragment: "seu estresse está no máximo",
     direction: "risk",
   },
+  plateau_detected: {
+    label: "Plateau",
+    fragment: "há plateau em exercícios-chave",
+    direction: "risk",
+  },
+  progression_ready: {
+    label: "Pronto para progressão",
+    fragment: "há espaço para progressão de carga",
+    direction: "up",
+  },
+  low_muscle_fatigue: {
+    label: "Baixa fadiga muscular",
+    fragment: "a fadiga muscular está baixa",
+    direction: "up",
+  },
+  excessive_muscle_load: {
+    label: "Carga muscular alta",
+    fragment: "a carga muscular recente está elevada",
+    direction: "risk",
+  },
+  undertrained_muscle: {
+    label: "Músculo subtreinados",
+    fragment: "há grupos musculares pouco estimulados",
+    direction: "risk",
+  },
+  pr_opportunity: {
+    label: "Oportunidade de PR",
+    fragment: "há oportunidade de PR próximo",
+    direction: "up",
+  },
+  nutrition_adherence_low: {
+    label: "Aderência nutricional baixa",
+    fragment: "a aderência nutricional está baixa",
+    direction: "down",
+  },
+  weekend_adherence_pattern: {
+    label: "Padrão de fim de semana",
+    fragment: "há um padrão de queda no fim de semana",
+    direction: "risk",
+  },
+  express_high_adherence: {
+    label: "Express com alta aderência",
+    fragment: "treinos curtos têm alta aderência para você",
+    direction: "up",
+  },
+};
+
+/** SCREAMING aliases for docs / Coach (SoT remains snake_case). */
+export const REASON_CODE_ALIASES: Record<string, ReasonCode> = {
+  LOW_SLEEP: "sleep_low",
+  HIGH_RPE_STREAK: "rpe_high",
+  LOW_RECOVERY: "recovery_low",
+  SHORT_AVAILABLE_TIME: "time_limited",
+  NO_EQUIPMENT: "equipment_limited",
+  PROGRESSION_READY: "progression_ready",
+  PLATEAU_DETECTED: "plateau_detected",
+  LOW_NUTRITION_ADHERENCE: "nutrition_adherence_low",
+  WEEKEND_ADHERENCE_PATTERN: "weekend_adherence_pattern",
+  EXPRESS_HIGH_ADHERENCE: "express_high_adherence",
+  MUSCLE_FATIGUE: "excessive_muscle_load",
+  MUSCLE_UNDERTRAINED: "undertrained_muscle",
 };
 
 export function isReasonCode(raw: string): raw is ReasonCode {

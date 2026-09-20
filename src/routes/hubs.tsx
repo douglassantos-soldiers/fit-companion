@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, Radio, Users } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, LoadingPulse } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { HUBS } from "@/data/hubs";
 import { listHubs, type Hub } from "@/lib/hubs";
@@ -38,15 +38,15 @@ function HubsListPage() {
   if (!hydrated) {
     return (
       <AppShell title="Hubs">
-        <div className="surface-glass h-40 animate-pulse" />
+        <LoadingPulse />
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Hubs" subtitle="Performance Hubs Soldiers">
+    <AppShell title="Hubs" subtitle="Hubs Soldiers">
       <header className="mb-6">
-        <p className="eyebrow">Creator OS</p>
+        <p className="eyebrow">Hub</p>
         <h2 className="mt-1 text-display text-3xl leading-none">Hubs</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Entre no hub, ative o desafio e compete por % de evolução — não por total bruto.

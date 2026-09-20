@@ -1,32 +1,41 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronRight, Medal, MessageSquare, Pill, RotateCcw, ShieldCheck, Trophy, Users } from "lucide-react";
+import { ChevronRight, Download, Medal, MessageSquare, Pill, RotateCcw, ShieldCheck, Trophy, Users } from "lucide-react";
 import { NumberInput } from "@mantine/core";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, LoadingPulse } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { ConfirmOverlay } from "@/components/confirm-overlay";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { challengeById } from "@/data/challenges";
+import { MetricRing } from "@/components/metric-ring";
+import { ProofCard } from "@/components/social/proof-card";
+import { challengeById, isPersonalizedChallenge, isRelativeChallenge } from "@/data/challenges";
 import { cosmeticById } from "@/lib/engine/rewards";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
+import { buildPerformanceProfile } from "@/lib/engine/performance-profile";
+import { buildProofOfPerformance } from "@/lib/engine/proof-of-performance";
+import { challengeProgress, trackEngagementEvent, uploadCheckinImage } from "@/lib/social";
 import {
   getAuthUser,
   linkAuthToSocial,
-  signInWithGoogle,
-  signInWithMagicLink,
   signOutAuth,
   watchAuth,
 } from "@/lib/auth";
 import { requestNotificationPermission } from "@/lib/notifications";
-import { DENY_MSG, verifyShopifyPurchase } from "@/lib/shopify.functions";
+import { completeAccountAccess } from "@/lib/access.functions";
+import { clearAccessSession } from "@/lib/access.functions";
+import { exportUserDataFn } from "@/lib/sync.functions";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
+import { ACCESS_PURCHASE_WINDOW_DAYS, formatAccessDate } from "@/lib/access-window";
+import { productById } from "@/data/products";
+import { ACHIEVEMENTS, achievementById } from "@/data/achievements";
+import { brandLevel } from "@/lib/engine/brand-level";
 import { GOAL_LABEL, LEVEL_LABEL } from "@/lib/types";
-import { trackEngagementEvent, uploadCheckinImage } from "@/lib/social";
-import { registerPushWorker } from "@/lib/push";
+import { registerPushWorker, subscribePush } from "@/lib/push";
 
 const ATALHOS = [
   { to: "/coach" as const, search: undefined, label: "Coach", hint: "Pergunte ao AI sobre treino e comida", icon: MessageSquare },
@@ -37,8 +46,8 @@ const ATALHOS = [
     hint: "Desafios, clubes e feed",
     icon: Users,
   },
-  { to: "/desafios" as const, search: undefined, label: "Desafios", hint: "Ranking e badges", icon: Trophy },
-  { to: "/suplementos" as const, search: undefined, label: "Suplementos", hint: "Rotina e doses do dia", icon: Pill },
+  { to: "/desafios" as const, search: { challenge: "consistencia-30-personal" }, label: "Desafios", hint: "Ranking e badges", icon: Trophy },
+  { to: "/nutricao" as const, search: { tab: "doses" as const }, label: "Suplementos", hint: "Rotina e doses do dia", icon: Pill },
 ];
 
 export const Route = createFileRoute("/perfil")({
@@ -62,21 +71,24 @@ function ProfilePage() {
     state,
     hydrated,
     reset,
+    clearAccountData,
     setTheme,
-    setShareProgress,
+    setSocialPrivacy,
     setSessionFx,
     setRemindersEnabled,
     setReminderHour,
+    setPushPrefs,
     setBio,
     setAvatarUrl,
     setAuthUserId,
     setAccessGranted,
   } = useStore();
-  const [email, setEmail] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
-  const [reverifyEmail, setReverifyEmail] = useState(state.accessEmail ?? "");
-  const [reverifyBusy, setReverifyBusy] = useState(false);
-  const verifyShopify = useServerFn(verifyShopifyPurchase);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [wipe, setWipe] = useState<null | "device" | "account">(null);
+  const completeAccess = useServerFn(completeAccountAccess);
+  const exportData = useServerFn(exportUserDataFn);
+  const clearCookie = useServerFn(clearAccessSession);
 
   useEffect(() => {
     void getAuthUser().then((u) => {
@@ -85,31 +97,53 @@ function ProfilePage() {
     return watchAuth((id) => setAuthUserId(id));
   }, [setAuthUserId]);
 
-  useEffect(() => {
-    if (state.accessEmail) setReverifyEmail(state.accessEmail);
-  }, [state.accessEmail]);
-
   if (!hydrated || !state.profile) {
     return (
       <AppShell title="Perfil">
-        <div className="surface-card h-40 animate-pulse" />
+        <LoadingPulse />
       </AppShell>
     );
   }
 
   const p = state.profile;
   const dims = performanceDimensions(state, p);
-  const badges = state.earnedBadges
+  const perfProfile = buildPerformanceProfile(state, p);
+  const proof = buildProofOfPerformance(state, 21);
+  const activeChallengeSummaries = (state.challenges ?? [])
+    .map((id) => {
+      const c = challengeById(id);
+      if (!c) return null;
+      const progress = challengeProgress(c, state.sessions, {
+        baseline: state.challengeBaselines?.[id],
+        personalTarget: state.challengePersonalTargets?.[id],
+        activityLogs: state.activityLogs,
+      });
+      return { challenge: c, progress };
+    })
+    .filter((x): x is NonNullable<typeof x> => Boolean(x))
+    .slice(0, 4);
+  const bestRelative = activeChallengeSummaries
+    .filter((x) => isRelativeChallenge(x.challenge) || isPersonalizedChallenge(x.challenge))
+    .sort((a, b) => b.progress.pct - a.progress.pct)[0];
+  const badges = ACHIEVEMENTS.map((a) => ({
+    ...a,
+    earned: (state.earnedBadges ?? []).includes(a.id),
+  }));
+  const extraBadges = (state.earnedBadges ?? [])
+    .filter((id) => !achievementById(id))
     .map((id) => challengeById(id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
   const cosmetics = (state.cosmeticBadges ?? [])
     .map((id) => cosmeticById(id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const brand = brandLevel(state);
 
   const rows: Array<[string, string]> = [
     ["Objetivo", GOAL_LABEL[p.goal]],
-    ["Nível", LEVEL_LABEL[p.level]],
+    ["Nível de treino", LEVEL_LABEL[p.level]],
+    ["Marca", `${brand.label} · Nv. ${brand.level}`],
     ["Dias por semana", `${p.daysPerWeek}`],
+    ["Tempo de sessão", `${p.typicalSessionMin ?? 60} min`],
     ["Onde treina", p.equipment === "casa" ? "Casa" : "Academia"],
     ["Idade", `${p.age} anos`],
     ["Altura", `${p.heightCm} cm`],
@@ -124,40 +158,73 @@ function ProfilePage() {
     void trackEngagementEvent(getDeviceId(), "auth_linked", { authUuid });
   };
 
-  const reverifyPurchase = async () => {
-    const trimmed = reverifyEmail.trim().toLowerCase();
-    if (!trimmed.includes("@")) {
-      toast.error("Informe um e-mail válido");
+  const refreshPurchase = async () => {
+    const user = await getAuthUser();
+    const email = user?.email ?? state.accessEmail;
+    if (!user || !email) {
+      toast.error("Entre na conta para reverificar");
       return;
     }
-    setReverifyBusy(true);
+    setAuthBusy(true);
     try {
-      const result = await verifyShopify({ data: { email: trimmed } });
+      const result = await completeAccess({
+        data: {
+          email,
+          deviceId: getDeviceId(),
+          authUserId: user.id,
+          displayName: p.name,
+          isNewUser: false,
+        },
+      });
       if (!result.ok) {
-        toast.error(
-          result.reason === "not_configured"
-            ? "Verificação indisponível"
-            : result.reason === "upstream"
-              ? "Loja indisponível agora"
-              : DENY_MSG,
-        );
+        toast.error("Compre para se manter ativo — janela de 40 dias.");
         return;
       }
       await setAccessGranted({
-        email: trimmed,
-        shopifyCustomerId: result.customerId,
+        email: result.email,
+        shopifyCustomerId: result.shopifyCustomerId,
         orderCount: result.orderCount,
         productIds: result.productIds,
-        accessTier: result.accessTier,
+        accessTier: result.tier,
         restockEstimates: result.restockEstimates,
+        lastPaidAt: result.lastPaidAt,
+        accessExpiresAt: result.accessExpiresAt,
+        shopifyDisplayName: result.shopifyDisplayName,
       });
       toast.success("Acesso confirmado");
     } catch {
       toast.error("Falha ao verificar");
     } finally {
-      setReverifyBusy(false);
+      setAuthBusy(false);
     }
   };
+
+  const downloadData = async () => {
+    setExportBusy(true);
+    try {
+      const result = await exportData({ data: { deviceId: getDeviceId() } });
+      if (!result.ok || !result.json) {
+        toast.error("Não foi possível exportar agora");
+        return;
+      }
+      const blob = new Blob([result.json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `soldiers-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Download iniciado");
+    } catch {
+      toast.error("Falha ao exportar");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const productNames = (state.purchaseProductIds ?? [])
+    .map((id) => productById(id)?.name ?? id)
+    .slice(0, 6);
 
   return (
     <AppShell
@@ -165,29 +232,67 @@ function ProfilePage() {
       subtitle={`Score ${performanceScore(dims)}/100 · streak de ${streak(state.sessions, { freezeUsedDates: state.freezeUsedDates })} dia(s)`}
     >
       <section className="surface-card mb-4 space-y-3 p-4">
-        <p className="eyebrow">Acesso Shopify</p>
-        <p className="text-sm text-muted-foreground">
-          {state.accessGranted
-            ? `Liberado com ${state.accessEmail ?? "e-mail da compra"} · plano ${state.accessTier === "performance" ? "Performance" : "Base"}`
-            : "Ainda sem compra verificada"}
+        <p className="eyebrow">Performance Profile</p>
+        <h2 className="text-display text-xl">Sua evolução</h2>
+        <p className="text-xs text-muted-foreground">{perfProfile.disclaimer}</p>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {perfProfile.indicators.map((ind) => (
+            <MetricRing
+              key={ind.key}
+              value={ind.score}
+              max={100}
+              label={ind.label}
+              unit={ind.levelLabel ? ind.levelLabel : undefined}
+              size="md"
+            />
+          ))}
+        </div>
+        {bestRelative ? (
+          <p className="text-xs text-muted-foreground">
+            Melhor evolução: {bestRelative.challenge.title} ·{" "}
+            {bestRelative.progress.pct >= 0 ? "+" : ""}
+            {bestRelative.progress.pct}%
+            {isPersonalizedChallenge(bestRelative.challenge) ? " da meta" : " vs baseline"}
+          </p>
+        ) : null}
+        {activeChallengeSummaries.length ? (
+          <ul className="space-y-1 border-t border-border/40 pt-3">
+            {activeChallengeSummaries.map(({ challenge, progress }) => (
+              <li key={challenge.id} className="flex justify-between text-xs">
+                <span className="truncate text-muted-foreground">{challenge.title}</span>
+                <span className="font-semibold tabular-nums">
+                  {isRelativeChallenge(challenge)
+                    ? `${progress.pct >= 0 ? "+" : ""}${progress.pct}%`
+                    : `${Math.round(progress.barPct)}%`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <ProofCard className="mb-4" proof={proof} name={p.name} state={state} />
+
+      <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conta</p>
+      <section className="surface-card mb-4 space-y-3 p-4">
+        <p className="eyebrow">Sua conta na loja</p>
+        <p className="text-sm font-semibold">
+          Conta {state.accessEmail ?? "—"}
+          {state.lastPurchaseAt
+            ? ` · última compra ${formatAccessDate(state.lastPurchaseAt)} · acesso até ${formatAccessDate(state.accessExpiresAt ?? state.lastPurchaseAt)}`
+            : ` · janela de ${ACCESS_PURCHASE_WINDOW_DAYS} dias`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {state.shopifyDisplayName ? `${state.shopifyDisplayName} · ` : ""}
+          plano {state.accessTier === "performance" ? "Performance" : "Base"}
+          {productNames.length ? ` · ${productNames.join(", ")}` : ""}
         </p>
         {state.cosmeticBadges?.includes("cliente-soldiers") ? (
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Cliente Soldiers</p>
         ) : null}
-        <Input
-          type="email"
-          value={reverifyEmail}
-          onChange={(e) => setReverifyEmail(e.target.value)}
-          placeholder="e-mail da compra"
-        />
-        <Button
-          variant="secondary"
-          className="w-full"
-          disabled={reverifyBusy}
-          onClick={() => void reverifyPurchase()}
-        >
+        <Button variant="secondary" className="w-full" disabled={authBusy} onClick={() => void refreshPurchase()}>
           <ShieldCheck className="size-4" />
-          {reverifyBusy ? "Verificando…" : "Trocar e-mail / reverificar"}
+          {authBusy ? "Verificando…" : "Atualizar compra"}
         </Button>
       </section>
 
@@ -203,7 +308,7 @@ function ProfilePage() {
           <div className="min-w-0 flex-1">
             <p className="font-semibold">{p.name}</p>
             <p className="text-xs text-muted-foreground">
-              {state.authUserId ? "Conta vinculada" : "Identidade local (device)"}
+              {state.authUserId ? `Conta ${state.accessEmail ?? "vinculada"}` : "Aparelho local"}
             </p>
           </div>
           <label className="cursor-pointer text-xs text-primary">
@@ -234,57 +339,28 @@ function ProfilePage() {
             onChange={(e) => setBio(e.target.value)}
           />
         </div>
-        {!state.authUserId ? (
-          <div className="space-y-2 border-t border-border pt-3">
-            <p className="text-xs text-muted-foreground">Vincule e-mail ou Google para não perder o progresso.</p>
-            <Input
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                disabled={authBusy || !email.includes("@")}
-                onClick={() => {
-                  setAuthBusy(true);
-                  void signInWithMagicLink(email)
-                    .then(() => toast.success("Link enviado — confira o e-mail"))
-                    .catch((e) => toast.error(e instanceof Error ? e.message : "Falha no login"))
-                    .finally(() => setAuthBusy(false));
-                }}
-              >
-                Magic link
-              </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                disabled={authBusy}
-                onClick={() => {
-                  setAuthBusy(true);
-                  void signInWithGoogle()
-                    .catch((e) => toast.error(e instanceof Error ? e.message : "OAuth indisponível"))
-                    .finally(() => setAuthBusy(false));
-                }}
-              >
-                Google
-              </Button>
-            </div>
-          </div>
-        ) : (
+        {state.authUserId ? (
           <Button
             variant="secondary"
             className="w-full"
             onClick={() => {
-              void signOutAuth().then(() => {
+              void signOutAuth().then(async () => {
                 setAuthUserId(null);
+                await clearCookie();
                 toast.success("Sessão encerrada");
               });
             }}
           >
-            Sair da conta
+            Sair
           </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Entre em{" "}
+            <Link to="/entrar" className="text-primary">
+              /entrar
+            </Link>{" "}
+            com e-mail e senha.
+          </p>
         )}
         <Button
           variant="outline"
@@ -294,17 +370,16 @@ function ProfilePage() {
               if (u) {
                 await bindAuth(u.id);
                 toast.success("Conta sincronizada");
-              } else toast.message("Faça login pelo link do e-mail primeiro");
+              } else toast.message("Entre com e-mail e senha primeiro");
             });
-            void registerPushWorker().then((ok) => {
-              if (ok) toast.success("Push worker registrado");
-            });
+            void registerPushWorker();
           }}
         >
-          Sincronizar conta + push
+          Sincronizar conta neste aparelho
         </Button>
       </section>
 
+      <p className="mt-6 mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preferências</p>
       <section className="mt-0">
         <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">Coach e Social</h2>
         <ul className="surface-glass divide-y divide-white/10">
@@ -326,14 +401,6 @@ function ProfilePage() {
           ))}
         </ul>
       </section>
-
-      <Link to="/admin" className="surface-glass mt-3 flex items-center justify-between px-5 py-3.5 text-sm">
-        <span>
-          <span className="block font-semibold">Admin CMS</span>
-          <span className="block text-xs text-muted-foreground">Treinos, vídeos e imagens</span>
-        </span>
-        <ChevronRight className="size-4 text-muted-foreground" />
-      </Link>
 
       <section className="surface-card mt-4 divide-y divide-border">
         {rows.map(([label, value]) => (
@@ -358,23 +425,55 @@ function ProfilePage() {
         />
       </section>
 
-      <section className="surface-card mt-4 flex items-center justify-between px-5 py-4">
+      <section className="surface-card mt-4 space-y-4 px-5 py-4">
         <div>
-          <Label htmlFor="share-progress" className="text-sm font-semibold">
-            Compartilhar progresso
-          </Label>
+          <p className="text-sm font-semibold">Privacidade social</p>
           <p className="text-xs text-muted-foreground">
-            Nome e progresso de desafios no ranking/feed. Peso e refeições nunca saem.
+            Peso e fotos começam privados. Peso não pode ser público; fotos no máximo amigos.
           </p>
         </div>
-        <Switch
-          id="share-progress"
-          checked={state.shareProgress !== false}
-          onCheckedChange={(checked) => {
-            setShareProgress(checked);
-            toast.success(checked ? "Progresso público ligado" : "Progresso público desligado");
-          }}
-        />
+        {(
+          [
+            ["profile", "Perfil", ["public", "friends", "private"]],
+            ["workouts", "Treinos", ["public", "friends", "private"]],
+            ["prs", "PRs", ["public", "friends", "private"]],
+            ["weight", "Peso", ["friends", "private"]],
+            ["photos", "Fotos", ["friends", "private"]],
+            ["nutrition", "Nutrição", ["friends", "private"]],
+          ] as const
+        ).map(([key, label, options]) => (
+          <div key={key} className="flex items-center justify-between gap-3">
+            <Label htmlFor={`privacy-${key}`} className="text-sm">
+              {label}
+            </Label>
+            <select
+              id={`privacy-${key}`}
+              className="rounded-lg border border-white/10 bg-background px-2 py-1 text-sm"
+              value={state.socialPrivacy?.[key] ?? (key === "weight" || key === "photos" || key === "nutrition" ? "private" : "public")}
+              onChange={(e) => {
+                const next = {
+                  ...(state.socialPrivacy ?? {
+                    profile: "public",
+                    workouts: "public",
+                    prs: "public",
+                    weight: "private",
+                    photos: "private",
+                    nutrition: "private",
+                  }),
+                  [key]: e.target.value,
+                };
+                setSocialPrivacy(next);
+                toast.success("Privacidade atualizada");
+              }}
+            >
+              {options.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt === "public" ? "Público" : opt === "friends" ? "Amigos" : "Privado"}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
       </section>
 
       <section className="surface-card mt-4 flex items-center justify-between px-5 py-4">
@@ -400,10 +499,11 @@ function ProfilePage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <Label htmlFor="reminders" className="text-sm font-semibold">
-              Lembretes do dia
+              Notificações
             </Label>
             <p className="text-xs text-muted-foreground">
-              Notificação local na hora do treino, streak e meta de XP.
+              Web Push no servidor (teto 3/dia). Silêncio 22h–7h (Brasília). Local se VAPID não estiver
+              configurado.
             </p>
           </div>
           <Switch
@@ -414,8 +514,8 @@ function ProfilePage() {
                 void requestNotificationPermission().then((perm) => {
                   if (perm === "granted") {
                     setRemindersEnabled(true);
-                    void registerPushWorker();
-                    toast.success("Lembretes ligados");
+                    void registerPushWorker().then(() => subscribePush());
+                    toast.success("Notificações ligadas");
                   } else if (perm === "unsupported") {
                     toast.error("Notificações não suportadas neste aparelho");
                   } else {
@@ -424,49 +524,77 @@ function ProfilePage() {
                 });
               } else {
                 setRemindersEnabled(false);
-                toast.success("Lembretes desligados");
+                toast.success("Notificações desligadas");
               }
             }}
           />
         </div>
         {state.remindersEnabled ? (
-          <NumberInput
-            label="Horário (0–23)"
-            value={state.reminderHour ?? 18}
-            onChange={(v) => setReminderHour(typeof v === "number" ? v : 18)}
-            min={6}
-            max={22}
-            step={1}
-            clampBehavior="strict"
-          />
+          <>
+            <NumberInput
+              label="Horário do treino (0–23)"
+              value={state.reminderHour ?? 18}
+              onChange={(v) => setReminderHour(typeof v === "number" ? v : 18)}
+              min={6}
+              max={22}
+              step={1}
+              clampBehavior="strict"
+            />
+            {(
+              [
+                ["workout", "Treino do dia"],
+                ["streak", "Sequência em risco"],
+                ["challenge", "Desafio"],
+                ["kudos", "Kudos"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between">
+                <Label className="text-sm">{label}</Label>
+                <Switch
+                  checked={state.pushPrefs?.[key] !== false}
+                  onCheckedChange={(on) => setPushPrefs({ [key]: on })}
+                />
+              </div>
+            ))}
+          </>
         ) : null}
       </section>
 
-      {badges.length > 0 || cosmetics.length > 0 ? (
-        <section className="surface-card mt-4 p-5">
-          <div className="flex items-center gap-2">
-            <Medal className="size-4 text-primary" />
-            <h2 className="text-lg">Conquistas</h2>
-          </div>
-          <ul className="mt-3 space-y-2">
-            {badges.map((b) => (
-              <li key={b.id} className="flex items-center gap-2 text-sm">
-                <Medal className="size-4 text-primary" />
-                <span>{b.title}</span>
-              </li>
-            ))}
-            {cosmetics.map((c) => (
-              <li key={c.id} className="flex items-center gap-2 text-sm">
-                <Medal className="size-4 text-amber-400" />
-                <span>
-                  {c.title}{" "}
-                  <span className="text-[0.65rem] uppercase text-muted-foreground">({c.rarity})</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <section className="surface-card mt-4 p-5">
+        <div className="flex items-center gap-2">
+          <Medal className="size-4 text-primary" />
+          <h2 className="text-lg">Conquistas</h2>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {badges.map((b) => (
+            <li
+              key={b.id}
+              className={`flex items-center gap-2 text-sm ${b.earned ? "" : "text-muted-foreground"}`}
+            >
+              <Medal className={`size-4 ${b.earned ? "text-primary" : "text-muted-foreground/50"}`} />
+              <span>
+                {b.emoji} {b.title}
+                {!b.earned ? <span className="ml-1 text-[0.65rem] uppercase">bloqueada</span> : null}
+              </span>
+            </li>
+          ))}
+          {extraBadges.map((b) => (
+            <li key={b.id} className="flex items-center gap-2 text-sm">
+              <Medal className="size-4 text-primary" />
+              <span>{b.title}</span>
+            </li>
+          ))}
+          {cosmetics.map((c) => (
+            <li key={c.id} className="flex items-center gap-2 text-sm">
+              <Medal className="size-4 text-amber-400" />
+              <span>
+                {c.title}{" "}
+                <span className="text-[0.65rem] uppercase text-muted-foreground">({c.rarity})</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="surface-card mt-4 grid grid-cols-3 gap-3 p-5 text-center">
         <Stat label="Treinos" value={state.sessions.length} />
@@ -478,27 +606,85 @@ function ProfilePage() {
         />
       </section>
 
-      <div className="mt-4 space-y-2">
-        <Button variant="secondary" className="h-12 w-full" onClick={() => navigate({ to: "/onboarding" })}>
-          Refazer meu perfil
+      <section className="surface-card mt-4 space-y-3 p-5">
+        <p className="eyebrow">Seus dados</p>
+        <p className="text-sm text-muted-foreground">
+          Baixe um JSON com perfil, treinos, pesos, refeições e eventos. Pedidos da loja Soldiers não saem
+          por aqui.
+        </p>
+        <Button
+          variant="secondary"
+          className="h-12 w-full"
+          disabled={exportBusy}
+          onClick={() => void downloadData()}
+        >
+          <Download className="size-4" /> {exportBusy ? "Preparando…" : "Baixar meus dados"}
+        </Button>
+      </section>
+
+      <p className="mt-6 mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-destructive">Perigo</p>
+      <section className="surface-card space-y-3 border-destructive/20 p-5">
+        <p className="text-sm text-muted-foreground">Ações irreversíveis neste aparelho ou na conta.</p>
+        <Button
+          variant="secondary"
+          className="h-12 w-full text-destructive"
+          onClick={() => setWipe("device")}
+        >
+          <RotateCcw className="size-4" /> Reiniciar dados deste aparelho
         </Button>
         <Button
           variant="secondary"
           className="h-12 w-full text-destructive"
-          onClick={() => {
-            if (window.confirm("Apagar todos os dados salvos neste aparelho?")) {
-              reset();
-              toast.success("Dados apagados");
-              navigate({ to: "/onboarding" });
-            }
-          }}
+          onClick={() => setWipe("account")}
         >
-          <RotateCcw className="size-4" /> Reiniciar dados
+          <RotateCcw className="size-4" /> Apagar dados da conta no servidor
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          <Link to="/termos" className="text-primary">
+            Termos
+          </Link>
+          {" · "}
+          <Link to="/privacidade" className="text-primary">
+            Privacidade
+          </Link>
+        </p>
+      </section>
+      <div className="mt-4 space-y-2">
+        <Button variant="secondary" className="h-12 w-full" onClick={() => navigate({ to: "/onboarding" })}>
+          Refazer meu perfil
         </Button>
       </div>
-      <p className="mt-4 text-xs text-muted-foreground">
-        Dados ficam no aparelho e sincronizam via Supabase. Conta opcional protege a identidade.
-      </p>
+      <ConfirmOverlay
+        open={wipe === "device"}
+        title="Reiniciar dados deste aparelho?"
+        description="Apaga o que está salvo neste aparelho. A conta no servidor permanece."
+        confirmLabel="Apagar neste aparelho"
+        destructive
+        onClose={() => setWipe(null)}
+        onConfirm={() => {
+          reset();
+          toast.success("Dados do aparelho apagados");
+          navigate({ to: "/onboarding" });
+        }}
+      />
+      <ConfirmOverlay
+        open={wipe === "account"}
+        title="Apagar dados da conta no servidor?"
+        description="Treinos, refeições e plano saem do servidor. Pedidos Shopify não são apagados."
+        confirmLabel="Apagar no servidor"
+        destructive
+        onClose={() => setWipe(null)}
+        onConfirm={() => {
+          void clearAccountData().then((r) => {
+            if (r.ok) {
+              toast.success("Dados da conta apagados");
+              navigate({ to: "/onboarding" });
+            } else {
+              toast.error(r.partial ? "Limpeza parcial — tente novamente" : "Falha ao apagar no servidor");
+            }
+          });
+        }}
+      />
     </AppShell>
   );
 }

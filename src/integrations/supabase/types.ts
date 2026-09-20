@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activity_events: {
@@ -23,6 +48,7 @@ export type Database = {
           kind: string
           kudos_count: number
           payload: Json
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -32,6 +58,7 @@ export type Database = {
           kind: string
           kudos_count?: number
           payload?: Json
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -41,8 +68,17 @@ export type Database = {
           kind?: string
           kudos_count?: number
           payload?: Json
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       activity_kudos: {
         Row: {
@@ -69,6 +105,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor: string
+          created_at: string
+          id: string
+          target: Json
+        }
+        Insert: {
+          action: string
+          actor?: string
+          created_at?: string
+          id?: string
+          target?: Json
+        }
+        Update: {
+          action?: string
+          actor?: string
+          created_at?: string
+          id?: string
+          target?: Json
+        }
+        Relationships: []
       }
       app_entitlement_emails: {
         Row: {
@@ -121,6 +181,7 @@ export type Database = {
           shopify_customer_id: string | null
           source: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           access_tier?: string
@@ -133,6 +194,7 @@ export type Database = {
           shopify_customer_id?: string | null
           source?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           access_tier?: string
@@ -145,8 +207,17 @@ export type Database = {
           shopify_customer_id?: string | null
           source?: string
           updated_at?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "app_entitlements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       app_state: {
         Row: {
@@ -154,34 +225,235 @@ export type Database = {
           chat: Json
           created_at: string
           device_id: string
+          id: string
           retention: Json
           supplement_routine: string[]
           updated_at: string
           user_id: string | null
+          version: number | null
         }
         Insert: {
           challenges?: string[]
           chat?: Json
           created_at?: string
           device_id: string
+          id?: string
           retention?: Json
           supplement_routine?: string[]
           updated_at?: string
           user_id?: string | null
+          version?: number | null
         }
         Update: {
           challenges?: string[]
           chat?: Json
           created_at?: string
           device_id?: string
+          id?: string
           retention?: Json
           supplement_routine?: string[]
           updated_at?: string
           user_id?: string | null
+          version?: number | null
         }
         Relationships: [
           {
             foreignKeyName: "app_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavior_experiments: {
+        Row: {
+          baseline: number
+          client_id: string | null
+          confidence: number
+          created_at: string
+          end_date: string
+          id: string
+          result: number | null
+          start_date: string
+          status: string
+          target: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          baseline?: number
+          client_id?: string | null
+          confidence?: number
+          created_at?: string
+          end_date: string
+          id?: string
+          result?: number | null
+          start_date: string
+          status?: string
+          target: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          baseline?: number
+          client_id?: string | null
+          confidence?: number
+          created_at?: string
+          end_date?: string
+          id?: string
+          result?: number | null
+          start_date?: string
+          status?: string
+          target?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_experiments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavior_interventions: {
+        Row: {
+          action: string
+          channel: string | null
+          confidence: number
+          created_at: string
+          expected_outcome: string
+          id: string
+          reason: string
+          status: string
+          trigger_key: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          channel?: string | null
+          confidence?: number
+          created_at?: string
+          expected_outcome?: string
+          id?: string
+          reason?: string
+          status?: string
+          trigger_key: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          channel?: string | null
+          confidence?: number
+          created_at?: string
+          expected_outcome?: string
+          id?: string
+          reason?: string
+          status?: string
+          trigger_key?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_interventions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavior_outcomes: {
+        Row: {
+          id: string
+          intervention_id: string | null
+          metrics: Json
+          observed_at: string
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          intervention_id?: string | null
+          metrics?: Json
+          observed_at?: string
+          success: boolean
+          user_id: string
+        }
+        Update: {
+          id?: string
+          intervention_id?: string | null
+          metrics?: Json
+          observed_at?: string
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_outcomes_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "behavior_interventions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "behavior_outcomes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      behavior_patterns: {
+        Row: {
+          confidence: number
+          description: string
+          evidence: Json
+          first_observed_at: string
+          id: string
+          key: string
+          last_observed_at: string
+          status: string
+          support_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          description?: string
+          evidence?: Json
+          first_observed_at?: string
+          id?: string
+          key: string
+          last_observed_at?: string
+          status?: string
+          support_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          description?: string
+          evidence?: Json
+          first_observed_at?: string
+          id?: string
+          key?: string
+          last_observed_at?: string
+          status?: string
+          support_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavior_patterns_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -194,45 +466,79 @@ export type Database = {
           challenge_id: string
           device_id: string
           joined_at: string
+          user_id: string | null
         }
         Insert: {
           challenge_id: string
           device_id: string
           joined_at?: string
+          user_id?: string | null
         }
         Update: {
           challenge_id?: string
           device_id?: string
           joined_at?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "challenge_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       challenge_progress: {
         Row: {
           baseline_value: number
           challenge_id: string
           device_id: string
+          fraud_flags: Json
           pct_value: number | null
+          personal_target: number | null
+          proof_source: string
+          proof_status: string
           updated_at: string
+          user_id: string | null
           value: number
         }
         Insert: {
           baseline_value?: number
           challenge_id: string
           device_id: string
+          fraud_flags?: Json
           pct_value?: number | null
+          personal_target?: number | null
+          proof_source?: string
+          proof_status?: string
           updated_at?: string
+          user_id?: string | null
           value?: number
         }
         Update: {
           baseline_value?: number
           challenge_id?: string
           device_id?: string
+          fraud_flags?: Json
           pct_value?: number | null
+          personal_target?: number | null
+          proof_source?: string
+          proof_status?: string
           updated_at?: string
+          user_id?: string | null
           value?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "challenge_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       club_league_weeks: {
         Row: {
@@ -271,16 +577,19 @@ export type Database = {
           club_id: string
           device_id: string
           joined_at: string
+          user_id: string | null
         }
         Insert: {
           club_id: string
           device_id: string
           joined_at?: string
+          user_id?: string | null
         }
         Update: {
           club_id?: string
           device_id?: string
           joined_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -288,6 +597,13 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -348,6 +664,165 @@ export type Database = {
         }
         Relationships: []
       }
+      cms_overrides: {
+        Row: {
+          entity_id: string
+          entity_type: string
+          id: string
+          media_url: string | null
+          note: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          entity_id: string
+          entity_type: string
+          id?: string
+          media_url?: string | null
+          note?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          media_url?: string | null
+          note?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
+      coach_memories: {
+        Row: {
+          confidence: number
+          created_at: string
+          id: string
+          key: string
+          kind: string
+          updated_at: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          key: string
+          kind: string
+          updated_at?: string
+          user_id: string
+          value?: Json
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          key?: string
+          kind?: string
+          updated_at?: string
+          user_id?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_memories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_proposals: {
+        Row: {
+          action: string
+          confidence: number
+          created_at: string
+          date: string
+          evidence: Json
+          id: string
+          reason_codes: string[]
+          status: string
+          type: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          action: string
+          confidence?: number
+          created_at?: string
+          date: string
+          evidence?: Json
+          id?: string
+          reason_codes?: string[]
+          status?: string
+          type: string
+          user_id: string
+          value?: Json
+        }
+        Update: {
+          action?: string
+          confidence?: number
+          created_at?: string
+          date?: string
+          evidence?: Json
+          id?: string
+          reason_codes?: string[]
+          status?: string
+          type?: string
+          user_id?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_proposals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_sessions: {
+        Row: {
+          client_id: string
+          id: string
+          message_count: number
+          started_at: string
+          summary: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          message_count?: number
+          started_at?: string
+          summary?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          message_count?: number
+          started_at?: string
+          summary?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_identities: {
         Row: {
           created_at: string
@@ -390,18 +865,22 @@ export type Database = {
         Row: {
           average_order_value: number | null
           current_goal: string | null
+          data_version: number | null
           estimated_ltv: number | null
           estimated_next_purchase: string | null
           favorite_categories: Json
           favorite_products: Json
           first_purchase_at: string | null
           last_purchase_at: string | null
+          last_recomputed_at: string | null
           metrics: Json
           nutrition_adherence: number | null
           performance_level: string | null
           purchase_frequency_days: number | null
           recovery_score: number | null
           restock_estimates: Json
+          shopify_customer_id: string | null
+          supplement_adherence: number | null
           total_orders: number
           total_spend: number
           training_frequency: number | null
@@ -411,18 +890,22 @@ export type Database = {
         Insert: {
           average_order_value?: number | null
           current_goal?: string | null
+          data_version?: number | null
           estimated_ltv?: number | null
           estimated_next_purchase?: string | null
           favorite_categories?: Json
           favorite_products?: Json
           first_purchase_at?: string | null
           last_purchase_at?: string | null
+          last_recomputed_at?: string | null
           metrics?: Json
           nutrition_adherence?: number | null
           performance_level?: string | null
           purchase_frequency_days?: number | null
           recovery_score?: number | null
           restock_estimates?: Json
+          shopify_customer_id?: string | null
+          supplement_adherence?: number | null
           total_orders?: number
           total_spend?: number
           training_frequency?: number | null
@@ -432,18 +915,22 @@ export type Database = {
         Update: {
           average_order_value?: number | null
           current_goal?: string | null
+          data_version?: number | null
           estimated_ltv?: number | null
           estimated_next_purchase?: string | null
           favorite_categories?: Json
           favorite_products?: Json
           first_purchase_at?: string | null
           last_purchase_at?: string | null
+          last_recomputed_at?: string | null
           metrics?: Json
           nutrition_adherence?: number | null
           performance_level?: string | null
           purchase_frequency_days?: number | null
           recovery_score?: number | null
           restock_estimates?: Json
+          shopify_customer_id?: string | null
+          supplement_adherence?: number | null
           total_orders?: number
           total_spend?: number
           training_frequency?: number | null
@@ -465,6 +952,7 @@ export type Database = {
           created_at: string
           date: string
           device_id: string
+          id: string
           meals: number
           updated_at: string
           user_id: string | null
@@ -474,6 +962,7 @@ export type Database = {
           created_at?: string
           date: string
           device_id: string
+          id?: string
           meals?: number
           updated_at?: string
           user_id?: string | null
@@ -483,6 +972,7 @@ export type Database = {
           created_at?: string
           date?: string
           device_id?: string
+          id?: string
           meals?: number
           updated_at?: string
           user_id?: string | null
@@ -491,6 +981,113 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "daily_metrics_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      day_checkins: {
+        Row: {
+          available_time: number | null
+          created_at: string
+          date: string
+          device_id: string | null
+          energy: string | null
+          equipment: string | null
+          id: string
+          notes: string | null
+          sleep: number | null
+          soreness: number | null
+          stress: number | null
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          available_time?: number | null
+          created_at?: string
+          date: string
+          device_id?: string | null
+          energy?: string | null
+          equipment?: string | null
+          id?: string
+          notes?: string | null
+          sleep?: number | null
+          soreness?: number | null
+          stress?: number | null
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          available_time?: number | null
+          created_at?: string
+          date?: string
+          device_id?: string | null
+          energy?: string | null
+          equipment?: string | null
+          id?: string
+          notes?: string | null
+          sleep?: number | null
+          soreness?: number | null
+          stress?: number | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_outcomes: {
+        Row: {
+          created_at: string
+          decision_id: string
+          id: string
+          metadata: Json
+          observed_at: string
+          outcome_type: string
+          user_id: string
+          value: Json | null
+        }
+        Insert: {
+          created_at?: string
+          decision_id: string
+          id?: string
+          metadata?: Json
+          observed_at?: string
+          outcome_type: string
+          user_id: string
+          value?: Json | null
+        }
+        Update: {
+          created_at?: string
+          decision_id?: string
+          id?: string
+          metadata?: Json
+          observed_at?: string
+          outcome_type?: string
+          user_id?: string
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_outcomes_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "recommendation_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_outcomes_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -571,6 +1168,215 @@ export type Database = {
           },
         ]
       }
+      exercise_performance: {
+        Row: {
+          best_reps: number
+          best_volume: number
+          best_weight: number
+          estimated_1rm: number
+          exercise_id: string
+          id: string
+          last_performed_at: string | null
+          recent_reps: number
+          recent_rpe: string | null
+          recent_weight: number
+          trend: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          best_reps?: number
+          best_volume?: number
+          best_weight?: number
+          estimated_1rm?: number
+          exercise_id: string
+          id?: string
+          last_performed_at?: string | null
+          recent_reps?: number
+          recent_rpe?: string | null
+          recent_weight?: number
+          trend?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          best_reps?: number
+          best_volume?: number
+          best_weight?: number
+          estimated_1rm?: number
+          exercise_id?: string
+          id?: string
+          last_performed_at?: string | null
+          recent_reps?: number
+          recent_rpe?: string | null
+          recent_weight?: number
+          trend?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_performance_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_preferences: {
+        Row: {
+          exercise_id: string
+          id: string
+          preference: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          exercise_id: string
+          id?: string
+          preference: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          exercise_id?: string
+          id?: string
+          preference?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      food_items: {
+        Row: {
+          active: boolean
+          brand: string | null
+          category: string
+          confidence: number
+          created_at: string
+          id: string
+          name: string
+          per100g: Json
+          serving_reference: string
+          source: string
+          synonyms: string[]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          brand?: string | null
+          category: string
+          confidence?: number
+          created_at?: string
+          id: string
+          name: string
+          per100g?: Json
+          serving_reference?: string
+          source?: string
+          synonyms?: string[]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          brand?: string | null
+          category?: string
+          confidence?: number
+          created_at?: string
+          id?: string
+          name?: string
+          per100g?: Json
+          serving_reference?: string
+          source?: string
+          synonyms?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      food_nutrients: {
+        Row: {
+          confidence: number
+          food_id: string
+          id: string
+          kind: string
+          nutrient_key: string
+          source: string
+          unit: string
+          value: number
+        }
+        Insert: {
+          confidence?: number
+          food_id: string
+          id?: string
+          kind?: string
+          nutrient_key: string
+          source?: string
+          unit: string
+          value: number
+        }
+        Update: {
+          confidence?: number
+          food_id?: string
+          id?: string
+          kind?: string
+          nutrient_key?: string
+          source?: string
+          unit?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_nutrients_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      food_servings: {
+        Row: {
+          food_id: string
+          grams_equivalent: number
+          id: string
+          is_default: boolean
+          label: string
+        }
+        Insert: {
+          food_id: string
+          grams_equivalent: number
+          id: string
+          is_default?: boolean
+          label: string
+        }
+        Update: {
+          food_id?: string
+          grams_equivalent?: number
+          id?: string
+          is_default?: boolean
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_servings_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       friend_quests: {
         Row: {
           club_id: string
@@ -581,6 +1387,8 @@ export type Database = {
           progress_a: number
           progress_b: number
           target: number
+          user_id_a: string | null
+          user_id_b: string | null
           week_start: string
         }
         Insert: {
@@ -592,6 +1400,8 @@ export type Database = {
           progress_a?: number
           progress_b?: number
           target?: number
+          user_id_a?: string | null
+          user_id_b?: string | null
           week_start: string
         }
         Update: {
@@ -603,6 +1413,8 @@ export type Database = {
           progress_a?: number
           progress_b?: number
           target?: number
+          user_id_a?: string | null
+          user_id_b?: string | null
           week_start?: string
         }
         Relationships: [
@@ -611,6 +1423,20 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "friend_quests_user_id_a_fkey"
+            columns: ["user_id_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "friend_quests_user_id_b_fkey"
+            columns: ["user_id_b"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -646,16 +1472,19 @@ export type Database = {
           device_id: string
           hub_id: string
           joined_at: string
+          user_id: string | null
         }
         Insert: {
           device_id: string
           hub_id: string
           joined_at?: string
+          user_id?: string | null
         }
         Update: {
           device_id?: string
           hub_id?: string
           joined_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -663,6 +1492,13 @@ export type Database = {
             columns: ["hub_id"]
             isOneToOne: false
             referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hub_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -711,6 +1547,7 @@ export type Database = {
           date: string
           device_id: string
           fat_g: number | null
+          fiber_g: number | null
           id: string
           kcal: number | null
           meal_type: string | null
@@ -719,6 +1556,7 @@ export type Database = {
           protein_g: number | null
           updated_at: string
           user_id: string | null
+          version: number
         }
         Insert: {
           carbs_g?: number | null
@@ -727,6 +1565,7 @@ export type Database = {
           date: string
           device_id: string
           fat_g?: number | null
+          fiber_g?: number | null
           id?: string
           kcal?: number | null
           meal_type?: string | null
@@ -735,6 +1574,7 @@ export type Database = {
           protein_g?: number | null
           updated_at?: string
           user_id?: string | null
+          version?: number
         }
         Update: {
           carbs_g?: number | null
@@ -743,6 +1583,7 @@ export type Database = {
           date?: string
           device_id?: string
           fat_g?: number | null
+          fiber_g?: number | null
           id?: string
           kcal?: number | null
           meal_type?: string | null
@@ -751,10 +1592,132 @@ export type Database = {
           protein_g?: number | null
           updated_at?: string
           user_id?: string | null
+          version?: number
         }
         Relationships: [
           {
             foreignKeyName: "meal_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_items: {
+        Row: {
+          client_id: string
+          confidence: number
+          created_at: string
+          device_id: string
+          food_id: string | null
+          food_name: string | null
+          grams: number
+          id: string
+          meal_client_id: string
+          nutrient_snapshot: Json
+          quantity: number
+          source: string
+          source_kind: string
+          unit: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          confidence?: number
+          created_at?: string
+          device_id?: string
+          food_id?: string | null
+          food_name?: string | null
+          grams?: number
+          id?: string
+          meal_client_id: string
+          nutrient_snapshot?: Json
+          quantity?: number
+          source?: string
+          source_kind?: string
+          unit?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          client_id?: string
+          confidence?: number
+          created_at?: string
+          device_id?: string
+          food_id?: string | null
+          food_name?: string | null
+          grams?: number
+          id?: string
+          meal_client_id?: string
+          nutrient_snapshot?: Json
+          quantity?: number
+          source?: string
+          source_kind?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      muscle_load_snapshots: {
+        Row: {
+          created_at: string
+          date: string
+          direct_sets: number
+          effective_sets: number
+          fatigue_contribution: number
+          id: string
+          indirect_sets: number
+          load_trend: string
+          muscle: string
+          rolling_28d: number
+          rolling_7d: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          direct_sets?: number
+          effective_sets?: number
+          fatigue_contribution?: number
+          id?: string
+          indirect_sets?: number
+          load_trend?: string
+          muscle: string
+          rolling_28d?: number
+          rolling_7d?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          direct_sets?: number
+          effective_sets?: number
+          fatigue_contribution?: number
+          id?: string
+          indirect_sets?: number
+          load_trend?: string
+          muscle?: string
+          rolling_28d?: number
+          rolling_7d?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "muscle_load_snapshots_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -865,6 +1828,53 @@ export type Database = {
           },
         ]
       }
+      personal_records: {
+        Row: {
+          achieved_at: string
+          created_at: string
+          exercise_id: string | null
+          id: string
+          label: string | null
+          pr_type: string
+          previous_value: number | null
+          session_id: string | null
+          user_id: string
+          value: number
+        }
+        Insert: {
+          achieved_at: string
+          created_at?: string
+          exercise_id?: string | null
+          id?: string
+          label?: string | null
+          pr_type: string
+          previous_value?: number | null
+          session_id?: string | null
+          user_id: string
+          value: number
+        }
+        Update: {
+          achieved_at?: string
+          created_at?: string
+          exercise_id?: string | null
+          id?: string
+          label?: string | null
+          pr_type?: string
+          previous_value?: number | null
+          session_id?: string | null
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age: number
@@ -874,11 +1884,15 @@ export type Database = {
           equipment: string
           goal: string
           height_cm: number
+          id: string
           level: string
           name: string
+          prefs: Json
           restrictions: string[]
+          timezone: string | null
           updated_at: string
           user_id: string | null
+          version: number
           weight_kg: number
         }
         Insert: {
@@ -889,11 +1903,15 @@ export type Database = {
           equipment?: string
           goal?: string
           height_cm?: number
+          id?: string
           level?: string
           name?: string
+          prefs?: Json
           restrictions?: string[]
+          timezone?: string | null
           updated_at?: string
           user_id?: string | null
+          version?: number
           weight_kg?: number
         }
         Update: {
@@ -904,16 +1922,157 @@ export type Database = {
           equipment?: string
           goal?: string
           height_cm?: number
+          id?: string
           level?: string
           name?: string
+          prefs?: Json
           restrictions?: string[]
+          timezone?: string | null
           updated_at?: string
           user_id?: string | null
+          version?: number
           weight_kg?: number
         }
         Relationships: [
           {
             foreignKeyName: "profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipe_items: {
+        Row: {
+          food_id: string
+          grams: number
+          id: string
+          quantity: number
+          recipe_id: string
+          unit: string
+        }
+        Insert: {
+          food_id: string
+          grams: number
+          id?: string
+          quantity: number
+          recipe_id: string
+          unit: string
+        }
+        Update: {
+          food_id?: string
+          grams?: number
+          id?: string
+          quantity?: number
+          recipe_id?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_items_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          cook_minutes: number | null
+          created_at: string
+          difficulty: string | null
+          id: string
+          name: string
+          prep_minutes: number | null
+          servings: number
+          source: string
+          tags: string[]
+          total_macros: Json
+        }
+        Insert: {
+          cook_minutes?: number | null
+          created_at?: string
+          difficulty?: string | null
+          id: string
+          name: string
+          prep_minutes?: number | null
+          servings?: number
+          source?: string
+          tags?: string[]
+          total_macros?: Json
+        }
+        Update: {
+          cook_minutes?: number | null
+          created_at?: string
+          difficulty?: string | null
+          id?: string
+          name?: string
+          prep_minutes?: number | null
+          servings?: number
+          source?: string
+          tags?: string[]
+          total_macros?: Json
+        }
+        Relationships: []
+      }
+      recommendation_decisions: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          date: string
+          decision_type: string
+          decision_value: Json
+          engine: string
+          evidence: Json
+          id: string
+          input_snapshot: Json
+          outcome: string | null
+          outcome_metrics: Json | null
+          reason_codes: string[]
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          date: string
+          decision_type: string
+          decision_value: Json
+          engine?: string
+          evidence?: Json
+          id?: string
+          input_snapshot?: Json
+          outcome?: string | null
+          outcome_metrics?: Json | null
+          reason_codes?: string[]
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          date?: string
+          decision_type?: string
+          decision_value?: Json
+          engine?: string
+          evidence?: Json
+          id?: string
+          input_snapshot?: Json
+          outcome?: string | null
+          outcome_metrics?: Json | null
+          reason_codes?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_decisions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -930,10 +2089,13 @@ export type Database = {
           device_id: string
           duration_min: number
           exercises: Json
+          express: boolean | null
           id: string
+          rpe: string | null
           title: string
           updated_at: string
           user_id: string | null
+          version: number
           volume_kg: number
         }
         Insert: {
@@ -944,10 +2106,13 @@ export type Database = {
           device_id: string
           duration_min?: number
           exercises?: Json
+          express?: boolean | null
           id?: string
+          rpe?: string | null
           title?: string
           updated_at?: string
           user_id?: string | null
+          version?: number
           volume_kg?: number
         }
         Update: {
@@ -958,10 +2123,13 @@ export type Database = {
           device_id?: string
           duration_min?: number
           exercises?: Json
+          express?: boolean | null
           id?: string
+          rpe?: string | null
           title?: string
           updated_at?: string
           user_id?: string | null
+          version?: number
           volume_kg?: number
         }
         Relationships: [
@@ -1021,6 +2189,7 @@ export type Database = {
       }
       social_profiles: {
         Row: {
+          app_user_id: string | null
           avatar_url: string | null
           bio: string | null
           device_id: string
@@ -1029,6 +2198,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          app_user_id?: string | null
           avatar_url?: string | null
           bio?: string | null
           device_id: string
@@ -1037,6 +2207,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          app_user_id?: string | null
           avatar_url?: string | null
           bio?: string | null
           device_id?: string
@@ -1044,13 +2215,141 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "social_profiles_app_user_id_fkey"
+            columns: ["app_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soldiers_media: {
+        Row: {
+          created_at: string
+          duration_sec: number | null
+          entity_id: string
+          gif_url: string | null
+          kind: string
+          license: string
+          mp4_url: string | null
+          needs_motion: boolean
+          ownership: string
+          poster_url: string | null
+          qa_notes: string | null
+          source: string
+          status: string
+          style: string
+          thumbnail_url: string | null
+          updated_at: string
+          version: string
+          webm_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_sec?: number | null
+          entity_id: string
+          gif_url?: string | null
+          kind: string
+          license?: string
+          mp4_url?: string | null
+          needs_motion?: boolean
+          ownership?: string
+          poster_url?: string | null
+          qa_notes?: string | null
+          source?: string
+          status?: string
+          style?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          version?: string
+          webm_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_sec?: number | null
+          entity_id?: string
+          gif_url?: string | null
+          kind?: string
+          license?: string
+          mp4_url?: string | null
+          needs_motion?: boolean
+          ownership?: string
+          poster_url?: string | null
+          qa_notes?: string | null
+          source?: string
+          status?: string
+          style?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          version?: string
+          webm_url?: string | null
+        }
         Relationships: []
+      }
+      supplement_dose_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          device_id: string | null
+          dose: number
+          frequency: string
+          id: string
+          product_id: string
+          source: string
+          taken_at: string
+          unit: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          device_id?: string | null
+          dose?: number
+          frequency?: string
+          id?: string
+          product_id: string
+          source?: string
+          taken_at?: string
+          unit?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          device_id?: string | null
+          dose?: number
+          frequency?: string
+          id?: string
+          product_id?: string
+          source?: string
+          taken_at?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplement_dose_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplement_logs: {
         Row: {
           created_at: string
           date: string
           device_id: string
+          id: string
           supplement_ids: string[]
           updated_at: string
           user_id: string | null
@@ -1059,6 +2358,7 @@ export type Database = {
           created_at?: string
           date: string
           device_id: string
+          id?: string
           supplement_ids?: string[]
           updated_at?: string
           user_id?: string | null
@@ -1067,6 +2367,7 @@ export type Database = {
           created_at?: string
           date?: string
           device_id?: string
+          id?: string
           supplement_ids?: string[]
           updated_at?: string
           user_id?: string | null
@@ -1085,9 +2386,12 @@ export type Database = {
         Row: {
           created_at: string
           device_id: string | null
+          entity_id: string | null
+          entity_type: string | null
           event_id: string
           event_type: string
           idempotency_key: string | null
+          metadata: Json
           occurred_at: string
           payload: Json
           source: string
@@ -1096,9 +2400,12 @@ export type Database = {
         Insert: {
           created_at?: string
           device_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
           event_id?: string
           event_type: string
           idempotency_key?: string | null
+          metadata?: Json
           occurred_at?: string
           payload?: Json
           source?: string
@@ -1107,9 +2414,12 @@ export type Database = {
         Update: {
           created_at?: string
           device_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
           event_id?: string
           event_type?: string
           idempotency_key?: string | null
+          metadata?: Json
           occurred_at?: string
           payload?: Json
           source?: string
@@ -1157,6 +2467,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -1164,6 +2475,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -1171,6 +2483,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1180,6 +2493,7 @@ export type Database = {
           created_at: string
           date: string
           device_id: string
+          id: string
           updated_at: string
           user_id: string | null
           weight_kg: number
@@ -1188,6 +2502,7 @@ export type Database = {
           created_at?: string
           date: string
           device_id: string
+          id?: string
           updated_at?: string
           user_id?: string | null
           weight_kg: number
@@ -1196,6 +2511,7 @@ export type Database = {
           created_at?: string
           date?: string
           device_id?: string
+          id?: string
           updated_at?: string
           user_id?: string | null
           weight_kg?: number
@@ -1344,7 +2660,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

@@ -9,15 +9,33 @@ import {
   type AppState,
   type ChatMessage,
   type DayCheckIn,
+  type DoseFrequency,
+  type DoseSource,
+  type DoseUnit,
   type Equipment,
   type ExerciseLog,
   type Goal,
+  type FocusMuscle,
+  type GymGear,
   type Level,
   type MealEntry,
-  type MealQuality,
-  type MealSlot,
+  type NutritionProfile,
+  type PrimaryBlocker,
+  type LivingPlanFeedback,
+  type Profile,
+  type ProgressPhotoEntry,
   type SessionRpe,
+  type SupplementDoseLog,
 } from "@/lib/types";
+import { mapMealEntryRow, mealEntryToDbPayload, mealItemsToRows } from "@/lib/sync/meal-map";
+import {
+  mapMeasurementRow,
+  mapPhotoRow,
+  measurementToRow,
+  mergeMeasurementsByDate,
+  mergeProgressPhotos,
+} from "@/lib/progress/body";
+import { normalizeSocialPrivacy } from "@/lib/social/visibility";
 
 function retentionFromRow(raw: unknown): Partial<AppState> {
   if (!raw || typeof raw !== "object") {
@@ -44,8 +62,17 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       routineFromPurchaseDismissed: false,
       upsellShownDate: null,
       challengeBaselines: {},
+      challengePersonalTargets: {},
+      activityLogs: [],
       joinedHubIds: [],
       dayCheckIns: {},
+      supplementDoseLogs: [],
+      supplementFrequencies: {},
+      earnedBadges: [],
+      livingPlanFeedback: {},
+      challengeInvitesSent: 0,
+      coachNudgeDismissedAt: null,
+      coachNudgeShownAt: null,
     };
   }
   const r = raw as Record<string, unknown>;
@@ -65,6 +92,9 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     accessGranted: r["accessGranted"] === true,
     accessEmail: typeof r["accessEmail"] === "string" ? r["accessEmail"] : null,
     accessGrantedAt: typeof r["accessGrantedAt"] === "string" ? r["accessGrantedAt"] : null,
+    lastPurchaseAt: typeof r["lastPurchaseAt"] === "string" ? r["lastPurchaseAt"] : null,
+    accessExpiresAt: typeof r["accessExpiresAt"] === "string" ? r["accessExpiresAt"] : null,
+    shopifyDisplayName: typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
     accessTier: r["accessTier"] === "performance" ? "performance" : "base",
     purchaseProductIds: Array.isArray(r["purchaseProductIds"]) ? (r["purchaseProductIds"] as string[]) : [],
     restockEstimates:
@@ -78,11 +108,60 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       r["challengeBaselines"] && typeof r["challengeBaselines"] === "object"
         ? (r["challengeBaselines"] as Record<string, number>)
         : {},
+    challengePersonalTargets:
+      r["challengePersonalTargets"] && typeof r["challengePersonalTargets"] === "object"
+        ? (r["challengePersonalTargets"] as Record<string, number>)
+        : {},
+    activityLogs: Array.isArray(r["activityLogs"])
+      ? (r["activityLogs"] as AppState["activityLogs"])
+      : [],
     joinedHubIds: Array.isArray(r["joinedHubIds"]) ? (r["joinedHubIds"] as string[]) : [],
     dayCheckIns:
       r["dayCheckIns"] && typeof r["dayCheckIns"] === "object"
         ? (r["dayCheckIns"] as Record<string, DayCheckIn>)
         : {},
+    supplementDoseLogs: Array.isArray(r["supplementDoseLogs"])
+      ? (r["supplementDoseLogs"] as SupplementDoseLog[])
+      : [],
+    supplementFrequencies:
+      r["supplementFrequencies"] && typeof r["supplementFrequencies"] === "object"
+        ? (r["supplementFrequencies"] as Record<string, DoseFrequency>)
+        : {},
+    likedExerciseIds: Array.isArray(r["likedExerciseIds"]) ? (r["likedExerciseIds"] as string[]) : [],
+    dislikedExerciseIds: Array.isArray(r["dislikedExerciseIds"])
+      ? (r["dislikedExerciseIds"] as string[])
+      : [],
+    exercisePreferences:
+      r["exercisePreferences"] && typeof r["exercisePreferences"] === "object"
+        ? (r["exercisePreferences"] as AppState["exercisePreferences"])
+        : {},
+    reminderHour: typeof r["reminderHour"] === "number" ? r["reminderHour"] : 18,
+    ...(r["pushPrefs"] && typeof r["pushPrefs"] === "object"
+      ? { pushPrefs: r["pushPrefs"] as AppState["pushPrefs"] }
+      : {}),
+    termsAcceptedAt: typeof r["termsAcceptedAt"] === "string" ? r["termsAcceptedAt"] : null,
+    privacyAcceptedAt: typeof r["privacyAcceptedAt"] === "string" ? r["privacyAcceptedAt"] : null,
+    healthPurposeAckAt: typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
+    remindersEnabled: r["remindersEnabled"] === true,
+    earnedBadges: Array.isArray(r["earnedBadges"]) ? (r["earnedBadges"] as string[]) : [],
+    socialPrivacy: normalizeSocialPrivacy(r["socialPrivacy"], true),
+    livingPlanFeedback:
+      r["livingPlanFeedback"] && typeof r["livingPlanFeedback"] === "object"
+        ? (r["livingPlanFeedback"] as Record<string, LivingPlanFeedback>)
+        : {},
+    challengeInvitesSent:
+      typeof r["challengeInvitesSent"] === "number" ? r["challengeInvitesSent"] : 0,
+    coachNudgeDismissedAt:
+      typeof r["coachNudgeDismissedAt"] === "string" ? r["coachNudgeDismissedAt"] : null,
+    coachNudgeShownAt: typeof r["coachNudgeShownAt"] === "string" ? r["coachNudgeShownAt"] : null,
+    favoriteMealPresetIds: Array.isArray(r["favoriteMealPresetIds"])
+      ? (r["favoriteMealPresetIds"] as string[])
+      : [],
+    savedMeals: Array.isArray(r["savedMeals"]) ? (r["savedMeals"] as AppState["savedMeals"]) : [],
+    wearableConnections: Array.isArray(r["wearableConnections"])
+      ? (r["wearableConnections"] as AppState["wearableConnections"])
+      : [],
+    lastFraudWarning: typeof r["lastFraudWarning"] === "string" ? r["lastFraudWarning"] : null,
   };
 }
 
@@ -103,6 +182,9 @@ function retentionPayload(state: AppState) {
     accessGranted: state.accessGranted === true,
     accessEmail: state.accessEmail ?? null,
     accessGrantedAt: state.accessGrantedAt ?? null,
+    lastPurchaseAt: state.lastPurchaseAt ?? null,
+    accessExpiresAt: state.accessExpiresAt ?? null,
+    shopifyDisplayName: state.shopifyDisplayName ?? null,
     accessTier: state.accessTier ?? "base",
     purchaseProductIds: state.purchaseProductIds ?? [],
     restockEstimates: state.restockEstimates ?? {},
@@ -110,29 +192,90 @@ function retentionPayload(state: AppState) {
     routineFromPurchaseDismissed: state.routineFromPurchaseDismissed === true,
     upsellShownDate: state.upsellShownDate ?? null,
     challengeBaselines: state.challengeBaselines ?? {},
+    challengePersonalTargets: state.challengePersonalTargets ?? {},
+    activityLogs: state.activityLogs ?? [],
     joinedHubIds: state.joinedHubIds ?? [],
     dayCheckIns: state.dayCheckIns ?? {},
+    supplementDoseLogs: state.supplementDoseLogs ?? [],
+    supplementFrequencies: state.supplementFrequencies ?? {},
+    likedExerciseIds: state.likedExerciseIds ?? [],
+    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+    exercisePreferences: state.exercisePreferences ?? {},
+    earnedBadges: state.earnedBadges ?? [],
+    livingPlanFeedback: state.livingPlanFeedback ?? {},
+    challengeInvitesSent: state.challengeInvitesSent ?? 0,
+    coachNudgeDismissedAt: state.coachNudgeDismissedAt ?? null,
+    coachNudgeShownAt: state.coachNudgeShownAt ?? null,
+    reminderHour: state.reminderHour ?? 18,
+    remindersEnabled: state.remindersEnabled === true,
+    pushPrefs: state.pushPrefs ?? { workout: true, streak: true, challenge: true, kudos: true },
+    termsAcceptedAt: state.termsAcceptedAt ?? null,
+    privacyAcceptedAt: state.privacyAcceptedAt ?? null,
+    healthPurposeAckAt: state.healthPurposeAckAt ?? null,
+    socialPrivacy: state.socialPrivacy,
+    favoriteMealPresetIds: state.favoriteMealPresetIds ?? [],
+    savedMeals: state.savedMeals ?? [],
+    wearableConnections: state.wearableConnections ?? [],
+    lastFraudWarning: state.lastFraudWarning ?? null,
   };
 }
 
 type Row = Record<string, unknown>;
 
 function mapMeals(rows: Row[]): MealEntry[] {
-  return rows.map((row) => {
-    const payload = (row["payload"] as Record<string, unknown> | null) ?? {};
-    const entry: MealEntry = {
-      id: String(row["client_id"] || row["id"] || crypto.randomUUID()),
-      date: String(row["date"] ?? ""),
-      slot: (payload["slot"] as MealSlot) || ((row["meal_type"] as MealSlot) ?? "almoco"),
-      label: String(row["name"] || payload["label"] || "Refeição"),
-      proteinG: Number(row["protein_g"] ?? payload["proteinG"] ?? 0),
-      kcal: Number(row["kcal"] ?? payload["kcal"] ?? 0),
-      quality: (payload["quality"] as MealQuality) ?? "ok",
-    };
-    if (typeof payload["presetId"] === "string") entry.presetId = payload["presetId"];
-    if (typeof payload["servings"] === "number") entry.servings = payload["servings"];
-    return entry;
-  });
+  return rows.map(mapMealEntryRow);
+}
+
+function mapDoseLogs(rows: Row[]): SupplementDoseLog[] {
+  return rows.map((row) => ({
+    id: String(row["client_id"] || row["id"] || crypto.randomUUID()),
+    productId: String(row["product_id"] ?? ""),
+    dose: Number(row["dose"] ?? 1),
+    unit: (row["unit"] as DoseUnit) || "serving",
+    frequency: (row["frequency"] as DoseFrequency) || "1x_day",
+    takenAt: String(row["taken_at"] ?? new Date().toISOString()),
+    source: (row["source"] as DoseSource) || "manual",
+    version: typeof row["version"] === "number" ? row["version"] : 1,
+  }));
+}
+
+function profilePrefsFromRow(prefs: unknown): Partial<
+  Pick<
+    Profile,
+    | "skipBreakfast"
+    | "lunchOutOften"
+    | "typicalSleepHours"
+    | "primaryBlocker"
+    | "nutritionProfile"
+    | "trainingWeekdays"
+    | "focusMuscles"
+    | "equipmentInventory"
+    | "typicalSessionMin"
+    | "onboardingComplete"
+  >
+> {
+  if (!prefs || typeof prefs !== "object") return {};
+  const p = prefs as Record<string, unknown>;
+  const out: ReturnType<typeof profilePrefsFromRow> = {};
+  if (p["skipBreakfast"] === true) out.skipBreakfast = true;
+  if (p["lunchOutOften"] === true) out.lunchOutOften = true;
+  if (typeof p["typicalSleepHours"] === "number") out.typicalSleepHours = p["typicalSleepHours"];
+  if (typeof p["primaryBlocker"] === "string") out.primaryBlocker = p["primaryBlocker"] as PrimaryBlocker;
+  if (p["nutritionProfile"] && typeof p["nutritionProfile"] === "object") {
+    out.nutritionProfile = p["nutritionProfile"] as NutritionProfile;
+  }
+  if (Array.isArray(p["trainingWeekdays"])) out.trainingWeekdays = p["trainingWeekdays"] as number[];
+  if (Array.isArray(p["focusMuscles"])) {
+    out.focusMuscles = p["focusMuscles"] as FocusMuscle[];
+  }
+  if (Array.isArray(p["equipmentInventory"])) {
+    out.equipmentInventory = p["equipmentInventory"] as GymGear[];
+  }
+  if (typeof p["typicalSessionMin"] === "number") out.typicalSessionMin = p["typicalSessionMin"];
+  if (p["onboardingComplete"] === true || p["onboardingComplete"] === false) {
+    out.onboardingComplete = p["onboardingComplete"] === true;
+  }
+  return out;
 }
 
 function parseRpe(raw: unknown): SessionRpe | undefined {
@@ -163,23 +306,45 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
   const db = await adminDbLoose();
   if (!db || !userId) return null;
 
-  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes, checkInsRes] =
-    await Promise.all([
-      db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-      db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
-      db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
-      db.from("daily_metrics").select("*").eq("user_id", userId),
-      db.from("supplement_logs").select("*").eq("user_id", userId),
-      db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
-      db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
-      db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
-    ]);
+  const [
+    profileRes,
+    sessionsRes,
+    weightsRes,
+    daysRes,
+    supplementsRes,
+    stateRes,
+    mealsRes,
+    checkInsRes,
+    doseRes,
+    measurementsRes,
+    photosRes,
+  ] = await Promise.all([
+    db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+    db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    db.from("daily_metrics").select("*").eq("user_id", userId),
+    db.from("supplement_logs").select("*").eq("user_id", userId),
+    db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
+    db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db.from("supplement_dose_logs").select("*").eq("user_id", userId).order("taken_at", { ascending: true }),
+    db.from("body_measurements").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    db.from("progress_photos").select("*").eq("user_id", userId).order("taken_on", { ascending: true }),
+  ]);
 
-  // day_checkins may be missing before migration — ignore table errors
+  // day_checkins / dose logs may be missing before migration — ignore table errors
   const checkInRows =
     checkInsRes && !("error" in checkInsRes && checkInsRes.error)
       ? ((checkInsRes.data ?? []) as Row[])
       : [];
+  const doseRows =
+    doseRes && !("error" in doseRes && doseRes.error) ? ((doseRes.data ?? []) as Row[]) : [];
+  const measurementRows =
+    measurementsRes && !("error" in measurementsRes && measurementsRes.error)
+      ? ((measurementsRes.data ?? []) as Row[])
+      : [];
+  const photoRows =
+    photosRes && !("error" in photosRes && photosRes.error) ? ((photosRes.data ?? []) as Row[]) : [];
 
   const hasUserRows =
     profileRes.data ||
@@ -189,7 +354,10 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
     (supplementsRes.data?.length ?? 0) > 0 ||
     stateRes.data ||
     (mealsRes.data?.length ?? 0) > 0 ||
-    checkInRows.length > 0;
+    checkInRows.length > 0 ||
+    doseRows.length > 0 ||
+    measurementRows.length > 0 ||
+    photoRows.length > 0;
 
   if (hasUserRows) {
     return assembleStateFromRows({
@@ -201,6 +369,9 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
       states: stateRes.data ? [stateRes.data as Row] : [],
       meals: (mealsRes.data ?? []) as Row[],
       dayCheckIns: checkInRows,
+      doseLogs: doseRows,
+      measurements: measurementRows,
+      progressPhotos: photoRows,
     });
   }
 
@@ -220,8 +391,24 @@ function assembleStateFromRows(opts: {
   states: Row[];
   meals: Row[];
   dayCheckIns?: Row[];
+  doseLogs?: Row[];
+  measurements?: Row[];
+  progressPhotos?: Row[];
 }): AppState | null {
-  const { profiles, sessions, weights, days, supplements, states, meals, dayCheckIns = [] } = opts;
+  const {
+    profiles,
+    sessions,
+    weights,
+    days,
+    supplements,
+    states,
+    meals,
+    dayCheckIns = [],
+    doseLogs = [],
+    measurements = [],
+    progressPhotos = [],
+  } =
+    opts;
   const hasAnything =
     profiles.length > 0 ||
     sessions.length > 0 ||
@@ -230,13 +417,17 @@ function assembleStateFromRows(opts: {
     supplements.length > 0 ||
     states.length > 0 ||
     meals.length > 0 ||
-    dayCheckIns.length > 0;
+    dayCheckIns.length > 0 ||
+    doseLogs.length > 0 ||
+    measurements.length > 0 ||
+    progressPhotos.length > 0;
   if (!hasAnything) return null;
 
   const stateRow = [...states].sort((a, b) =>
     String(b["updated_at"] ?? "").localeCompare(String(a["updated_at"] ?? "")),
   )[0];
   const p = profiles[0];
+  const prefs = profilePrefsFromRow(p?.["prefs"]);
 
   const sessionById = new Map<string, Row>();
   for (const s of sessions) {
@@ -258,6 +449,11 @@ function assembleStateFromRows(opts: {
   const retention = retentionFromRow(stateRow?.["retention"]);
   const tableCheckIns = dayCheckIns.map((r) => rowToDayCheckIn(r));
   const mergedCheckIns = mergeDayCheckIns(retention.dayCheckIns ?? {}, tableCheckIns);
+  const fromTableDoses = mapDoseLogs(doseLogs);
+  const doseFromRetention = retention.supplementDoseLogs ?? [];
+  const doseById = new Map<string, SupplementDoseLog>();
+  for (const d of doseFromRetention) doseById.set(d.id, d);
+  for (const d of fromTableDoses) doseById.set(d.id, d);
 
   return {
     profile: p
@@ -272,6 +468,8 @@ function assembleStateFromRows(opts: {
           equipment: p["equipment"] as Equipment,
           restrictions: (p["restrictions"] as string[]) ?? [],
           createdAt: String(p["created_at"] ?? new Date().toISOString()),
+          ...prefs,
+          version: typeof p["version"] === "number" ? p["version"] : undefined,
         }
       : null,
     sessions: mapSessions([...sessionById.values()]),
@@ -279,6 +477,12 @@ function assembleStateFromRows(opts: {
       date: String(w["date"]),
       weightKg: Number(w["weight_kg"]),
     })),
+    measurements: mergeMeasurementsByDate(
+      measurements.map(mapMeasurementRow).filter((x): x is NonNullable<typeof x> => Boolean(x)),
+    ),
+    progressPhotos: mergeProgressPhotos(
+      progressPhotos.map(mapPhotoRow).filter((x): x is ProgressPhotoEntry => Boolean(x)),
+    ),
     days: Object.fromEntries(
       [...dayByDate.values()].map((d) => [
         String(d["date"]),
@@ -296,13 +500,17 @@ function assembleStateFromRows(opts: {
     earnedBadges: [],
     meals: mapMeals([...mealByClient.values()]),
     shareProgress: true,
+    socialPrivacy: normalizeSocialPrivacy(undefined, true),
     sessionFx: true,
-    favoriteMealPresetIds: [],
+    favoriteMealPresetIds: retention.favoriteMealPresetIds ?? [],
+    savedMeals: retention.savedMeals ?? [],
     remindersEnabled: false,
     reminderHour: 18,
     seenOnboardingTips: [],
     ...retention,
     dayCheckIns: mergedCheckIns,
+    supplementDoseLogs: [...doseById.values()],
+    supplementFrequencies: retention.supplementFrequencies ?? {},
   } as AppState;
 }
 
@@ -337,11 +545,14 @@ export async function pullStateServer(deviceId: string): Promise<{
   state: AppState | null;
   userId: string | null;
 }> {
-  const identity = await resolveTrustedIdentity({ deviceId });
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccessIfLinked: true });
   if (!identity) {
     const { ensureUserForDevice } = await import("@/lib/identity");
     const user = await ensureUserForDevice(deviceId);
     if (!user) return { state: null, userId: null };
+    // Linked users without cookie are refused by resolveTrustedIdentity above.
+    // ensureUserForDevice only for anonymous bootstrap.
+    if (user.email) return { state: null, userId: null };
     const state = await pullForUserId(user.id, [deviceId]);
     if (state) state.userId = user.id;
     return { state, userId: user.id };
@@ -358,7 +569,13 @@ export async function pullStateServer(deviceId: string): Promise<{
 export async function pushStateServer(
   deviceId: string,
   state: AppState,
-): Promise<{ ok: boolean; userId: string | null; conflicts?: string[] }> {
+): Promise<{
+  ok: boolean;
+  partial?: boolean;
+  userId: string | null;
+  conflicts?: string[];
+  errors?: Array<{ table: string; code: string }>;
+}> {
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false, userId: null };
 
@@ -396,6 +613,18 @@ export async function pushStateServer(
             weight_kg: state.profile.weightKg,
             equipment: state.profile.equipment,
             restrictions: state.profile.restrictions,
+            prefs: {
+              skipBreakfast: state.profile.skipBreakfast === true,
+              lunchOutOften: state.profile.lunchOutOften === true,
+              typicalSleepHours: state.profile.typicalSleepHours,
+              primaryBlocker: state.profile.primaryBlocker,
+              nutritionProfile: state.profile.nutritionProfile,
+              trainingWeekdays: state.profile.trainingWeekdays,
+              focusMuscles: state.profile.focusMuscles,
+              equipmentInventory: state.profile.equipmentInventory,
+              typicalSessionMin: state.profile.typicalSessionMin,
+              onboardingComplete: state.profile.onboardingComplete === true,
+            },
             version: nextVersion((remoteProfile as { version?: number } | null)?.version),
             updated_at: new Date().toISOString(),
           },
@@ -408,17 +637,40 @@ export async function pushStateServer(
   }
 
   tasks.push(
-    db.from("app_state").upsert(
-      {
-        ...channel,
-        supplement_routine: state.supplementRoutine,
-        challenges: state.challenges,
-        chat: state.chat as unknown as never,
-        retention: { ...retentionPayload(state), userId },
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    ),
+    (async () => {
+      const { data: remoteApp } = await db
+        .from("app_state")
+        .select("version, updated_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const remoteVer = Number((remoteApp as { version?: number } | null)?.version ?? 0);
+      const localVer = Number((state as { appStateVersion?: number }).appStateVersion ?? 1);
+      if (
+        remoteApp &&
+        !shouldAcceptWrite(
+          {
+            version: remoteVer,
+            updated_at: String((remoteApp as { updated_at?: string }).updated_at ?? ""),
+          },
+          { version: localVer, clientUpdatedAt: new Date().toISOString() },
+        )
+      ) {
+        conflicts.push("app_state");
+        return { error: null };
+      }
+      return db.from("app_state").upsert(
+        {
+          ...channel,
+          supplement_routine: state.supplementRoutine,
+          challenges: state.challenges,
+          chat: state.chat as unknown as never,
+          retention: { ...retentionPayload(state), userId },
+          version: nextVersion(remoteVer),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+    })(),
   );
 
   if (state.sessions.length) {
@@ -475,6 +727,42 @@ export async function pushStateServer(
         { onConflict: "user_id,date" },
       ),
     );
+  }
+
+  if ((state.measurements ?? []).length) {
+    const measProbe = await db.from("body_measurements").select("date").eq("user_id", userId).limit(1);
+    if (!measProbe.error) {
+      tasks.push(
+        db.from("body_measurements").upsert(
+          state.measurements.map((m) => ({
+            ...channel,
+            ...measurementToRow(m),
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: "user_id,date" },
+        ),
+      );
+    }
+  }
+
+  if ((state.progressPhotos ?? []).length) {
+    const photoProbe = await db.from("progress_photos").select("id").eq("user_id", userId).limit(1);
+    if (!photoProbe.error) {
+      tasks.push(
+        db.from("progress_photos").upsert(
+          state.progressPhotos.map((p) => ({
+            ...channel,
+            id: p.id,
+            taken_on: p.takenOn,
+            pose: p.pose,
+            storage_path: p.storagePath,
+            visibility: p.visibility,
+            updated_at: new Date().toISOString(),
+          })),
+          { onConflict: "user_id,taken_on,pose" },
+        ),
+      );
+    }
   }
 
   const days = Object.values(state.days);
@@ -535,16 +823,11 @@ export async function pushStateServer(
               name: m.label,
               meal_type: m.slot,
               protein_g: m.proteinG,
+              carbs_g: m.carbG ?? null,
+              fat_g: m.fatG ?? null,
+              fiber_g: m.fiberG ?? null,
               kcal: m.kcal,
-              payload: {
-                slot: m.slot,
-                label: m.label,
-                quality: m.quality,
-                presetId: m.presetId,
-                servings: m.servings,
-                proteinG: m.proteinG,
-                kcal: m.kcal,
-              },
+              payload: mealEntryToDbPayload(m),
               version: nextVersion((remote as { version?: number } | undefined)?.version),
               updated_at: new Date().toISOString(),
             };
@@ -552,6 +835,55 @@ export async function pushStateServer(
           { onConflict: "user_id,client_id" },
         ),
       );
+      const itemRows = mealItemsToRows(accepted, channel);
+      if (itemRows.length) {
+        tasks.push(db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }));
+      }
+    }
+  }
+
+  // FASE 7 — dose logs (consumption)
+  const doses = state.supplementDoseLogs ?? [];
+  if (doses.length) {
+    const doseQuery = await db
+      .from("supplement_dose_logs")
+      .select("client_id, version, updated_at")
+      .eq("user_id", userId);
+    if (!doseQuery.error) {
+      const remoteById = new Map(
+        ((doseQuery.data ?? []) as Row[]).map((r) => [String(r["client_id"]), r]),
+      );
+      const accepted = doses.filter((d) => {
+        const remote = remoteById.get(d.id);
+        const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
+          version: Number(d.version ?? 1),
+          clientUpdatedAt: new Date().toISOString(),
+        });
+        if (!ok) conflicts.push(`dose:${d.id}`);
+        return ok;
+      });
+      if (accepted.length) {
+        tasks.push(
+          db.from("supplement_dose_logs").upsert(
+            accepted.map((d) => {
+              const remote = remoteById.get(d.id);
+              return {
+                ...channel,
+                client_id: d.id,
+                product_id: d.productId,
+                dose: d.dose,
+                unit: d.unit,
+                frequency: d.frequency,
+                taken_at: d.takenAt,
+                source: d.source,
+                version: nextVersion((remote as { version?: number } | undefined)?.version),
+                updated_at: new Date().toISOString(),
+              };
+            }),
+            { onConflict: "user_id,client_id" },
+          ),
+        );
+      }
     }
   }
 
@@ -591,16 +923,40 @@ export async function pushStateServer(
     }
   }
 
-  const results = await Promise.all(tasks.map((t) => Promise.resolve(t).catch((e: unknown) => ({ error: e }))));
+  const results = await Promise.all(
+    tasks.map(async (t) => {
+      try {
+        const r = (await t) as { error?: { message?: string; code?: string } | null };
+        return r;
+      } catch (e) {
+        return { error: e as { message?: string; code?: string } };
+      }
+    }),
+  );
+
+  const { logSyncOp } = await import("@/lib/engine/observability");
+  const errors: Array<{ table: string; code: string }> = [];
+  let criticalFailed = false;
+
   for (const r of results) {
-    const error = (r as { error?: unknown } | null)?.error;
-    if (error) console.error("pushStateServer failed", error);
+    const error = r?.error;
+    if (!error) continue;
+    const code = String(error.code ?? "write_failed");
+    criticalFailed = true;
+    errors.push({ table: "domain", code });
+    logSyncOp({
+      userId,
+      operation: "push",
+      table: "domain",
+      status: "error",
+      errorCode: code,
+    });
   }
 
   for (const s of state.sessions) {
     if (s.rpe == null && !s.express) continue;
     try {
-      await db
+      const { error } = await db
         .from("sessions")
         .update({
           ...(s.rpe != null ? { rpe: s.rpe } : {}),
@@ -608,12 +964,45 @@ export async function pushStateServer(
         } as never)
         .eq("user_id", userId)
         .eq("client_id", s.id);
+      if (error) {
+        errors.push({ table: "sessions", code: String(error.code ?? "update_failed") });
+        // RPE enrichment is non-critical
+        logSyncOp({
+          userId,
+          operation: "push_rpe",
+          table: "sessions",
+          status: "error",
+          errorCode: String(error.code ?? "update_failed"),
+        });
+      }
     } catch {
-      /* ignore */
+      /* ignore non-critical */
     }
   }
 
-  return { ok: true, userId, ...(conflicts.length ? { conflicts } : {}) };
+  if (criticalFailed) {
+    return {
+      ok: false,
+      partial: errors.length < results.length,
+      userId,
+      errors,
+      ...(conflicts.length ? { conflicts } : {}),
+    };
+  }
+
+  try {
+    const { recomputeTrainingDerived } = await import("@/lib/training/recompute.server");
+    await recomputeTrainingDerived(userId, state);
+  } catch {
+    /* derived tables are non-critical */
+  }
+
+  return {
+    ok: true,
+    userId,
+    ...(conflicts.length ? { conflicts } : {}),
+    ...(errors.length ? { partial: true, errors } : {}),
+  };
 }
 
 /** Granular day check-in upsert with version conflict. */
@@ -663,22 +1052,169 @@ export async function upsertDayCheckInServer(
   return { ok: true, userId };
 }
 
-export async function clearRemoteStateServer(deviceId: string): Promise<{ ok: boolean }> {
-  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
-  if (!identity) return { ok: false };
-  const db = await adminDbLoose();
-  if (!db) return { ok: false };
-
-  const tables = [
-    "sessions",
-    "weights",
-    "daily_metrics",
-    "supplement_logs",
-    "app_state",
-    "profiles",
-    "meal_entries",
-    "day_checkins",
-  ] as const;
-  await Promise.all(tables.map((t) => db.from(t).delete().eq("user_id", identity.userId)));
-  return { ok: true };
+/**
+ * Clear local-only: UI "Apagar dados neste aparelho" should call client clear,
+ * not this. Kept for backward compat as a thin alias that does NOT wipe server.
+ * Prefer clearUserDataServer for explicit account wipe.
+ */
+export async function clearRemoteStateServer(deviceId: string): Promise<{
+  ok: boolean;
+  mode: "noop_use_clearUserData";
+}> {
+  // Do not silently wipe partial server data under a "local device" label.
+  void deviceId;
+  return { ok: true, mode: "noop_use_clearUserData" };
 }
+
+/** Core + analytics domain tables owned by user_id (never Shopify external). */
+const CLEAR_USER_CORE_TABLES = [
+  "sessions",
+  "weights",
+  "body_measurements",
+  "progress_photos",
+  "daily_metrics",
+  "supplement_logs",
+  "supplement_dose_logs",
+  "app_state",
+  "profiles",
+  "meal_entries",
+  "day_checkins",
+  "customer_profiles",
+  "recommendation_decisions",
+  "decision_outcomes",
+  "user_patterns",
+  "user_events",
+  "push_subscriptions",
+  "push_sends",
+] as const;
+
+/**
+ * Explicit account data wipe (internal domain only — never Shopify orders/identities external).
+ */
+export async function clearUserDataServer(deviceId: string): Promise<{
+  ok: boolean;
+  partial?: boolean;
+  errors?: Array<{ table: string; code: string }>;
+  userId?: string | null;
+}> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity) return { ok: false, userId: null };
+  const db = await adminDbLoose();
+  if (!db) return { ok: false, userId: identity.userId };
+
+  const { logSyncOp } = await import("@/lib/engine/observability");
+  const errors: Array<{ table: string; code: string }> = [];
+
+  try {
+    const { removeProgressPhotosForUser } = await import("@/lib/progress/photos.server");
+    await removeProgressPhotosForUser(identity.userId);
+  } catch (e) {
+    errors.push({
+      table: "progress-photos",
+      code: e instanceof Error ? e.message.slice(0, 40) : "storage_wipe",
+    });
+  }
+
+  for (const table of CLEAR_USER_CORE_TABLES) {
+    try {
+      const { error } = await db.from(table).delete().eq("user_id", identity.userId);
+      if (error) {
+        // decision_outcomes / optional tables may not exist yet
+        if (String(error.message ?? "").includes("does not exist")) continue;
+        errors.push({ table, code: String(error.code ?? "delete_failed") });
+        logSyncOp({
+          userId: identity.userId,
+          operation: "clearUserData",
+          table,
+          status: "error",
+          errorCode: String(error.code ?? "delete_failed"),
+        });
+      } else {
+        logSyncOp({
+          userId: identity.userId,
+          operation: "clearUserData",
+          table,
+          status: "ok",
+        });
+      }
+    } catch (e) {
+      errors.push({
+        table,
+        code: e instanceof Error ? e.message.slice(0, 40) : "exception",
+      });
+    }
+  }
+
+  if (errors.length === CLEAR_USER_CORE_TABLES.length) {
+    return { ok: false, userId: identity.userId, errors };
+  }
+  if (errors.length) {
+    return { ok: false, partial: true, userId: identity.userId, errors };
+  }
+  return { ok: true, userId: identity.userId };
+}
+
+/** LGPD export — profile, sessions, weights, meals, events, prefs. No Shopify PII dump. */
+export async function exportUserDataServer(deviceId: string): Promise<{
+  ok: boolean;
+  json: string;
+}> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: false });
+  if (!identity) return { ok: false, json: "" };
+  const db = await adminDbLoose();
+  if (!db) return { ok: false, json: "" };
+
+  const [profile, sessions, weights, meals, events, stateRow, measurements, photos] = await Promise.all([
+    db.from("profiles").select("*").eq("user_id", identity.userId).maybeSingle(),
+    db.from("sessions").select("client_id, date, title, duration_min, volume_kg, rpe").eq("user_id", identity.userId),
+    db.from("weights").select("date, weight_kg").eq("user_id", identity.userId),
+    db.from("meal_entries").select("client_id, date, slot, items").eq("user_id", identity.userId),
+    db
+      .from("user_events")
+      .select("event_type, occurred_at, entity_type, entity_id, metadata")
+      .eq("user_id", identity.userId)
+      .order("occurred_at", { ascending: false })
+      .limit(500),
+    db.from("app_state").select("retention").eq("user_id", identity.userId).maybeSingle(),
+    db
+      .from("body_measurements")
+      .select("date, waist_cm, arm_cm, chest_cm, hip_cm, thigh_cm")
+      .eq("user_id", identity.userId),
+    db
+      .from("progress_photos")
+      .select("taken_on, pose, visibility, storage_path")
+      .eq("user_id", identity.userId),
+  ]);
+
+  const retention = (stateRow.data?.retention as Record<string, unknown> | null) ?? {};
+  return {
+    ok: true,
+    json: JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      userId: identity.userId,
+      email: identity.email,
+      profile: profile.data ?? null,
+      sessions: sessions.data ?? [],
+      weights: weights.data ?? [],
+      measurements: measurements.error ? [] : (measurements.data ?? []),
+      progressPhotos: photos.error
+        ? []
+        : (photos.data ?? []).map((p: Record<string, unknown>) => ({
+            takenOn: p["taken_on"],
+            pose: p["pose"],
+            visibility: p["visibility"],
+            storagePath: p["storage_path"],
+          })),
+      meals: meals.data ?? [],
+      events: events.data ?? [],
+      prefs: {
+        reminderHour: retention["reminderHour"] ?? 18,
+        pushPrefs: retention["pushPrefs"] ?? null,
+        termsAcceptedAt: retention["termsAcceptedAt"] ?? null,
+        privacyAcceptedAt: retention["privacyAcceptedAt"] ?? null,
+        healthPurposeAckAt: retention["healthPurposeAckAt"] ?? null,
+      },
+    }),
+  };
+}
+

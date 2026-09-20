@@ -1,15 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, History, Play } from "lucide-react";
+import { CalendarDays, ChevronRight, History, Pin, Play, RefreshCw, Settings2, X } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell, EmptyState } from "@/components/app-shell";
+import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
+import { MuscleHeatmap } from "@/components/session/muscle-heatmap";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SoldiersOverlay } from "@/components/soldiers-overlay";
+import { alternativesFor } from "@/data/exercises";
 import { buildWeeklyPlanDetailed } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
-import { WEEK_MODE_LABEL } from "@/lib/engine/progression";
-import { muscleRecoveryMap, recoveryLabel } from "@/lib/engine/recovery";
+import { WEEK_MODE_LABEL, PROGRESSION_CODE_LABEL, type ProgressionReasonCode } from "@/lib/engine/progression";
+import { muscleRecoveryMap, buildMuscleRecoverySnapshots } from "@/lib/engine/recovery";
 import { useStore } from "@/lib/store";
-import { GOAL_LABEL, type Equipment } from "@/lib/types";
+import { resolveExerciseMedia } from "@/lib/soldiers-media";
+import { GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
+import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
+import {
+  FOCUS_MUSCLE_LABEL,
+  GYM_GEAR_LABEL,
+  GOAL_LABEL,
+  todayKey,
+  type Equipment,
+  type FocusMuscle,
+  type GymGear,
+} from "@/lib/types";
 
 export const Route = createFileRoute("/treino/")({
   head: () => ({
@@ -26,23 +42,32 @@ export const Route = createFileRoute("/treino/")({
   component: TrainingPage,
 });
 
-const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const FOCUS_OPTIONS = Object.keys(FOCUS_MUSCLE_LABEL) as FocusMuscle[];
 
 function TrainingPage() {
-  const { state, hydrated } = useStore();
-  const [equipOverride, setEquipOverride] = useState<Equipment | null>(null);
+  const { state, hydrated, patchProfile, setExercisePreference, saveDayCheckIn } = useStore();
+  const todayCheck = state.dayCheckIns?.[todayKey()];
+  const [equipOverride, setEquipOverride] = useState<Equipment | null>(todayCheck?.equipment ?? null);
+  const [ajustesOpen, setAjustesOpen] = useState(false);
+  const [swapFor, setSwapFor] = useState<{ dayId: string; exerciseId: string } | null>(null);
 
   const planResult = useMemo(() => {
     if (!state.profile) return null;
     return buildWeeklyPlanDetailed(
       state.profile,
       state.sessions,
-      equipOverride ?? undefined,
+      equipOverride ?? todayCheck?.equipment ?? undefined,
       learningWeekHint(state),
+      {
+        likedExerciseIds: state.likedExerciseIds ?? [],
+        dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+        exercisePreferences: state.exercisePreferences,
+      },
     );
-  }, [state, equipOverride]);
+  }, [state, equipOverride, todayCheck?.equipment]);
 
   const recovery = useMemo(() => muscleRecoveryMap(state.sessions), [state.sessions]);
+  const recoverySnaps = useMemo(() => buildMuscleRecoverySnapshots(state.sessions), [state.sessions]);
 
   if (!hydrated || !state.profile || !planResult) {
     return (
@@ -54,13 +79,57 @@ function TrainingPage() {
 
   const profile = state.profile;
   const { days: plan, weekMode } = planResult;
-  const activeEquip = equipOverride ?? profile.equipment;
+  const todayWeekday = new Date().getDay();
+  const todayDay = plan.find((d) => d.weekday === todayWeekday) ?? plan[0] ?? null;
+  const activeEquip = equipOverride ?? todayCheck?.equipment ?? profile.equipment;
+  const weekdays = profile.trainingWeekdays ?? plan.map((d) => d.weekday);
+  const swapSource = swapFor
+    ? plan.flatMap((d) => d.exercises).find((e) => e.exerciseId === swapFor.exerciseId)
+    : null;
+  const swapOptions = swapSource
+    ? alternativesFor(swapSource.exerciseId, activeEquip, profile.restrictions)
+    : [];
+
+  const persistEquip = (eq: Equipment) => {
+    setEquipOverride(eq);
+    saveDayCheckIn({
+      sleepHours: todayCheck?.sleepHours ?? profile.typicalSleepHours ?? 7,
+      energy: todayCheck?.energy ?? "ok",
+      availableMin: todayCheck?.availableMin ?? profile.typicalSessionMin ?? 60,
+      equipment: eq,
+      ...(eq === "casa" ? { noEquipment: true } : {}),
+      ...(todayCheck?.soreness != null ? { soreness: todayCheck.soreness } : {}),
+      ...(todayCheck?.stress != null ? { stress: todayCheck.stress } : {}),
+      ...(todayCheck?.notes ? { notes: todayCheck.notes } : {}),
+      ...(todayCheck?.acceptedTrainingMode ? { acceptedTrainingMode: todayCheck.acceptedTrainingMode } : {}),
+    });
+    toast.success(`Plano de hoje: ${eq}`);
+  };
 
   return (
     <AppShell
       title="Seu plano"
       subtitle={`${plan.length}x por semana · ${GOAL_LABEL[profile.goal].toLowerCase()} · ${activeEquip}`}
     >
+      {todayDay ? (
+        <Link
+          to="/treino/sessao/$id"
+          params={{ id: todayDay.id }}
+          search={{ express: false, from: "treino" }}
+          className="mb-4 block"
+        >
+          <Button className="glow-primary h-14 w-full font-bold uppercase tracking-wide">
+            <Play className="size-4" /> Treinar agora
+          </Button>
+        </Link>
+      ) : null}
+
+      <div className="mb-4 flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => setAjustesOpen(true)}>
+          <Settings2 className="size-3.5" /> Ajustes
+        </Button>
+      </div>
+
       {weekMode !== "normal" ? (
         <div
           className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
@@ -80,26 +149,22 @@ function TrainingPage() {
 
       <section className="surface-card mb-4 p-5">
         <h2 className="text-lg">Recuperação muscular</h2>
-        <p className="text-xs text-muted-foreground">Frescor por grupo — influencia o plano do dia</p>
-        <ul className="mt-4 space-y-2">
-          {recovery
-            .filter((m) => m.group !== "cardio")
-            .map((m) => (
-              <li key={m.group}>
-                <div className="flex justify-between text-xs">
-                  <span>{m.label}</span>
-                  <span className="text-muted-foreground">
-                    {recoveryLabel(m.freshness)} · {m.freshness}%
-                  </span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-muted">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${
-                      m.freshness >= 70 ? "bg-primary" : m.freshness >= 35 ? "bg-chart-2" : "bg-chart-4"
-                    }`}
-                    style={{ width: `${m.freshness}%` }}
-                  />
-                </div>
+        <p className="text-xs text-muted-foreground">
+          Heatmap por grupo — volume e carga muscular (7d) influenciam a recuperação
+        </p>
+        <div className="mt-4">
+          <MuscleHeatmap recovery={recovery} />
+        </div>
+        <ul className="mt-3 grid grid-cols-2 gap-1.5 text-[0.65rem] text-muted-foreground">
+          {recoverySnaps
+            .filter((s) => s.muscle !== "cardio")
+            .map((s) => (
+              <li key={s.muscle} className="flex justify-between gap-2">
+                <span>{s.label}</span>
+                <span>
+                  load7d {s.load7d}
+                  {s.reasonCodes.includes("excessive_muscle_load") ? " · alta" : ""}
+                </span>
               </li>
             ))}
         </ul>
@@ -109,7 +174,8 @@ function TrainingPage() {
         {(["academia", "casa"] as Equipment[]).map((eq) => (
           <button
             key={eq}
-            onClick={() => setEquipOverride(eq === profile.equipment && !equipOverride ? null : eq)}
+            type="button"
+            onClick={() => persistEquip(eq)}
             className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold capitalize transition-colors ${
               activeEquip === eq
                 ? "border-primary bg-primary text-primary-foreground"
@@ -133,37 +199,89 @@ function TrainingPage() {
 
         <TabsContent value="semana" className="mt-4 space-y-3">
           {plan.map((day) => (
-            <Link key={day.id} to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false }} className="block">
-              <article className="surface-card p-5 transition-colors hover:border-primary">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">
-                      {WEEKDAYS[day.weekday]}
-                      {day.recoveryScore !== undefined && day.recoveryScore < 35 ? " · leve" : ""}
-                    </p>
-                    <h2 className="mt-1 text-xl">{day.title}</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {day.focus} · ~{day.estimatedMin} min
-                    </p>
-                  </div>
-                  <ChevronRight className="size-5 text-muted-foreground" />
+            <article key={day.id} className="surface-card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">
+                    {WEEKDAY_LABELS[day.weekday]}
+                    {day.recoveryScore !== undefined && day.recoveryScore < 35 ? " · leve" : ""}
+                  </p>
+                  <h2 className="mt-1 text-xl">{day.title}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {day.focus} · ~{day.estimatedMin} min
+                  </p>
                 </div>
-                <ul className="mt-3 space-y-1">
-                  {day.exercises.map((ex) => (
-                    <li key={ex.exerciseId} className="flex justify-between text-sm">
-                      <span className="text-foreground">{ex.name}</span>
-                      <span className="text-muted-foreground">
-                        {ex.sets}x{ex.reps}
-                        {ex.suggestedLoad > 0 && ex.unit === "kg" ? ` · ${ex.suggestedLoad} kg` : ""}
-                      </span>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {day.exercises.map((ex) => {
+                  const thumb = resolveExerciseMedia(ex.exerciseId);
+                  const pinned = state.exercisePreferences?.[ex.exerciseId] === "preferred";
+                  const chips = (ex.reasonCodes ?? [])
+                    .slice(0, 2)
+                    .map((c) => PROGRESSION_CODE_LABEL[c as ProgressionReasonCode] ?? c);
+                  return (
+                    <li key={ex.exerciseId} className="rounded-xl border border-white/10 p-2">
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <Link
+                          to="/treino/exercicio/$id"
+                          params={{ id: ex.exerciseId }}
+                          className="flex min-w-0 items-center gap-2 text-foreground"
+                        >
+                          <SoldiersMediaThumb media={thumb} alt={ex.name} className="size-8 rounded-md" />
+                          <span className="truncate">{ex.name}</span>
+                        </Link>
+                        <span className="shrink-0 text-muted-foreground">
+                          {ex.sets}x{ex.reps}
+                          {ex.suggestedLoad > 0 && ex.unit === "kg" ? ` · ${ex.suggestedLoad} kg` : ""}
+                        </span>
+                      </div>
+                      {chips.length ? (
+                        <p className="mt-1 text-[0.65rem] text-muted-foreground">{chips.join(" · ")}</p>
+                      ) : null}
+                      <div className="mt-2 flex gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[0.65rem]"
+                          onClick={() =>
+                            setExercisePreference(ex.exerciseId, pinned ? "clear" : "preferred")
+                          }
+                        >
+                          <Pin className="size-3" /> {pinned ? "Fixado" : "Fixar"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[0.65rem]"
+                          onClick={() => setSwapFor({ dayId: day.id, exerciseId: ex.exerciseId })}
+                        >
+                          <RefreshCw className="size-3" /> Trocar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[0.65rem]"
+                          onClick={() => {
+                            setExercisePreference(ex.exerciseId, "avoided");
+                            toast.success("Exercício evitado no próximo plano");
+                          }}
+                        >
+                          <X className="size-3" /> Pular
+                        </Button>
+                      </div>
                     </li>
-                  ))}
-                </ul>
-                <Button className="mt-4 h-11 w-full font-bold uppercase tracking-wide">
+                  );
+                })}
+              </ul>
+              <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false, from: "treino" }} className="mt-4 block">
+                <Button className="h-11 w-full font-bold uppercase tracking-wide">
                   <Play className="size-4" /> Treinar
                 </Button>
-              </article>
-            </Link>
+              </Link>
+            </article>
           ))}
         </TabsContent>
 
@@ -175,7 +293,7 @@ function TrainingPage() {
               description="Sua primeira sessão aparece aqui depois que você treinar."
               action={
                 plan[0] ? (
-                  <Link to="/treino/sessao/$id" params={{ id: plan[0].id }} search={{ express: false }} className="block">
+                  <Link to="/treino/sessao/$id" params={{ id: plan[0].id }} search={{ express: false, from: "treino" }} className="block">
                     <Button className="h-11 w-full font-bold uppercase tracking-wide">
                       <Play className="size-4" /> Começar sessão
                     </Button>
@@ -189,23 +307,136 @@ function TrainingPage() {
             />
           ) : (
             state.sessions.map((s) => (
-              <article key={s.id} className="surface-card p-4">
-                <div className="flex justify-between">
-                  <h2 className="text-base">{s.title}</h2>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(s.date).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {s.durationMin} min · {s.volumeKg.toLocaleString("pt-BR")} kg de volume ·{" "}
-                  {s.exercises.length} exercícios
-                  {s.rpe ? ` · RPE ${s.rpe}` : ""}
-                </p>
-              </article>
+              <Link key={s.id} to="/treino/historico/$sessionId" params={{ sessionId: s.id }} className="block">
+                <article className="surface-card p-4 transition-colors hover:border-primary">
+                  <div className="flex justify-between">
+                    <h2 className="text-base">{s.title}</h2>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {new Date(s.date).toLocaleDateString("pt-BR")} · {s.durationMin} min ·{" "}
+                    {s.volumeKg.toLocaleString("pt-BR")} kg · {s.exercises.length} exercícios
+                    {s.rpe ? ` · RPE ${s.rpe}` : ""}
+                  </p>
+                </article>
+              </Link>
             ))
           )}
         </TabsContent>
       </Tabs>
+
+      <SoldiersOverlay open={ajustesOpen} onClose={() => setAjustesOpen(false)} title="Ajustes do plano">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dias da semana</p>
+        <div className="mb-4 grid grid-cols-7 gap-1.5">
+          {WEEKDAY_LABELS.map((label, weekday) => {
+            const on = weekdays.includes(weekday);
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  const next = on ? weekdays.filter((d) => d !== weekday) : [...weekdays, weekday].sort((a, b) => a - b);
+                  if (next.length < 2) {
+                    toast.error("Escolha pelo menos 2 dias");
+                    return;
+                  }
+                  patchProfile({ trainingWeekdays: next.slice(0, 6), daysPerWeek: Math.min(6, next.length) });
+                }}
+                className={`rounded-xl border py-3 text-[0.65rem] font-bold uppercase ${
+                  on ? "border-primary bg-primary text-primary-foreground" : "border-white/10"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Priorizar músculos</p>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {FOCUS_OPTIONS.map((m) => {
+            const on = (profile.focusMuscles ?? []).includes(m);
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  const cur = profile.focusMuscles ?? [];
+                  patchProfile({
+                    focusMuscles: on ? cur.filter((x) => x !== m) : [...cur, m],
+                  });
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  on ? "border-primary bg-primary/15 text-primary" : "border-white/10"
+                }`}
+              >
+                {FOCUS_MUSCLE_LABEL[m]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inventário</p>
+        <div className="flex flex-wrap gap-2">
+          {GYM_GEAR_OPTIONS.map((g: GymGear) => {
+            const on = (profile.equipmentInventory ?? []).includes(g);
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => {
+                  const cur = profile.equipmentInventory ?? [];
+                  const next = on ? cur.filter((x) => x !== g) : [...cur, g];
+                  patchProfile({
+                    equipmentInventory: next,
+                    equipment: next.includes("barra") || next.includes("maquinas") ? "academia" : "casa",
+                  });
+                }}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  on ? "border-primary bg-primary/15 text-primary" : "border-white/10"
+                }`}
+              >
+                {GYM_GEAR_LABEL[g]}
+              </button>
+            );
+          })}
+        </div>
+      </SoldiersOverlay>
+
+      <SoldiersOverlay
+        open={Boolean(swapFor)}
+        onClose={() => setSwapFor(null)}
+        title="Trocar exercício"
+        description="O atual entra em evitar; o novo fica preferido."
+      >
+        {swapOptions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma alternativa agora.</p>
+        ) : (
+          <ul className="space-y-2">
+            {swapOptions.map((alt) => (
+              <li key={alt.id}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto w-full justify-between rounded-xl px-4 py-3 text-left font-normal"
+                  onClick={() => {
+                    if (swapFor) setExercisePreference(swapFor.exerciseId, "avoided");
+                    setExercisePreference(alt.id, "preferred");
+                    setSwapFor(null);
+                    toast.success(`Trocado para ${alt.name}`);
+                  }}
+                >
+                  <span>
+                    <span className="block text-sm font-semibold">{alt.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {alt.group} · {alt.equipment}
+                    </span>
+                  </span>
+                  <RefreshCw className="size-4 text-primary" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SoldiersOverlay>
     </AppShell>
   );
 }

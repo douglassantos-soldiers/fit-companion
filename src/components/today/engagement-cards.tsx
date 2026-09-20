@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Check, Flame, Sparkles, Trophy, Users, X } from "lucide-react";
+import { Bell, Check, Flame, Sparkles, Trophy, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { DAILY_XP_GOAL } from "@/lib/types";
 import { questById, isQuestComplete, questProgressValue } from "@/data/daily-quests";
 import type { AppState } from "@/lib/types";
+import { PUSH_AFTER_FIRST_BODY, PUSH_AFTER_FIRST_TITLE, SHARE_FIRST_WORKOUT } from "@/lib/ui/platform-copy";
 
 export function XpBar({ xp, className }: { xp: number; className?: string }) {
   const pct = Math.min(100, Math.round((xp / DAILY_XP_GOAL) * 100));
@@ -77,9 +78,17 @@ export function SessionCelebration({
   streak,
   questsDone,
   questsTotal,
+  nextHint,
   upsell,
   onUpsellClick,
   onUpsellDismiss,
+  unlocked,
+  rankLabel,
+  pushPrompt,
+  onEnablePush,
+  onDismissPush,
+  shareFirst,
+  onShareFirst,
 }: {
   open: boolean;
   onClose: () => void;
@@ -88,9 +97,17 @@ export function SessionCelebration({
   streak: number;
   questsDone: number;
   questsTotal: number;
+  nextHint?: string | null;
   upsell?: { name: string; url: string } | null;
   onUpsellClick?: () => void;
   onUpsellDismiss?: () => void;
+  unlocked?: string[];
+  rankLabel?: string | null;
+  pushPrompt?: boolean;
+  onEnablePush?: () => void;
+  onDismissPush?: () => void;
+  shareFirst?: boolean;
+  onShareFirst?: () => void;
 }) {
   if (!open) return null;
   return (
@@ -117,9 +134,26 @@ export function SessionCelebration({
             <Flame className="size-4 text-primary" />
             <span>Streak {streak}d</span>
           </div>
+          {rankLabel ? <p className="text-sm font-semibold text-primary">{rankLabel}</p> : null}
+          {unlocked?.length ? (
+            <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold">
+              <Trophy className="mr-1 inline size-4" />
+              {unlocked.join(" · ")}
+            </p>
+          ) : null}
+          <Link to="/progresso">
+            <Button variant="secondary" className="h-10 w-full">
+              Ver meu progresso
+            </Button>
+          </Link>
           <p className="text-sm text-muted-foreground">
             Missões {questsDone}/{questsTotal}
           </p>
+          {nextHint ? (
+            <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground">
+              {nextHint}
+            </p>
+          ) : null}
           {upsell ? (
             <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">Recuperação</p>
@@ -148,6 +182,28 @@ export function SessionCelebration({
               </div>
             </div>
           ) : null}
+          {pushPrompt ? (
+            <div className="rounded-xl border border-primary/25 bg-primary/10 p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                <Bell className="size-4 text-primary" />
+                {PUSH_AFTER_FIRST_TITLE}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{PUSH_AFTER_FIRST_BODY}</p>
+              <div className="mt-2 flex gap-2">
+                <Button className="flex-1" size="sm" onClick={() => onEnablePush?.()}>
+                  Quero o lembrete
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => onDismissPush?.()}>
+                  Agora não
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {shareFirst ? (
+            <Button className="w-full" size="sm" variant="outline" onClick={() => onShareFirst?.()}>
+              {SHARE_FIRST_WORKOUT}
+            </Button>
+          ) : null}
         </div>
         <div className="mt-4 flex gap-2">
           <Link to="/social" search={{ tab: "desafios" }} className="flex-1" onClick={onClose}>
@@ -155,7 +211,12 @@ export function SessionCelebration({
               <Users className="size-4" /> Social
             </Button>
           </Link>
-          <Link to="/desafios" className="flex-1" onClick={onClose}>
+          <Link
+            to="/desafios"
+            search={{ challenge: "consistencia-30-personal" }}
+            className="flex-1"
+            onClick={onClose}
+          >
             <Button className="w-full" variant="outline">
               <Trophy className="size-4" /> Desafio
             </Button>

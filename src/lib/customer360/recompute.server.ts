@@ -7,7 +7,7 @@ import {
   buildEstimatesFromCommerce,
   type LineageEntry,
 } from "@/lib/customer360/types";
-import { hydrateAppStateFromDb, mergeAppStateOverride } from "@/lib/customer360/hydrate.server";
+import { hydrateAppStateFromDb } from "@/lib/customer360/hydrate.server";
 import type { AppState } from "@/lib/types";
 import { adminDbLoose } from "@/lib/db-admin";
 
@@ -16,11 +16,11 @@ export async function loadShopifyCustomerId(userId: string): Promise<string | nu
   if (!db || !userId) return null;
   const { data } = await db
     .from("customer_identities")
-    .select("external_id")
+    .select("external_customer_id")
     .eq("user_id", userId)
     .eq("provider", "shopify")
     .maybeSingle();
-  return data?.external_id ? String(data.external_id) : null;
+  return data?.external_customer_id ? String(data.external_customer_id) : null;
 }
 
 export async function loadCommerce360(userId: string): Promise<Commerce360> {
@@ -191,14 +191,10 @@ export function computeCommerceFromOrders(
   };
 }
 
-export async function recomputeCustomerProfile(
-  userId: string,
-  stateOverride?: AppState | null,
-): Promise<Customer360 | null> {
+export async function recomputeCustomerProfile(userId: string): Promise<Customer360 | null> {
   if (!userId) return null;
 
-  const hydrated = await hydrateAppStateFromDb(userId);
-  const state = mergeAppStateOverride(hydrated, stateOverride ?? undefined);
+  const state = await hydrateAppStateFromDb(userId);
   const commerce = await loadCommerce360(userId);
   const shopifyCustomerId = await loadShopifyCustomerId(userId);
 
@@ -216,18 +212,23 @@ export async function recomputeCustomerProfile(
     ...(base.lineage ?? {}),
   } as Record<string, LineageEntry>;
 
+  const now = new Date().toISOString();
+  const dataVersion = Math.floor(Date.now() / 1000);
+
   const c360: Customer360 = {
     ...base,
     shopifyCustomerId,
     commerce: mergedCommerce,
     estimates,
     lineage,
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
+    lastRecomputedAt: now,
+    dataVersion,
   };
 
   const db = await adminDbLoose();
   if (db) {
-    await db.from("customer_profiles").upsert(
+    const { error } = await db.from("customer_profiles").upsert(
       {
         user_id: userId,
         first_purchase_at: c360.commerce.firstPurchaseAt,
@@ -259,12 +260,16 @@ export async function recomputeCustomerProfile(
           estimates: c360.estimates,
           shopifyCustomerId: c360.shopifyCustomerId,
         },
-        updated_at: c360.updatedAt,
+        updated_at: now,
+        last_recomputed_at: now,
+        data_version: dataVersion,
       },
       { onConflict: "user_id" },
     );
+    if (error) {
+      console.warn("customer_profiles upsert failed", error.message);
+    }
 
-    // Optional columns from 20260919140000 — best-effort after core upsert
     void db
       .from("customer_profiles")
       .update({
@@ -272,14 +277,54 @@ export async function recomputeCustomerProfile(
         supplement_adherence: c360.supplements.adherence30d,
       })
       .eq("user_id", userId)
-      .then(({ error }) => {
-        if (error) {
-          console.warn("customer_profiles lineage columns update skipped", error.message);
+      .then((res: { error?: { message?: string } | null }) => {
+        const e2 = res.error;
+        if (e2) {
+          console.warn("customer_profiles lineage columns update skipped", e2.message);
         }
       });
   }
 
   return c360;
+}
+
+/**
+ * Preview Customer360 from local AppState — NEVER persists.
+ * For QA / simulation only.
+ */
+export function previewCustomer360FromState(
+  state: AppState,
+  opts?: { userId?: string; shopifyCustomerId?: string | null },
+): Customer360 {
+  const base = buildCustomer360FromState(state, {
+    userId: opts?.userId ?? state.userId ?? "preview",
+    shopifyCustomerId: opts?.shopifyCustomerId ?? null,
+  });
+  return {
+    ...base,
+    updatedAt: new Date().toISOString(),
+    lastRecomputedAt: null,
+    dataVersion: null,
+  };
+}
+
+const STALE_MS = 6 * 60 * 60_000; // 6h
+
+export function isCustomer360Stale(
+  profile: Pick<Customer360, "lastRecomputedAt" | "updatedAt"> | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!profile) return true;
+  const ts = profile.lastRecomputedAt ?? profile.updatedAt;
+  if (!ts) return true;
+  const t = new Date(ts).getTime();
+  if (!Number.isFinite(t)) return true;
+  return now - t > STALE_MS;
+}
+
+/** Alias — idempotent recompute from DB domain data only. */
+export async function recomputeCustomer360(userId: string): Promise<Customer360 | null> {
+  return recomputeCustomerProfile(userId);
 }
 
 /** Load persisted customer_profiles row (server). */
@@ -336,6 +381,8 @@ export async function loadCustomerProfile(userId: string): Promise<Customer360 |
     userId,
     shopifyCustomerId,
     updatedAt: String(data.updated_at ?? new Date().toISOString()),
+    lastRecomputedAt: (data.last_recomputed_at as string | null) ?? null,
+    dataVersion: data.data_version != null ? Number(data.data_version) : null,
     lineage,
     estimates,
     commerce: {
@@ -374,6 +421,10 @@ export async function loadCustomerProfile(userId: string): Promise<Customer360 |
         data.nutrition_adherence != null
           ? Number(data.nutrition_adherence)
           : (nutri.proteinAdherence7d ?? null),
+      ...(nutri.loggingCompleteness7d != null
+        ? { loggingCompleteness7d: nutri.loggingCompleteness7d }
+        : {}),
+      ...(nutri.proteinAdherence ? { proteinAdherence: nutri.proteinAdherence } : {}),
       mealsLogged7d: Number(nutri.mealsLogged7d ?? 0),
       weightTrendKg7d: nutri.weightTrendKg7d ?? null,
       latestWeightKg: nutri.latestWeightKg ?? null,

@@ -246,6 +246,31 @@ request → authenticated user → hydrate DB / Customer 360
 
 Arquivos: `coach.functions.ts`, `coach-contract.ts`, `engine/coach-context.ts`, `engine/coach.ts`, `components/today/living-plan-hero.tsx`.
 
+### FASE 7 — Nutrition Intelligence + Supplement Intelligence
+
+Alimentação e suplementação contextuais; compra ≠ consumo.
+
+**Nutrition Intelligence**
+
+- `Profile.nutritionProfile` + `skipBreakfast` / `lunchOutOften` persistidos em `profiles.prefs` JSONB
+- Slots ativos flexíveis (`activeMealSlots`) — não força café da manhã
+- `buildDailyMealPlan` omite slots desabilitados e **redistribui** porções sugeridas
+- Meal AI (texto / foto / voz) com provenance: `sourceKind` informed|estimated + `confidence` + correção do usuário
+- Sync: campos no `meal_entries.payload`
+
+**Supplement Intelligence**
+
+```
+purchase (orders) → product map → package size → dose log → frequency → consumption → estimated inventory → soft replenishment
+```
+
+- Tabela `supplement_dose_logs` (product, dose, unit, frequency, taken_at)
+- Inventário estimado: depleção por doses (`engine/supplement-inventory.ts`); confidence sobe com logs
+- Commerce: “Seu estoque estimado está chegando ao fim.” + confiança — sem “COMPRE AGORA”
+- Recs de produto só para itens já comprados / na rotina, com reasons transparentes
+
+Arquivos: `engine/nutrition.ts`, `engine/nutrition-profile.ts`, `engine/supplement-inventory.ts`, `meal-picker-sheet.tsx`, `suplementos.tsx`, migration `20260920180000_fase7_nutrition_supplement_intelligence.sql`.
+
 ## Migration
 
 `supabase/migrations/20260919000000_identity_customer360.sql` — não destrutiva.
@@ -256,6 +281,7 @@ Arquivos: `coach.functions.ts`, `coach-contract.ts`, `engine/coach-context.ts`, 
 `supabase/migrations/20260920150000_fase3_events_sync.sql` — Event Layer (`entity_type`/`metadata`), `day_checkins`, `version` em entidades.
 `supabase/migrations/20260920160000_fase4_recommendation_decisions.sql` — Decision log (`recommendation_decisions`).
 `supabase/migrations/20260920170000_fase5_learning_outcomes.sql` — `outcome_metrics` JSONB no decision log.
+`supabase/migrations/20260920180000_fase7_nutrition_supplement_intelligence.sql` — `profiles.prefs`, `supplement_dose_logs`.
 
 Aplicar com `supabase db push` (conta com privilégio no projeto `zphtvrsxlhfgltwgbreu`) ou SQL Editor no dashboard.
 
@@ -282,5 +308,7 @@ Aplicar com `supabase db push` (conta com privilégio no projeto `zphtvrsxlhfglt
 - `src/lib/engine/context.ts` — Context Engine
 - `src/lib/engine/safety.ts` — Safety Engine (+ escalateCare FASE 6)
 - `src/lib/engine/living-plan.ts` — Living Plan
+- `src/lib/engine/nutrition.ts` — Nutrition Intelligence (FASE 7)
+- `src/lib/engine/supplement-inventory.ts` — inventário estimado (FASE 7)
 - `src/lib/coach.functions.ts` — AI Coach 2.0 (server context)
 - `src/routes/api/shopify.webhook.ts` — webhooks multi-topic

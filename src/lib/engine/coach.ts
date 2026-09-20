@@ -43,11 +43,16 @@ export function coachReply(promptId: string, state: AppState): string {
   if (!profile) return "Complete seu perfil de performance para eu montar o próximo passo.";
 
   const insights = computeLearningInsights(state);
+  const prefs = {
+    likedExerciseIds: state.likedExerciseIds ?? [],
+    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+  };
   const { days: plan, weekMode } = buildWeeklyPlanDetailed(
     profile,
     state.sessions,
     undefined,
     learningWeekHint(state),
+    prefs,
   );
   const today = planDayForToday(plan);
   const recent = sessionsInLastDays(state.sessions, 7);
@@ -58,7 +63,10 @@ export function coachReply(promptId: string, state: AppState): string {
   const totals = dayNutritionTotals(state.meals ?? []);
   const mealPlan = buildDailyMealPlan(profile, state, todayKey(), insights);
   const nextMeal = nextSuggestedMeal(mealPlan);
-  const lesson = lessonForToday();
+  const lesson = lessonForToday(new Date(), null, {
+    goal: profile.goal,
+    level: profile.level,
+  });
   const routine = state.supplementRoutine.length
     ? state.supplementRoutine
     : PRODUCTS.filter((p) => p.goals.includes(profile.goal))

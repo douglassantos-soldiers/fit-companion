@@ -40,17 +40,20 @@ export const trackAppUserEvent = createServerFn({ method: "POST" })
   .inputValidator(parseTrack)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({
+      deviceId: data.deviceId,
+      requireAccessIfLinked: true,
+    });
     const { trackUserEvent } = await import("@/lib/events/track");
     return trackUserEvent({
       deviceId: data.deviceId,
-      userId: identity?.userId ?? null,
+      resolvedUserId: identity?.userId ?? null,
       eventType: data.eventType,
-      source: data.source,
-      metadata: data.metadata,
-      entityType: data.entityType,
-      entityId: data.entityId,
-      occurredAt: data.occurredAt,
-      idempotencyKey: data.idempotencyKey,
+      ...(data.source ? { source: data.source } : {}),
+      ...(data.metadata ? { metadata: data.metadata } : {}),
+      ...(data.entityType ? { entityType: data.entityType } : {}),
+      ...(data.entityId ? { entityId: data.entityId } : {}),
+      ...(data.occurredAt ? { occurredAt: data.occurredAt } : {}),
+      ...(data.idempotencyKey ? { idempotencyKey: data.idempotencyKey } : {}),
     });
   });

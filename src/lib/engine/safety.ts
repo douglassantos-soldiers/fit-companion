@@ -1,9 +1,11 @@
 /**
  * Safety Engine — contraindications and soft guards before recommendations / AI.
  * Pure TypeScript; no network. Does not diagnose.
+ * Date-aware: always evaluate against the same calendar date as Living Plan / Today.
  */
 import { computeRecoveryV2 } from "@/lib/engine/recovery-v2";
 import type { AppState, Goal } from "@/lib/types";
+import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
 
 export type SafetyFlag =
   | "low_sleep"
@@ -25,30 +27,32 @@ export type SafetyVerdict = {
   requireMedicalDisclaimer: boolean;
   /** Serious signals — do not treat as routine training adaptation. */
   escalateCare: boolean;
+  /** Calendar date used for evaluation */
+  date: string;
 };
 
 /** Non-diagnostic keyword scan for potentially serious check-in notes. */
 const ESCALATE_NOTE_RE =
   /\b(dor\s+no\s+peito|dor\s+no\s+cora[cç][aã]o|falta\s+de\s+ar|n[aã]o\s+consigo\s+respirar|desmaio|desmaiei|tontura\s+forte|sangramento|peito\s+apertando|chest\s+pain|shortness\s+of\s+breath|fainted|seizure|convuls[aã]o)\b/i;
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function notesSuggestEscalation(notes: string | null | undefined): boolean {
   if (!notes?.trim()) return false;
   return ESCALATE_NOTE_RE.test(notes);
 }
 
-export function evaluateSafety(
-  state: Pick<AppState, "dayCheckIns" | "sessions" | "profile">,
-): SafetyVerdict {
+export type SafetyInput = Pick<AppState, "dayCheckIns" | "sessions" | "profile">;
+
+/**
+ * Evaluate safety for a specific calendar date (YYYY-MM-DD).
+ * Prefer this over evaluateSafety when building plans for a target day.
+ */
+export function evaluateSafetyForDate(state: SafetyInput, date: string): SafetyVerdict {
   const flags: SafetyFlag[] = ["medical_disclaimer"];
   const reasons: string[] = [
     "O Coach não substitui orientação médica — ajuste se sentir dor ou mal-estar.",
   ];
 
-  const checkIn = state.dayCheckIns?.[todayKey()];
+  const checkIn = state.dayCheckIns?.[date];
   let blockStims = false;
   let preferLightTraining = false;
   let escalateCare = false;
@@ -109,6 +113,7 @@ export function evaluateSafety(
   }
 
   const recent = [...(state.sessions ?? [])]
+    .filter((s) => s.date <= date)
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 3);
   if (recent.length >= 3 && recent.every((s) => s.rpe === "dificil")) {
@@ -118,7 +123,7 @@ export function evaluateSafety(
   }
 
   try {
-    const v2 = computeRecoveryV2(state as AppState);
+    const v2 = computeRecoveryV2(state as AppState, date);
     if (v2.level === "low") {
       flags.push("under_recovery");
       reasons.push(v2.explanation);
@@ -144,7 +149,19 @@ export function evaluateSafety(
     preferLightTraining,
     requireMedicalDisclaimer: true,
     escalateCare,
+    date,
   };
+}
+
+/** Evaluate safety for "today" in the user's timezone (or default BR). */
+export function evaluateSafety(
+  state: SafetyInput,
+  opts?: { date?: string; timezone?: string | null },
+): SafetyVerdict {
+  const date =
+    opts?.date ??
+    getUserTodayKey(opts?.timezone ?? state.profile?.timezone ?? DEFAULT_USER_TIMEZONE);
+  return evaluateSafetyForDate(state, date);
 }
 
 export function safetyToneForGoal(goal: Goal | undefined): "neutral" | "conservative" {

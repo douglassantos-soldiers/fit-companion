@@ -4,74 +4,63 @@ import {
   CalendarCheck,
   Dumbbell,
   Flame,
-  MessageSquare,
   TrendingUp,
   User,
   Users,
   Utensils,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { SoldiersLogo } from "@/components/soldiers-logo";
 import { cn } from "@/lib/utils";
+import { resolveTabKey } from "@/lib/ui/app-nav";
 
 const TABS = [
   { to: "/", label: "Hoje", icon: CalendarCheck },
   { to: "/treino", label: "Treino", icon: Dumbbell },
-  { to: "/nutricao", label: "Nutrição", icon: Utensils },
   { to: "/social", label: "Social", icon: Users },
-  { to: "/coach", label: "Coach", icon: MessageSquare },
+  { to: "/progresso", label: "Progresso", icon: TrendingUp },
+  { to: "/nutricao", label: "Nutri", icon: Utensils },
 ] as const;
-
-/** Routes that highlight the Social tab */
-const SOCIAL_PATHS = ["/social", "/desafios", "/clubes"];
-
-function resolveTabKey(pathname: string): string {
-  if (pathname === "/" || pathname === "") return "/";
-  if (SOCIAL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return "/social";
-  if (pathname.startsWith("/coach")) return "/coach";
-  const match = TABS.find((t) => t.to !== "/" && pathname.startsWith(t.to));
-  if (match) return match.to;
-  return "/";
-}
 
 export function AppShell({
   title,
   subtitle,
   headerBadge,
+  headerAccessDays,
   hideTitle,
   children,
 }: {
   title: string;
   subtitle?: string;
   headerBadge?: ReactNode;
+  headerAccessDays?: number | null;
   hideTitle?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const selected = resolveTabKey(pathname);
+  const showAccess = headerAccessDays != null && headerAccessDays <= 7;
 
   return (
     <div className="relative min-h-screen bg-background pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
 
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/70 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-md items-center gap-2 px-4 py-3">
           <SoldiersLogo />
           <div className="ml-auto flex items-center gap-1.5">
-            {headerBadge ? (
+            {showAccess ? (
+              <span className="badge badge-soldiers glow-primary gap-1 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wider">
+                acesso {headerAccessDays}d
+              </span>
+            ) : headerBadge ? (
               <span className="badge badge-soldiers glow-primary gap-1 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wider">
                 <Flame className="size-3.5" />
                 {headerBadge}
               </span>
             ) : null}
-            <Link
-              to="/progresso"
-              className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-              aria-label="Progresso"
-            >
-              <TrendingUp className="size-4" />
-            </Link>
             <Link
               to="/perfil"
               className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
@@ -99,10 +88,6 @@ export function AppShell({
             selectedKey={selected}
             onSelectionChange={(key) => {
               const to = String(key) as (typeof TABS)[number]["to"];
-              if (to === "/social") {
-                void navigate({ to, search: { tab: "desafios" } });
-                return;
-              }
               void navigate({ to });
             }}
             className="w-full"
@@ -170,6 +155,19 @@ function EmptyIllustration({ variant }: { variant: "treino" | "progresso" | "soc
   );
 }
 
+export function LoadingPulse({ label = "Carregando…" }: { label?: string }) {
+  return (
+    <div
+      className="surface-glass flex h-40 flex-col items-center justify-center gap-2"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="size-8 animate-pulse rounded-full bg-primary/40" />
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   description,
@@ -183,12 +181,19 @@ export function EmptyState({
   variant?: "treino" | "progresso" | "social" | "default";
   className?: string;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <div className={cn("surface-glass flex flex-col items-center px-6 py-10 text-center", className)}>
+    <motion.div
+      role="status"
+      className={cn("surface-glass flex flex-col items-center px-6 py-10 text-center", className)}
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+    >
       <EmptyIllustration variant={variant} />
       <h2 className="mt-4 text-lg font-bold">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       {action ? <div className="mt-5 w-full">{action}</div> : null}
-    </div>
+    </motion.div>
   );
 }

@@ -6,6 +6,7 @@ import { emitUserEvent } from "@/lib/events/emit";
 import { trackAppEvent } from "@/lib/shopify.functions";
 import { markDecisionOutcomeBestEffort } from "@/lib/decision-client";
 import { todayKey } from "@/lib/types";
+import { recordBehaviorOutcomeBestEffort } from "@/lib/engine/outcome-learning";
 
 export type OutcomeKind =
   | "workout_started"
@@ -58,4 +59,29 @@ export async function trackOutcome(
   } catch {
     /* best-effort */
   }
+}
+
+/** After express/workout/meal completion tied to a behavior intervention. */
+export async function trackBehaviorInterventionOutcome(opts: {
+  userId?: string | null;
+  interventionId?: string | null;
+  success: boolean;
+  kind?: "express" | "workout" | "meal";
+  metrics?: Record<string, unknown>;
+}): Promise<void> {
+  const payload: {
+    userId?: string | null;
+    interventionId?: string | null;
+    success: boolean;
+    metrics: Record<string, unknown>;
+  } = {
+    success: opts.success,
+    metrics: {
+      kind: opts.kind ?? "workout",
+      ...(opts.metrics ?? {}),
+    },
+  };
+  if (opts.userId !== undefined) payload.userId = opts.userId;
+  if (opts.interventionId !== undefined) payload.interventionId = opts.interventionId;
+  await recordBehaviorOutcomeBestEffort(payload);
 }

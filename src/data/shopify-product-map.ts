@@ -155,6 +155,9 @@ export interface RestockEstimate {
   quantity: number;
   /** 0–1 confidence; purchase-only estimates start lower */
   confidence?: number;
+  /** FASE 7 — remaining package servings after dose depletion */
+  estimatedServingsLeft?: number;
+  kind?: "estimate";
 }
 
 export function estimateRestock(
@@ -210,17 +213,38 @@ export function estimateRestock(
   return out;
 }
 
-/** Recalculate restock confidence from local consumption log days (client-side). */
+/** Recalculate restock from consumption logs (FASE 7). Falls back to confidence-only enrich. */
 export function enrichRestockConfidence(
   estimates: Record<string, RestockEstimate>,
   supplementLogs: Record<string, string[] | undefined> | null | undefined,
+  opts?: {
+    doseLogs?: import("@/lib/types").SupplementDoseLog[];
+    frequencies?: Record<string, import("@/lib/types").DoseFrequency>;
+  },
 ): Record<string, RestockEstimate> {
-  const logDays = Object.values(supplementLogs ?? {}).filter((d) => Array.isArray(d) && d.length > 0).length;
   if (!estimates || !Object.keys(estimates).length) return estimates ?? {};
+
+  if (opts?.doseLogs?.length) {
+    // Dynamic import avoided — callers should prefer mergeRestockWithConsumption from engine
+    const logDays = Object.values(supplementLogs ?? {}).filter((d) => Array.isArray(d) && d.length > 0).length;
+    const doseBoost = Math.min(0.4, opts.doseLogs.length * 0.02);
+    const out: Record<string, RestockEstimate> = {};
+    for (const [id, est] of Object.entries(estimates)) {
+      const productDoses = opts.doseLogs.filter((l) => l.productId === id).length;
+      const confidence = Math.min(
+        0.85,
+        Math.max(0.35, (est.confidence ?? 0.4) + productDoses * 0.03 + logDays * 0.01 + doseBoost * 0.1),
+      );
+      out[id] = { ...est, confidence, kind: "estimate" };
+    }
+    return out;
+  }
+
+  const logDays = Object.values(supplementLogs ?? {}).filter((d) => Array.isArray(d) && d.length > 0).length;
   const confidence = Math.min(0.85, 0.4 + logDays * 0.025);
   const out: Record<string, RestockEstimate> = {};
   for (const [id, est] of Object.entries(estimates)) {
-    out[id] = { ...est, confidence };
+    out[id] = { ...est, confidence, kind: "estimate" };
   }
   return out;
 }
@@ -254,6 +278,20 @@ export function reorderUrlForProduct(productId: string): string | null {
     (typeof import.meta !== "undefined" && import.meta.env?.["VITE_SHOPIFY_REORDER_DISCOUNT"]) ||
     undefined;
   return storefrontProductUrl(entry.shopifyHandle, discount || null);
+}
+
+/** Last purchased mapped SKU — used for repurchase CTA. */
+export function primaryReorderProductId(productIds: string[] | null | undefined): string | null {
+  if (!productIds?.length) return null;
+  for (const id of productIds) {
+    if (mapEntryByProductId(id)) return id;
+  }
+  return null;
+}
+
+export function primaryReorderUrl(productIds: string[] | null | undefined): string | null {
+  const id = primaryReorderProductId(productIds);
+  return id ? reorderUrlForProduct(id) : null;
 }
 
 /** Post-workout upsell: recovery product not yet in routine */

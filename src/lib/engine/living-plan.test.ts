@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 import { buildLivingPlan } from "@/lib/engine/living-plan";
 import { emptyState, todayKey, type AppState, type Profile } from "@/lib/types";
 
+/** Monday — daysPerWeek:4 maps to Mon/Tue/Thu/Fri so volume decisions apply. */
+const TRAINING_DATE = "2026-09-14";
+
 const baseProfile: Profile = {
   name: "Teste",
   goal: "massa",
@@ -31,7 +34,7 @@ function stateWith(profile: Profile, extras: Partial<AppState> = {}): AppState {
 
 describe("buildLivingPlan — persona A vs B (mesmo goal)", () => {
   it("gera ações diferentes para bom sono vs sono ruim + baixa proteína", () => {
-    const date = todayKey();
+    const date = TRAINING_DATE;
 
     const personaA = stateWith({
       ...baseProfile,
@@ -86,7 +89,7 @@ describe("buildLivingPlan — persona A vs B (mesmo goal)", () => {
 
 describe("buildLivingPlan — adaptação pós check-in de sono", () => {
   it("reduz volume e explica no Why após sono ruim", () => {
-    const date = todayKey();
+    const date = TRAINING_DATE;
     const base = stateWith({
       ...baseProfile,
       typicalSleepHours: 8,
@@ -120,7 +123,7 @@ describe("buildLivingPlan — adaptação pós check-in de sono", () => {
   });
 
   it("cenário multi-dia: sono ruim → volume↓ → sono ok → volume sobe", () => {
-    const date = todayKey();
+    const date = TRAINING_DATE;
     const d = new Date(`${date}T12:00:00`);
     d.setDate(d.getDate() - 1);
     const yesterday = todayKey(d);
@@ -160,7 +163,7 @@ describe("buildLivingPlan — adaptação pós check-in de sono", () => {
 
 describe("buildLivingPlan — Why por mudança", () => {
   it("explica proteína e calorias quando bias/delta ativos", () => {
-    const date = todayKey();
+    const date = TRAINING_DATE;
     const state = stateWith(
       { ...baseProfile, goal: "massa", typicalSleepHours: 5 },
       {

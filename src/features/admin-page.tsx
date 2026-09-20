@@ -1,81 +1,215 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Image, Save, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EXERCISES } from "@/data/exercises";
 import { MEAL_PRESETS } from "@/data/meal-presets";
-import { CHALLENGES } from "@/data/challenges";
-import { checkAdminSession, loginAdmin } from "@/lib/access.functions";
-import { loadCms, saveCms, type CmsState } from "@/lib/cms";
-import { useStore } from "@/lib/store";
+import { checkAdminSession, loginAdmin, logoutAdmin } from "@/lib/access.functions";
+import {
+  deleteAdminContent,
+  hideAdminActivity,
+  hideAdminComment,
+  listAdminChallenges,
+  listAdminContent,
+  listAdminExercises,
+  listAdminReports,
+  listShopifyOps,
+  loadAdminTrainingRules,
+  loadCmsRemote,
+  loadProductAnalytics,
+  lookupUserByEmail,
+  importShopifyCustomersBatch,
+  resolveAdminReport,
+  resyncEntitlement,
+  saveAdminChallenge,
+  saveAdminContent,
+  saveAdminExercise,
+  saveAdminTrainingRules,
+  saveCmsRemote,
+  setEntitlementManual,
+  setUserStatus,
+} from "@/lib/admin.functions";
+import type { AdminUserLookup, ShopifyOpsSnapshot } from "@/lib/admin.server";
+import {
+  accumulateShopifyCustomerImport,
+  emptyShopifyCustomerImportTotals,
+  type ShopifyCustomerImportTotals,
+} from "@/lib/shopify-customers";
+import type { ProductAnalytics } from "@/lib/analytics.server";
+import { loadCms, setCmsCache, type CmsState } from "@/lib/cms";
+import type { ResolvedLibraryExercise } from "@/lib/training/resolve-catalog";
+import type { AdminChallengeRow } from "@/lib/catalog.server";
+import type { PublicContentItem } from "@/lib/content-match";
+import type { TrainingRules } from "@/lib/training/training-rules";
+import type { ContentReportRow } from "@/lib/moderation.server";
+import { ALL_ADMIN_TABS, ADMIN_CATALOG_TABS, ADMIN_OPS_TABS, type AdminTabId } from "@/features/admin/nav";
+import { DashboardTab } from "@/features/admin/dashboard-tab";
+import { UsersTab } from "@/features/admin/users-tab";
+import { ExercisesTab } from "@/features/admin/exercises-tab";
+import { ProgramsTab } from "@/features/admin/programs-tab";
+import { ChallengesTab } from "@/features/admin/challenges-tab";
+import { ContentTab } from "@/features/admin/content-tab";
+import { MediaTab } from "@/features/admin/media-tab";
+import { ModerationTab } from "@/features/admin/moderation-tab";
+import { SystemTab } from "@/features/admin/system-tab";
+import { cn } from "@/lib/utils";
 
 export function AdminPage() {
-  const { state, hydrated } = useStore();
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [tab, setTab] = useState<AdminTabId>("dashboard");
   const [cms, setCms] = useState<CmsState>(() => emptyCms());
+  const [saving, setSaving] = useState(false);
+  const [lookupEmail, setLookupEmail] = useState("");
+  const [lookup, setLookup] = useState<AdminUserLookup | null>(null);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [ops, setOps] = useState<ShopifyOpsSnapshot | null>(null);
+  const [opsBusy, setOpsBusy] = useState(false);
+  const [importRunning, setImportRunning] = useState(false);
+  const [importTotals, setImportTotals] = useState<ShopifyCustomerImportTotals | null>(null);
+  const importAbortRef = useRef(false);
+  const [analytics, setAnalytics] = useState<ProductAnalytics | null>(null);
+  const [analyticsBusy, setAnalyticsBusy] = useState(false);
+  const [exercises, setExercises] = useState<ResolvedLibraryExercise[]>([]);
+  const [challenges, setChallenges] = useState<AdminChallengeRow[]>([]);
+  const [content, setContent] = useState<PublicContentItem[]>([]);
+  const [rules, setRules] = useState<TrainingRules | null>(null);
+  const [reports, setReports] = useState<ContentReportRow[]>([]);
+  const [catalogBusy, setCatalogBusy] = useState(false);
+
   const doLogin = useServerFn(loginAdmin);
   const doCheck = useServerFn(checkAdminSession);
+  const doLogout = useServerFn(logoutAdmin);
+  const doLoadCms = useServerFn(loadCmsRemote);
+  const doSaveCms = useServerFn(saveCmsRemote);
+  const doLookup = useServerFn(lookupUserByEmail);
+  const doResync = useServerFn(resyncEntitlement);
+  const doSetEntitlement = useServerFn(setEntitlementManual);
+  const doSetStatus = useServerFn(setUserStatus);
+  const doListOps = useServerFn(listShopifyOps);
+  const doImportCustomers = useServerFn(importShopifyCustomersBatch);
+  const doAnalytics = useServerFn(loadProductAnalytics);
+  const doListExercises = useServerFn(listAdminExercises);
+  const doSaveExercise = useServerFn(saveAdminExercise);
+  const doListChallenges = useServerFn(listAdminChallenges);
+  const doSaveChallenge = useServerFn(saveAdminChallenge);
+  const doLoadRules = useServerFn(loadAdminTrainingRules);
+  const doSaveRules = useServerFn(saveAdminTrainingRules);
+  const doListContent = useServerFn(listAdminContent);
+  const doSaveContent = useServerFn(saveAdminContent);
+  const doDeleteContent = useServerFn(deleteAdminContent);
+  const doListReports = useServerFn(listAdminReports);
+  const doResolveReport = useServerFn(resolveAdminReport);
+  const doHideActivity = useServerFn(hideAdminActivity);
+  const doHideComment = useServerFn(hideAdminComment);
+
   const featured = useMemo(
     () => EXERCISES.filter((e) => e.priority === 1 || e.mediaUrl).slice(0, 24),
     [],
   );
 
   useEffect(() => {
-    setCms(loadCms());
     void doCheck()
-      .then((r) => setAuthed(r.ok))
+      .then(async (r) => {
+        setAuthed(r.ok);
+        if (r.ok) {
+          try {
+            const remote = await doLoadCms();
+            setCms(remote);
+            setCmsCache(remote);
+          } catch {
+            setCms(loadCms());
+          }
+        }
+      })
       .catch(() => setAuthed(false))
       .finally(() => setChecking(false));
-  }, [doCheck]);
+  }, [doCheck, doLoadCms]);
 
-  if (!hydrated || checking) {
-    return <div className="flex min-h-screen items-center justify-center bg-background text-sm">Carregando…</div>;
-  }
+  const loadAnalytics = () => {
+    setAnalyticsBusy(true);
+    void doAnalytics()
+      .then((r) => setAnalytics(r))
+      .catch(() => toast.error("Falha ao carregar métricas"))
+      .finally(() => setAnalyticsBusy(false));
+  };
 
-  if (!state.accessGranted) {
+  useEffect(() => {
+    if (authed && tab === "dashboard" && !analytics) loadAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per tab
+  }, [authed, tab]);
+
+  if (checking) {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5">
-        <p className="text-sm text-muted-foreground">Libere o acesso do app antes de abrir o admin.</p>
-        <Link to="/acesso" search={{ token: undefined }} className="mt-4">
-          <Button className="w-full">Ir para acesso</Button>
-        </Link>
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm">
+        Carregando…
       </div>
     );
   }
 
   const tryAuth = () => {
-    void doLogin({ data: { pin } }).then((r) => {
-      if (r.ok) {
-        setAuthed(true);
-        toast.success("Admin liberado");
-      } else if (r.reason === "not_configured") {
-        toast.error("ADMIN_PIN não configurado no servidor");
-      } else if (r.reason === "rate_limited") {
-        toast.error("Muitas tentativas — aguarde");
-      } else {
-        toast.error("PIN inválido");
-      }
-    });
+    void doLogin({ data: { email, password } })
+      .then(async (r) => {
+        if (r.ok) {
+          setAuthed(true);
+          toast.success("Admin liberado");
+          try {
+            const remote = await doLoadCms();
+            setCms(remote);
+            setCmsCache(remote);
+          } catch {
+            setCms(loadCms());
+          }
+        } else if (r.reason === "not_configured") {
+          toast.error("Admin não configurado no servidor");
+        } else if (r.reason === "rate_limited") {
+          toast.error("Muitas tentativas — aguarde");
+        } else {
+          toast.error("E-mail ou senha inválidos");
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Falha no login admin";
+        toast.error(msg);
+      });
   };
 
   if (!authed) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5">
-        <h1 className="text-display text-3xl">Admin CMS</h1>
-        <p className="mt-2 text-sm text-muted-foreground">PIN do servidor (ADMIN_PIN — nunca VITE_).</p>
+        <h1 className="text-display text-3xl">Admin Console</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Entre com o e-mail e a senha de admin (nunca VITE_).
+        </p>
+        <Label htmlFor="admin-email" className="mt-4 text-xs">
+          E-mail
+        </Label>
         <Input
+          id="admin-email"
+          type="email"
+          className="mt-1"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="admin@exemplo.com"
+          autoComplete="username"
+        />
+        <Label htmlFor="admin-password" className="mt-3 text-xs">
+          Senha
+        </Label>
+        <Input
+          id="admin-password"
           type="password"
-          className="mt-4"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="PIN"
+          className="mt-1"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Senha"
+          autoComplete="current-password"
           onKeyDown={(e) => {
             if (e.key === "Enter") tryAuth();
           }}
@@ -90,112 +224,501 @@ export function AdminPage() {
     );
   }
 
-  const persist = () => {
-    saveCms(cms);
-    toast.success("CMS salvo neste aparelho");
+  const persistCms = () => {
+    setSaving(true);
+    void doSaveCms({ data: { cms } })
+      .then((r) => {
+        if (r.ok) {
+          setCms(r.cms);
+          setCmsCache(r.cms);
+          toast.success(`CMS salvo no servidor (${r.count} itens)`);
+        } else {
+          toast.error(r.reason === "db_unavailable" ? "DB indisponível" : "Falha ao salvar CMS");
+        }
+      })
+      .catch(() => toast.error("Falha ao salvar CMS"))
+      .finally(() => setSaving(false));
+  };
+
+  const runLookup = () => {
+    const next = lookupEmail.trim().toLowerCase();
+    if (!next.includes("@")) {
+      toast.error("E-mail inválido");
+      return;
+    }
+    setLookupBusy(true);
+    void doLookup({ data: { email: next } })
+      .then((r) => setLookup(r))
+      .catch(() => toast.error("Falha no lookup"))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const runResync = () => {
+    if (!lookup?.email) return;
+    setLookupBusy(true);
+    void doResync({ data: { email: lookup.email } })
+      .then((r) => {
+        if (r.ok) {
+          setLookup(r.lookup);
+          toast.success("Entitlement resincronizado");
+        } else {
+          toast.error(r.reason === "no_entitlement" ? "Sem entitlement / pedidos" : "Falha no resync");
+        }
+      })
+      .catch(() => toast.error("Falha no resync"))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const runGrant = (tier: "base" | "performance") => {
+    if (!lookup?.email) return;
+    if (!window.confirm(`Liberar acesso ${tier} para ${lookup.email}?`)) return;
+    setLookupBusy(true);
+    void doSetEntitlement({ data: { email: lookup.email, action: "grant", tier } })
+      .then((r) => {
+        if (r.ok) {
+          setLookup(r.lookup);
+          toast.success(`Acesso ${tier} liberado`);
+        } else toast.error("Falha ao liberar");
+      })
+      .catch(() => toast.error("Falha ao liberar"))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const runRevoke = () => {
+    if (!lookup?.email) return;
+    if (!window.confirm(`Revogar acesso de ${lookup.email}?`)) return;
+    setLookupBusy(true);
+    void doSetEntitlement({ data: { email: lookup.email, action: "revoke", tier: "base" } })
+      .then((r) => {
+        if (r.ok) {
+          setLookup(r.lookup);
+          toast.success("Acesso revogado");
+        } else toast.error("Falha ao revogar");
+      })
+      .catch(() => toast.error("Falha ao revogar"))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const runStatus = (status: "active" | "suspended" | "banned") => {
+    if (!lookup?.email) return;
+    const until =
+      status === "suspended" ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null;
+    setLookupBusy(true);
+    void doSetStatus({
+      data: {
+        email: lookup.email,
+        status,
+        statusUntil: until,
+        reason: status === "active" ? null : status,
+      },
+    })
+      .then((r) => {
+        if (r.ok) {
+          setLookup(r.lookup);
+          toast.success(status === "active" ? "Conta reativada" : `Conta ${status}`);
+        } else toast.error(r.reason === "not_found" ? "Usuário não encontrado" : "Falha no status");
+      })
+      .catch(() => toast.error("Falha no status"))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const loadOps = () => {
+    setOpsBusy(true);
+    void doListOps()
+      .then((r) => setOps(r))
+      .catch(() => toast.error("Falha ao carregar ops"))
+      .finally(() => setOpsBusy(false));
+  };
+
+  const runCustomerImport = (reset: boolean) => {
+    importAbortRef.current = false;
+    setImportRunning(true);
+    setImportTotals(emptyShopifyCustomerImportTotals());
+    void (async () => {
+      let acc = emptyShopifyCustomerImportTotals();
+      let first = true;
+      try {
+        while (!importAbortRef.current) {
+          const batch = await doImportCustomers({ data: { reset: first && reset } });
+          first = false;
+          acc = accumulateShopifyCustomerImport(acc, batch);
+          setImportTotals(acc);
+          if (!batch.hasMore) {
+            toast.success("Importação de clientes concluída");
+            break;
+          }
+        }
+        if (importAbortRef.current) {
+          toast.message("Importação pausada. Continue para retomar o cursor.");
+        }
+        loadOps();
+      } catch {
+        toast.error("Falha na importação Shopify");
+      } finally {
+        setImportRunning(false);
+      }
+    })();
+  };
+
+  const loadExercises = () => {
+    setCatalogBusy(true);
+    void doListExercises()
+      .then((r) => setExercises(r))
+      .catch(() => toast.error("Falha ao listar exercícios"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadChallenges = () => {
+    setCatalogBusy(true);
+    void doListChallenges()
+      .then((r) => setChallenges(r))
+      .catch(() => toast.error("Falha ao listar desafios"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadContent = () => {
+    setCatalogBusy(true);
+    void doListContent()
+      .then((r) => setContent(r))
+      .catch(() => toast.error("Falha ao listar conteúdo"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadRules = () => {
+    setCatalogBusy(true);
+    void doLoadRules()
+      .then((r) => setRules(r))
+      .catch(() => toast.error("Falha ao carregar regras"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadReports = () => {
+    setCatalogBusy(true);
+    void doListReports()
+      .then((r) => setReports(r))
+      .catch(() => toast.error("Falha ao carregar denúncias"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const selectTab = (next: AdminTabId) => {
+    setTab(next);
+    if (next === "dashboard" && !analytics) loadAnalytics();
+    if (next === "sistema" && !ops) loadOps();
+    if (next === "exercicios" && !exercises.length) loadExercises();
+    if (next === "desafios" && !challenges.length) loadChallenges();
+    if (next === "conteudo" && !content.length) loadContent();
+    if (next === "programas" && !rules) loadRules();
+    if (next === "moderacao" && !reports.length) loadReports();
   };
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md bg-background px-4 py-6 pb-20">
-      <div className="flex items-center gap-3">
+    <div className="mx-auto min-h-screen w-full max-w-6xl bg-background px-4 py-6 pb-20">
+      <div className="flex flex-wrap items-center gap-3">
         <Link to="/perfil" className="rounded-full border border-white/10 p-2 text-muted-foreground">
           <ArrowLeft className="size-4" />
         </Link>
-        <div>
-          <h1 className="text-display text-2xl">Admin CMS</h1>
-          <p className="text-xs text-muted-foreground">Treinos, vídeos e imagens · local até o remoto</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-display text-2xl">Admin Console</h1>
+          <p className="text-xs text-muted-foreground">Backoffice de produto · sem dados de saúde</p>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => {
+            void doLogout().then(() => {
+              setAuthed(false);
+              setPassword("");
+              toast.success("Sessão admin encerrada");
+            });
+          }}
+        >
+          <LogOut className="size-3.5" /> Sair
+        </Button>
       </div>
 
-      <Button className="mt-4 h-11 w-full gap-2 font-bold uppercase tracking-wide" onClick={persist}>
-        <Save className="size-4" /> Salvar alterações
-      </Button>
+      <div className="mt-6 md:hidden">
+        <select
+          className="h-11 w-full rounded-md border border-white/10 bg-background px-3 text-sm"
+          value={tab}
+          onChange={(e) => selectTab(e.target.value as AdminTabId)}
+        >
+          {ALL_ADMIN_TABS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <Tabs defaultValue="exercicios" className="mt-6">
-        <TabsList className="w-full rounded-full bg-muted/40 p-1">
-          <TabsTrigger value="exercicios" className="flex-1 rounded-full">
-            Treinos
-          </TabsTrigger>
-          <TabsTrigger value="comidas" className="flex-1 rounded-full">
-            Comidas
-          </TabsTrigger>
-          <TabsTrigger value="desafios" className="flex-1 rounded-full">
-            Desafios
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="exercicios" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Cole URL de imagem ou vídeo (mp4/gif). Usado na sessão quando o override existir.
+      <div className="mt-6 flex gap-6">
+        <nav className="hidden w-44 shrink-0 md:block">
+          <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            Operação
           </p>
-          {featured.map((ex) => (
-            <div key={ex.id} className="surface-glass space-y-2 p-4">
-              <div className="flex items-center gap-2">
-                <Video className="size-4 text-primary" />
-                <p className="text-sm font-semibold">{ex.name}</p>
-              </div>
-              <Label className="text-xs text-muted-foreground">mediaUrl</Label>
-              <Input
-                value={cms.exerciseMedia[ex.id] ?? ex.mediaUrl ?? ""}
-                placeholder="https://…"
-                onChange={(e) =>
-                  setCms((s) => ({
-                    ...s,
-                    exerciseMedia: { ...s.exerciseMedia, [ex.id]: e.target.value },
-                  }))
-                }
-              />
-              <Label className="text-xs text-muted-foreground">Nota do movimento</Label>
-              <Input
-                value={cms.workoutNotes[ex.id] ?? ""}
-                placeholder="Cue de execução…"
-                onChange={(e) =>
-                  setCms((s) => ({
-                    ...s,
-                    workoutNotes: { ...s.workoutNotes, [ex.id]: e.target.value },
-                  }))
-                }
-              />
-            </div>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="comidas" className="mt-4 space-y-3">
-          {MEAL_PRESETS.map((m) => (
-            <div key={m.id} className="surface-glass space-y-2 p-4">
-              <div className="flex items-center gap-2">
-                <Image className="size-4 text-primary" />
-                <p className="text-sm font-semibold">{m.label}</p>
-              </div>
-              <Input
-                value={cms.mealImages[m.id] ?? m.imageUrl ?? ""}
-                placeholder="https://… imagem"
-                onChange={(e) =>
-                  setCms((s) => ({
-                    ...s,
-                    mealImages: { ...s.mealImages, [m.id]: e.target.value },
-                  }))
-                }
-              />
-            </div>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="desafios" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Catálogo atual (somente leitura). Edição remota entra na próxima fase do CMS.
+          <ul className="mt-1 space-y-1">
+            {ADMIN_OPS_TABS.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    "w-full rounded-lg px-2 py-1.5 text-left text-sm",
+                    tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground",
+                  )}
+                  onClick={() => selectTab(t.id)}
+                >
+                  {t.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            Catálogo
           </p>
-          {CHALLENGES.map((c) => (
-            <div key={c.id} className="surface-glass p-4">
-              <p className="text-sm font-semibold">{c.title}</p>
-              <p className="text-xs text-muted-foreground">
-                {c.target} {c.unit} · {c.durationDays}d
-                {c.requiresPerformance ? " · Performance" : ""}
-              </p>
-            </div>
-          ))}
-        </TabsContent>
-      </Tabs>
+          <ul className="mt-1 space-y-1">
+            {ADMIN_CATALOG_TABS.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    "w-full rounded-lg px-2 py-1.5 text-left text-sm",
+                    tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground",
+                  )}
+                  onClick={() => selectTab(t.id)}
+                >
+                  {t.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="min-w-0 flex-1">
+          {tab === "dashboard" ? (
+            <DashboardTab analytics={analytics} busy={analyticsBusy} onRefresh={loadAnalytics} />
+          ) : null}
+          {tab === "usuarios" ? (
+            <UsersTab
+              lookupEmail={lookupEmail}
+              setLookupEmail={setLookupEmail}
+              lookup={lookup}
+              busy={lookupBusy}
+              onLookup={runLookup}
+              onResync={runResync}
+              onGrant={runGrant}
+              onRevoke={runRevoke}
+              onStatus={runStatus}
+            />
+          ) : null}
+          {tab === "exercicios" ? (
+            <ExercisesTab
+              rows={exercises}
+              busy={catalogBusy}
+              onReload={loadExercises}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveExercise({
+                  data: {
+                    id: row.id,
+                    name: row.name,
+                    group: row.group,
+                    equipment: row.equipment,
+                    swapGroup: row.swapGroup,
+                    joints: row.joints,
+                    unit: row.unit,
+                    baseLoad: row.baseLoad,
+                    priority: row.priority,
+                    primaryMuscles: row.primaryMuscles,
+                    secondaryMuscles: row.secondaryMuscles,
+                    movementPattern: row.movementPattern,
+                    difficulty: row.difficulty,
+                    plannerEligible: row.plannerEligible,
+                    active: row.active,
+                    instructions: row.instructions,
+                    videoUrl: row.videoUrl ?? null,
+                    mediaUrl: row.mediaUrl ?? null,
+                    cues: row.cues ?? null,
+                    alternativeIds: row.alternativeIds,
+                  },
+                })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Exercício salvo");
+                      loadExercises();
+                    } else toast.error("Falha ao salvar exercício");
+                  })
+                  .catch(() => toast.error("Falha ao salvar exercício"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "programas" ? (
+            <ProgramsTab
+              rules={rules}
+              setRules={setRules}
+              busy={catalogBusy}
+              onSave={() => {
+                if (!rules) return;
+                setCatalogBusy(true);
+                void doSaveRules({ data: rules })
+                  .then((r) => {
+                    if (r.ok) toast.success("Regras salvas");
+                    else toast.error("Falha ao salvar regras");
+                  })
+                  .catch(() => toast.error("Falha ao salvar regras"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "desafios" ? (
+            <ChallengesTab
+              rows={challenges}
+              busy={catalogBusy}
+              onReload={loadChallenges}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveChallenge({
+                  data: {
+                    id: row.id,
+                    title: row.title ?? "",
+                    description: row.description ?? "",
+                    category: row.category ?? "consistency",
+                    metric: row.metric ?? "sessoes",
+                    target: row.target ?? 1,
+                    unit: row.unit ?? "treinos",
+                    durationDays: row.durationDays ?? 7,
+                    rankingMode: row.rankingMode ?? "absolute",
+                    reward: row.reward ?? null,
+                    active: row.active !== false,
+                    startsAt: row.startsAt ?? null,
+                    endsAt: row.endsAt ?? null,
+                    requiresPerformance: Boolean(row.requiresPerformance),
+                    targetPct: row.targetPct ?? null,
+                    personalTargetMin: row.personalTargetMin ?? null,
+                    personalTargetMax: row.personalTargetMax ?? null,
+                    personalTargetFactor: row.personalTargetFactor ?? null,
+                    personalTargetOffset: row.personalTargetOffset ?? null,
+                  },
+                })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Desafio salvo");
+                      loadChallenges();
+                    } else toast.error("Falha ao salvar desafio");
+                  })
+                  .catch(() => toast.error("Falha ao salvar desafio"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "conteudo" ? (
+            <ContentTab
+              rows={content}
+              busy={catalogBusy}
+              onReload={loadContent}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveContent({
+                  data: {
+                    ...(row.id ? { id: row.id } : {}),
+                    kind: row.kind,
+                    title: row.title,
+                    body: row.body,
+                    mediaUrl: row.mediaUrl ?? null,
+                    goals: row.goals,
+                    levels: row.levels,
+                    published: row.published,
+                    sortOrder: row.sortOrder,
+                  },
+                })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Conteúdo salvo");
+                      loadContent();
+                    } else toast.error("Falha ao salvar conteúdo");
+                  })
+                  .catch(() => toast.error("Falha ao salvar conteúdo"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+              onDelete={(id) => {
+                if (!window.confirm("Excluir este conteúdo?")) return;
+                setCatalogBusy(true);
+                void doDeleteContent({ data: { id } })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Excluído");
+                      loadContent();
+                    } else toast.error("Falha ao excluir");
+                  })
+                  .catch(() => toast.error("Falha ao excluir"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "midia" ? (
+            <MediaTab
+              cms={cms}
+              setCms={(updater) => setCms(updater)}
+              featured={featured}
+              meals={MEAL_PRESETS}
+              saving={saving}
+              onSave={persistCms}
+            />
+          ) : null}
+          {tab === "moderacao" ? (
+            <ModerationTab
+              reports={reports}
+              busy={catalogBusy}
+              onReload={loadReports}
+              onResolve={(reportId, status, hideEvent) => {
+                setCatalogBusy(true);
+                void doResolveReport({ data: { reportId, status, hideEvent } })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Relatório atualizado");
+                      loadReports();
+                    } else toast.error("Falha na moderação");
+                  })
+                  .catch(() => toast.error("Falha na moderação"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+              onHide={(eventId) => {
+                setCatalogBusy(true);
+                void doHideActivity({ data: { eventId } })
+                  .then((r) => {
+                    if (r.ok) toast.success("Evento oculto");
+                    else toast.error("Falha ao ocultar");
+                  })
+                  .catch(() => toast.error("Falha ao ocultar"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+              onHideComment={(commentId) => {
+                setCatalogBusy(true);
+                void doHideComment({ data: { commentId } })
+                  .then((r) => {
+                    if (r.ok) toast.success("Comentário oculto");
+                    else toast.error("Falha ao ocultar");
+                  })
+                  .catch(() => toast.error("Falha ao ocultar"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "sistema" ? (
+            <SystemTab
+              ops={ops}
+              busy={opsBusy}
+              onReload={loadOps}
+              importRunning={importRunning}
+              importTotals={importTotals}
+              onImport={runCustomerImport}
+              onImportStop={() => {
+                importAbortRef.current = true;
+              }}
+            />
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { Utensils } from "lucide-react";
 import type { MealPreset } from "@/data/meal-presets";
-import { mealImageUrl } from "@/lib/cms";
+import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
+import { resolveMealMedia } from "@/lib/soldiers-media";
 import { cn } from "@/lib/utils";
 
-/** Mini thumb de preset: foto se houver imageUrl, senão gradient por quality. */
+/** Mini thumb de preset: Soldiers poster → Unsplash legado → gradient. */
 export function MealPresetThumb({
   preset,
   className,
@@ -13,22 +14,12 @@ export function MealPresetThumb({
   className?: string;
   iconClassName?: string;
 }) {
-  const src = mealImageUrl(preset.id, preset.imageUrl);
-  if (src) {
-    return (
-      <div className={cn("relative shrink-0 overflow-hidden rounded-xl", className ?? "size-12")}>
-        <img
-          src={src}
-          alt=""
-          width={96}
-          height={96}
-          loading="lazy"
-          decoding="async"
-          sizes="48px"
-          className="h-full w-full object-cover"
-        />
-      </div>
-    );
+  const media = resolveMealMedia(preset.id, preset.imageUrl);
+  const thumb = (
+    <SoldiersMediaThumb media={media} alt={preset.label} className={className ?? "size-12"} />
+  );
+  if (media.posterUrl || media.thumbnailUrl) {
+    return thumb;
   }
 
   return (

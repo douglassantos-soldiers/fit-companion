@@ -7,7 +7,7 @@ import {
   isAllowedPatternKind,
   sanitizeEvidenceNote,
 } from "@/lib/engine/learning-guardrails";
-import { extractUserPatterns, type UserPatterns } from "@/lib/engine/learning";
+import { extractUserPatterns, type UserPatterns } from "@/lib/engine/user-patterns";
 import { todayKey, type AppState } from "@/lib/types";
 
 export type PatternKind =

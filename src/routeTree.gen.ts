@@ -12,20 +12,36 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AcessoRouteImport } from './routes/acesso'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as ClubesRouteImport } from './routes/clubes'
 import { Route as CoachRouteImport } from './routes/coach'
 import { Route as DesafiosRouteImport } from './routes/desafios'
+import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as HubsRouteImport } from './routes/hubs'
 import { Route as NutricaoRouteImport } from './routes/nutricao'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PerfilRouteImport } from './routes/perfil'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as ProgressoRouteImport } from './routes/progresso'
 import { Route as SocialRouteImport } from './routes/social'
 import { Route as SuplementosRouteImport } from './routes/suplementos'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as ConteudoIndexRouteImport } from './routes/conteudo.index'
+import { Route as ConteudoIdRouteImport } from './routes/conteudo.$id'
 import { Route as HubsSlugRouteImport } from './routes/hubs.$slug'
+import { Route as ProgressoIndexRouteImport } from './routes/progresso.index'
+import { Route as ProgressoCorpoRouteImport } from './routes/progresso.corpo'
+import { Route as ProgressoResumoRouteImport } from './routes/progresso.resumo'
+import { Route as SocialIndexRouteImport } from './routes/social.index'
+import { Route as SocialUserIdRouteImport } from './routes/social.$userId'
+import { Route as SocialSeguidoresRouteImport } from './routes/social.seguidores'
 import { Route as TreinoIndexRouteImport } from './routes/treino.index'
+import { Route as WearablesCallbackRouteImport } from './routes/wearables.callback'
+import { Route as ApiCronDailyPushesRouteImport } from './routes/api/cron.daily-pushes'
 import { Route as ApiShopifyWebhookRouteImport } from './routes/api/shopify.webhook'
+import { Route as TreinoExercicioIdRouteImport } from './routes/treino.exercicio.$id'
+import { Route as TreinoHistoricoSessionIdRouteImport } from './routes/treino.historico.$sessionId'
 import { Route as TreinoSessaoIdRouteImport } from './routes/treino.sessao.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -43,6 +59,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClubesRoute = ClubesRouteImport.update({
   id: '/clubes',
   path: '/clubes',
@@ -56,6 +77,11 @@ const CoachRoute = CoachRouteImport.update({
 const DesafiosRoute = DesafiosRouteImport.update({
   id: '/desafios',
   path: '/desafios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntrarRoute = EntrarRouteImport.update({
+  id: '/entrar',
+  path: '/entrar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HubsRoute = HubsRouteImport.update({
@@ -78,6 +104,11 @@ const PerfilRoute = PerfilRouteImport.update({
   path: '/perfil',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressoRoute = ProgressoRouteImport.update({
   id: '/progresso',
   path: '/progresso',
@@ -93,9 +124,24 @@ const SuplementosRoute = SuplementosRouteImport.update({
   path: '/suplementos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConteudoIndexRoute = ConteudoIndexRouteImport.update({
+  id: '/conteudo/',
+  path: '/conteudo/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConteudoIdRoute = ConteudoIdRouteImport.update({
+  id: '/conteudo/$id',
+  path: '/conteudo/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HubsSlugRoute = HubsSlugRouteImport.update({
@@ -103,9 +149,49 @@ const HubsSlugRoute = HubsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => HubsRoute,
 } as any)
+const ProgressoIndexRoute = ProgressoIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProgressoRoute,
+} as any)
+const ProgressoCorpoRoute = ProgressoCorpoRouteImport.update({
+  id: '/corpo',
+  path: '/corpo',
+  getParentRoute: () => ProgressoRoute,
+} as any)
+const ProgressoResumoRoute = ProgressoResumoRouteImport.update({
+  id: '/resumo',
+  path: '/resumo',
+  getParentRoute: () => ProgressoRoute,
+} as any)
+const SocialIndexRoute = SocialIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SocialRoute,
+} as any)
+const SocialUserIdRoute = SocialUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => SocialRoute,
+} as any)
+const SocialSeguidoresRoute = SocialSeguidoresRouteImport.update({
+  id: '/seguidores',
+  path: '/seguidores',
+  getParentRoute: () => SocialRoute,
+} as any)
 const TreinoIndexRoute = TreinoIndexRouteImport.update({
   id: '/treino/',
   path: '/treino/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WearablesCallbackRoute = WearablesCallbackRouteImport.update({
+  id: '/wearables/callback',
+  path: '/wearables/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronDailyPushesRoute = ApiCronDailyPushesRouteImport.update({
+  id: '/api/cron/daily-pushes',
+  path: '/api/cron/daily-pushes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiShopifyWebhookRoute = ApiShopifyWebhookRouteImport.update({
@@ -113,6 +199,17 @@ const ApiShopifyWebhookRoute = ApiShopifyWebhookRouteImport.update({
   path: '/api/shopify/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TreinoExercicioIdRoute = TreinoExercicioIdRouteImport.update({
+  id: '/treino/exercicio/$id',
+  path: '/treino/exercicio/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TreinoHistoricoSessionIdRoute =
+  TreinoHistoricoSessionIdRouteImport.update({
+    id: '/treino/historico/$sessionId',
+    path: '/treino/historico/$sessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const TreinoSessaoIdRoute = TreinoSessaoIdRouteImport.update({
   id: '/treino/sessao/$id',
   path: '/treino/sessao/$id',
@@ -123,40 +220,70 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/acesso': typeof AcessoRoute
   '/admin': typeof AdminRoute
+  '/cadastro': typeof CadastroRoute
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/entrar': typeof EntrarRoute
   '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
-  '/progresso': typeof ProgressoRoute
-  '/social': typeof SocialRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/progresso': typeof ProgressoRouteWithChildren
+  '/social': typeof SocialRouteWithChildren
   '/suplementos': typeof SuplementosRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
+  '/conteudo/$id': typeof ConteudoIdRoute
   '/hubs/$slug': typeof HubsSlugRoute
+  '/progresso/corpo': typeof ProgressoCorpoRoute
+  '/progresso/resumo': typeof ProgressoResumoRoute
+  '/social/$userId': typeof SocialUserIdRoute
+  '/social/seguidores': typeof SocialSeguidoresRoute
+  '/wearables/callback': typeof WearablesCallbackRoute
+  '/conteudo/': typeof ConteudoIndexRoute
+  '/progresso/': typeof ProgressoIndexRoute
+  '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
+  '/api/cron/daily-pushes': typeof ApiCronDailyPushesRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
+  '/treino/exercicio/$id': typeof TreinoExercicioIdRoute
+  '/treino/historico/$sessionId': typeof TreinoHistoricoSessionIdRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/acesso': typeof AcessoRoute
   '/admin': typeof AdminRoute
+  '/cadastro': typeof CadastroRoute
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/entrar': typeof EntrarRoute
   '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
-  '/progresso': typeof ProgressoRoute
-  '/social': typeof SocialRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/suplementos': typeof SuplementosRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
+  '/conteudo/$id': typeof ConteudoIdRoute
   '/hubs/$slug': typeof HubsSlugRoute
+  '/progresso/corpo': typeof ProgressoCorpoRoute
+  '/progresso/resumo': typeof ProgressoResumoRoute
+  '/social/$userId': typeof SocialUserIdRoute
+  '/social/seguidores': typeof SocialSeguidoresRoute
+  '/wearables/callback': typeof WearablesCallbackRoute
+  '/conteudo': typeof ConteudoIndexRoute
+  '/progresso': typeof ProgressoIndexRoute
+  '/social': typeof SocialIndexRoute
   '/treino': typeof TreinoIndexRoute
+  '/api/cron/daily-pushes': typeof ApiCronDailyPushesRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
+  '/treino/exercicio/$id': typeof TreinoExercicioIdRoute
+  '/treino/historico/$sessionId': typeof TreinoHistoricoSessionIdRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRoutesById {
@@ -164,20 +291,36 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/acesso': typeof AcessoRoute
   '/admin': typeof AdminRoute
+  '/cadastro': typeof CadastroRoute
   '/clubes': typeof ClubesRoute
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
+  '/entrar': typeof EntrarRoute
   '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
-  '/progresso': typeof ProgressoRoute
-  '/social': typeof SocialRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/progresso': typeof ProgressoRouteWithChildren
+  '/social': typeof SocialRouteWithChildren
   '/suplementos': typeof SuplementosRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
+  '/conteudo/$id': typeof ConteudoIdRoute
   '/hubs/$slug': typeof HubsSlugRoute
+  '/progresso/corpo': typeof ProgressoCorpoRoute
+  '/progresso/resumo': typeof ProgressoResumoRoute
+  '/social/$userId': typeof SocialUserIdRoute
+  '/social/seguidores': typeof SocialSeguidoresRoute
+  '/wearables/callback': typeof WearablesCallbackRoute
+  '/conteudo/': typeof ConteudoIndexRoute
+  '/progresso/': typeof ProgressoIndexRoute
+  '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
+  '/api/cron/daily-pushes': typeof ApiCronDailyPushesRoute
   '/api/shopify/webhook': typeof ApiShopifyWebhookRoute
+  '/treino/exercicio/$id': typeof TreinoExercicioIdRoute
+  '/treino/historico/$sessionId': typeof TreinoHistoricoSessionIdRoute
   '/treino/sessao/$id': typeof TreinoSessaoIdRoute
 }
 export interface FileRouteTypes {
@@ -186,60 +329,106 @@ export interface FileRouteTypes {
     | '/'
     | '/acesso'
     | '/admin'
+    | '/cadastro'
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/entrar'
     | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
+    | '/privacidade'
     | '/progresso'
     | '/social'
     | '/suplementos'
+    | '/termos'
     | '/welcome'
+    | '/conteudo/$id'
     | '/hubs/$slug'
+    | '/progresso/corpo'
+    | '/progresso/resumo'
+    | '/social/$userId'
+    | '/social/seguidores'
+    | '/wearables/callback'
+    | '/conteudo/'
+    | '/progresso/'
+    | '/social/'
     | '/treino/'
+    | '/api/cron/daily-pushes'
     | '/api/shopify/webhook'
+    | '/treino/exercicio/$id'
+    | '/treino/historico/$sessionId'
     | '/treino/sessao/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/acesso'
     | '/admin'
+    | '/cadastro'
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/entrar'
     | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
+    | '/privacidade'
+    | '/suplementos'
+    | '/termos'
+    | '/welcome'
+    | '/conteudo/$id'
+    | '/hubs/$slug'
+    | '/progresso/corpo'
+    | '/progresso/resumo'
+    | '/social/$userId'
+    | '/social/seguidores'
+    | '/wearables/callback'
+    | '/conteudo'
     | '/progresso'
     | '/social'
-    | '/suplementos'
-    | '/welcome'
-    | '/hubs/$slug'
     | '/treino'
+    | '/api/cron/daily-pushes'
     | '/api/shopify/webhook'
+    | '/treino/exercicio/$id'
+    | '/treino/historico/$sessionId'
     | '/treino/sessao/$id'
   id:
     | '__root__'
     | '/'
     | '/acesso'
     | '/admin'
+    | '/cadastro'
     | '/clubes'
     | '/coach'
     | '/desafios'
+    | '/entrar'
     | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
+    | '/privacidade'
     | '/progresso'
     | '/social'
     | '/suplementos'
+    | '/termos'
     | '/welcome'
+    | '/conteudo/$id'
     | '/hubs/$slug'
+    | '/progresso/corpo'
+    | '/progresso/resumo'
+    | '/social/$userId'
+    | '/social/seguidores'
+    | '/wearables/callback'
+    | '/conteudo/'
+    | '/progresso/'
+    | '/social/'
     | '/treino/'
+    | '/api/cron/daily-pushes'
     | '/api/shopify/webhook'
+    | '/treino/exercicio/$id'
+    | '/treino/historico/$sessionId'
     | '/treino/sessao/$id'
   fileRoutesById: FileRoutesById
 }
@@ -247,19 +436,29 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcessoRoute: typeof AcessoRoute
   AdminRoute: typeof AdminRoute
+  CadastroRoute: typeof CadastroRoute
   ClubesRoute: typeof ClubesRoute
   CoachRoute: typeof CoachRoute
   DesafiosRoute: typeof DesafiosRoute
+  EntrarRoute: typeof EntrarRoute
   HubsRoute: typeof HubsRouteWithChildren
   NutricaoRoute: typeof NutricaoRoute
   OnboardingRoute: typeof OnboardingRoute
   PerfilRoute: typeof PerfilRoute
-  ProgressoRoute: typeof ProgressoRoute
-  SocialRoute: typeof SocialRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  ProgressoRoute: typeof ProgressoRouteWithChildren
+  SocialRoute: typeof SocialRouteWithChildren
   SuplementosRoute: typeof SuplementosRoute
+  TermosRoute: typeof TermosRoute
   WelcomeRoute: typeof WelcomeRoute
+  ConteudoIdRoute: typeof ConteudoIdRoute
+  WearablesCallbackRoute: typeof WearablesCallbackRoute
+  ConteudoIndexRoute: typeof ConteudoIndexRoute
   TreinoIndexRoute: typeof TreinoIndexRoute
+  ApiCronDailyPushesRoute: typeof ApiCronDailyPushesRoute
   ApiShopifyWebhookRoute: typeof ApiShopifyWebhookRoute
+  TreinoExercicioIdRoute: typeof TreinoExercicioIdRoute
+  TreinoHistoricoSessionIdRoute: typeof TreinoHistoricoSessionIdRoute
   TreinoSessaoIdRoute: typeof TreinoSessaoIdRoute
 }
 
@@ -286,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clubes': {
       id: '/clubes'
       path: '/clubes'
@@ -305,6 +511,13 @@ declare module '@tanstack/react-router' {
       path: '/desafios'
       fullPath: '/desafios'
       preLoaderRoute: typeof DesafiosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entrar': {
+      id: '/entrar'
+      path: '/entrar'
+      fullPath: '/entrar'
+      preLoaderRoute: typeof EntrarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hubs': {
@@ -335,6 +548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerfilRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/progresso': {
       id: '/progresso'
       path: '/progresso'
@@ -356,11 +576,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuplementosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/welcome': {
       id: '/welcome'
       path: '/welcome'
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conteudo/': {
+      id: '/conteudo/'
+      path: '/conteudo'
+      fullPath: '/conteudo/'
+      preLoaderRoute: typeof ConteudoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conteudo/$id': {
+      id: '/conteudo/$id'
+      path: '/conteudo/$id'
+      fullPath: '/conteudo/$id'
+      preLoaderRoute: typeof ConteudoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hubs/$slug': {
@@ -370,6 +611,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HubsSlugRouteImport
       parentRoute: typeof HubsRoute
     }
+    '/progresso/': {
+      id: '/progresso/'
+      path: '/'
+      fullPath: '/progresso/'
+      preLoaderRoute: typeof ProgressoIndexRouteImport
+      parentRoute: typeof ProgressoRoute
+    }
+    '/progresso/corpo': {
+      id: '/progresso/corpo'
+      path: '/corpo'
+      fullPath: '/progresso/corpo'
+      preLoaderRoute: typeof ProgressoCorpoRouteImport
+      parentRoute: typeof ProgressoRoute
+    }
+    '/progresso/resumo': {
+      id: '/progresso/resumo'
+      path: '/resumo'
+      fullPath: '/progresso/resumo'
+      preLoaderRoute: typeof ProgressoResumoRouteImport
+      parentRoute: typeof ProgressoRoute
+    }
+    '/social/': {
+      id: '/social/'
+      path: '/'
+      fullPath: '/social/'
+      preLoaderRoute: typeof SocialIndexRouteImport
+      parentRoute: typeof SocialRoute
+    }
+    '/social/$userId': {
+      id: '/social/$userId'
+      path: '/$userId'
+      fullPath: '/social/$userId'
+      preLoaderRoute: typeof SocialUserIdRouteImport
+      parentRoute: typeof SocialRoute
+    }
+    '/social/seguidores': {
+      id: '/social/seguidores'
+      path: '/seguidores'
+      fullPath: '/social/seguidores'
+      preLoaderRoute: typeof SocialSeguidoresRouteImport
+      parentRoute: typeof SocialRoute
+    }
     '/treino/': {
       id: '/treino/'
       path: '/treino'
@@ -377,11 +660,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TreinoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wearables/callback': {
+      id: '/wearables/callback'
+      path: '/wearables/callback'
+      fullPath: '/wearables/callback'
+      preLoaderRoute: typeof WearablesCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/daily-pushes': {
+      id: '/api/cron/daily-pushes'
+      path: '/api/cron/daily-pushes'
+      fullPath: '/api/cron/daily-pushes'
+      preLoaderRoute: typeof ApiCronDailyPushesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/shopify/webhook': {
       id: '/api/shopify/webhook'
       path: '/api/shopify/webhook'
       fullPath: '/api/shopify/webhook'
       preLoaderRoute: typeof ApiShopifyWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/treino/exercicio/$id': {
+      id: '/treino/exercicio/$id'
+      path: '/treino/exercicio/$id'
+      fullPath: '/treino/exercicio/$id'
+      preLoaderRoute: typeof TreinoExercicioIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/treino/historico/$sessionId': {
+      id: '/treino/historico/$sessionId'
+      path: '/treino/historico/$sessionId'
+      fullPath: '/treino/historico/$sessionId'
+      preLoaderRoute: typeof TreinoHistoricoSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/treino/sessao/$id': {
@@ -404,23 +715,64 @@ const HubsRouteChildren: HubsRouteChildren = {
 
 const HubsRouteWithChildren = HubsRoute._addFileChildren(HubsRouteChildren)
 
+interface ProgressoRouteChildren {
+  ProgressoCorpoRoute: typeof ProgressoCorpoRoute
+  ProgressoResumoRoute: typeof ProgressoResumoRoute
+  ProgressoIndexRoute: typeof ProgressoIndexRoute
+}
+
+const ProgressoRouteChildren: ProgressoRouteChildren = {
+  ProgressoCorpoRoute: ProgressoCorpoRoute,
+  ProgressoResumoRoute: ProgressoResumoRoute,
+  ProgressoIndexRoute: ProgressoIndexRoute,
+}
+
+const ProgressoRouteWithChildren = ProgressoRoute._addFileChildren(
+  ProgressoRouteChildren,
+)
+
+interface SocialRouteChildren {
+  SocialUserIdRoute: typeof SocialUserIdRoute
+  SocialSeguidoresRoute: typeof SocialSeguidoresRoute
+  SocialIndexRoute: typeof SocialIndexRoute
+}
+
+const SocialRouteChildren: SocialRouteChildren = {
+  SocialUserIdRoute: SocialUserIdRoute,
+  SocialSeguidoresRoute: SocialSeguidoresRoute,
+  SocialIndexRoute: SocialIndexRoute,
+}
+
+const SocialRouteWithChildren =
+  SocialRoute._addFileChildren(SocialRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcessoRoute: AcessoRoute,
   AdminRoute: AdminRoute,
+  CadastroRoute: CadastroRoute,
   ClubesRoute: ClubesRoute,
   CoachRoute: CoachRoute,
   DesafiosRoute: DesafiosRoute,
+  EntrarRoute: EntrarRoute,
   HubsRoute: HubsRouteWithChildren,
   NutricaoRoute: NutricaoRoute,
   OnboardingRoute: OnboardingRoute,
   PerfilRoute: PerfilRoute,
-  ProgressoRoute: ProgressoRoute,
-  SocialRoute: SocialRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  ProgressoRoute: ProgressoRouteWithChildren,
+  SocialRoute: SocialRouteWithChildren,
   SuplementosRoute: SuplementosRoute,
+  TermosRoute: TermosRoute,
   WelcomeRoute: WelcomeRoute,
+  ConteudoIdRoute: ConteudoIdRoute,
+  WearablesCallbackRoute: WearablesCallbackRoute,
+  ConteudoIndexRoute: ConteudoIndexRoute,
   TreinoIndexRoute: TreinoIndexRoute,
+  ApiCronDailyPushesRoute: ApiCronDailyPushesRoute,
   ApiShopifyWebhookRoute: ApiShopifyWebhookRoute,
+  TreinoExercicioIdRoute: TreinoExercicioIdRoute,
+  TreinoHistoricoSessionIdRoute: TreinoHistoricoSessionIdRoute,
   TreinoSessaoIdRoute: TreinoSessaoIdRoute,
 }
 export const routeTree = rootRouteImport

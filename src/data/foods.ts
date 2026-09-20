@@ -1,0 +1,198 @@
+/**
+ * Soldiers internal food catalog — authored macros (approx. BR common foods).
+ * Conceptual reference only (TACO / nutribr). No licensed datasets copied.
+ */
+import type { FoodCategory, FoodItem, FoodServing, MacroSnapshot } from "@/lib/nutrition/types";
+
+type FoodDef = {
+  id: string;
+  name: string;
+  category: FoodCategory;
+  synonyms?: string[];
+  brand?: string;
+  /** per 100g */
+  kcal: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  fiberG?: number;
+  sugarG?: number;
+  sodiumMg?: number;
+  servings?: Array<{ id: string; label: string; grams: number; isDefault?: boolean }>;
+  confidence?: number;
+};
+
+function per100(d: FoodDef): MacroSnapshot {
+  return {
+    energyKcal: d.kcal,
+    proteinG: d.proteinG,
+    carbG: d.carbG,
+    fatG: d.fatG,
+    ...(d.fiberG != null ? { fiberG: d.fiberG } : {}),
+    ...(d.sugarG != null ? { sugarG: d.sugarG } : {}),
+    ...(d.sodiumMg != null ? { sodiumMg: d.sodiumMg } : {}),
+  };
+}
+
+const DEFS: FoodDef[] = [
+  // Cereais
+  { id: "arroz-branco-cozido", name: "Arroz branco cozido", category: "cereais", synonyms: ["arroz", "arroz branco"], kcal: 128, proteinG: 2.5, carbG: 28.1, fatG: 0.2, fiberG: 1.6, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-xicara", label: "1 xícara", grams: 160 }] },
+  { id: "arroz-integral-cozido", name: "Arroz integral cozido", category: "cereais", synonyms: ["arroz integral"], kcal: 124, proteinG: 2.6, carbG: 25.8, fatG: 1.0, fiberG: 2.7, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-xicara", label: "1 xícara", grams: 160 }] },
+  { id: "feijao-carioca-cozido", name: "Feijão carioca cozido", category: "leguminosas", synonyms: ["feijão", "feijao", "feijão carioca"], kcal: 76, proteinG: 4.8, carbG: 13.6, fatG: 0.5, fiberG: 8.5, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-concha", label: "1 concha", grams: 140 }] },
+  { id: "feijao-preto-cozido", name: "Feijão preto cozido", category: "leguminosas", synonyms: ["feijão preto", "feijao preto"], kcal: 77, proteinG: 4.5, carbG: 14.0, fatG: 0.5, fiberG: 8.4, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-concha", label: "1 concha", grams: 140 }] },
+  { id: "aveia-flocos", name: "Aveia em flocos", category: "cereais", synonyms: ["aveia"], kcal: 394, proteinG: 13.9, carbG: 66.6, fatG: 8.5, fiberG: 9.1, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-colher", label: "1 colher de sopa", grams: 15 }] },
+  { id: "pao-frances", name: "Pão francês", category: "cereais", synonyms: ["pão", "pao", "pãozinho", "cacetinho"], kcal: 300, proteinG: 8.0, carbG: 58.6, fatG: 3.1, fiberG: 2.3, sodiumMg: 648, servings: [{ id: "s-unidade", label: "1 unidade", grams: 50, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "pao-integral", name: "Pão integral", category: "cereais", synonyms: ["pão integral", "pao integral"], kcal: 253, proteinG: 9.4, carbG: 43.9, fatG: 3.5, fiberG: 6.9, servings: [{ id: "s-fatia", label: "1 fatia", grams: 30, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "macarrao-cozido", name: "Macarrão cozido", category: "cereais", synonyms: ["macarrão", "massa", "espaguete"], kcal: 131, proteinG: 4.0, carbG: 25.0, fatG: 1.0, fiberG: 1.5, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-prato", label: "1 prato", grams: 200 }] },
+  { id: "tapioca", name: "Tapioca (goma hidratada)", category: "cereais", synonyms: ["tapioca", "beiju"], kcal: 240, proteinG: 0.5, carbG: 58.0, fatG: 0.2, fiberG: 0.5, servings: [{ id: "s-unidade", label: "1 unidade média", grams: 80, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "cuscuz-milho", name: "Cuscuz de milho", category: "cereais", synonyms: ["cuscuz", "cuscuz paulista"], kcal: 113, proteinG: 2.2, carbG: 25.3, fatG: 0.3, fiberG: 2.4, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "batata-inglesa-cozida", name: "Batata inglesa cozida", category: "tuberculos", synonyms: ["batata", "batata cozida"], kcal: 52, proteinG: 1.2, carbG: 11.9, fatG: 0.1, fiberG: 1.3, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-unidade", label: "1 unidade média", grams: 150 }] },
+  { id: "batata-doce-cozida", name: "Batata-doce cozida", category: "tuberculos", synonyms: ["batata doce", "batata-doce"], kcal: 77, proteinG: 0.6, carbG: 18.4, fatG: 0.1, fiberG: 2.2, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-unidade", label: "1 unidade média", grams: 130 }] },
+  { id: "mandioca-cozida", name: "Mandioca cozida", category: "tuberculos", synonyms: ["aipim", "macaxeira", "mandioca"], kcal: 125, proteinG: 0.6, carbG: 30.1, fatG: 0.3, fiberG: 1.6, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "inhame-cozido", name: "Inhame cozido", category: "tuberculos", synonyms: ["inhame"], kcal: 97, proteinG: 2.0, carbG: 23.0, fatG: 0.1, fiberG: 1.5, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+
+  // Carnes / aves / peixes
+  { id: "frango-peito-grelhado", name: "Peito de frango grelhado", category: "aves", synonyms: ["frango", "peito de frango", "chicken"], kcal: 159, proteinG: 32.0, carbG: 0, fatG: 2.5, sodiumMg: 50, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-file", label: "1 filé", grams: 120 }] },
+  { id: "frango-coxa-assada", name: "Coxa de frango assada", category: "aves", synonyms: ["coxa de frango"], kcal: 215, proteinG: 26.0, carbG: 0, fatG: 12.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-unidade", label: "1 unidade", grams: 80 }] },
+  { id: "carne-bovina-patinho", name: "Patinho bovino grelhado", category: "carnes", synonyms: ["carne", "patinho", "bife"], kcal: 219, proteinG: 32.5, carbG: 0, fatG: 9.2, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-bife", label: "1 bife", grams: 120 }] },
+  { id: "carne-bovina-alcatra", name: "Alcatra grelhada", category: "carnes", synonyms: ["alcatra"], kcal: 241, proteinG: 31.0, carbG: 0, fatG: 12.5, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "carne-moida-cozida", name: "Carne moída cozida", category: "carnes", synonyms: ["carne moída", "carne moida"], kcal: 212, proteinG: 26.0, carbG: 0, fatG: 12.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "carne-seca", name: "Carne-seca dessalgada", category: "carnes", synonyms: ["carne seca", "jabá"], kcal: 243, proteinG: 36.0, carbG: 0, fatG: 10.0, sodiumMg: 1200, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "porco-lombo", name: "Lombo de porco grelhado", category: "carnes", synonyms: ["lombo", "porco"], kcal: 210, proteinG: 29.0, carbG: 0, fatG: 10.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "tilapia-grelhada", name: "Tilápia grelhada", category: "peixes", synonyms: ["tilápia", "tilapia", "peixe"], kcal: 128, proteinG: 26.0, carbG: 0, fatG: 2.7, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-file", label: "1 filé", grams: 150 }] },
+  { id: "salmao-grelhado", name: "Salmão grelhado", category: "peixes", synonyms: ["salmão", "salmao"], kcal: 208, proteinG: 22.0, carbG: 0, fatG: 13.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "atum-lata-agua", name: "Atum em lata (água)", category: "peixes", synonyms: ["atum"], kcal: 116, proteinG: 25.5, carbG: 0, fatG: 0.8, sodiumMg: 300, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-lata", label: "1 lata drenada", grams: 120 }] },
+  { id: "sardinha-lata", name: "Sardinha em lata (óleo)", category: "peixes", synonyms: ["sardinha"], kcal: 208, proteinG: 24.0, carbG: 0, fatG: 12.0, sodiumMg: 400, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "ovo-cozido", name: "Ovo de galinha cozido", category: "ovos", synonyms: ["ovo", "ovos"], kcal: 146, proteinG: 13.3, carbG: 0.6, fatG: 9.5, servings: [{ id: "s-unidade", label: "1 unidade", grams: 50, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "ovo-frito", name: "Ovo frito", category: "ovos", synonyms: ["ovo frito"], kcal: 192, proteinG: 13.0, carbG: 0.6, fatG: 15.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 50, isDefault: true }] },
+  { id: "clara-ovo", name: "Clara de ovo", category: "ovos", synonyms: ["clara"], kcal: 48, proteinG: 11.0, carbG: 0.7, fatG: 0.2, servings: [{ id: "s-unidade", label: "1 clara", grams: 33, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+
+  // Laticínios
+  { id: "leite-integral", name: "Leite de vaca integral", category: "laticinios", synonyms: ["leite"], kcal: 61, proteinG: 3.2, carbG: 4.8, fatG: 3.2, sugarG: 4.8, servings: [{ id: "s-200ml", label: "1 copo (200 ml)", grams: 200, isDefault: true }, { id: "s-100g", label: "100 ml", grams: 100 }] },
+  { id: "leite-desnatado", name: "Leite desnatado", category: "laticinios", synonyms: ["leite desnatado"], kcal: 35, proteinG: 3.4, carbG: 5.0, fatG: 0.2, sugarG: 5.0, servings: [{ id: "s-200ml", label: "1 copo (200 ml)", grams: 200, isDefault: true }] },
+  { id: "iogurte-natural", name: "Iogurte natural", category: "laticinios", synonyms: ["iogurte", "yogurt"], kcal: 51, proteinG: 4.1, carbG: 4.0, fatG: 2.0, sugarG: 4.0, servings: [{ id: "s-pote", label: "1 pote (170 g)", grams: 170, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "iogurte-grego", name: "Iogurte grego", category: "laticinios", synonyms: ["iogurte grego"], kcal: 97, proteinG: 9.0, carbG: 3.6, fatG: 5.0, servings: [{ id: "s-pote", label: "1 pote (150 g)", grams: 150, isDefault: true }] },
+  { id: "queijo-minas", name: "Queijo minas frescal", category: "laticinios", synonyms: ["queijo minas", "queijo"], kcal: 264, proteinG: 17.4, carbG: 3.2, fatG: 20.5, sodiumMg: 30, servings: [{ id: "s-fatia", label: "1 fatia", grams: 30, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "queijo-mussarela", name: "Queijo mussarela", category: "laticinios", synonyms: ["mussarela", "muçarela", "mozzarella"], kcal: 330, proteinG: 22.6, carbG: 3.0, fatG: 25.0, sodiumMg: 560, servings: [{ id: "s-fatia", label: "1 fatia", grams: 20, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "queijo-cottage", name: "Queijo cottage", category: "laticinios", synonyms: ["cottage"], kcal: 98, proteinG: 11.5, carbG: 3.4, fatG: 4.3, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-colher", label: "1 colher de sopa", grams: 20 }] },
+  { id: "requeijao", name: "Requeijão cremoso", category: "laticinios", synonyms: ["requeijão", "requeijao"], kcal: 257, proteinG: 9.0, carbG: 2.5, fatG: 23.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 30, isDefault: true }] },
+
+  // Frutas
+  { id: "banana-prata", name: "Banana-prata", category: "frutas", synonyms: ["banana", "banana prata"], kcal: 98, proteinG: 1.3, carbG: 26.0, fatG: 0.1, fiberG: 2.0, sugarG: 18.0, servings: [{ id: "s-unidade", label: "1 unidade média", grams: 100, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "banana-nanica", name: "Banana-nanica", category: "frutas", synonyms: ["banana nanica"], kcal: 92, proteinG: 1.4, carbG: 23.8, fatG: 0.1, fiberG: 1.9, servings: [{ id: "s-unidade", label: "1 unidade", grams: 90, isDefault: true }] },
+  { id: "maca", name: "Maçã", category: "frutas", synonyms: ["maçã", "maca", "apple"], kcal: 56, proteinG: 0.3, carbG: 15.2, fatG: 0.2, fiberG: 1.3, sugarG: 12.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 130, isDefault: true }] },
+  { id: "laranja-pera", name: "Laranja-pera", category: "frutas", synonyms: ["laranja"], kcal: 37, proteinG: 0.9, carbG: 8.9, fatG: 0.1, fiberG: 1.0, sugarG: 8.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 140, isDefault: true }] },
+  { id: "mamao-papaia", name: "Mamão papaia", category: "frutas", synonyms: ["mamão", "mamao", "papaia"], kcal: 40, proteinG: 0.5, carbG: 10.4, fatG: 0.1, fiberG: 1.0, servings: [{ id: "s-fatia", label: "1 fatia", grams: 150, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "mamao-formosa", name: "Mamão formosa", category: "frutas", synonyms: ["mamão formosa"], kcal: 45, proteinG: 0.8, carbG: 11.6, fatG: 0.1, fiberG: 1.8, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "abacate", name: "Abacate", category: "frutas", synonyms: ["abacate"], kcal: 96, proteinG: 1.2, carbG: 6.0, fatG: 8.4, fiberG: 6.3, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 30, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "morango", name: "Morango", category: "frutas", synonyms: ["morango"], kcal: 30, proteinG: 0.9, carbG: 6.8, fatG: 0.3, fiberG: 1.7, sugarG: 5.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-xicara", label: "1 xícara", grams: 150 }] },
+  { id: "uva", name: "Uva", category: "frutas", synonyms: ["uva"], kcal: 53, proteinG: 0.5, carbG: 13.0, fatG: 0.2, fiberG: 0.8, sugarG: 12.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "manga", name: "Manga", category: "frutas", synonyms: ["manga"], kcal: 64, proteinG: 0.4, carbG: 16.7, fatG: 0.3, fiberG: 1.6, servings: [{ id: "s-unidade", label: "1 unidade média", grams: 140, isDefault: true }] },
+  { id: "abacaxi", name: "Abacaxi", category: "frutas", synonyms: ["abacaxi"], kcal: 48, proteinG: 0.9, carbG: 12.3, fatG: 0.1, fiberG: 1.0, servings: [{ id: "s-fatia", label: "1 fatia", grams: 100, isDefault: true }] },
+  { id: "melancia", name: "Melancia", category: "frutas", synonyms: ["melancia"], kcal: 31, proteinG: 0.9, carbG: 7.1, fatG: 0.1, fiberG: 0.2, servings: [{ id: "s-fatia", label: "1 fatia", grams: 200, isDefault: true }] },
+  { id: "pera", name: "Pera", category: "frutas", synonyms: ["pera"], kcal: 53, proteinG: 0.4, carbG: 14.0, fatG: 0.1, fiberG: 3.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 130, isDefault: true }] },
+  { id: "kiwi", name: "Kiwi", category: "frutas", synonyms: ["kiwi"], kcal: 51, proteinG: 1.1, carbG: 11.7, fatG: 0.4, fiberG: 2.7, servings: [{ id: "s-unidade", label: "1 unidade", grams: 75, isDefault: true }] },
+
+  // Hortaliças
+  { id: "brocolis-cozido", name: "Brócolis cozido", category: "hortalicas", synonyms: ["brócolis", "brocolis"], kcal: 25, proteinG: 2.1, carbG: 4.4, fatG: 0.3, fiberG: 3.4, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-xicara", label: "1 xícara", grams: 90 }] },
+  { id: "couve-refogada", name: "Couve refogada", category: "hortalicas", synonyms: ["couve"], kcal: 90, proteinG: 2.0, carbG: 6.0, fatG: 6.5, fiberG: 3.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "alface", name: "Alface crespa", category: "hortalicas", synonyms: ["alface"], kcal: 11, proteinG: 1.3, carbG: 1.7, fatG: 0.2, fiberG: 1.7, servings: [{ id: "s-folha", label: "4 folhas", grams: 40, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "tomate", name: "Tomate", category: "hortalicas", synonyms: ["tomate"], kcal: 15, proteinG: 1.1, carbG: 3.1, fatG: 0.2, fiberG: 1.2, servings: [{ id: "s-unidade", label: "1 unidade", grams: 100, isDefault: true }] },
+  { id: "cenoura-crua", name: "Cenoura crua", category: "hortalicas", synonyms: ["cenoura"], kcal: 34, proteinG: 1.3, carbG: 7.7, fatG: 0.2, fiberG: 3.2, servings: [{ id: "s-unidade", label: "1 unidade média", grams: 60, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "abobrinha-refogada", name: "Abobrinha refogada", category: "hortalicas", synonyms: ["abobrinha"], kcal: 33, proteinG: 1.0, carbG: 3.5, fatG: 1.8, fiberG: 1.2, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "berinjela-refogada", name: "Berinjela refogada", category: "hortalicas", synonyms: ["berinjela"], kcal: 42, proteinG: 1.0, carbG: 5.0, fatG: 2.0, fiberG: 2.5, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "pepino", name: "Pepino", category: "hortalicas", synonyms: ["pepino"], kcal: 10, proteinG: 0.9, carbG: 1.8, fatG: 0.1, fiberG: 0.8, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "salada-mista", name: "Salada mista (folhas)", category: "hortalicas", synonyms: ["salada"], kcal: 20, proteinG: 1.5, carbG: 3.0, fatG: 0.3, fiberG: 2.0, servings: [{ id: "s-prato", label: "1 prato", grams: 100, isDefault: true }] },
+
+  // Leguminosas extras
+  { id: "grao-de-bico-cozido", name: "Grão-de-bico cozido", category: "leguminosas", synonyms: ["grão de bico", "grao de bico", "chickpea"], kcal: 164, proteinG: 8.9, carbG: 27.4, fatG: 2.6, fiberG: 7.6, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "lentilha-cozida", name: "Lentilha cozida", category: "leguminosas", synonyms: ["lentilha"], kcal: 93, proteinG: 6.3, carbG: 16.3, fatG: 0.4, fiberG: 7.9, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "ervilha-cozida", name: "Ervilha cozida", category: "leguminosas", synonyms: ["ervilha"], kcal: 88, proteinG: 6.2, carbG: 14.0, fatG: 0.4, fiberG: 5.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+
+  // Oleaginosas / óleos
+  { id: "amendoim", name: "Amendoim torrado", category: "oleaginosas", synonyms: ["amendoim"], kcal: 544, proteinG: 27.2, carbG: 20.3, fatG: 43.9, fiberG: 8.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 15, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "castanha-caju", name: "Castanha de caju", category: "oleaginosas", synonyms: ["castanha de caju", "caju"], kcal: 570, proteinG: 18.5, carbG: 29.1, fatG: 46.3, fiberG: 3.7, servings: [{ id: "s-unidade", label: "6 unidades", grams: 20, isDefault: true }] },
+  { id: "castanha-para", name: "Castanha-do-pará", category: "oleaginosas", synonyms: ["castanha do pará", "castanha do para"], kcal: 643, proteinG: 14.3, carbG: 15.1, fatG: 63.5, fiberG: 7.9, servings: [{ id: "s-unidade", label: "2 unidades", grams: 10, isDefault: true }] },
+  { id: "linhaça", name: "Linhaça", category: "oleaginosas", synonyms: ["linhaça", "linhaca"], kcal: 495, proteinG: 14.1, carbG: 28.9, fatG: 32.3, fiberG: 33.5, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 10, isDefault: true }] },
+  { id: "chia", name: "Semente de chia", category: "oleaginosas", synonyms: ["chia"], kcal: 486, proteinG: 16.5, carbG: 42.1, fatG: 30.7, fiberG: 34.4, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 12, isDefault: true }] },
+  { id: "azeite-oliva", name: "Azeite de oliva", category: "oleos", synonyms: ["azeite"], kcal: 884, proteinG: 0, carbG: 0, fatG: 100, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 13, isDefault: true }] },
+  { id: "oleo-soja", name: "Óleo de soja", category: "oleos", synonyms: ["óleo", "oleo"], kcal: 884, proteinG: 0, carbG: 0, fatG: 100, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 13, isDefault: true }] },
+  { id: "manteiga", name: "Manteiga", category: "oleos", synonyms: ["manteiga"], kcal: 726, proteinG: 0.4, carbG: 0.1, fatG: 82.0, servings: [{ id: "s-colher", label: "1 colher de chá", grams: 5, isDefault: true }] },
+
+  // Bebidas / industrializados / suplementos
+  { id: "cafe-sem-acucar", name: "Café sem açúcar", category: "bebidas", synonyms: ["café", "cafe"], kcal: 2, proteinG: 0.1, carbG: 0.3, fatG: 0, servings: [{ id: "s-xicara", label: "1 xícara", grams: 50, isDefault: true }] },
+  { id: "suco-laranja", name: "Suco de laranja natural", category: "bebidas", synonyms: ["suco de laranja", "suco"], kcal: 45, proteinG: 0.7, carbG: 10.4, fatG: 0.1, sugarG: 9.0, servings: [{ id: "s-copo", label: "1 copo (200 ml)", grams: 200, isDefault: true }] },
+  { id: "agua-de-coco", name: "Água de coco", category: "bebidas", synonyms: ["água de coco", "agua de coco"], kcal: 22, proteinG: 0.2, carbG: 5.3, fatG: 0, sugarG: 4.5, sodiumMg: 20, servings: [{ id: "s-copo", label: "1 copo (200 ml)", grams: 200, isDefault: true }] },
+  { id: "refrigerante-cola", name: "Refrigerante tipo cola", category: "bebidas", synonyms: ["refrigerante", "coca", "cola"], kcal: 42, proteinG: 0, carbG: 10.6, fatG: 0, sugarG: 10.6, sodiumMg: 5, servings: [{ id: "s-lata", label: "1 lata (350 ml)", grams: 350, isDefault: true }] },
+  { id: "whey-protein", name: "Whey protein (concentrado)", category: "suplementos", synonyms: ["whey", "proteína", "proteina"], kcal: 380, proteinG: 80.0, carbG: 6.0, fatG: 4.0, servings: [{ id: "s-scoop", label: "1 scoop (30 g)", grams: 30, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "creatina", name: "Creatina monohidratada", category: "suplementos", synonyms: ["creatina"], kcal: 0, proteinG: 0, carbG: 0, fatG: 0, servings: [{ id: "s-dose", label: "1 dose (5 g)", grams: 5, isDefault: true }] },
+  { id: "pasta-amendoim", name: "Pasta de amendoim", category: "industrializados", synonyms: ["pasta de amendoim"], kcal: 588, proteinG: 22.0, carbG: 20.0, fatG: 50.0, fiberG: 6.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 20, isDefault: true }] },
+  { id: "mel", name: "Mel", category: "industrializados", synonyms: ["mel"], kcal: 309, proteinG: 0.4, carbG: 82.4, fatG: 0, sugarG: 82.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 20, isDefault: true }] },
+  { id: "acucar-refinado", name: "Açúcar refinado", category: "industrializados", synonyms: ["açúcar", "acucar"], kcal: 387, proteinG: 0, carbG: 99.9, fatG: 0, sugarG: 99.9, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 12, isDefault: true }] },
+  { id: "arroz-doce", name: "Arroz-doce (caseiro)", category: "industrializados", synonyms: ["arroz doce"], kcal: 140, proteinG: 2.5, carbG: 28.0, fatG: 2.0, sugarG: 15.0, servings: [{ id: "s-porcao", label: "1 porção", grams: 150, isDefault: true }] },
+  { id: "tapioca-queijo", name: "Tapioca com queijo", category: "industrializados", synonyms: ["tapioca com queijo"], kcal: 280, proteinG: 10.0, carbG: 40.0, fatG: 9.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 120, isDefault: true }] },
+  { id: "omelete-2ovos", name: "Omelete (2 ovos)", category: "ovos", synonyms: ["omelete"], kcal: 190, proteinG: 14.0, carbG: 1.0, fatG: 14.0, servings: [{ id: "s-unidade", label: "1 omelete", grams: 100, isDefault: true }] },
+  { id: "strogonoff-frango", name: "Strogonoff de frango", category: "industrializados", synonyms: ["strogonoff", "estrogonofe"], kcal: 160, proteinG: 12.0, carbG: 6.0, fatG: 10.0, servings: [{ id: "s-porcao", label: "1 porção", grams: 200, isDefault: true }] },
+  { id: "feijoada", name: "Feijoada (porção)", category: "industrializados", synonyms: ["feijoada"], kcal: 180, proteinG: 12.0, carbG: 14.0, fatG: 9.0, fiberG: 5.0, sodiumMg: 500, servings: [{ id: "s-porcao", label: "1 porção", grams: 250, isDefault: true }] },
+  { id: "pure-batata", name: "Purê de batata", category: "tuberculos", synonyms: ["purê", "pure"], kcal: 90, proteinG: 2.0, carbG: 14.0, fatG: 3.0, servings: [{ id: "s-colher", label: "2 colheres de sopa", grams: 80, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "farofa", name: "Farofa", category: "cereais", synonyms: ["farofa"], kcal: 350, proteinG: 3.0, carbG: 50.0, fatG: 15.0, fiberG: 3.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 20, isDefault: true }] },
+  { id: "vinagrete", name: "Vinagrete", category: "hortalicas", synonyms: ["vinagrete"], kcal: 35, proteinG: 0.8, carbG: 5.0, fatG: 1.5, fiberG: 1.5, servings: [{ id: "s-colher", label: "2 colheres de sopa", grams: 50, isDefault: true }] },
+  { id: "arroz-feijao-prato", name: "Arroz com feijão (prato)", category: "cereais", synonyms: ["arroz e feijão", "arroz com feijão"], kcal: 110, proteinG: 3.5, carbG: 22.0, fatG: 0.5, fiberG: 3.5, servings: [{ id: "s-prato", label: "1 prato (arroz+feijão)", grams: 250, isDefault: true }] },
+  { id: "granola", name: "Granola", category: "cereais", synonyms: ["granola"], kcal: 430, proteinG: 10.0, carbG: 65.0, fatG: 15.0, fiberG: 8.0, sugarG: 20.0, servings: [{ id: "s-colher", label: "2 colheres de sopa", grams: 30, isDefault: true }] },
+  { id: "mingau-aveia", name: "Mingau de aveia", category: "cereais", synonyms: ["mingau"], kcal: 90, proteinG: 3.5, carbG: 14.0, fatG: 2.0, fiberG: 1.5, servings: [{ id: "s-tigela", label: "1 tigela", grams: 200, isDefault: true }] },
+  { id: "tapioca-ovo", name: "Tapioca com ovo", category: "cereais", synonyms: ["tapioca com ovo"], kcal: 260, proteinG: 12.0, carbG: 35.0, fatG: 8.0, servings: [{ id: "s-unidade", label: "1 unidade", grams: 130, isDefault: true }] },
+  { id: "wrap-frango", name: "Wrap de frango", category: "industrializados", synonyms: ["wrap"], kcal: 220, proteinG: 18.0, carbG: 22.0, fatG: 7.0, servings: [{ id: "s-unidade", label: "1 wrap", grams: 180, isDefault: true }] },
+  { id: "hamburguer-caseiro", name: "Hambúrguer caseiro (carne)", category: "carnes", synonyms: ["hambúrguer", "hamburger", "burger"], kcal: 250, proteinG: 20.0, carbG: 2.0, fatG: 18.0, servings: [{ id: "s-unidade", label: "1 unidade (120 g)", grams: 120, isDefault: true }] },
+  { id: "peito-peru", name: "Peito de peru fatiado", category: "aves", synonyms: ["peito de peru", "peru"], kcal: 105, proteinG: 18.0, carbG: 2.0, fatG: 2.5, sodiumMg: 900, servings: [{ id: "s-fatia", label: "2 fatias", grams: 40, isDefault: true }] },
+  { id: "ricota", name: "Ricota", category: "laticinios", synonyms: ["ricota"], kcal: 140, proteinG: 11.0, carbG: 3.0, fatG: 9.0, servings: [{ id: "s-colher", label: "1 colher de sopa", grams: 30, isDefault: true }, { id: "s-100g", label: "100 g", grams: 100 }] },
+  { id: "tofu", name: "Tofu firme", category: "leguminosas", synonyms: ["tofu"], kcal: 145, proteinG: 15.0, carbG: 3.0, fatG: 9.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "quinoa-cozida", name: "Quinoa cozida", category: "cereais", synonyms: ["quinoa"], kcal: 120, proteinG: 4.4, carbG: 21.3, fatG: 1.9, fiberG: 2.8, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }, { id: "s-xicara", label: "1 xícara", grams: 185 }] },
+  { id: "milho-cozido", name: "Milho verde cozido", category: "cereais", synonyms: ["milho"], kcal: 98, proteinG: 3.2, carbG: 21.0, fatG: 1.2, fiberG: 3.0, servings: [{ id: "s-espiga", label: "1 espiga", grams: 100, isDefault: true }] },
+  { id: "beterraba-cozida", name: "Beterraba cozida", category: "hortalicas", synonyms: ["beterraba"], kcal: 32, proteinG: 1.5, carbG: 7.2, fatG: 0.1, fiberG: 1.9, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "espinafre-cozido", name: "Espinafre cozido", category: "hortalicas", synonyms: ["espinafre"], kcal: 23, proteinG: 2.7, carbG: 3.0, fatG: 0.4, fiberG: 2.4, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "cogumelo", name: "Cogumelo Paris", category: "hortalicas", synonyms: ["cogumelo"], kcal: 22, proteinG: 3.1, carbG: 3.3, fatG: 0.3, fiberG: 1.0, servings: [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true }] },
+  { id: "pimentao", name: "Pimentão", category: "hortalicas", synonyms: ["pimentão", "pimentao"], kcal: 23, proteinG: 1.0, carbG: 5.0, fatG: 0.2, fiberG: 1.5, servings: [{ id: "s-unidade", label: "1 unidade", grams: 120, isDefault: true }] },
+  { id: "cebola", name: "Cebola", category: "hortalicas", synonyms: ["cebola"], kcal: 39, proteinG: 1.7, carbG: 8.9, fatG: 0.1, fiberG: 2.2, servings: [{ id: "s-unidade", label: "1 unidade média", grams: 80, isDefault: true }] },
+  { id: "alho", name: "Alho", category: "hortalicas", synonyms: ["alho"], kcal: 113, proteinG: 5.0, carbG: 23.0, fatG: 0.2, fiberG: 1.8, servings: [{ id: "s-dente", label: "1 dente", grams: 3, isDefault: true }] },
+];
+
+function toFood(d: FoodDef): FoodItem {
+  const defaultServing = d.servings?.find((s) => s.isDefault) ?? d.servings?.[0];
+  const item: FoodItem = {
+    id: d.id,
+    name: d.name,
+    category: d.category,
+    source: "internal",
+    servingReference: defaultServing?.id ?? "s-100g",
+    active: true,
+    confidence: d.confidence ?? 0.85,
+    per100g: per100(d),
+  };
+  if (d.brand) item.brand = d.brand;
+  if (d.synonyms?.length) item.synonyms = d.synonyms;
+  return item;
+}
+
+function toServings(d: FoodDef): FoodServing[] {
+  const list = d.servings?.length
+    ? d.servings
+    : [{ id: "s-100g", label: "100 g", grams: 100, isDefault: true as const }];
+  return list.map((s) => {
+    const serving: FoodServing = {
+      id: `${d.id}:${s.id}`,
+      foodId: d.id,
+      label: s.label,
+      gramsEquivalent: s.grams,
+    };
+    if (s.isDefault) serving.isDefault = true;
+    return serving;
+  });
+}
+
+export const FOOD_DEFS = DEFS;
+export const FOOD_ITEMS: FoodItem[] = DEFS.map(toFood);
+export const FOOD_SERVINGS: FoodServing[] = DEFS.flatMap(toServings);
+
+export function foodDefById(id: string): FoodDef | undefined {
+  return DEFS.find((d) => d.id === id);
+}

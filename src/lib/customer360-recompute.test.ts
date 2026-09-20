@@ -101,11 +101,11 @@ describe("computeCommerceFromOrders", () => {
 });
 
 describe("lineage + estimates", () => {
-  it("marks estimatedLtv as estimate and total_spend as orders/raw", () => {
+  it("marks estimatedLtv as estimated and total_spend as orders/observed", () => {
     const lineage = buildDefaultLineage();
-    expect(lineage["estimated_ltv"]?.kind).toBe("estimate");
+    expect(lineage["estimated_ltv"]?.kind).toBe("estimated");
     expect(lineage["total_spend"]?.source).toBe("orders");
-    expect(lineage["total_spend"]?.kind).toBe("raw");
+    expect(lineage["total_spend"]?.kind).toBe("observed");
     expect(lineage["training_frequency"]?.kind).toBe("derived");
 
     const commerce = computeCommerceFromOrders([
@@ -127,7 +127,13 @@ describe("lineage + estimates", () => {
       ...emptyState,
       profile,
       restockEstimates: {
-        "whey-protein": { emptyAt: "2026-10-01T00:00:00.000Z", confidence: 0.5 },
+        "whey-protein": {
+          productId: "whey-protein",
+          emptyAt: "2026-10-01T00:00:00.000Z",
+          daysLeft: 14,
+          quantity: 1,
+          confidence: 0.5,
+        },
       },
     });
     expect(c360.estimates.ltv.kind).toBe("estimate");

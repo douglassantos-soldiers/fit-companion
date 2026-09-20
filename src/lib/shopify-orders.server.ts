@@ -118,6 +118,101 @@ export async function setSyncCursor(id: string, value: string | null): Promise<v
 /** Max pages per sync run (20 × 50 = 1000). Full history = loop until hasMore=false via cursor. */
 const MAX_PAGES = 20;
 const PAGE_LIMIT = 50;
+/** One Admin list page per import batch — keeps the server fn under Shopify rate limits. */
+export const CUSTOMER_PAGE_LIMIT = 25;
+/** Order pages pulled per customer inside one import batch; remaining pages resume via cursor. */
+export const MAX_ORDER_PAGES_PER_CUSTOMER_BATCH = 2;
+
+export type ShopifyCustomerListItem = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  tags: string[];
+  createdAt: string | null;
+  ordersCount: number;
+};
+
+function parseCustomerTags(raw: string | null | undefined): string[] {
+  return String(raw ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/** Map REST `/customers.json` payload — email/name/tags/orders_count only. */
+export function parseCustomersPage(json: unknown): ShopifyCustomerListItem[] {
+  const customers =
+    (json as {
+      customers?: Array<{
+        id?: number | string;
+        email?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        tags?: string | null;
+        created_at?: string | null;
+        orders_count?: number | string | null;
+      }>;
+    }).customers ?? [];
+
+  return customers
+    .map((c) => {
+      const id = c.id != null ? String(c.id).trim() : "";
+      const emailRaw = String(c.email ?? "")
+        .trim()
+        .toLowerCase();
+      return {
+        id,
+        email: emailRaw.includes("@") ? emailRaw : null,
+        firstName: c.first_name?.trim() || null,
+        lastName: c.last_name?.trim() || null,
+        tags: parseCustomerTags(c.tags),
+        createdAt: c.created_at ?? null,
+        ordersCount: Number(c.orders_count ?? 0) || 0,
+      };
+    })
+    .filter((c) => Boolean(c.id));
+}
+
+async function paginatePaidOrders(opts: {
+  startPath: string;
+  cursorId: string;
+  maxPages: number;
+  resumeCursor: boolean;
+  initialCustomerId?: string | null;
+}): Promise<{ orders: PaidOrder[]; customerId: string | null; hasMore: boolean }> {
+  const saved = opts.resumeCursor ? await getSyncCursor(opts.cursorId) : null;
+  let customerId = opts.initialCustomerId ?? null;
+  const all: PaidOrder[] = [];
+  let next: string | null = saved ?? opts.startPath;
+  let pages = 0;
+
+  while (next && pages < opts.maxPages) {
+    const { json, link } = await shopifyGetRaw(next);
+    const list = (json as { orders?: PaidOrder[] }).orders ?? [];
+    const paid = list.filter((o) => PAID.has(String(o.financial_status ?? "").toLowerCase()));
+    all.push(...paid);
+    if (!customerId) {
+      const cid = list[0]?.customer?.id;
+      if (cid != null) customerId = String(cid);
+    }
+    next = parseNextPageUrl(link);
+    pages += 1;
+  }
+
+  const hasMore = Boolean(next);
+  if (hasMore && next) {
+    await setSyncCursor(opts.cursorId, next);
+  } else {
+    await setSyncCursor(opts.cursorId, null);
+  }
+
+  return {
+    orders: sortOrdersByProcessedAtDesc(all),
+    customerId,
+    hasMore,
+  };
+}
 
 export async function fetchPaidOrdersByEmailServer(
   email: string,
@@ -139,48 +234,100 @@ export async function fetchPaidOrdersByEmailServer(
     /* continue */
   }
 
-  const cursorId = syncCursorKey({ customerId, email: normalized });
-  const saved = resumeCursor ? await getSyncCursor(cursorId) : null;
+  const startPath = customerId
+    ? `/customers/${customerId}/orders.json?status=any&limit=${PAGE_LIMIT}`
+    : `/orders.json?email=${encodeURIComponent(normalized)}&status=any&limit=${PAGE_LIMIT}`;
 
-  const all: PaidOrder[] = [];
-  let next: string | null;
-  let pages = 0;
+  return paginatePaidOrders({
+    startPath,
+    cursorId: syncCursorKey({ customerId, email: normalized }),
+    maxPages,
+    resumeCursor,
+    initialCustomerId: customerId,
+  });
+}
 
-  if (customerId) {
-    next =
-      saved ??
-      `/customers/${customerId}/orders.json?status=any&limit=${PAGE_LIMIT}`;
-  } else {
-    next =
-      saved ??
-      `/orders.json?email=${encodeURIComponent(normalized)}&status=any&limit=${PAGE_LIMIT}`;
+export async function fetchPaidOrdersByCustomerIdServer(
+  customerId: string,
+  opts?: { maxPages?: number; resumeCursor?: boolean },
+): Promise<{ orders: PaidOrder[]; customerId: string; hasMore: boolean }> {
+  const id = String(customerId ?? "").trim();
+  if (!id) {
+    return { orders: [], customerId: "", hasMore: false };
   }
+  const result = await paginatePaidOrders({
+    startPath: `/customers/${encodeURIComponent(id)}/orders.json?status=any&limit=${PAGE_LIMIT}`,
+    cursorId: syncCursorKey({ customerId: id }),
+    maxPages: opts?.maxPages ?? MAX_PAGES,
+    resumeCursor: opts?.resumeCursor !== false,
+    initialCustomerId: id,
+  });
+  return { orders: result.orders, customerId: result.customerId ?? id, hasMore: result.hasMore };
+}
 
-  while (next && pages < maxPages) {
-    const { json, link } = await shopifyGetRaw(next);
-    const list = (json as { orders?: PaidOrder[] }).orders ?? [];
-    const paid = list.filter((o) => PAID.has(String(o.financial_status ?? "").toLowerCase()));
-    all.push(...paid);
-    if (!customerId) {
-      const cid = list[0]?.customer?.id;
-      if (cid != null) customerId = String(cid);
-    }
-    next = parseNextPageUrl(link);
-    pages += 1;
-  }
-
-  const hasMore = Boolean(next);
-  if (hasMore && next) {
-    await setSyncCursor(cursorId, next);
-  } else {
-    await setSyncCursor(cursorId, null);
-  }
-
+/**
+ * One REST `/customers.json` page. Does not persist the list cursor — caller advances
+ * after ingesting the page so a failed batch can retry the same page.
+ */
+export async function fetchCustomersPageServer(opts?: {
+  cursor?: string | null;
+}): Promise<{
+  customers: ShopifyCustomerListItem[];
+  nextUrl: string | null;
+  hasMore: boolean;
+}> {
+  const path = opts?.cursor || `/customers.json?limit=${CUSTOMER_PAGE_LIMIT}`;
+  const { json, link } = await shopifyGetRaw(path);
+  const nextUrl = parseNextPageUrl(link);
   return {
-    orders: sortOrdersByProcessedAtDesc(all),
-    customerId,
-    hasMore,
+    customers: parseCustomersPage(json),
+    nextUrl,
+    hasMore: Boolean(nextUrl),
   };
+}
+
+/** Store customer card — name/tags only. Never phone, CPF, or address. */
+export async function fetchShopifyCustomerServer(customerId: string): Promise<{
+  firstName: string | null;
+  lastName: string | null;
+  tags: string[];
+  createdAt: string | null;
+} | null> {
+  const id = String(customerId ?? "").trim();
+  if (!id) return null;
+  try {
+    const { json } = await shopifyGetRaw(`/customers/${encodeURIComponent(id)}.json`);
+    const c = (json as {
+      customer?: {
+        first_name?: string | null;
+        last_name?: string | null;
+        tags?: string | null;
+        created_at?: string | null;
+      };
+    }).customer;
+    if (!c) return null;
+    const tags = String(c.tags ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    return {
+      firstName: c.first_name?.trim() || null,
+      lastName: c.last_name?.trim() || null,
+      tags,
+      createdAt: c.created_at ?? null,
+    };
+  } catch (e) {
+    console.warn("fetchShopifyCustomerServer skipped", e);
+    return null;
+  }
+}
+
+export function shopifyDisplayName(opts: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string | null {
+  const name = `${opts.firstName ?? ""} ${opts.lastName ?? ""}`.trim();
+  return name || null;
 }
 
 export { PAGE_LIMIT, MAX_PAGES, PAID };

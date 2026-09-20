@@ -4,11 +4,17 @@
  */
 import type { AppState, Goal, Level } from "@/lib/types";
 
-export type LineageKind = "raw" | "derived" | "estimate";
+export type LineageKind = "raw" | "derived" | "estimate" | "observed" | "estimated" | "inferred";
 
 export type LineageEntry = {
   source: string;
   kind: LineageKind;
+};
+
+export type MetricConfidence = {
+  value: number | null;
+  confidence: number;
+  basis: "full_logging" | "partial_logging" | "inferred" | "none";
 };
 
 export type EstimateField<T> = {
@@ -37,10 +43,25 @@ export type Performance360 = {
   trainingFrequency: number;
   avgRpeHardStreak: number;
   performanceLevel: Level | null;
+  /** Deep Training extensions */
+  exerciseCount?: number;
+  prCount?: number;
+  estimated1rmTrend?: "up" | "flat" | "down" | "unknown" | null;
+  volumeTrend?: "up" | "flat" | "down" | "unknown" | null;
+  muscleBalance?: number | null;
+  strengthTrend?: "up" | "flat" | "down" | "unknown" | null;
 };
 
 export type Nutrition360 = {
   proteinAdherence7d: number | null;
+  /** Logging completeness 0–1 (days with any meal / 7) — distinct from adherence */
+  loggingCompleteness7d?: number | null;
+  proteinAdherence?: MetricConfidence;
+  /** Phase 2 */
+  kcalAdherence?: MetricConfidence;
+  macroDistribution7d?: { protein: number; carb: number; fat: number } | null;
+  mealFrequency7d?: number | null;
+  nutritionConfidence?: number | null;
   mealsLogged7d: number;
   weightTrendKg7d: number | null;
   latestWeightKg: number | null;
@@ -78,6 +99,17 @@ export type Behavior360 = {
   supplementDays: number;
   coachMessages: number;
   streak: number;
+  patterns?: Array<{ key: string; confidence: number; supportCount: number }>;
+  triggerCount?: number;
+  interventionCount?: number;
+  successfulInterventionCount?: number;
+  engagement?: number;
+  adherence?: {
+    training: number;
+    meal: number;
+    sleep: number;
+  };
+  behaviorConfidence?: number;
 };
 
 export type Goals360 = {
@@ -108,6 +140,8 @@ export type Customer360 = {
   /** Explicit estimate wrappers (do not present as facts) */
   estimates: Customer360Estimates;
   updatedAt: string;
+  lastRecomputedAt?: string | null;
+  dataVersion?: number | null;
 };
 
 export type { AppState };
@@ -115,23 +149,24 @@ export type { AppState };
 /** Default lineage map for a fully built 360. */
 export function buildDefaultLineage(): Record<string, LineageEntry> {
   return {
-    total_spend: { source: "orders", kind: "raw" },
-    total_orders: { source: "orders", kind: "raw" },
+    total_spend: { source: "orders", kind: "observed" },
+    total_orders: { source: "orders", kind: "observed" },
     average_order_value: { source: "orders", kind: "derived" },
     purchase_frequency: { source: "orders", kind: "derived" },
     favorite_products: { source: "order_items", kind: "derived" },
-    first_purchase_at: { source: "orders", kind: "raw" },
-    last_purchase_at: { source: "orders", kind: "raw" },
-    estimated_ltv: { source: "orders", kind: "estimate" },
-    estimated_next_purchase: { source: "orders", kind: "estimate" },
+    first_purchase_at: { source: "orders", kind: "observed" },
+    last_purchase_at: { source: "orders", kind: "observed" },
+    estimated_ltv: { source: "orders", kind: "estimated" },
+    estimated_next_purchase: { source: "orders", kind: "estimated" },
     training_frequency: { source: "sessions", kind: "derived" },
-    nutrition_adherence: { source: "meal_entries", kind: "derived" },
+    nutrition_adherence: { source: "meal_entries", kind: "estimated" },
     recovery_score: { source: "sessions+dayCheckIns", kind: "derived" },
     supplement_adherence: { source: "supplement_logs", kind: "derived" },
-    restock_estimates: { source: "order_items+supplement_logs", kind: "estimate" },
-    current_goal: { source: "profiles", kind: "raw" },
-    performance_level: { source: "profiles", kind: "raw" },
+    restock_estimates: { source: "order_items+supplement_dose_logs", kind: "estimated" },
+    current_goal: { source: "profiles", kind: "observed" },
+    performance_level: { source: "profiles", kind: "observed" },
     behavioral_streak: { source: "sessions", kind: "derived" },
+    user_patterns: { source: "decision_outcomes", kind: "inferred" },
   };
 }
 

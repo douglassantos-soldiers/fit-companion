@@ -1,9 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { allQuestsComplete, bumpManualQuest, ensureDailyQuests } from "@/data/daily-quests";
+import { runBehaviorLoop } from "@/lib/engine/behavior";
 import { presetById } from "@/data/meal-presets";
 import { performanceDimensions } from "@/lib/engine/dimensions";
 import { buildLivingPlan } from "@/lib/engine/living-plan";
 import { scalePreset } from "@/lib/engine/nutrition";
+import { grantPendingAchievements } from "@/lib/engine/achievements";
+import { prsAchievedInSession } from "@/lib/engine/period-review";
 import { applyXpAward, dailyXpGoalMet, supplementsComplete, waterGoalReached, XP } from "@/lib/engine/xp";
 import {
   bumpFriendQuestOnSession,
@@ -18,17 +21,19 @@ import {
   syncAllJoinedChallenges,
   syncChallengeProgress,
   syncLeaguePoints,
+  saveSocialPrivacyRemote,
 } from "@/lib/social";
-import { challengeById } from "@/data/challenges";
+import { challengeById, computePersonalTarget, isPersonalizedChallenge } from "@/data/challenges";
 import { hubById } from "@/data/hubs";
 import { joinHub as joinHubRemote, leaveHub as leaveHubRemote } from "@/lib/hubs";
-import { clearRemoteState, getDeviceId, pullState, pushState } from "@/lib/sync";
-import { fetchEntitlement } from "@/lib/entitlements";
+import { getDeviceId, pullState, pushState } from "@/lib/sync";
 import { establishAccessSession } from "@/lib/access.functions";
 import { ensureIdentityForDevice } from "@/lib/identity.functions";
 import { persistUserPatterns } from "@/lib/learning.functions";
 import { buildPatternsBlobV2 } from "@/lib/engine/learned-patterns";
 import { enrichRestockConfidence } from "@/data/shopify-product-map";
+import { mergeRestockWithConsumption } from "@/lib/engine/supplement-inventory";
+import { productById } from "@/data/products";
 import { emitAppEventCompat } from "@/lib/events/emit";
 import { enqueueEntity, ensureOutboxListeners, flushOutbox } from "@/lib/sync/outbox";
 import {
@@ -37,6 +42,34 @@ import {
   recordSessionOutcomeBestEffort,
 } from "@/lib/decision-client";
 import { clearLocalReminders, scheduleLocalReminders } from "@/lib/notifications";
+import { applyCmsState } from "@/lib/cms";
+import { applyPublicCatalog, type PublicCatalog } from "@/lib/catalog-runtime";
+import { getPublicCms, getPublicCatalog } from "@/lib/admin.functions";
+import { hydrateSoldiersMedia } from "@/lib/soldiers-media";
+import { getPublishedSoldiersMedia } from "@/lib/soldiers-media.functions";
+import {
+  migrateLegacyPrefs,
+  prefsToLegacyArrays,
+  setPreference,
+} from "@/lib/training/preferences";
+import type {
+  ActivityLogEntry,
+  ActivityLogKind,
+  DoseFrequency,
+  DoseUnit,
+  SupplementDoseLog,
+  WearableConnection,
+} from "@/lib/types";
+import { validateActivityLog, validateChallengeProgress } from "@/lib/engine/anti-fraud";
+import { applyFraudPolicy } from "@/lib/engine/anti-fraud-policy";
+import { mergeActivityLogs } from "@/lib/wearables/normalize";
+import { challengeProofFromLogs } from "@/lib/wearables/challenge-proof";
+import {
+  isSocialSharingEnabled,
+  normalizeSocialPrivacy,
+  privacyFromLegacyShareProgress,
+  shouldPublishEvent,
+} from "@/lib/social/visibility";
 
 function emitAppEvent(
   deviceId: string,
@@ -47,6 +80,48 @@ function emitAppEvent(
   if (!deviceId) return;
   emitAppEventCompat(deviceId, kind, payload, opts);
 }
+
+/** Parse catalog serving like "30 g" / "1 cápsula" into dose + unit. */
+function defaultDoseFromProduct(productId: string): { dose: number; unit: DoseUnit } {
+  const p = productById(productId);
+  const serving = (p?.serving ?? "1 dose").toLowerCase();
+  const num = Number.parseFloat(serving.replace(",", "."));
+  const dose = Number.isFinite(num) && num > 0 ? num : 1;
+  if (serving.includes("cápsula") || serving.includes("capsula") || serving.includes("caps")) {
+    return { dose, unit: "caps" };
+  }
+  if (serving.includes("ml")) return { dose, unit: "ml" };
+  if (serving.includes("g")) return { dose, unit: "g" };
+  if (serving.includes("scoop")) return { dose, unit: "scoop" };
+  return { dose: 1, unit: "serving" };
+}
+
+function rollupSupplementLogsFromDoses(
+  existing: Record<string, string[]>,
+  doses: SupplementDoseLog[],
+): Record<string, string[]> {
+  const out: Record<string, string[]> = { ...existing };
+  for (const d of doses) {
+    const date = d.takenAt.slice(0, 10);
+    const ids = new Set(out[date] ?? []);
+    ids.add(d.productId);
+    out[date] = [...ids];
+  }
+  return out;
+}
+
+function refreshRestock(s: AppState, base?: AppState["restockEstimates"]): AppState["restockEstimates"] {
+  const estimates = base ?? s.restockEstimates ?? {};
+  const withConf = enrichRestockConfidence(estimates, s.supplementLogs, {
+    doseLogs: s.supplementDoseLogs ?? [],
+    frequencies: s.supplementFrequencies,
+  });
+  return mergeRestockWithConsumption(
+    withConf,
+    s.supplementDoseLogs ?? [],
+    s.supplementFrequencies,
+  );
+}
 import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
 import { rollCosmeticReward } from "@/lib/engine/rewards";
@@ -54,12 +129,23 @@ import {
   emptyState,
   todayKey,
   type AppState,
+  type BodyMeasurementEntry,
   type DayCheckIn,
   type MealEntry,
+  type PhotoVisibility,
   type Profile,
+  type ProgressPhotoEntry,
+  type SavedMeal,
   type SessionLog,
   type Theme,
 } from "@/lib/types";
+import {
+  emptyMeasurement,
+  mergeMeasurementsByDate,
+  mergeProgressPhotos,
+  measurementsLoggedPayload,
+  parseCm,
+} from "@/lib/progress/body";
 
 const KEY = "soldiers-os-v1";
 
@@ -68,26 +154,79 @@ interface Store {
   hydrated: boolean;
   deviceId: string;
   setProfile: (p: Profile) => void;
+  patchProfile: (patch: Partial<Profile>) => void;
   addSession: (s: SessionLog, opts?: { imageUrl?: string }) => void;
   addWeight: (kg: number) => void;
+  addMeasurements: (entry: Omit<BodyMeasurementEntry, "date"> & { date?: string }) => void;
+  upsertProgressPhoto: (photo: ProgressPhotoEntry) => void;
+  removeProgressPhoto: (id: string) => void;
+  setProgressPhotoVisibility: (id: string, visibility: PhotoVisibility) => void;
   addWater: (ml: number) => void;
   addMealEntry: (entry: Omit<MealEntry, "id" | "date"> & { date?: string; servings?: number }) => void;
   removeMealEntry: (id: string) => void;
   updateMealEntry: (
     id: string,
-    patch: Partial<Pick<MealEntry, "label" | "slot" | "servings" | "proteinG" | "kcal" | "quality">>,
+    patch: Partial<
+      Pick<
+        MealEntry,
+        | "label"
+        | "slot"
+        | "servings"
+        | "proteinG"
+        | "kcal"
+        | "quality"
+        | "sourceKind"
+        | "confidence"
+        | "aiMode"
+        | "correctedFromAi"
+      >
+    >,
   ) => void;
   toggleFavoriteMeal: (presetId: string) => void;
+  saveMealTemplate: (meal: Omit<SavedMeal, "id" | "createdAt"> & { id?: string }) => void;
+  removeSavedMeal: (id: string) => void;
+  setExercisePreference: (
+    exerciseId: string,
+    preference: "like" | "dislike" | "clear" | "preferred" | "disliked" | "avoided" | "neutral",
+  ) => void;
+  setExercisePreferences: (prefs: AppState["exercisePreferences"]) => void;
+  saveLivingPlanFeedback: (
+    date: string,
+    vote: import("@/lib/types").LivingPlanFeedbackVote,
+    reason?: import("@/lib/types").LivingPlanFeedbackReason,
+  ) => void;
   toggleSupplement: (id: string) => void;
+  logSupplementDose: (opts: {
+    productId: string;
+    dose: number;
+    unit: import("@/lib/types").DoseUnit;
+    frequency: import("@/lib/types").DoseFrequency;
+    takenAt?: string;
+    source?: import("@/lib/types").DoseSource;
+  }) => void;
+  removeSupplementDose: (id: string) => void;
   setRoutine: (ids: string[]) => void;
   toggleChallenge: (id: string) => void;
+  bumpChallengeInvitesSent: () => void;
+  dismissCoachNudge: () => void;
+  markCoachNudgeShown: () => void;
   toggleHub: (hubId: string) => void;
+  logActivity: (kind: ActivityLogKind, value: number, date?: string) => {
+    ok: boolean;
+    message?: string;
+    warning?: string;
+  };
+  ingestActivityLogs: (entries: ActivityLogEntry[]) => void;
+  setWearableConnection: (conn: WearableConnection) => void;
   pushChat: (role: "coach" | "user", text: string) => void;
   setTheme: (theme: Theme) => void;
   setShareProgress: (share: boolean) => void;
+  setSocialPrivacy: (privacy: import("@/lib/social/visibility").SocialPrivacy) => void;
   setSessionFx: (enabled: boolean) => void;
   setRemindersEnabled: (enabled: boolean) => void;
   setReminderHour: (hour: number) => void;
+  setPushPrefs: (prefs: Partial<AppState["pushPrefs"]>) => void;
+  acceptLegal: (kind: "terms" | "privacy" | "health") => void;
   markTipSeen: (id: string) => void;
   earnBadge: (id: string) => boolean;
   recordDimensionSnapshot: () => void;
@@ -104,9 +243,16 @@ interface Store {
     productIds?: string[];
     accessTier?: "base" | "performance";
     restockEstimates?: AppState["restockEstimates"];
+    lastPaidAt?: string | null;
+    accessExpiresAt?: string | null;
+    shopifyDisplayName?: string | null;
   }) => Promise<void>;
   /** Sync UX flag from validated server cookie (no entitlement write). */
-  updateAccessFromSession: (opts: { email: string; tier: "base" | "performance" }) => void;
+  updateAccessFromSession: (opts: {
+    email: string;
+    tier: "base" | "performance";
+    lastPaidAt?: string | null;
+  }) => void;
   /** Clear local grant when server session is missing. */
   revokeAccessLocal: () => void;
   dismissRoutineFromPurchase: () => void;
@@ -115,6 +261,8 @@ interface Store {
   refreshLivingPlan: () => void;
   lastSessionXp: number;
   reset: () => void;
+  /** Explicit wipe of account domain data on server (requires confirmation in UI). */
+  clearAccountData: () => Promise<{ ok: boolean; partial?: boolean }>;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -124,7 +272,12 @@ function load(): AppState {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return emptyState;
-    return { ...emptyState, ...(JSON.parse(raw) as AppState) };
+    const parsed = JSON.parse(raw) as AppState;
+    return {
+      ...emptyState,
+      ...parsed,
+      socialPrivacy: normalizeSocialPrivacy(parsed.socialPrivacy, parsed.shareProgress !== false),
+    };
   } catch {
     return emptyState;
   }
@@ -149,6 +302,8 @@ function withSnapshot(s: AppState): AppState {
     dayCheckIns: s.dayCheckIns ?? {},
     livingPlans: s.livingPlans ?? {},
     challengeBaselines: s.challengeBaselines ?? {},
+    challengePersonalTargets: s.challengePersonalTargets ?? {},
+    activityLogs: s.activityLogs ?? [],
     joinedHubIds: s.joinedHubIds ?? [],
     dimensionSnapshots: [...rest, { date, scores }].sort((a, b) => (a.date < b.date ? -1 : 1)),
   };
@@ -166,8 +321,39 @@ function syncMealCount(s: AppState, date: string): AppState {
   return { ...s, days: { ...s.days, [date]: { ...d, meals: count } } };
 }
 
+function mergeWearableConnections(
+  local?: WearableConnection[],
+  remote?: WearableConnection[],
+): WearableConnection[] {
+  const byProvider = new Map<string, WearableConnection>();
+  for (const c of remote ?? []) {
+    if (c?.provider) byProvider.set(c.provider, c);
+  }
+  for (const c of local ?? []) {
+    if (c?.provider) byProvider.set(c.provider, c);
+  }
+  return [...byProvider.values()];
+}
+
+function mergeSavedMeals(local?: SavedMeal[], remote?: SavedMeal[]): SavedMeal[] {
+  const byId = new Map<string, SavedMeal>();
+  for (const m of remote ?? []) {
+    if (m?.id) byId.set(m.id, m);
+  }
+  for (const m of local ?? []) {
+    if (m?.id) byId.set(m.id, m);
+  }
+  return [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 40);
+}
+
 function withQuests(s: AppState, deviceId: string): AppState {
-  return ensureDailyQuests(s, deviceId);
+  const loop = runBehaviorLoop(s);
+  return ensureDailyQuests(s, deviceId, todayKey(), {
+    triggers: loop.triggers,
+    patterns: loop.patterns,
+    profile: loop.profile,
+    weekday: new Date().getDay(),
+  });
 }
 
 function afterXpSideEffects(
@@ -209,6 +395,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(emptyState);
   const [hydrated, setHydrated] = useState(false);
   const [lastSessionXp, setLastSessionXp] = useState(0);
+  const [, setCmsRevision] = useState(0);
 
   const deviceId = useRef("");
   const skipPush = useRef(true);
@@ -221,7 +408,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deviceId.current = id;
     setState(withQuests({ ...emptyState, ...local }, id));
     applyTheme(local.theme ?? "dark");
-        setHydrated(true);
+    setHydrated(true);
+
+    try {
+      const openedKey = `soldiers_app_opened_${todayKey()}`;
+      if (typeof window !== "undefined" && !window.localStorage.getItem(openedKey)) {
+        window.localStorage.setItem(openedKey, "1");
+        emitAppEvent(id, "app_opened", { date: todayKey() });
+      }
+    } catch {
+      /* ignore */
+    }
+
+    void getPublicCms()
+      .then((cms) => {
+        applyCmsState(cms);
+        setCmsRevision((n) => n + 1);
+      })
+      .catch((e) => {
+        console.warn("CMS hydrate failed", e);
+        applyCmsState({ exerciseMedia: {}, mealImages: {}, workoutNotes: {} });
+        setCmsRevision((n) => n + 1);
+      });
+
+    void getPublicCatalog()
+      .then((payload) => {
+        try {
+          applyPublicCatalog(JSON.parse(payload.json) as PublicCatalog);
+        } catch (e) {
+          console.warn("Catalog parse failed", e);
+        }
+        setCmsRevision((n) => n + 1);
+      })
+      .catch((e) => {
+        console.warn("Catalog hydrate failed", e);
+      });
+
+    void getPublishedSoldiersMedia()
+      .then((rows) => {
+        hydrateSoldiersMedia(rows);
+        setCmsRevision((n) => n + 1);
+      })
+      .catch((e) => {
+        console.warn("Soldiers media hydrate failed", e);
+      });
 
     void (async () => {
       try {
@@ -239,16 +469,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           console.warn("ensureIdentityForDevice failed", e);
         }
 
-        const [remote, entitlement] = await Promise.all([pullState(id), fetchEntitlement(id)]);
-        const accessFromRemote = entitlement
-          ? {
-              accessGranted: true,
-              accessEmail: entitlement.email,
-              accessGrantedAt: entitlement.grantedAt,
-              accessTier: entitlement.accessTier,
-              purchaseProductIds: entitlement.productIds,
-            }
-          : {};
+        const remote = await pullState(id);
 
         if (remote) {
           skipPush.current = true;
@@ -264,16 +485,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ...emptyState,
               ...remote,
               meals: remote.meals?.length ? remote.meals : local.meals ?? [],
+              measurements: mergeMeasurementsByDate(remote.measurements ?? [], local.measurements ?? []),
+              progressPhotos: mergeProgressPhotos(remote.progressPhotos ?? [], local.progressPhotos ?? []),
               theme: local.theme ?? remote.theme ?? "dark",
-              earnedBadges: local.earnedBadges?.length ? local.earnedBadges : remote.earnedBadges ?? [],
+              earnedBadges: [...new Set([...(remote.earnedBadges ?? []), ...(local.earnedBadges ?? [])])],
+              livingPlanFeedback: {
+                ...(remote.livingPlanFeedback ?? {}),
+                ...(local.livingPlanFeedback ?? {}),
+              },
               dimensionSnapshots: local.dimensionSnapshots?.length
                 ? local.dimensionSnapshots
                 : remote.dimensionSnapshots ?? [],
               shareProgress: local.shareProgress ?? remote.shareProgress ?? true,
+              socialPrivacy: normalizeSocialPrivacy(
+                local.socialPrivacy ?? remote.socialPrivacy,
+                local.shareProgress ?? remote.shareProgress ?? true,
+              ),
               sessionFx: local.sessionFx ?? remote.sessionFx ?? true,
               favoriteMealPresetIds: local.favoriteMealPresetIds ?? remote.favoriteMealPresetIds ?? [],
+              savedMeals: mergeSavedMeals(local.savedMeals, remote.savedMeals),
+              wearableConnections: mergeWearableConnections(local.wearableConnections, remote.wearableConnections),
+              lastFraudWarning: local.lastFraudWarning ?? remote.lastFraudWarning ?? null,
+              likedExerciseIds: [
+                ...new Set([
+                  ...(remote.likedExerciseIds ?? []),
+                  ...(local.likedExerciseIds ?? []),
+                ]),
+              ],
+              dislikedExerciseIds: [
+                ...new Set([
+                  ...(remote.dislikedExerciseIds ?? []),
+                  ...(local.dislikedExerciseIds ?? []),
+                ]),
+              ],
+              exercisePreferences: {
+                ...(remote.exercisePreferences ?? {}),
+                ...(local.exercisePreferences ?? {}),
+              },
               remindersEnabled: local.remindersEnabled ?? false,
               reminderHour: local.reminderHour ?? remote.reminderHour ?? 18,
+              pushPrefs: {
+                workout: local.pushPrefs?.workout ?? remote.pushPrefs?.workout ?? true,
+                streak: local.pushPrefs?.streak ?? remote.pushPrefs?.streak ?? true,
+                challenge: local.pushPrefs?.challenge ?? remote.pushPrefs?.challenge ?? true,
+                kudos: local.pushPrefs?.kudos ?? remote.pushPrefs?.kudos ?? true,
+              },
+              termsAcceptedAt: local.termsAcceptedAt ?? remote.termsAcceptedAt ?? null,
+              privacyAcceptedAt: local.privacyAcceptedAt ?? remote.privacyAcceptedAt ?? null,
+              healthPurposeAckAt: local.healthPurposeAckAt ?? remote.healthPurposeAckAt ?? null,
               seenOnboardingTips: local.seenOnboardingTips ?? remote.seenOnboardingTips ?? [],
               xpByDate: { ...(remote.xpByDate ?? {}), ...(local.xpByDate ?? {}) },
               streakFreezes: local.streakFreezes ?? remote.streakFreezes ?? 1,
@@ -294,29 +553,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               userId: resolvedUserId ?? local.userId ?? remote.userId ?? null,
               bio: local.bio || remote.bio || "",
               avatarUrl: local.avatarUrl ?? remote.avatarUrl ?? null,
-              accessGranted:
-                entitlement != null ||
-                local.accessGranted === true ||
-                remote.accessGranted === true,
-              accessEmail:
-                entitlement?.email ?? local.accessEmail ?? remote.accessEmail ?? null,
-              accessGrantedAt:
-                entitlement?.grantedAt ?? local.accessGrantedAt ?? remote.accessGrantedAt ?? null,
-              accessTier:
-                entitlement?.accessTier ?? local.accessTier ?? remote.accessTier ?? "base",
-              purchaseProductIds:
-                entitlement?.productIds?.length
-                  ? entitlement.productIds
-                  : local.purchaseProductIds?.length
-                    ? local.purchaseProductIds
-                    : remote.purchaseProductIds ?? [],
+              accessGranted: local.accessGranted === true || remote.accessGranted === true,
+              accessEmail: local.accessEmail ?? remote.accessEmail ?? null,
+              accessGrantedAt: local.accessGrantedAt ?? remote.accessGrantedAt ?? null,
+              lastPurchaseAt: local.lastPurchaseAt ?? remote.lastPurchaseAt ?? null,
+              accessExpiresAt: local.accessExpiresAt ?? remote.accessExpiresAt ?? null,
+              shopifyDisplayName: local.shopifyDisplayName ?? remote.shopifyDisplayName ?? null,
+              accessTier: local.accessTier ?? remote.accessTier ?? "base",
+              purchaseProductIds: local.purchaseProductIds?.length
+                ? local.purchaseProductIds
+                : remote.purchaseProductIds ?? [],
               restockEstimates: enrichRestockConfidence(restockBase ?? {}, logsForConfidence),
               supplementLogs: logsForConfidence,
               routineFromPurchase: local.routineFromPurchase || remote.routineFromPurchase || false,
               routineFromPurchaseDismissed:
                 local.routineFromPurchaseDismissed || remote.routineFromPurchaseDismissed || false,
               upsellShownDate: local.upsellShownDate ?? remote.upsellShownDate ?? null,
-              ...accessFromRemote,
             },
             id,
           );
@@ -332,32 +584,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }).catch(() => undefined);
           }
         } else {
-          if (entitlement) {
-            skipPush.current = true;
-            setState((s) =>
-              withQuests(
-                {
-                  ...s,
-                  accessGranted: true,
-                  accessEmail: entitlement.email,
-                  accessGrantedAt: entitlement.grantedAt,
-                  accessTier: entitlement.accessTier,
-                  purchaseProductIds: entitlement.productIds,
-                  userId: resolvedUserId ?? s.userId,
-                  restockEstimates: enrichRestockConfidence(
-                    s.restockEstimates ?? {},
-                    s.supplementLogs,
-                  ),
-                },
-                id,
-              ),
-            );
-          } else if (resolvedUserId) {
-            setState((s) => ({ ...s, userId: resolvedUserId }));
-          }
           if (resolvedUserId) {
+            setState((s) => ({ ...s, userId: resolvedUserId }));
             const bootState = withQuests(
-              { ...emptyState, ...local, ...accessFromRemote, userId: resolvedUserId },
+              { ...emptyState, ...local, userId: resolvedUserId },
               id,
             );
             void persistUserPatterns({
@@ -368,7 +598,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }).catch(() => undefined);
           }
           if (local.profile) {
-            void pushState(id, withQuests({ ...emptyState, ...local, ...accessFromRemote }, id));
+            void pushState(id, withQuests({ ...emptyState, ...local }, id));
           }
         }
       } catch (e) {
@@ -396,7 +626,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => {
       void import("@/lib/customer360.functions")
         .then(({ recomputeCustomer360Fn }) =>
-          recomputeCustomer360Fn({ data: { deviceId: deviceId.current, state } }),
+          recomputeCustomer360Fn({ data: { deviceId: deviceId.current } }),
         )
         .catch(() => undefined);
     }, 15_000);
@@ -416,11 +646,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.theme, hydrated]);
 
   useEffect(() => {
-    if (!hydrated || !state.profile || !state.shareProgress || !deviceId.current) return;
+    if (!hydrated || !state.profile || !deviceId.current) return;
     void ensureSocialProfile(deviceId.current, state.profile.name).catch((err) =>
       console.warn("ensureSocialProfile failed", err),
     );
-  }, [hydrated, state.profile?.name, state.shareProgress]);
+  }, [hydrated, state.profile?.name]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -430,7 +660,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const day =
       state.profile != null
-        ? planDayForToday(buildWeeklyPlan(state.profile, state.sessions, learningWeekHint(state)))
+        ? planDayForToday(
+            buildWeeklyPlan(state.profile, state.sessions, learningWeekHint(state), {
+              likedExerciseIds: state.likedExerciseIds ?? [],
+              dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+            }),
+          )
         : null;
     scheduleLocalReminders({
       enabled: true,
@@ -466,7 +701,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProfile: (profile) => {
         const wasFirst = !stateRef.current.profile;
         update((s) => withSnapshot(withQuests({ ...s, profile }, deviceId.current)));
-        if (deviceId.current && state.shareProgress !== false) {
+        if (deviceId.current) {
           void ensureSocialProfile(deviceId.current, profile.name).catch((err) =>
             console.warn("ensureSocialProfile failed", err),
           );
@@ -475,15 +710,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           emitAppEvent(deviceId.current, "onboarding_completed", { goal: profile.goal });
         }
       },
+      patchProfile: (patch) => {
+        update((s) => {
+          if (!s.profile) return s;
+          return withSnapshot({ ...s, profile: { ...s.profile, ...patch } });
+        });
+      },
       addSession: (session, opts) => {
-        const xpGain = session.express ? XP.express : XP.session;
+        const prs = prsAchievedInSession(session, stateRef.current.sessions);
+        const xpGain = (session.express ? XP.express : XP.session) + (prs.length ? XP.pr : 0);
         setLastSessionXp(xpGain);
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           let next = withSnapshot({ ...prev, sessions: [session, ...prev.sessions] });
           const awarded = applyXpAward(next, xpGain);
           next = afterXpSideEffects(prev, awarded.state, deviceId.current, { fromSession: session });
-          if (deviceId.current && next.shareProgress && next.profile) {
+          const granted = grantPendingAchievements(next);
+          next = granted.state;
+          if (granted.unlocked.length && deviceId.current && next.profile && shouldPublishEvent(next.socialPrivacy, "badge", {})) {
+            for (const id of granted.unlocked) {
+              void publishBadgeEvent(deviceId.current, next.profile.name, id).catch((err) =>
+                console.warn("publishBadgeEvent failed", err),
+              );
+            }
+          }
+          if (deviceId.current && next.profile && shouldPublishEvent(next.socialPrivacy, "session", { volumeKg: session.volumeKg })) {
             const id = deviceId.current;
             const name = next.profile.name;
             void publishSessionEvent(id, name, session.title, session.volumeKg, {
@@ -522,6 +773,47 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           entityId: todayKey(),
         });
       },
+      addMeasurements: (entry) => {
+        const date = (entry.date ?? todayKey()).slice(0, 10);
+        const nextEntry: BodyMeasurementEntry = {
+          ...emptyMeasurement(date),
+          waistCm: parseCm(entry.waistCm),
+          armCm: parseCm(entry.armCm),
+          chestCm: parseCm(entry.chestCm),
+          hipCm: parseCm(entry.hipCm),
+          thighCm: parseCm(entry.thighCm),
+        };
+        update((s) => ({
+          ...s,
+          measurements: mergeMeasurementsByDate(s.measurements ?? [], [nextEntry]),
+        }));
+        emitAppEvent(deviceId.current, "measurements_logged", measurementsLoggedPayload(date), {
+          entityType: "body_measurement",
+          entityId: date,
+        });
+      },
+      upsertProgressPhoto: (photo) => {
+        update((s) => ({
+          ...s,
+          progressPhotos: mergeProgressPhotos(s.progressPhotos ?? [], [photo]),
+        }));
+        emitAppEvent(
+          deviceId.current,
+          "progress_photo_uploaded",
+          { pose: photo.pose, date: photo.takenOn },
+          { entityType: "progress_photo", entityId: photo.id },
+        );
+      },
+      removeProgressPhoto: (id) =>
+        update((s) => ({
+          ...s,
+          progressPhotos: (s.progressPhotos ?? []).filter((p) => p.id !== id),
+        })),
+      setProgressPhotoVisibility: (id, visibility) =>
+        update((s) => ({
+          ...s,
+          progressPhotos: (s.progressPhotos ?? []).map((p) => (p.id === id ? { ...p, visibility } : p)),
+        })),
       addWater: (ml) =>
         update((s) => {
           const prev = withQuests(s, deviceId.current);
@@ -549,6 +841,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...entry,
             date,
             servings,
+            sourceKind: entry.sourceKind ?? (entry.presetId ? "informed" : entry.aiMode ? "estimated" : "informed"),
+            confidence: entry.confidence ?? (entry.sourceKind === "estimated" ? 0.5 : 1),
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           };
           mealId = full.id;
@@ -565,7 +859,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           mealId,
           date: entry.date ?? todayKey(),
           proteinG: entry.proteinG,
+          sourceKind: entry.sourceKind ?? "informed",
         }, { entityType: "meal", entityId: mealId });
+        if (entry.aiMode || entry.sourceKind === "estimated") {
+          emitAppEvent(
+            deviceId.current,
+            "meal_ai_used",
+            { mealId, mode: entry.aiMode ?? "text", confidence: entry.confidence ?? 0.5 },
+            { entityType: "meal", entityId: mealId },
+          );
+        }
       },
       removeMealEntry: (id) => {
         const target = stateRef.current.meals.find((m) => m.id === id);
@@ -611,6 +914,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               servings,
               proteinG,
               kcal,
+              sourceKind: patch.sourceKind ?? m.sourceKind,
+              confidence: patch.confidence ?? m.confidence,
+              correctedFromAi: patch.correctedFromAi ?? m.correctedFromAi,
             };
           });
           const target = meals.find((m) => m.id === id);
@@ -630,18 +936,118 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const next = ids.includes(presetId) ? ids.filter((x) => x !== presetId) : [...ids, presetId];
           return { ...s, favoriteMealPresetIds: next };
         }),
+      saveMealTemplate: (meal) =>
+        update((s) => {
+          const saved: SavedMeal = {
+            ...meal,
+            id: meal.id ?? `saved-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            createdAt: new Date().toISOString(),
+            items: meal.items ?? [],
+          };
+          const rest = (s.savedMeals ?? []).filter((m) => m.id !== saved.id);
+          return { ...s, savedMeals: [saved, ...rest].slice(0, 40) };
+        }),
+      removeSavedMeal: (id) =>
+        update((s) => ({
+          ...s,
+          savedMeals: (s.savedMeals ?? []).filter((m) => m.id !== id),
+        })),
+      setExercisePreference: (exerciseId, preference) =>
+        update((s) => {
+          const mapped =
+            preference === "like"
+              ? "preferred"
+              : preference === "dislike"
+                ? "disliked"
+                : preference === "clear"
+                  ? "clear"
+                  : preference;
+          const current = migrateLegacyPrefs(s);
+          const exercisePreferences = setPreference(current, exerciseId, mapped);
+          const legacy = prefsToLegacyArrays(exercisePreferences);
+          return {
+            ...s,
+            exercisePreferences,
+            likedExerciseIds: legacy.likedExerciseIds,
+            dislikedExerciseIds: legacy.dislikedExerciseIds,
+          };
+        }),
+      setExercisePreferences: (prefs) =>
+        update((s) => {
+          const merged = { ...migrateLegacyPrefs(s), ...prefs };
+          const legacy = prefsToLegacyArrays(merged);
+          return {
+            ...s,
+            exercisePreferences: merged,
+            likedExerciseIds: legacy.likedExerciseIds,
+            dislikedExerciseIds: legacy.dislikedExerciseIds,
+          };
+        }),
+      saveLivingPlanFeedback: (date, vote, reason) =>
+        update((s) => ({
+          ...s,
+          livingPlanFeedback: {
+            ...(s.livingPlanFeedback ?? {}),
+            [date]: {
+              vote,
+              at: new Date().toISOString(),
+              ...(reason ? { reason } : {}),
+            },
+          },
+        })),
       toggleSupplement: (id) => {
         let took = false;
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           const date = todayKey();
           const taken = prev.supplementLogs[date] ?? [];
-          const nextTaken = taken.includes(id) ? taken.filter((t) => t !== id) : [...taken, id];
-          took = !taken.includes(id);
-          let next = withSnapshot({
+          const already = taken.includes(id);
+          took = !already;
+          let doseLogs = [...(prev.supplementDoseLogs ?? [])];
+          let frequencies = { ...(prev.supplementFrequencies ?? {}) };
+          let nextTaken: string[];
+
+          if (already) {
+            // Remove today's routine_toggle doses for this product
+            doseLogs = doseLogs.filter(
+              (d) =>
+                !(
+                  d.productId === id &&
+                  d.takenAt.slice(0, 10) === date &&
+                  d.source === "routine_toggle"
+                ),
+            );
+            nextTaken = taken.filter((t) => t !== id);
+          } else {
+            const def = defaultDoseFromProduct(id);
+            const freq = (frequencies[id] ?? "1x_day") as DoseFrequency;
+            const log: SupplementDoseLog = {
+              id: `dose-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              productId: id,
+              dose: def.dose,
+              unit: def.unit,
+              frequency: freq,
+              takenAt: new Date().toISOString(),
+              source: "routine_toggle",
+            };
+            doseLogs = [...doseLogs, log];
+            frequencies[id] = freq;
+            nextTaken = [...taken, id];
+          }
+
+          const rolled = rollupSupplementLogsFromDoses(
+            { ...prev.supplementLogs, [date]: nextTaken },
+            doseLogs,
+          );
+
+          let next: AppState = {
             ...prev,
-            supplementLogs: { ...prev.supplementLogs, [date]: nextTaken },
-          });
+            supplementLogs: rolled,
+            supplementDoseLogs: doseLogs,
+            supplementFrequencies: frequencies,
+          };
+          next = { ...next, restockEstimates: refreshRestock(next) };
+          next = withSnapshot(next);
           const was = supplementsComplete(prev, date);
           const now = supplementsComplete(next, date);
           if (!was && now) {
@@ -666,46 +1072,137 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
       },
+      logSupplementDose: (opts) => {
+        update((s) => {
+          const prev = withQuests(s, deviceId.current);
+          const takenAt = opts.takenAt ?? new Date().toISOString();
+          const date = takenAt.slice(0, 10);
+          const log: SupplementDoseLog = {
+            id: `dose-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            productId: opts.productId,
+            dose: opts.dose,
+            unit: opts.unit,
+            frequency: opts.frequency,
+            takenAt,
+            source: opts.source ?? "manual",
+          };
+          const doseLogs = [...(prev.supplementDoseLogs ?? []), log];
+          const frequencies = {
+            ...(prev.supplementFrequencies ?? {}),
+            [opts.productId]: opts.frequency,
+          };
+          const taken = new Set(prev.supplementLogs[date] ?? []);
+          taken.add(opts.productId);
+          const supplementLogs = {
+            ...prev.supplementLogs,
+            [date]: [...taken],
+          };
+          let next: AppState = {
+            ...prev,
+            supplementDoseLogs: doseLogs,
+            supplementFrequencies: frequencies,
+            supplementLogs,
+          };
+          next = { ...next, restockEstimates: refreshRestock(next) };
+          next = withSnapshot(next);
+          const was = supplementsComplete(prev, date);
+          const nowDone = supplementsComplete(next, date);
+          if (!was && nowDone) {
+            const awarded = applyXpAward(next, XP.supplementsComplete, date);
+            next = afterXpSideEffects(prev, awarded.state, deviceId.current);
+          }
+          return next;
+        });
+        emitAppEvent(
+          deviceId.current,
+          "supplement_taken",
+          {
+            productId: opts.productId,
+            dose: opts.dose,
+            unit: opts.unit,
+            frequency: opts.frequency,
+            takenAt: opts.takenAt ?? new Date().toISOString(),
+          },
+          { entityType: "supplement", entityId: opts.productId },
+        );
+      },
+      removeSupplementDose: (id) => {
+        update((s) => {
+          const doseLogs = (s.supplementDoseLogs ?? []).filter((d) => d.id !== id);
+          const next: AppState = {
+            ...s,
+            supplementDoseLogs: doseLogs,
+            restockEstimates: refreshRestock({ ...s, supplementDoseLogs: doseLogs }),
+          };
+          return withSnapshot(next);
+        });
+      },
       setRoutine: (ids) => update((s) => ({ ...s, supplementRoutine: ids })),
       toggleChallenge: (id) => {
         const current = stateRef.current;
         const joining = !current.challenges.includes(id);
         const challenge = challengeById(id);
-        const baseline = challenge ? challengeRawValue(challenge, current.sessions) : 0;
+        const baseline = challenge
+          ? challengeRawValue(challenge, current.sessions, current.activityLogs, {
+              invitesSent: current.challengeInvitesSent ?? 0,
+            })
+          : 0;
+        const personalTarget =
+          challenge && isPersonalizedChallenge(challenge)
+            ? computePersonalTarget(challenge, baseline)
+            : undefined;
         update((s) => {
           if (joining) {
-            return {
+            const nextTargets = { ...(s.challengePersonalTargets ?? {}) };
+            if (personalTarget !== undefined) nextTargets[id] = personalTarget;
+            const next = {
               ...s,
               challenges: [...s.challenges, id],
               challengeBaselines: { ...(s.challengeBaselines ?? {}), [id]: baseline },
+              challengePersonalTargets: nextTargets,
             };
+            return grantPendingAchievements(next).state;
           }
           const nextBaselines = { ...(s.challengeBaselines ?? {}) };
+          const nextTargets = { ...(s.challengePersonalTargets ?? {}) };
           delete nextBaselines[id];
+          delete nextTargets[id];
           return {
             ...s,
             challenges: s.challenges.filter((c) => c !== id),
             challengeBaselines: nextBaselines,
+            challengePersonalTargets: nextTargets,
           };
         });
         if (joining) {
           emitAppEvent(
             deviceId.current,
             "challenge_joined",
-            { challengeId: id },
+            { challengeId: id, personalTarget },
             { entityType: "challenge", entityId: id },
           );
         }
         if (!deviceId.current || !current.profile || current.shareProgress === false) return;
         const name = current.profile.name;
         if (joining && challenge) {
-          const progress = challengeProgress(challenge, current.sessions, baseline);
-          void joinChallengeRemote(deviceId.current, id, name, baseline)
+          const progress = challengeProgress(challenge, current.sessions, {
+            baseline,
+            personalTarget,
+            activityLogs: current.activityLogs,
+            invitesSent: current.challengeInvitesSent ?? 0,
+          });
+          void joinChallengeRemote(deviceId.current, id, name, baseline, personalTarget)
             .then(() =>
               syncChallengeProgress(deviceId.current, id, progress.current, name, {
                 baseline: progress.baseline,
                 pct: progress.pct,
                 complete: progress.complete,
+                personalTarget: progress.personalTarget,
+                proofStatus: "self_reported",
+                proofSource:
+                  challenge.metric === "steps" || challenge.metric === "football_sessions"
+                    ? "app_manual"
+                    : "app_session",
               }),
             )
             .catch((e) => console.error("Falha ao entrar no desafio remoto", e));
@@ -715,6 +1212,80 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
         }
       },
+      bumpChallengeInvitesSent: () =>
+        update((s) => ({ ...s, challengeInvitesSent: (s.challengeInvitesSent ?? 0) + 1 })),
+      dismissCoachNudge: () =>
+        update((s) => ({ ...s, coachNudgeDismissedAt: new Date().toISOString() })),
+      markCoachNudgeShown: () =>
+        update((s) => ({ ...s, coachNudgeShownAt: new Date().toISOString() })),
+      logActivity: (kind, value, date) => {
+        const day = date ?? todayKey();
+        const fraud = validateActivityLog({ kind, value, date: day });
+        const policy = applyFraudPolicy(fraud);
+        if (policy.action === "block_input") {
+          return { ok: false, message: policy.userMessage ?? "Valor inválido" };
+        }
+        const entry: ActivityLogEntry = {
+          id: crypto.randomUUID(),
+          date: day,
+          kind,
+          value,
+          source: "app_manual",
+          status: "self_reported",
+        };
+        update((s) => ({
+          ...s,
+          activityLogs: [...(s.activityLogs ?? []), entry],
+          lastFraudWarning: policy.action === "warn" ? policy.userMessage : s.lastFraudWarning,
+        }));
+        if (deviceId.current) {
+          void syncAllJoinedChallenges(stateRef.current, deviceId.current).catch(() => undefined);
+        }
+        const out: { ok: true; warning?: string } = { ok: true };
+        if (policy.action === "warn" && policy.userMessage) out.warning = policy.userMessage;
+        return out;
+      },
+      ingestActivityLogs: (entries) => {
+        if (!entries.length) return;
+        update((s) => ({
+          ...s,
+          activityLogs: mergeActivityLogs(s.activityLogs ?? [], entries),
+        }));
+        if (deviceId.current) {
+          const current = stateRef.current;
+          let warning: string | null = current.lastFraudWarning;
+          for (const id of current.challenges ?? []) {
+            const challenge = challengeById(id);
+            if (!challenge) continue;
+            const progressOpts: import("@/lib/social").ChallengeProgressOpts = {
+              activityLogs: current.activityLogs,
+            };
+            if (current.challengeBaselines?.[id] != null) progressOpts.baseline = current.challengeBaselines[id];
+            if (current.challengePersonalTargets?.[id] != null) {
+              progressOpts.personalTarget = current.challengePersonalTargets[id];
+            }
+            const progress = challengeProgress(challenge, current.sessions, progressOpts);
+            const fraudInput: import("@/lib/engine/anti-fraud").ChallengeProgressInput = {
+              value: progress.current,
+              baseline: progress.baseline,
+              metric: challenge.metric,
+            };
+            if (progress.personalTarget != null) fraudInput.personalTarget = progress.personalTarget;
+            const fraud = validateChallengeProgress(fraudInput);
+            const policy = applyFraudPolicy(fraud);
+            if (policy.action === "warn" && policy.userMessage) warning = policy.userMessage;
+          }
+          if (warning !== current.lastFraudWarning) {
+            update((s) => ({ ...s, lastFraudWarning: warning }));
+          }
+          void syncAllJoinedChallenges(stateRef.current, deviceId.current).catch(() => undefined);
+        }
+      },
+      setWearableConnection: (conn) =>
+        update((s) => {
+          const rest = (s.wearableConnections ?? []).filter((c) => c.provider !== conn.provider);
+          return { ...s, wearableConnections: [...rest, conn] };
+        }),
       toggleHub: (hubId) => {
         const current = stateRef.current;
         const hub = hubById(hubId);
@@ -730,7 +1301,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const challenge = challengeById(cid);
             if (!challenge) continue;
             challenges.push(cid);
-            baselines[cid] = challengeRawValue(challenge, current.sessions);
+            baselines[cid] = challengeRawValue(challenge, current.sessions, current.activityLogs);
           }
           update((s) => ({
             ...s,
@@ -744,14 +1315,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 for (const cid of hub.challengeIds) {
                   const challenge = challengeById(cid);
                   if (!challenge) continue;
-                  const baseline = baselines[cid] ?? challengeRawValue(challenge, current.sessions);
-                  const progress = challengeProgress(challenge, current.sessions, baseline);
+                  const baseline =
+                    baselines[cid] ??
+                    challengeRawValue(challenge, current.sessions, current.activityLogs);
+                  const progress = challengeProgress(challenge, current.sessions, {
+                    baseline,
+                    activityLogs: current.activityLogs,
+                  });
+                  const proof = challengeProofFromLogs(
+                    challenge.metric,
+                    current.activityLogs ?? [],
+                    challenge.durationDays,
+                  );
                   await joinChallengeRemote(deviceId.current, cid, name, baseline).catch(() => undefined);
-                  await syncChallengeProgress(deviceId.current, cid, progress.current, name, {
+                  const hubSync: {
+                    baseline?: number;
+                    pct?: number;
+                    complete?: boolean;
+                    personalTarget?: number;
+                    proofStatus?: string;
+                    proofSource?: string;
+                  } = {
                     baseline: progress.baseline,
                     pct: progress.pct,
                     complete: progress.complete,
-                  }).catch(() => undefined);
+                    proofStatus: proof.status,
+                    proofSource: proof.source,
+                  };
+                  if (progress.personalTarget != null) hubSync.personalTarget = progress.personalTarget;
+                  await syncChallengeProgress(deviceId.current, cid, progress.current, name, hubSync).catch(
+                    () => undefined,
+                  );
                 }
               })
               .catch((e) => console.error("Falha ao entrar no hub remoto", e));
@@ -774,11 +1368,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           chat: [...s.chat, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, text }],
         })),
       setTheme: (theme) => update((s) => ({ ...s, theme })),
-      setShareProgress: (share) => update((s) => ({ ...s, shareProgress: share })),
+      setShareProgress: (share) =>
+        update((s) => {
+          const privacy = privacyFromLegacyShareProgress(share);
+          if (deviceId.current) {
+            void saveSocialPrivacyRemote(deviceId.current, privacy).catch(() => undefined);
+          }
+          return { ...s, shareProgress: share, socialPrivacy: privacy };
+        }),
+      setSocialPrivacy: (privacy) =>
+        update((s) => {
+          const next = normalizeSocialPrivacy(privacy, s.shareProgress);
+          if (deviceId.current) {
+            void saveSocialPrivacyRemote(deviceId.current, next).catch(() => undefined);
+          }
+          return { ...s, socialPrivacy: next, shareProgress: isSocialSharingEnabled(next) };
+        }),
       setSessionFx: (enabled) => update((s) => ({ ...s, sessionFx: enabled })),
       setRemindersEnabled: (enabled) => update((s) => ({ ...s, remindersEnabled: enabled })),
       setReminderHour: (hour) =>
         update((s) => ({ ...s, reminderHour: Math.min(22, Math.max(6, Math.round(hour))) })),
+      setPushPrefs: (prefs) =>
+        update((s) => ({
+          ...s,
+          pushPrefs: { ...(s.pushPrefs ?? emptyState.pushPrefs), ...prefs },
+        })),
+      acceptLegal: (kind) =>
+        update((s) => {
+          const at = new Date().toISOString();
+          if (kind === "terms") return { ...s, termsAcceptedAt: s.termsAcceptedAt ?? at };
+          if (kind === "privacy") return { ...s, privacyAcceptedAt: s.privacyAcceptedAt ?? at };
+          return { ...s, healthPurposeAckAt: s.healthPurposeAckAt ?? at };
+        }),
       markTipSeen: (id) =>
         update((s) => {
           const seen = s.seenOnboardingTips ?? [];
@@ -846,24 +1467,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const productIds = (opts.productIds ?? []).slice(0, 5);
         const accessTier = opts.accessTier ?? "base";
         const restockEstimates = opts.restockEstimates ?? {};
+        const lastPaidAt = opts.lastPaidAt ?? null;
+        const accessExpiresAt = opts.accessExpiresAt ?? null;
+        const shopifyDisplayName = opts.shopifyDisplayName ?? null;
         update((s) => {
           const applyRoutine = s.supplementRoutine.length === 0 && productIds.length > 0;
           const badges = new Set(s.cosmeticBadges ?? []);
           badges.add("cliente-soldiers");
           const nextRestock = Object.keys(restockEstimates).length
-            ? enrichRestockConfidence(restockEstimates, s.supplementLogs)
-            : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs);
+            ? refreshRestock(s, restockEstimates)
+            : refreshRestock(s);
           return {
             ...s,
             accessGranted: true,
             accessEmail: email,
             accessGrantedAt: grantedAt,
+            lastPurchaseAt: lastPaidAt ?? s.lastPurchaseAt,
+            accessExpiresAt: accessExpiresAt ?? s.accessExpiresAt,
+            shopifyDisplayName: shopifyDisplayName ?? s.shopifyDisplayName,
             accessTier,
             purchaseProductIds: productIds.length ? productIds : s.purchaseProductIds,
             restockEstimates: nextRestock,
             supplementRoutine: applyRoutine ? productIds : s.supplementRoutine,
             routineFromPurchase: applyRoutine || s.routineFromPurchase,
             cosmeticBadges: [...badges],
+            ...(shopifyDisplayName && s.profile && !s.profile.name.trim()
+              ? { profile: { ...s.profile, name: shopifyDisplayName } }
+              : {}),
           };
         });
         try {
@@ -881,6 +1511,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 ? session.productIds
                 : s.purchaseProductIds,
               userId: session.userId ?? s.userId,
+              lastPurchaseAt: session.lastPaidAt ?? s.lastPurchaseAt,
+              accessExpiresAt: session.accessExpiresAt ?? s.accessExpiresAt,
+              shopifyDisplayName: session.shopifyDisplayName ?? s.shopifyDisplayName,
               restockEstimates: session.restockEstimates
                 ? enrichRestockConfidence(
                     { ...s.restockEstimates, ...session.restockEstimates },
@@ -888,6 +1521,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   )
                 : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs),
             }));
+          } else {
+            update((s) => ({ ...s, accessGranted: false }));
           }
         } catch (e) {
           console.warn("establishAccessSession failed", e);
@@ -900,14 +1535,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           accessEmail: opts.email,
           accessTier: opts.tier,
           accessGrantedAt: s.accessGrantedAt ?? new Date().toISOString(),
+          lastPurchaseAt: opts.lastPaidAt ?? s.lastPurchaseAt,
         }));
       },
       revokeAccessLocal: () => {
         update((s) => ({
           ...s,
           accessGranted: false,
-          accessEmail: null,
-          accessGrantedAt: null,
         }));
       },
       dismissRoutineFromPurchase: () =>
@@ -923,9 +1557,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           availableMin: checkIn.availableMin,
           version: prevVersion + 1,
           ...(checkIn.noEquipment ? { noEquipment: true } : {}),
+          ...(checkIn.equipment ? { equipment: checkIn.equipment } : {}),
+          ...(checkIn.acceptedTrainingMode ? { acceptedTrainingMode: checkIn.acceptedTrainingMode } : {}),
           ...(checkIn.soreness != null ? { soreness: checkIn.soreness } : {}),
           ...(checkIn.stress != null ? { stress: checkIn.stress } : {}),
           ...(checkIn.notes ? { notes: checkIn.notes.slice(0, 280) } : {}),
+          ...(checkIn.lunchOutToday ? { lunchOutToday: true } : {}),
+          ...(Array.isArray(checkIn.skippedSlots) ? { skippedSlots: checkIn.skippedSlots } : {}),
         };
         const nextState = withSnapshot({
           ...stateRef.current,
@@ -1002,7 +1640,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState(emptyState);
         applyTheme("dark");
         if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
-        void clearRemoteState(deviceId.current);
+        // Local-only clear — does not wipe server account data
+      },
+      clearAccountData: async () => {
+        skipPush.current = true;
+        setState(emptyState);
+        applyTheme("dark");
+        if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
+        const { clearUserDataFn } = await import("@/lib/sync.functions");
+        return clearUserDataFn({ data: { deviceId: deviceId.current } });
       },
     }),
     [state, hydrated, update, lastSessionXp],

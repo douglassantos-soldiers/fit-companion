@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { NumberInput, Modal } from "@mantine/core";
 import { Chip } from "@heroui/react";
 import {
-  Check,
   ChevronDown,
   ChevronUp,
   Droplets,
@@ -19,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { MealPickerSheet } from "@/components/meal-picker-sheet";
-import { MealPresetThumb } from "@/components/meal-preset-thumb";
+import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
 import { MetricRing } from "@/components/metric-ring";
 import { Spinner } from "@/components/kibo-ui/spinner";
 import { NumberTicker } from "@/components/ui/number-ticker";
@@ -28,10 +27,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActivityFeed } from "@/components/social/activity-feed";
 import { DailyQuestsCard, XpBar } from "@/components/today/engagement-cards";
-import { LivingPlanHero } from "@/components/today/living-plan-hero";
+import { LivingPlanHero, type LivingPlanEatAction, type LivingPlanPrimaryAction } from "@/components/today/living-plan-hero";
+import { AccessWindowBanner } from "@/components/today/access-window-banner";
 import { WeekPath } from "@/components/today/week-path";
 import { PRODUCTS } from "@/data/products";
-import { reorderUrlForProduct } from "@/data/shopify-product-map";
+import { resolveProductMedia } from "@/lib/soldiers-media";
+import {
+  getStorefrontBaseUrl,
+  primaryReorderProductId,
+  primaryReorderUrl,
+  reorderUrlForProduct,
+} from "@/data/shopify-product-map";
 import { trackAppEvent } from "@/lib/shopify.functions";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import type { MealPreset } from "@/data/meal-presets";
@@ -41,15 +47,18 @@ import { buildUserContext } from "@/lib/engine/context";
 import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { evaluateSafety } from "@/lib/engine/safety";
 import { rankRecommendations } from "@/lib/engine/recommendation";
+import { runBehaviorLoop } from "@/lib/engine/behavior";
 import { trackOutcome } from "@/lib/outcome";
 import {
   buildDailyMealPlan,
-  dayNutritionTotals,
+  dayNutritionTotalsFromState,
   nextSuggestedMeal,
   nutritionGoals,
   addMealFromPreset,
   suggestSlot,
 } from "@/lib/engine/nutrition";
+import { clampServings, copyMealToSlot, lastMealForSlot, nutritionProofLine, proteinGapLine } from "@/lib/nutrition/log-loop";
+import { mealPlanOptsFromState } from "@/lib/nutrition/plan-opts";
 import { buildExpressSession, buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
 import { daySummary, nextOnboardingTip, streakAtRisk, weekPathStates } from "@/lib/engine/retention";
 import { dailyXp } from "@/lib/engine/xp";
@@ -65,7 +74,18 @@ import {
 import { useClubSocialFeed } from "@/hooks/use-club-social-feed";
 import { todayMetrics, todaySupplements, useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
-import { DAILY_XP_GOAL, MEAL_SLOT_LABEL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
+import { trainingProofLine } from "@/lib/training/proof";
+import { DAILY_XP_GOAL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
+import { PeriodReviewCard } from "@/components/progress/period-review-card";
+import { brandLevel } from "@/lib/engine/brand-level";
+import { homePersona } from "@/lib/engine/home-persona";
+import { periodReview } from "@/lib/engine/period-review";
+import { resolvedAvailableMin } from "@/lib/engine/session-time";
+import { weekOverWeek } from "@/lib/engine/dimensions";
+import { prsInCurrentWeek } from "@/lib/engine/dimensions";
+import { orderHomeBlocks, type HomeBlockId } from "@/lib/engine/home-layout";
+import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
+import { accessDaysRemaining, accessUrgencyLevel } from "@/lib/access-window";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -109,14 +129,21 @@ function Today() {
     markQuestKudos,
     saveDayCheckIn,
     refreshLivingPlan,
+    patchProfile,
+    saveLivingPlanFeedback,
+    dismissCoachNudge,
+    markCoachNudgeShown,
   } = useStore();
   const [mealSlot, setMealSlot] = useState<MealSlot | null>(null);
+  const [eatServings, setEatServings] = useState<number | null>(null);
   const [weightOpen, setWeightOpen] = useState(false);
   const [weightKg, setWeightKg] = useState<number | string>("");
   const [leagueMe, setLeagueMe] = useState<LeagueRow | null>(null);
   const [friendQuest, setFriendQuest] = useState<FriendQuest | null>(null);
   const [stories, setStories] = useState<ClubStory[]>([]);
   const [maisAberto, setMaisAberto] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [nudgeOpen, setNudgeOpen] = useState(false);
   const days = useMemo(() => weekDays(), []);
   const deviceId = getDeviceId();
   const {
@@ -226,7 +253,10 @@ function Today() {
   const insights = computeLearningInsights(state);
   const userCtx = buildUserContext(state, state.userId);
   const insightLine = userCtx.headline ?? topLearningInsight(state);
-  const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state));
+  const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state), {
+    likedExerciseIds: state.likedExerciseIds ?? [],
+    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+  });
   const day = planDayForToday(plan);
   const expressDay = day ? buildExpressSession(day) : null;
   const doneToday = state.sessions.some((s) => s.date.slice(0, 10) === todayKey());
@@ -236,11 +266,26 @@ function Today() {
   const score = performanceScore(dims);
   const adhere = adherenceScore(dims);
   const st = streak(state.sessions, { freezeUsedDates: state.freezeUsedDates });
-  const goals = nutritionGoals(profile, insights);
-  const nutrition = dayNutritionTotals(state.meals ?? []);
-  const mealPlan = buildDailyMealPlan(profile, state, todayKey(), insights);
+  const persona = homePersona(state);
+  const brand = brandLevel(state);
+  const weekReview = persona === "consistente" || persona === "avancado" ? periodReview(state, "week") : null;
+  const wow = persona === "avancado" ? weekOverWeek(state.sessions) : null;
+  const weekPrs = persona === "consistente" || persona === "avancado" ? prsInCurrentWeek(state.sessions) : [];
+  const showLeague = persona !== "novo" && persona !== "inativo";
+  const needsRecovery = !profile.typicalSleepHours || !profile.primaryBlocker;
+  const bodyIncomplete = !(profile.age >= 16 && profile.heightCm >= 130 && profile.weightKg >= 35);
+  const profileIncomplete = bodyIncomplete || needsRecovery || profile.onboardingComplete === false;
+  const livingBundle = buildLivingPlanWithDecisions(state, todayKey());
+  const engine = mealPlanOptsFromState(state, todayKey(), livingBundle?.decisions);
+  const goals = nutritionGoals(profile, insights, engine);
+  const nutrition = dayNutritionTotalsFromState(state);
+  const mealPlan = buildDailyMealPlan(profile, state, todayKey(), insights, engine);
   const nextMeal = nextSuggestedMeal(mealPlan);
   const xp = dailyXp(state);
+  const gap = proteinGapLine(nutrition.proteinG, goals.proteinG, nextMeal?.slot);
+  const nutProof = nutritionProofLine(state.meals ?? [], goals.proteinG);
+  const lastSameSlot = nextMeal ? lastMealForSlot(state.meals ?? [], nextMeal.slot) : null;
+  const servingsNow = clampServings(eatServings ?? nextMeal?.suggestedServings ?? 1);
 
   const goalProducts = PRODUCTS.filter((p) => p.goals.includes(profile.goal));
   const routine = state.supplementRoutine.length
@@ -261,23 +306,43 @@ function Today() {
     label: string;
     proteinG: number;
     kcal: number;
+    carbG?: number;
+    fatG?: number;
+    fiberG?: number;
     quality: MealQuality;
+    sourceKind?: "informed" | "estimated";
+    confidence?: number;
+    aiMode?: "photo" | "voice" | "text";
+    correctedFromAi?: boolean;
+    items?: import("@/lib/types").MealItemEntry[];
+    foodSource?: import("@/lib/types").FoodLineageSource;
   }) => {
     const slot = mealSlot ?? suggestSlot();
-    addMealEntry({
+    const entry: Parameters<typeof addMealEntry>[0] = {
       slot,
       label: meal.label,
       proteinG: meal.proteinG,
       kcal: meal.kcal,
       quality: meal.quality,
-    });
+      sourceKind: meal.sourceKind ?? "estimated",
+    };
+    if (meal.carbG != null) entry.carbG = meal.carbG;
+    if (meal.fatG != null) entry.fatG = meal.fatG;
+    if (meal.fiberG != null) entry.fiberG = meal.fiberG;
+    if (meal.confidence != null) entry.confidence = meal.confidence;
+    if (meal.aiMode) entry.aiMode = meal.aiMode;
+    if (meal.correctedFromAi != null) entry.correctedFromAi = meal.correctedFromAi;
+    if (meal.items) entry.items = meal.items;
+    if (meal.foodSource) entry.foodSource = meal.foodSource;
+    addMealEntry(entry);
     setMealSlot(null);
     toast.success(`${meal.label} registrado`);
   };
 
-  const applySuggestedMeal = () => {
+  const applySuggestedMeal = (servings = servingsNow) => {
     if (!nextMeal?.preset) return;
-    addMealEntry(addMealFromPreset(nextMeal.preset, nextMeal.slot, 1));
+    addMealEntry(addMealFromPreset(nextMeal.preset, nextMeal.slot, servings));
+    setEatServings(null);
     toast.success(`${nextMeal.preset.label} registrado`);
   };
 
@@ -303,10 +368,10 @@ function Today() {
     return q ? isQuestComplete(state, q) : false;
   }).length;
 
-  const livingBundle = buildLivingPlanWithDecisions(state, todayKey());
   const living = livingBundle?.plan ?? state.livingPlans?.[todayKey()] ?? null;
   const todayCheckIn = state.dayCheckIns?.[todayKey()];
   const safety = evaluateSafety(state);
+  const behaviorLoop = livingBundle?.behavior ?? runBehaviorLoop(state);
   const topRec = living
     ? rankRecommendations({
         livingPlan: living,
@@ -315,14 +380,53 @@ function Today() {
         decisions: livingBundle?.decisions ?? null,
         goal: profile.goal,
         purchaseProductIds: state.purchaseProductIds ?? [],
+        behavior: behaviorLoop,
+        weekday: new Date().getDay(),
       })[0]
     : null;
+
+  const homeBlocks = orderHomeBlocks(state, behaviorLoop.profile, {
+    hasClub: Boolean(club),
+    followingCount: 0,
+    level: profile.level,
+  });
+  const nudge = coachNudgeFromState(state);
+  const daysLeft = accessDaysRemaining(state.accessExpiresAt);
+  const urgency = accessUrgencyLevel(daysLeft);
+  const windowReorderUrl = primaryReorderUrl(state.purchaseProductIds) ?? getStorefrontBaseUrl();
+  const windowProductName = (() => {
+    const id = primaryReorderProductId(state.purchaseProductIds);
+    return id ? (PRODUCTS.find((p) => p.id === id)?.name ?? null) : null;
+  })();
+  const restockSoon = (() => {
+    const estimates = Object.values(state.restockEstimates ?? {});
+    if (!estimates.length) return null;
+    const soon = estimates
+      .map((e) => {
+        const days = Math.ceil((new Date(e.emptyAt).getTime() - Date.now()) / 86_400_000);
+        return { ...e, days };
+      })
+      .filter((e) => e.days <= 14)
+      .sort((a, b) => a.days - b.days)[0];
+    if (!soon) return null;
+    const product = PRODUCTS.find((p) => p.id === soon.productId);
+    const url = reorderUrlForProduct(soon.productId);
+    if (!product || !url) return null;
+    return { soon, product, url };
+  })();
+
+  useEffect(() => {
+    if (!hydrated || !nudge.show) return;
+    setNudgeOpen(true);
+    markCoachNudgeShown();
+  }, [hydrated, nudge.show, markCoachNudgeShown]);
 
   return (
     <AppShell
       title={`Bom treino, ${profile.name.split(" ")[0]}`}
       subtitle={`Score ${score}/100 · streak ${st}d · ${xp}/${DAILY_XP_GOAL} XP`}
       headerBadge={`${st}d`}
+      headerAccessDays={urgency ? daysLeft : null}
       hideTitle
     >
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -331,8 +435,9 @@ function Today() {
             Olá, <span className="font-semibold text-foreground">{profile.name.split(" ")[0]}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Score {living?.score ?? score}/100 · streak {st}d
-            {leagueMe ? ` · Liga #${leagueMe.rank}` : ""}
+            {brand.label} · Nv. {brand.level} · streak {st}d
+            {showLeague && leagueMe ? ` · Liga #${leagueMe.rank}` : ""}
+            {daysLeft != null && daysLeft <= 7 ? ` · acesso ${daysLeft}d` : ""}
           </p>
         </div>
         <Link to="/progresso" className="flex items-center gap-1 text-xs font-semibold text-primary">
@@ -340,20 +445,93 @@ function Today() {
         </Link>
       </div>
 
+      {urgency && daysLeft != null && windowReorderUrl ? (
+        <AccessWindowBanner
+          daysRemaining={daysLeft}
+          urgency={urgency}
+          reorderUrl={windowReorderUrl}
+          productName={windowProductName}
+        />
+      ) : null}
+
+      {persona !== "novo" &&
+        (() => {
+        const proof = trainingProofLine(state);
+        if (!proof) return null;
+        return proof.exerciseId ? (
+          <Link
+            to="/treino/exercicio/$id"
+            params={{ id: proof.exerciseId }}
+            className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+          >
+            {proof.text}
+          </Link>
+        ) : (
+          <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+            {proof.text}
+          </p>
+        );
+      })()}
+
+      {profileIncomplete ? (
+        <button
+          type="button"
+          className="mb-3 w-full rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-left"
+          onClick={() => setProfileOpen(true)}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Completar perfil</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {bodyIncomplete
+              ? "Idade, altura e peso calibram proteína e cargas — 30 segundos."
+              : "Sono e o que mais te impede — o plano fica mais preciso."}
+          </p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/60">
+            <div
+              className="h-1.5 rounded-full bg-primary"
+              style={{ width: bodyIncomplete ? "40%" : "75%" }}
+            />
+          </div>
+        </button>
+      ) : null}
+
+      {persona === "inativo" && day && !doneToday ? (
+        <div className="surface-glass mb-4 border-primary/30 p-4">
+          <p className="eyebrow">Retomar</p>
+          <p className="mt-1 text-sm font-semibold">Volte com pouca fricção — Express protege o hábito.</p>
+          <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: true, from: "hoje" }}>
+            <Button className="mt-3 h-11 w-full font-bold uppercase">Retomar treino</Button>
+          </Link>
+        </div>
+      ) : null}
+
       {living ? (
         <LivingPlanHero
           plan={living}
           doneToday={doneToday}
           checkIn={todayCheckIn}
+          defaultAvailableMin={resolvedAvailableMin(todayCheckIn, profile)}
+          feedback={state.livingPlanFeedback?.[todayKey()] ?? null}
+          onFeedback={(vote, reason) => {
+            saveLivingPlanFeedback(todayKey(), vote, reason);
+            void trackOutcome(getDeviceId(), vote === "up" ? "living_plan_followed" : "living_plan_skipped", {
+              reason: reason ?? null,
+            });
+            toast.success(vote === "up" ? "Obrigado — o plano segue" : "Anotado — vamos ajustar");
+          }}
           onSaveCheckIn={(c) => {
             saveDayCheckIn(c);
             toast.success("Plano de hoje atualizado");
           }}
-          primaryAction={
-            topRec
-              ? { id: topRec.id, title: topRec.title, reason: topRec.reason, href: topRec.href }
-              : null
-          }
+          primaryAction={(() => {
+            if (!topRec) return null;
+            const action: LivingPlanPrimaryAction = {
+              id: topRec.id,
+              title: topRec.title,
+              reason: topRec.reason,
+            };
+            if (topRec.href) action.href = topRec.href;
+            return action;
+          })()}
           onPrimaryAction={() => {
             if (!topRec) return;
             void trackOutcome(getDeviceId(), "living_plan_followed", {
@@ -361,7 +539,35 @@ function Today() {
               kind: topRec.kind,
             });
           }}
+          eatAction={(() => {
+            const eat: LivingPlanEatAction = {
+              title: nextMeal?.preset?.label ?? "Registrar refeição",
+              hint: gap ?? (nextMeal?.preset ? `${nextMeal.preset.proteinG} g proteína` : "Slots do dia preenchidos"),
+              servings: servingsNow,
+              onServings: (n) => setEatServings(clampServings(n)),
+              onApply: () => {
+                if (nextMeal?.preset) applySuggestedMeal(servingsNow);
+                else setMealSlot(suggestSlot());
+              },
+              onRegister: () => setMealSlot(nextMeal?.slot ?? suggestSlot()),
+            };
+            if (lastSameSlot) {
+              eat.onRepeatLast = () => {
+                addMealEntry(copyMealToSlot(lastSameSlot, nextMeal?.slot ?? lastSameSlot.slot));
+                toast.success("Igual ontem");
+              };
+              eat.repeatLabel = "Igual ontem";
+            }
+            return eat;
+          })()}
         />
+      ) : null}
+
+      {persona !== "inativo" ? (
+        <div className="mb-4 space-y-3">
+          <XpBar xp={xp} />
+          <DailyQuestsCard state={state} />
+        </div>
       ) : null}
 
       {atRisk ? (
@@ -375,7 +581,7 @@ function Today() {
           </div>
           <div className="flex flex-wrap gap-2">
             {day ? (
-              <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false }}>
+              <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false, from: "hoje" }}>
                 <Button size="sm">Treinar</Button>
               </Link>
             ) : null}
@@ -395,56 +601,122 @@ function Today() {
         </div>
       ) : null}
 
-      {/* Legacy detailed plan card removed — Living Plan hero above */}
-      <section className="surface-glass mb-4 space-y-3 p-4">
-          <div className="border-0">
-            <p className="eyebrow">Comida agora</p>
-            {nextMeal?.preset ? (
-              <div className="mt-2 flex items-center justify-between gap-3">
+      {restockSoon ? (
+        <div className="surface-glass mb-4 border-primary/25 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Estoque estimado</p>
+          <div className="mt-2 flex items-center gap-3">
+            <SoldiersMediaThumb
+              media={resolveProductMedia(restockSoon.product.id)}
+              alt={restockSoon.product.name}
+              className="size-12 rounded-xl"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Pedir de novo {restockSoon.product.name}</p>
+              <p className="text-xs text-muted-foreground">
+                ~{Math.max(0, restockSoon.soon.days)} dia{restockSoon.soon.days === 1 ? "" : "s"} restantes
+                (estimativa)
+              </p>
+            </div>
+          </div>
+          <a
+            href={restockSoon.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 block"
+            onClick={() => {
+              const id = getDeviceId();
+              if (!id) return;
+              void trackAppEvent({
+                data: {
+                  deviceId: id,
+                  kind: "restock_clicked",
+                  payload: { source: "home", productId: restockSoon.soon.productId },
+                  entityType: "product",
+                  entityId: restockSoon.soon.productId,
+                },
+              });
+            }}
+          >
+            <Button className="h-11 w-full font-bold uppercase tracking-wide">Pedir de novo</Button>
+          </a>
+        </div>
+      ) : null}
+
+      {homeBlocks.map((blockId: HomeBlockId) => {
+        if (blockId === "wow" && persona === "avancado" && wow) {
+          return (
+            <div key="wow" className="mb-4 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                <p className="text-display text-lg text-primary">
+                  {wow.volumeDeltaPct != null ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%` : "—"}
+                </p>
+                <p className="text-[0.65rem] uppercase text-muted-foreground">Volume</p>
+              </div>
+              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                <p className="text-display text-lg text-primary">{living?.traffic.recovery ?? "—"}</p>
+                <p className="text-[0.65rem] uppercase text-muted-foreground">Recuperação</p>
+              </div>
+              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                <p className="text-display text-lg text-primary">{weekPrs.length}</p>
+                <p className="text-[0.65rem] uppercase text-muted-foreground">PRs sem.</p>
+              </div>
+            </div>
+          );
+        }
+        if (blockId === "weekPrs" && persona === "consistente" && weekPrs.length) {
+          return (
+            <p key="weekPrs" className="mb-3 text-sm font-semibold text-primary">
+              {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
+            </p>
+          );
+        }
+        if (blockId === "periodReview" && weekReview && weekReview.sessions > 0) {
+          return <PeriodReviewCard key="periodReview" review={weekReview} />;
+        }
+        if (blockId === "streakRisk") return null;
+        if (blockId === "nutritionProof" && nutProof) {
+          return (
+            <Link
+              key="nutritionProof"
+              to="/nutricao"
+              className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+            >
+              {nutProof}
+            </Link>
+          );
+        }
+        if (blockId === "registerMeal") {
+          if (living) return null;
+          return (
+            <div key="registerMeal" className="mb-4 space-y-2">
+              {gap ? (
+                <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+                  {gap}
+                </p>
+              ) : null}
+              <Button variant="secondary" className="h-11 w-full" onClick={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}>
+                <Utensils className="size-4" /> Registrar refeição
+              </Button>
+            </div>
+          );
+        }
+        if (blockId === "supplement" && nowSuggestion) {
+          return (
+            <section key="supplement" className="surface-glass mb-4 space-y-3 p-4">
+              <p className="eyebrow">Suplemento</p>
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <MealPresetThumb preset={nextMeal.preset} className="size-11" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">
-                      {MEAL_SLOT_LABEL[nextMeal.slot]} · {nextMeal.preset.label}
-                    </p>
+                  <SoldiersMediaThumb
+                    media={resolveProductMedia(nowSuggestion.id)}
+                    alt={nowSuggestion.name}
+                    className="size-12 rounded-xl"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold">{nowSuggestion.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {nextMeal.preset.proteinG} g · {nutrition.proteinG}/{living?.nutrition.proteinG ?? goals.proteinG}{" "}
-                      g hoje
+                      {nowSuggestion.timing} · {nowSuggestion.serving}
                     </p>
                   </div>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button size="sm" onClick={applySuggestedMeal}>
-                    <Check className="size-3.5" /> Aplicar
-                  </Button>
-                  <Link to="/nutricao">
-                    <Button size="sm" variant="secondary">
-                      Plano
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">Slots do dia preenchidos.</p>
-                <Link to="/nutricao">
-                  <Button size="sm" variant="secondary">
-                    Ver
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {nowSuggestion ? (
-            <div className="border-t border-white/10 pt-3">
-              <p className="eyebrow">Suplemento</p>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">{nowSuggestion.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {nowSuggestion.timing} · {nowSuggestion.serving}
-                  </p>
                 </div>
                 <Button
                   size="sm"
@@ -457,19 +729,69 @@ function Today() {
                   {taken.includes(nowSuggestion.id) ? "Tomado" : "Marcar"}
                 </Button>
               </div>
+            </section>
+          );
+        }
+        if (blockId === "insights") {
+          if (!insightLine && userCtx.why.length <= 1) return null;
+          return (
+            <div key="insights">
+              {insightLine ? (
+                <p className="mb-3 px-1 text-xs text-muted-foreground">{insightLine}</p>
+              ) : null}
+              {userCtx.why.length > 1 ? (
+                <p className="mb-3 px-1 text-[11px] text-muted-foreground/80">
+                  {userCtx.why.slice(1, 3).join(" · ")}
+                  {adhere > 0 ? ` · Aderência ${adhere}` : ""}
+                </p>
+              ) : null}
             </div>
-          ) : null}
-      </section>
-
-      {insightLine ? (
-        <p className="mb-3 px-1 text-xs text-muted-foreground">{insightLine}</p>
-      ) : null}
-      {userCtx.why.length > 1 ? (
-        <p className="mb-3 px-1 text-[11px] text-muted-foreground/80">
-          {userCtx.why.slice(1, 3).join(" · ")}
-          {adhere > 0 ? ` · Aderência ${adhere}` : ""}
-        </p>
-      ) : null}
+          );
+        }
+        if (blockId === "habitTip" && persona === "novo" && tip) {
+          return (
+            <div key="habitTip" className="surface-glass mb-4 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="eyebrow">Hábito</p>
+                  <p className="mt-1 text-sm font-semibold">{tip.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{tip.body}</p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Dispensar"
+                  onClick={() => markTipSeen(tip.id)}
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <Link to={tip.ctaTo} className="mt-3 block">
+                <Button size="sm" className="w-full" onClick={() => markTipSeen(tip.id)}>
+                  {tip.ctaLabel}
+                </Button>
+              </Link>
+            </div>
+          );
+        }
+        if (blockId === "socialTeaser" && showLeague) {
+          return (
+            <Link
+              key="socialTeaser"
+              to="/social"
+              search={{ tab: "feed" }}
+              className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2"
+            >
+              <Users className="size-4 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Para você"}</p>
+                <p className="text-[0.65rem] text-muted-foreground">Feed, desafios e pressão saudável</p>
+              </div>
+            </Link>
+          );
+        }
+        return null;
+      })}
 
       <div className="mt-4">
         <button
@@ -488,65 +810,9 @@ function Today() {
 
         {maisAberto ? (
           <div className="space-y-4">
-            <XpBar xp={xp} />
-
-            {(() => {
-              const estimates = Object.values(state.restockEstimates ?? {});
-              if (!estimates.length) return null;
-              const soon = estimates
-                .map((e) => {
-                  const days = Math.ceil((new Date(e.emptyAt).getTime() - Date.now()) / 86_400_000);
-                  return { ...e, days };
-                })
-                .filter((e) => e.days <= 14)
-                .sort((a, b) => a.days - b.days)[0];
-              if (!soon) return null;
-              const product = PRODUCTS.find((p) => p.id === soon.productId);
-              const url = reorderUrlForProduct(soon.productId);
-              if (!product || !url) return null;
-              return (
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="surface-glass block border-primary/25 px-4 py-3"
-                  onClick={() => {
-                    const id = getDeviceId();
-                    if (!id) return;
-                    void trackAppEvent({
-                      data: {
-                        deviceId: id,
-                        kind: "restock_clicked",
-                        payload: { source: "home", productId: soon.productId },
-                        entityType: "product",
-                        entityId: soon.productId,
-                      },
-                    });
-                    void trackAppEvent({
-                      data: {
-                        deviceId: id,
-                        kind: "product_clicked",
-                        payload: { source: "home", productId: soon.productId },
-                        entityType: "product",
-                        entityId: soon.productId,
-                      },
-                    });
-                  }}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Reposição</p>
-                  <p className="mt-1 text-sm font-semibold">
-                    {product.name} acaba em ~{Math.max(0, soon.days)} dia{soon.days === 1 ? "" : "s"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Toque para reordenar na Soldiers</p>
-                </a>
-              );
-            })()}
-
             <WeekPath days={days} states={pathStates} />
 
-            <DailyQuestsCard state={state} />
-
-            {friendQuest ? (
+            {showLeague && friendQuest ? (
               <section className="surface-glass p-4">
                 <p className="eyebrow">Missão em dupla</p>
                 <p className="mt-1 text-sm font-semibold">
@@ -558,7 +824,7 @@ function Today() {
               </section>
             ) : null}
 
-            {stories.length ? (
+            {showLeague && stories.length ? (
               <Link to="/social" search={{ tab: "clubes" }} className="mb-0 flex gap-2 overflow-x-auto pb-1">
                 {stories.map((s) => (
                   <div key={s.id} className="shrink-0 text-center">
@@ -573,6 +839,7 @@ function Today() {
               </Link>
             ) : null}
 
+            {showLeague ? (
             <section>
               <div className="mb-2 flex items-center justify-between px-1">
                 <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Clube"}</p>
@@ -604,8 +871,9 @@ function Today() {
                 </Link>
               )}
             </section>
+            ) : null}
 
-            {tip ? (
+            {persona !== "novo" && tip ? (
               <div className="surface-glass p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -715,6 +983,12 @@ function Today() {
                           highlight ? "border-primary/40" : ""
                         }`}
                       >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <SoldiersMediaThumb
+                            media={resolveProductMedia(p.id)}
+                            alt={p.name}
+                            className="size-10 rounded-lg"
+                          />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold">{p.name}</p>
@@ -727,6 +1001,7 @@ function Today() {
                           <p className="text-xs text-muted-foreground">
                             {p.timing} · {p.serving}
                           </p>
+                        </div>
                         </div>
                         <Button size="sm" variant={done ? "default" : "secondary"} onClick={() => toggleSupplement(p.id)}>
                           {done ? "Tomado" : "Marcar"}
@@ -773,6 +1048,24 @@ function Today() {
           <Plus className="size-4" /> Salvar peso
         </Button>
       </Modal>
+
+      <CompleteProfileSheet
+        open={profileOpen}
+        profile={profile}
+        onClose={() => setProfileOpen(false)}
+        onSave={(patch) => {
+          patchProfile(patch);
+          toast.success("Perfil atualizado");
+        }}
+      />
+      <CoachNudgeOverlay
+        open={nudgeOpen}
+        volumeDeltaPct={nudge.volumeDeltaPct}
+        onClose={() => {
+          setNudgeOpen(false);
+          dismissCoachNudge();
+        }}
+      />
     </AppShell>
   );
 }

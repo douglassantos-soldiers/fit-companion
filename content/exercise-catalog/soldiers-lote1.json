@@ -1,0 +1,602 @@
+[
+  {
+    "id": "supino-reto",
+    "name": "Supino reto",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "supino-inclinado-halter",
+    "name": "Supino inclinado com halteres",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "flexao",
+    "name": "Flexão de braço",
+    "group": "peito",
+    "equipment": "ambos"
+  },
+  {
+    "id": "crucifixo",
+    "name": "Crucifixo",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "supino-declinado",
+    "name": "Supino declinado",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "flexao-diamante",
+    "name": "Flexão diamante",
+    "group": "peito",
+    "equipment": "casa"
+  },
+  {
+    "id": "crossover-polia",
+    "name": "Crossover na polia",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "peck-deck",
+    "name": "Peck deck",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "supino-maquina",
+    "name": "Supino na máquina",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "flexao-inclinada",
+    "name": "Flexão inclinada",
+    "group": "peito",
+    "equipment": "casa"
+  },
+  {
+    "id": "crucifixo-inclinado",
+    "name": "Crucifixo inclinado",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "flexao-declinada",
+    "name": "Flexão declinada",
+    "group": "peito",
+    "equipment": "casa"
+  },
+  {
+    "id": "barra-fixa",
+    "name": "Barra fixa",
+    "group": "costas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "remada-curvada",
+    "name": "Remada curvada",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "remada-unilateral",
+    "name": "Remada unilateral",
+    "group": "costas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "pulldown",
+    "name": "Puxada alta",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "remada-baixa",
+    "name": "Remada baixa",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "pullover",
+    "name": "Pullover",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "barra-fixa-supinada",
+    "name": "Barra fixa supinada",
+    "group": "costas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "remada-cavalinho",
+    "name": "Remada cavalinho",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "face-pull",
+    "name": "Face pull",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "remada-halter-peito",
+    "name": "Remada com peito apoiado",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "puxada-neutra",
+    "name": "Puxada pegada neutra",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "australian-row",
+    "name": "Remada australiana",
+    "group": "costas",
+    "equipment": "casa"
+  },
+  {
+    "id": "encolhimento",
+    "name": "Encolhimento de ombros",
+    "group": "costas",
+    "equipment": "academia"
+  },
+  {
+    "id": "agachamento",
+    "name": "Agachamento livre",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "agachamento-corpo",
+    "name": "Agachamento com peso do corpo",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "leg-press",
+    "name": "Leg press",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "afundo",
+    "name": "Afundo",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "terra-romeno",
+    "name": "Levantamento terra romeno",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "panturrilha",
+    "name": "Panturrilha em pé",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "agachamento-goblet",
+    "name": "Agachamento goblet",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "agachamento-bulgaro",
+    "name": "Agachamento búlgaro",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "stiff",
+    "name": "Stiff",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "cadeira-extensora",
+    "name": "Cadeira extensora",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "mesa-flexora",
+    "name": "Mesa flexora",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "hack-squat",
+    "name": "Hack squat",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "passo-lateral",
+    "name": "Afundo lateral",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "elevacao-pelvica",
+    "name": "Elevação pélvica",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "panturrilha-sentado",
+    "name": "Panturrilha sentado",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "agachamento-sumo",
+    "name": "Agachamento sumô",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "passada-caminhada",
+    "name": "Passada caminhando",
+    "group": "pernas",
+    "equipment": "ambos"
+  },
+  {
+    "id": "terra-convencional",
+    "name": "Levantamento terra",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "desenvolvimento",
+    "name": "Desenvolvimento militar",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "elevacao-lateral",
+    "name": "Elevação lateral",
+    "group": "ombros",
+    "equipment": "ambos"
+  },
+  {
+    "id": "pike-push",
+    "name": "Flexão pike",
+    "group": "ombros",
+    "equipment": "casa"
+  },
+  {
+    "id": "desenvolvimento-halter",
+    "name": "Desenvolvimento com halteres",
+    "group": "ombros",
+    "equipment": "ambos"
+  },
+  {
+    "id": "elevacao-frontal",
+    "name": "Elevação frontal",
+    "group": "ombros",
+    "equipment": "ambos"
+  },
+  {
+    "id": "remada-alta",
+    "name": "Remada alta",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "arnold-press",
+    "name": "Arnold press",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "crucifixo-inverso",
+    "name": "Crucifixo inverso",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "desenvolvimento-maquina",
+    "name": "Desenvolvimento na máquina",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "elevacao-lateral-polia",
+    "name": "Elevação lateral na polia",
+    "group": "ombros",
+    "equipment": "academia"
+  },
+  {
+    "id": "handstand-hold",
+    "name": "Parada de mãos na parede",
+    "group": "ombros",
+    "equipment": "casa"
+  },
+  {
+    "id": "rosca-direta",
+    "name": "Rosca direta",
+    "group": "biceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "rosca-martelo",
+    "name": "Rosca martelo",
+    "group": "biceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "rosca-inclinada",
+    "name": "Rosca inclinada",
+    "group": "biceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "rosca-scott",
+    "name": "Rosca scott",
+    "group": "biceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "rosca-concentrada",
+    "name": "Rosca concentrada",
+    "group": "biceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "rosca-polia",
+    "name": "Rosca na polia",
+    "group": "biceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "rosca-banco",
+    "name": "Rosca no banco 21",
+    "group": "biceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "chin-hold",
+    "name": "Isometria na barra supinada",
+    "group": "biceps",
+    "equipment": "casa"
+  },
+  {
+    "id": "triceps-corda",
+    "name": "Tríceps na corda",
+    "group": "triceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "triceps-banco",
+    "name": "Tríceps no banco",
+    "group": "triceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "triceps-testa",
+    "name": "Tríceps testa",
+    "group": "triceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "triceps-frances",
+    "name": "Tríceps francês",
+    "group": "triceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "mergulho-paralelas",
+    "name": "Mergulho nas paralelas",
+    "group": "triceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "triceps-coice",
+    "name": "Tríceps coice",
+    "group": "triceps",
+    "equipment": "ambos"
+  },
+  {
+    "id": "triceps-polia-barra",
+    "name": "Tríceps na polia com barra",
+    "group": "triceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "diamond-hold",
+    "name": "Isometria flexão diamante",
+    "group": "triceps",
+    "equipment": "casa"
+  },
+  {
+    "id": "prancha",
+    "name": "Prancha",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "abdominal-remador",
+    "name": "Abdominal remador",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "hollow",
+    "name": "Hollow hold",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "abdominal-infra",
+    "name": "Elevação de pernas",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "prancha-lateral",
+    "name": "Prancha lateral",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "ab-wheel",
+    "name": "Roda abdominal",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "dead-bug",
+    "name": "Dead bug",
+    "group": "core",
+    "equipment": "casa"
+  },
+  {
+    "id": "mountain-climber",
+    "name": "Mountain climber",
+    "group": "core",
+    "equipment": "casa"
+  },
+  {
+    "id": "pallof",
+    "name": "Pallof press",
+    "group": "core",
+    "equipment": "academia"
+  },
+  {
+    "id": "crunch",
+    "name": "Abdominal crunch",
+    "group": "core",
+    "equipment": "casa"
+  },
+  {
+    "id": "farmers-carry",
+    "name": "Farmer walk",
+    "group": "core",
+    "equipment": "academia"
+  },
+  {
+    "id": "russian-twist",
+    "name": "Russian twist",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "corrida",
+    "name": "Corrida contínua",
+    "group": "cardio",
+    "equipment": "ambos"
+  },
+  {
+    "id": "hiit-bike",
+    "name": "HIIT na bike",
+    "group": "cardio",
+    "equipment": "academia"
+  },
+  {
+    "id": "burpee",
+    "name": "Burpee",
+    "group": "cardio",
+    "equipment": "ambos"
+  },
+  {
+    "id": "pular-corda",
+    "name": "Pular corda",
+    "group": "cardio",
+    "equipment": "ambos"
+  },
+  {
+    "id": "remo-ergometro",
+    "name": "Remo ergômetro",
+    "group": "cardio",
+    "equipment": "academia"
+  },
+  {
+    "id": "eliptico",
+    "name": "Elíptico",
+    "group": "cardio",
+    "equipment": "academia"
+  },
+  {
+    "id": "jumping-jack",
+    "name": "Polichinelo",
+    "group": "cardio",
+    "equipment": "casa"
+  },
+  {
+    "id": "battle-rope",
+    "name": "Corda naval",
+    "group": "cardio",
+    "equipment": "academia"
+  },
+  {
+    "id": "subida-caixa",
+    "name": "Subida na caixa",
+    "group": "cardio",
+    "equipment": "ambos"
+  },
+  {
+    "id": "assalto-bike",
+    "name": "Assault bike",
+    "group": "cardio",
+    "equipment": "academia"
+  },
+  {
+    "id": "crucifixo-polia-baixa",
+    "name": "Crucifixo na polia baixa",
+    "group": "peito",
+    "equipment": "academia"
+  },
+  {
+    "id": "good-morning",
+    "name": "Good morning",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "adutora",
+    "name": "Cadeira adutora",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "abdutora",
+    "name": "Cadeira abdutora",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "rosca-inversa",
+    "name": "Rosca inversa",
+    "group": "biceps",
+    "equipment": "academia"
+  },
+  {
+    "id": "hanging-knee-raise",
+    "name": "Elevação de joelhos na barra",
+    "group": "core",
+    "equipment": "ambos"
+  },
+  {
+    "id": "kettlebell-swing",
+    "name": "Swing com kettlebell",
+    "group": "pernas",
+    "equipment": "academia"
+  },
+  {
+    "id": "ski-erg",
+    "name": "SkiErg",
+    "group": "cardio",
+    "equipment": "academia"
+  }
+]

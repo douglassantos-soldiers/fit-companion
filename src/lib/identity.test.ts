@@ -2,7 +2,7 @@
  * Identity + access session contract tests (no DB / no server runtime).
  */
 import { describe, expect, it } from "vitest";
-import { parseEstablishAccessInput } from "@/lib/access-parse";
+import { parseAdminLogin, parseEstablishAccessInput } from "@/lib/access-parse";
 import * as identity from "@/lib/identity";
 
 describe("parseEstablishAccessInput", () => {
@@ -36,6 +36,24 @@ describe("parseEstablishAccessInput", () => {
   });
 });
 
+describe("parseAdminLogin", () => {
+  it("normalizes email and accepts password", () => {
+    expect(parseAdminLogin({ email: "  Admin@Teste.COM ", password: "secret" })).toEqual({
+      email: "admin@teste.com",
+      password: "secret",
+    });
+  });
+
+  it("accepts pin as password alias", () => {
+    expect(parseAdminLogin({ email: "a@b.com", pin: "1234" }).password).toBe("1234");
+  });
+
+  it("rejects missing email or password", () => {
+    expect(() => parseAdminLogin({ password: "x" })).toThrow(/E-mail/i);
+    expect(() => parseAdminLogin({ email: "a@b.com" })).toThrow(/Senha/i);
+  });
+});
+
 describe("identity module exports", () => {
   it("exports core Identity Engine functions", () => {
     expect(typeof identity.resolveOrCreateUserByEmail).toBe("function");
@@ -44,5 +62,26 @@ describe("identity module exports", () => {
     expect(typeof identity.getUserIdForDevice).toBe("function");
     expect(typeof identity.ensureUserForDevice).toBe("function");
     expect(typeof identity.linkDeviceToShopifyUser).toBe("function");
+  });
+});
+
+describe("parseCompleteAccountInput", () => {
+  it("keeps email, device, auth id and new-user flag", async () => {
+    const { parseCompleteAccountInput } = await import("@/lib/access-parse");
+    const parsed = parseCompleteAccountInput({
+      email: " Buyer@Soldiers.COM ",
+      deviceId: "device-uuid-abc",
+      authUserId: "auth-uuid",
+      displayName: "Ana",
+      isNewUser: true,
+      accessTier: "performance",
+    });
+    expect(parsed).toEqual({
+      email: "buyer@soldiers.com",
+      deviceId: "device-uuid-abc",
+      authUserId: "auth-uuid",
+      displayName: "Ana",
+      isNewUser: true,
+    });
   });
 });

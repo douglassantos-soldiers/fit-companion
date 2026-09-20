@@ -16,6 +16,25 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/** Lookup user by email without creating. */
+export async function findUserByEmail(email: string): Promise<AppUser | null> {
+  const db = await adminDb();
+  if (!db) return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized.includes("@")) return null;
+  const { data: existing } = await db
+    .from("users")
+    .select("id, email, auth_user_id")
+    .ilike("email", normalized)
+    .maybeSingle();
+  if (!existing) return null;
+  return {
+    id: existing.id as string,
+    email: (existing.email as string) ?? normalized,
+    authUserId: (existing.auth_user_id as string | null) ?? null,
+  };
+}
+
 /** Resolve user by email or create one. */
 export async function resolveOrCreateUserByEmail(email: string): Promise<AppUser | null> {
   const db = await adminDb();
@@ -23,19 +42,8 @@ export async function resolveOrCreateUserByEmail(email: string): Promise<AppUser
   const normalized = email.trim().toLowerCase();
   if (!normalized.includes("@")) return null;
 
-  const { data: existing } = await db
-    .from("users")
-    .select("id, email, auth_user_id")
-    .ilike("email", normalized)
-    .maybeSingle();
-
-  if (existing) {
-    return {
-      id: existing.id as string,
-      email: (existing.email as string) ?? normalized,
-      authUserId: (existing.auth_user_id as string | null) ?? null,
-    };
-  }
+  const existing = await findUserByEmail(normalized);
+  if (existing) return existing;
 
   const { data: created, error } = await db
     .from("users")

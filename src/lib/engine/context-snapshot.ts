@@ -16,17 +16,21 @@ import {
 } from "@/lib/engine/learning";
 import { activePatterns, extractLearnedPatterns, type LearnedPattern } from "@/lib/engine/learned-patterns";
 import { computeRecoveryV2, type RecoveryLevel } from "@/lib/engine/recovery-v2";
+import { plateauExerciseIds, listExercisesWithHistory } from "@/lib/engine/exercise-history";
+import { computeMuscleLoad } from "@/lib/training/muscle-load";
 import {
   detectTravelFromNotes,
   type ReasonCode,
 } from "@/lib/engine/reason-codes";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
+import { resolvedAvailableMin } from "@/lib/engine/session-time";
 import {
   todayKey,
   type AppState,
   type DayEnergy,
   type Equipment,
   type Goal,
+  type TrainingMode,
 } from "@/lib/types";
 
 export type ContextSnapshot = {
@@ -71,6 +75,7 @@ export type ContextSnapshot = {
     profile: Equipment;
     limitedToday: boolean;
   };
+  acceptedTrainingMode: TrainingMode | null;
   behavioralPatterns: UserPatterns | null;
   activePatterns: LearnedPattern[];
   supplements: {
@@ -198,18 +203,45 @@ export function buildContextSnapshot(
     if (!reasonSeeds.includes(code)) reasonSeeds.push(code);
   }
   if (insights && insights.proteinAdherence7d < 0.7) reasonSeeds.push("protein_low");
+  if (insights && insights.proteinAdherence7d < 0.55) reasonSeeds.push("nutrition_adherence_low");
   if (c360.nutrition.weightTrendKg7d != null && c360.nutrition.weightTrendKg7d <= -0.5) {
     reasonSeeds.push("weight_trend_down");
   }
   if (checkIn && checkIn.availableMin < 40) reasonSeeds.push("time_limited");
-  if (active.some((p) => p.kind === "prefers_short_sessions") && (checkIn?.availableMin ?? 60) <= 50) {
+  if (active.some((p) => p.kind === "prefers_short_sessions") && resolvedAvailableMin(checkIn, profile) <= 50) {
     reasonSeeds.push("time_limited");
+  }
+  if (active.some((p) => p.kind === "prefers_short_sessions" && p.successfulOutcomes >= 2)) {
+    reasonSeeds.push("express_high_adherence");
+  }
+  if (
+    patterns.mealGapWeekend ||
+    active.some((p) => p.kind === "weekend_protein_drop" || p.kind === "sunday_meal_gap")
+  ) {
+    reasonSeeds.push("weekend_adherence_pattern");
   }
   if (travel) reasonSeeds.push("travel");
   if (limitedToday) reasonSeeds.push("equipment_limited");
   if (adhereScore < 45) reasonSeeds.push("adherence_drop");
   if (weekHint === "deload") reasonSeeds.push("deload_week");
   if (restockRiskIds.length) reasonSeeds.push("restock_risk");
+  if (plateauExerciseIds(state.sessions).length >= 2) reasonSeeds.push("plateau_detected");
+
+  {
+    const loads = computeMuscleLoad(state.sessions);
+    if (loads.some((m) => m.muscle !== "cardio" && m.rolling_7d >= 16)) {
+      reasonSeeds.push("excessive_muscle_load");
+    }
+    if (loads.filter((m) => m.muscle !== "cardio" && m.rolling_7d < 2).length >= 3) {
+      reasonSeeds.push("undertrained_muscle");
+    }
+    if (loads.some((m) => m.muscle !== "cardio" && m.rolling_7d > 0 && m.rolling_7d <= 6)) {
+      reasonSeeds.push("low_muscle_fatigue");
+    }
+    const hist = listExercisesWithHistory(state.sessions, 12);
+    if (hist.some((h) => h.trend === "up" && !h.plateau)) reasonSeeds.push("progression_ready");
+    if (hist.some((h) => h.hits.length >= 2 && h.trend === "up")) reasonSeeds.push("pr_opportunity");
+  }
 
   let confidenceBase = recoveryV2.confidence;
   if (hasCheckInToday) confidenceBase = Math.max(confidenceBase, 0.6);
@@ -256,11 +288,12 @@ export function buildContextSnapshot(
       sessions3d: sessions3d.length,
       hardCount,
     },
-    availableTimeMin: checkIn?.availableMin ?? null,
+    availableTimeMin: resolvedAvailableMin(checkIn, profile),
     equipment: {
       profile: profile.equipment,
       limitedToday,
     },
+    acceptedTrainingMode: checkIn?.acceptedTrainingMode ?? null,
     behavioralPatterns: patterns,
     activePatterns: active,
     supplements: {

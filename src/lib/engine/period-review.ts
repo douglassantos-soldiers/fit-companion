@@ -1,0 +1,191 @@
+import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
+import type { CoachContext } from "@/lib/coach/types";
+import { exerciseById } from "@/data/exercises";
+import { sessionsInLastDays, streak, weekOverWeek } from "@/lib/engine/dimensions";
+import { isoWeekDateKeys } from "@/lib/engine/xp";
+import { currentPersonalRecords, detectExercisePrs } from "@/lib/training/prs";
+import { todayKey, type AppState, type SessionLog } from "@/lib/types";
+
+export type PeriodKind = "week" | "month";
+
+export interface PeriodReview {
+  kind: PeriodKind;
+  label: string;
+  sessions: number;
+  volumeKg: number;
+  prCount: number;
+  consistencyPct: number;
+  volumeDeltaPct: number | null;
+  bestEvolution: { exerciseId: string; name: string; deltaKg: number } | null;
+  coachLine: string;
+  wins: string[];
+  risks: string[];
+  start: string;
+  end: string;
+}
+
+function monthRange(now = new Date()): { start: string; end: string; label: string } {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const label = start.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).toUpperCase();
+  return { start: todayKey(start), end: todayKey(end), label };
+}
+
+function weekRange(now = new Date()): { start: string; end: string; label: string } {
+  const keys = isoWeekDateKeys(now);
+  const start = keys[0]!;
+  const end = keys[6]!;
+  return { start, end, label: "SEU RESUMO" };
+}
+
+function inRange(session: SessionLog, start: string, end: string) {
+  const d = session.date.slice(0, 10);
+  return d >= start && d <= end;
+}
+
+function bestEvolution(sessions: SessionLog[], start: string, end: string) {
+  const period = sessions.filter((s) => inRange(s, start, end));
+  const prior = sessions.filter((s) => s.date.slice(0, 10) < start);
+  let best: { exerciseId: string; name: string; deltaKg: number } | null = null;
+  const ids = new Set(period.flatMap((s) => s.exercises.map((e) => e.exerciseId)));
+  for (const exerciseId of ids) {
+    const prs = detectExercisePrs(exerciseId, [...period, ...prior]).filter(
+      (p) => p.prType === "WEIGHT_PR" && p.achievedAt.slice(0, 10) >= start && p.achievedAt.slice(0, 10) <= end,
+    );
+    const hit = prs[prs.length - 1];
+    if (!hit || hit.previousValue == null) continue;
+    const deltaKg = Math.round((hit.value - hit.previousValue) * 10) / 10;
+    if (deltaKg <= 0) continue;
+    if (!best || deltaKg > best.deltaKg) {
+      best = {
+        exerciseId,
+        name: exerciseById(exerciseId)?.name ?? exerciseId,
+        deltaKg,
+      };
+    }
+  }
+  return best;
+}
+
+function stubCoachContext(state: AppState): CoachContext {
+  const date = todayKey();
+  const p = state.profile;
+  const sessions7d = sessionsInLastDays(state.sessions, 7).length;
+  const prs = currentPersonalRecords(state.sessions).slice(0, 5);
+  return {
+    userId: state.userId ?? "local",
+    date,
+    profile: p
+      ? {
+          name: p.name,
+          goal: p.goal,
+          level: p.level,
+          weightKg: p.weightKg,
+          daysPerWeek: p.daysPerWeek,
+          equipment: p.equipment,
+          restrictions: p.restrictions,
+        }
+      : null,
+    goals: null,
+    training: {
+      streak: streak(state.sessions, { freezeUsedDates: state.freezeUsedDates }),
+      sessions7d,
+      sessions28d: sessionsInLastDays(state.sessions, 28).length,
+      todayMode: null,
+      todayTitle: null,
+      volumeFactor: null,
+      lastSessionDate: state.sessions[0]?.date.slice(0, 10) ?? null,
+      lastSessionRpe: state.sessions[0]?.rpe ?? null,
+    },
+    exercisePerformance: {
+      recentPrs: prs.map((pr) => ({ label: pr.label, value: pr.value, date: pr.achievedAt })),
+      top1rm: [],
+    },
+    recovery: {
+      level: null,
+      score: null,
+      sleepHours: state.dayCheckIns?.[date]?.sleepHours ?? null,
+      energy: state.dayCheckIns?.[date]?.energy ?? null,
+      hardRpeStreak: 0,
+    },
+    nutrition: {
+      proteinG: 0,
+      carbG: 0,
+      fatG: 0,
+      kcal: 0,
+      mealsLogged: (state.meals ?? []).filter((m) => m.date.slice(0, 10) === date).length,
+      proteinTarget: null,
+      loggingConfidence: null,
+    },
+    supplements: { routineIds: state.supplementRoutine ?? [], adherence30d: null },
+    behavior: {
+      workouts7d: sessions7d,
+      meals7d: (state.meals ?? []).filter((m) => {
+        const d = m.date.slice(0, 10);
+        const limit = new Date();
+        limit.setDate(limit.getDate() - 6);
+        return d >= todayKey(limit);
+      }).length,
+      coachMessages: 0,
+    },
+    customer360: { nutritionAdherence: null, recoveryScore: null, performanceScore: null },
+    todayDecisions: [],
+    recentDecisions: [],
+    userPatterns: [],
+    safety: {
+      escalateCare: false,
+      blockStims: false,
+      preferLightTraining: false,
+      flags: [],
+      reasons: [],
+    },
+    memory: [],
+    livingSummary: "",
+    why: [],
+    reasonCodes: [],
+  };
+}
+
+export function periodReview(state: AppState, kind: PeriodKind, now = new Date()): PeriodReview {
+  const range = kind === "week" ? weekRange(now) : monthRange(now);
+  const inPeriod = state.sessions.filter((s) => inRange(s, range.start, range.end));
+  const volumeKg = Math.round(inPeriod.reduce((sum, s) => sum + s.volumeKg, 0));
+  const prs = currentPersonalRecords(state.sessions).filter((p) => {
+    const d = p.achievedAt.slice(0, 10);
+    return d >= range.start && d <= range.end;
+  });
+  const planned = Math.max(1, (state.profile?.daysPerWeek ?? 3) * (kind === "week" ? 1 : 4));
+  const consistencyPct = Math.min(100, Math.round((inPeriod.length / planned) * 100));
+  const wow = weekOverWeek(state.sessions);
+  const volumeDeltaPct = kind === "week" ? wow.volumeDeltaPct : null;
+  const coach = weeklyReviewWorkflow(stubCoachContext(state));
+  const best = bestEvolution(state.sessions, range.start, range.end);
+
+  return {
+    kind,
+    label: range.label,
+    sessions: inPeriod.length,
+    volumeKg,
+    prCount: prs.length,
+    consistencyPct,
+    volumeDeltaPct,
+    bestEvolution: best,
+    coachLine: coach.nextFocus ?? coach.wins?.[0] ?? "Continue registrando.",
+    wins: coach.wins ?? [],
+    risks: coach.risks ?? [],
+    start: range.start,
+    end: range.end,
+  };
+}
+
+export function prsAchievedInSession(session: SessionLog, priorSessions: SessionLog[]) {
+  const all = [session, ...priorSessions];
+  const ids = new Set(session.exercises.map((e) => e.exerciseId));
+  const out = [];
+  for (const exerciseId of ids) {
+    for (const pr of detectExercisePrs(exerciseId, all)) {
+      if (pr.sessionId === session.id) out.push(pr);
+    }
+  }
+  return out;
+}

@@ -31,7 +31,10 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
 
   const insights = computeLearningInsights(state);
   const goals = nutritionGoals(p, insights);
-  const plan = buildWeeklyPlan(p, state.sessions, learningWeekHint(state));
+  const plan = buildWeeklyPlan(p, state.sessions, learningWeekHint(state), {
+    likedExerciseIds: state.likedExerciseIds ?? [],
+    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+  });
   const today = planDayForToday(plan);
   const mealPlan = buildDailyMealPlan(p, state, todayKey(), insights);
   const dims = performanceDimensions(state, p);

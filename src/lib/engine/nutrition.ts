@@ -1,88 +1,65 @@
-import { MEAL_PRESETS, presetsForSlot, type MealPreset } from "@/data/meal-presets";
+import { MEAL_PRESETS, type MealPreset } from "@/data/meal-presets";
 import type { LearningInsights } from "@/lib/engine/learning";
-import type { AppState, Goal, MealEntry, MealQuality, MealSlot, Profile } from "@/lib/types";
+import { ALL_MEAL_SLOTS } from "@/lib/engine/nutrition-profile";
+import {
+  buildDailyMealPlanCore,
+  buildMultiDayMealPlan,
+  computeNutritionGoals,
+  scalePreset as scalePresetCore,
+  shiftDateKey,
+  type DailyMealPlan,
+  type MealPlanEngineOpts,
+  type MealPlanSlot,
+  type NutritionGoals,
+} from "@/lib/nutrition/meal-planner";
+import { mealPlanOptsFromState } from "@/lib/nutrition/plan-opts";
+import { wheyMacrosFromDoses } from "@/lib/nutrition/whey";
+import { dayMealTotals, mealsOnDate } from "@/lib/nutrition/nutrition-context";
+import type { AppState, MealEntry, MealQuality, MealSlot, Profile } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 
-export interface NutritionGoals {
-  kcal: number;
-  proteinG: number;
-  mealsTarget: number;
-  waterMl: number;
+export type { NutritionGoals, MealPlanSlot, DailyMealPlan, MealPlanEngineOpts };
+
+/** Facade → nutrition domain */
+export function nutritionGoals(
+  profile: Profile,
+  insights?: LearningInsights | null,
+  engine?: Pick<MealPlanEngineOpts, "calorieDelta" | "proteinBias">,
+): NutritionGoals {
+  return computeNutritionGoals(profile, insights, engine);
 }
 
-export interface MealPlanSlot {
-  slot: MealSlot;
-  status: "suggested" | "logged";
-  preset: MealPreset | null;
-  logged: MealEntry[];
-}
+export { buildDailyMealPlanCore, buildMultiDayMealPlan, mealsOnDate, shiftDateKey };
 
-export interface DailyMealPlan {
-  date: string;
-  slots: MealPlanSlot[];
-  goals: NutritionGoals;
-  projectedProteinG: number;
-  projectedKcal: number;
-}
-
-const SLOTS: MealSlot[] = ["cafe", "almoco", "lanche", "jantar"];
-
-const PROTEIN_PER_KG: Record<Goal, number> = {
-  massa: 2.0,
-  gordura: 2.2,
-  performance: 1.8,
-  saude: 1.6,
-};
-
-const KCAL_PER_KG: Record<Goal, number> = {
-  massa: 36,
-  gordura: 28,
-  performance: 34,
-  saude: 30,
-};
-
-export function nutritionGoals(profile: Profile, insights?: LearningInsights | null): NutritionGoals {
-  let proteinG = Math.round(profile.weightKg * PROTEIN_PER_KG[profile.goal]);
-  let kcal = Math.round(profile.weightKg * KCAL_PER_KG[profile.goal]);
-
-  if (insights?.adaptations.kcalDelta) {
-    kcal = Math.max(1400, kcal + insights.adaptations.kcalDelta);
-  }
-  if (insights?.adaptations.proteinBias === "up") {
-    proteinG = Math.round(proteinG * 1.1);
-  }
-
+export function dayNutritionTotals(
+  meals: MealEntry[],
+  date = todayKey(),
+  extra?: { proteinG: number; kcal: number },
+) {
+  const t = dayMealTotals(meals, date);
   return {
-    proteinG,
-    kcal,
-    mealsTarget: 4,
-    waterMl: Math.max(2500, Math.round(profile.weightKg * 35)),
+    proteinG: t.proteinG + (extra?.proteinG ?? 0),
+    carbG: t.carbG,
+    fatG: t.fatG,
+    fiberG: t.fiberG,
+    kcal: t.kcal + (extra?.kcal ?? 0),
+    count: t.count,
+    bySlot: t.bySlot,
   };
 }
 
-export function mealsOnDate(meals: MealEntry[], date = todayKey()) {
-  return meals.filter((m) => m.date === date);
+export function dayNutritionTotalsFromState(state: AppState, date = todayKey()) {
+  const whey = wheyMacrosFromDoses(
+    state.supplementDoseLogs,
+    date,
+    state.profile?.nutritionProfile?.countWheyInMacros === true,
+  );
+  return dayNutritionTotals(state.meals ?? [], date, whey);
 }
 
-export function dayNutritionTotals(meals: MealEntry[], date = todayKey()) {
-  const day = mealsOnDate(meals, date);
-  return {
-    proteinG: Math.round(day.reduce((s, m) => s + m.proteinG, 0)),
-    kcal: Math.round(day.reduce((s, m) => s + m.kcal, 0)),
-    count: day.length,
-    bySlot: Object.fromEntries(
-      SLOTS.map((slot) => [slot, day.filter((m) => m.slot === slot)]),
-    ) as Record<MealSlot, MealEntry[]>,
-  };
-}
-
-/** Scale preset macros by servings (0.5–3 typical). */
+/** Scale preset macros by servings (0.25–3 typical). */
 export function scalePreset(preset: MealPreset, servings: number) {
-  const s = Math.max(0.25, servings);
-  return {
-    proteinG: Math.round(preset.proteinG * s),
-    kcal: Math.round(preset.kcal * s),
-  };
+  return scalePresetCore(preset, servings);
 }
 
 /** Build a meal entry payload from a preset (caller persists via store). */
@@ -93,9 +70,14 @@ export function addMealFromPreset(preset: MealPreset, slot: MealSlot, servings =
     label: preset.label,
     proteinG: scaled.proteinG,
     kcal: scaled.kcal,
+    carbG: scaled.carbG,
+    fatG: scaled.fatG,
     quality: preset.quality,
     presetId: preset.id,
     servings,
+    sourceKind: "informed" as const,
+    confidence: 1,
+    foodSource: "internal" as const,
   };
 }
 
@@ -115,7 +97,15 @@ export function recentMealPresets(meals: MealEntry[], limit = 8): MealPreset[] {
 }
 
 export function weeklyNutritionSeries(meals: MealEntry[], days = 7) {
-  const out: { label: string; date: string; proteinG: number; meals: number; kcal: number }[] = [];
+  const out: {
+    label: string;
+    date: string;
+    proteinG: number;
+    carbG: number;
+    fatG: number;
+    meals: number;
+    kcal: number;
+  }[] = [];
   for (let i = days - 1; i >= 0; i -= 1) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -125,6 +115,8 @@ export function weeklyNutritionSeries(meals: MealEntry[], days = 7) {
       date,
       label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
       proteinG: totals.proteinG,
+      carbG: totals.carbG,
+      fatG: totals.fatG,
       meals: totals.count,
       kcal: totals.kcal,
     });
@@ -132,88 +124,45 @@ export function weeklyNutritionSeries(meals: MealEntry[], days = 7) {
   return out;
 }
 
-export function suggestSlot(now = new Date()): MealSlot {
+export function suggestSlot(now = new Date(), active?: MealSlot[]): MealSlot {
   const h = now.getHours();
-  if (h < 11) return "cafe";
-  if (h < 15) return "almoco";
-  if (h < 18) return "lanche";
-  return "jantar";
+  let preferred: MealSlot = "jantar";
+  if (h < 11) preferred = "cafe";
+  else if (h < 15) preferred = "almoco";
+  else if (h < 18) preferred = "lanche";
+
+  if (!active?.length) return preferred;
+  if (active.includes(preferred)) return preferred;
+  const order = ALL_MEAL_SLOTS.filter((s) => active.includes(s));
+  const idx = ALL_MEAL_SLOTS.indexOf(preferred);
+  for (let i = idx; i < ALL_MEAL_SLOTS.length; i += 1) {
+    const s = ALL_MEAL_SLOTS[i]!;
+    if (active.includes(s)) return s;
+  }
+  for (let i = idx; i >= 0; i -= 1) {
+    const s = ALL_MEAL_SLOTS[i]!;
+    if (active.includes(s)) return s;
+  }
+  return order[0] ?? preferred;
 }
 
-function yesterdayKey(date: string) {
-  const d = new Date(`${date}T12:00:00`);
-  d.setDate(d.getDate() - 1);
-  return todayKey(d);
-}
-
-function pickPresetForSlot(
-  slot: MealSlot,
-  preferGreen: boolean,
-  avoidIds: Set<string>,
-  remainingProtein: number,
-): MealPreset {
-  const pool = presetsForSlot(slot);
-  const ranked = [...pool].sort((a, b) => {
-    const greenA = a.quality === "verde" ? 1 : 0;
-    const greenB = b.quality === "verde" ? 1 : 0;
-    if (preferGreen && greenA !== greenB) return greenB - greenA;
-    const avoidA = avoidIds.has(a.id) ? 1 : 0;
-    const avoidB = avoidIds.has(b.id) ? 1 : 0;
-    if (avoidA !== avoidB) return avoidA - avoidB;
-    // Prefer higher protein when still below target
-    if (remainingProtein > 0) return b.proteinG - a.proteinG;
-    return a.kcal - b.kcal;
-  });
-  return ranked[0] ?? MEAL_PRESETS[0]!;
-}
-
-/** Plano do dia: slots logados + presets sugeridos até cobrir metas. */
+/** Plano do dia — delega ao meal-planner (prefs, restrictions, macros). */
 export function buildDailyMealPlan(
   profile: Profile,
   state: AppState,
   date = todayKey(),
   insights?: LearningInsights | null,
+  engine?: MealPlanEngineOpts,
 ): DailyMealPlan {
-  const goals = nutritionGoals(profile, insights);
-  const totals = dayNutritionTotals(state.meals ?? [], date);
-  const yKey = yesterdayKey(date);
-  const yesterdayIds = new Set(
-    mealsOnDate(state.meals ?? [], yKey)
-      .map((m) => m.presetId)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const preferGreen = insights?.adaptations.preferGreenMeals ?? false;
-
-  let projectedProtein = 0;
-  let projectedKcal = 0;
-  const slots: MealPlanSlot[] = [];
-
-  for (const slot of SLOTS) {
-    const logged = totals.bySlot[slot] ?? [];
-    if (logged.length > 0) {
-      projectedProtein += logged.reduce((s, m) => s + m.proteinG, 0);
-      projectedKcal += logged.reduce((s, m) => s + m.kcal, 0);
-      slots.push({ slot, status: "logged", preset: null, logged });
-      continue;
-    }
-    const remainingProtein = goals.proteinG - projectedProtein;
-    const preset = pickPresetForSlot(slot, preferGreen, yesterdayIds, remainingProtein);
-    projectedProtein += preset.proteinG;
-    projectedKcal += preset.kcal;
-    slots.push({ slot, status: "suggested", preset, logged: [] });
-  }
-
-  return {
-    date,
-    slots,
-    goals,
-    projectedProteinG: Math.round(projectedProtein),
-    projectedKcal: Math.round(projectedKcal),
-  };
+  return buildDailyMealPlanCore(profile, state, date, insights, engine ?? mealPlanOptsFromState(state, date));
 }
 
-export function nextSuggestedMeal(plan: DailyMealPlan, now = new Date()): MealPlanSlot | null {
-  const preferred = suggestSlot(now);
+export function nextSuggestedMeal(
+  plan: DailyMealPlan,
+  now = new Date(),
+  active?: MealSlot[],
+): MealPlanSlot | null {
+  const preferred = suggestSlot(now, active);
   const preferredSlot = plan.slots.find((s) => s.slot === preferred && s.status === "suggested");
   if (preferredSlot) return preferredSlot;
   return plan.slots.find((s) => s.status === "suggested") ?? null;
@@ -224,3 +173,15 @@ export const QUALITY_LABEL: Record<MealQuality, string> = {
   amarelo: "Equilibrado",
   laranja: "Ocasional",
 };
+
+/** Provenance badge label for UI. */
+export function mealProvenanceLabel(entry: MealEntry): string {
+  if (entry.sourceKind === "informed" || entry.correctedFromAi) {
+    return entry.correctedFromAi ? "Informado (corrigido)" : "Informado";
+  }
+  if (entry.sourceKind === "estimated") {
+    const pct = Math.round((entry.confidence ?? 0.5) * 100);
+    return `Estimativa IA (${pct}%)`;
+  }
+  return "Informado";
+}

@@ -3,7 +3,7 @@
  * Session cookie is authoritative for userId when present.
  * Never trust client-supplied userId.
  */
-import { readAccessSession } from "@/lib/access-session.server";
+import { assertSecurityConfiguration, readAppAccessSession } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
 import {
   ensureUserForDevice,
@@ -23,17 +23,42 @@ export type TrustedIdentity = {
  * - With access cookie: userId from session (email → public.users); device attached as canal.
  * - Without cookie: anonymous user via device (local-first boot / pull only).
  * - requireAccess: refuse if no valid cookie.
+ * - requireAccessIfLinked: if device user already has email, require cookie (sensitive reads).
  */
 export async function resolveTrustedIdentity(opts: {
   deviceId: string;
   /** If true, require a valid access cookie (for sensitive writes). */
   requireAccess?: boolean;
+  /** If true, require cookie when the device is already linked to an email user. */
+  requireAccessIfLinked?: boolean;
 }): Promise<TrustedIdentity | null> {
+  try {
+    assertSecurityConfiguration();
+  } catch {
+    if (process.env["NODE_ENV"] === "production") return null;
+    // Dev without secrets: still allow identity resolution for local boot
+  }
+
   const deviceId = String(opts.deviceId ?? "").trim();
   if (!deviceId || deviceId.length < 8) return null;
 
-  const session = readAccessSession();
+  const session = readAppAccessSession();
   if (opts.requireAccess && !session) return null;
+
+  if (opts.requireAccessIfLinked && !session && !opts.requireAccess) {
+    const existingUserId = await getUserIdForDevice(deviceId);
+    if (existingUserId) {
+      const db = await adminDbLoose();
+      if (db) {
+        const { data: u } = await db
+          .from("users")
+          .select("email")
+          .eq("id", existingUserId)
+          .maybeSingle();
+        if (u?.email) return null;
+      }
+    }
+  }
 
   if (session?.email) {
     // Prefer cookie.userId when present and valid; else resolve by email
@@ -82,6 +107,13 @@ export async function resolveTrustedIdentity(opts: {
       });
     }
 
+    try {
+      const { isUserBlocked } = await import("@/lib/account-status.server");
+      if (await isUserBlocked({ userId, email })) return null;
+    } catch (e) {
+      console.warn("trusted identity status check failed", e);
+    }
+
     return {
       userId,
       deviceId,
@@ -94,6 +126,12 @@ export async function resolveTrustedIdentity(opts: {
 
   const user = await ensureUserForDevice(deviceId);
   if (!user) return null;
+  try {
+    const { isUserBlocked } = await import("@/lib/account-status.server");
+    if (await isUserBlocked({ userId: user.id, email: user.email })) return null;
+  } catch (e) {
+    console.warn("trusted identity status check failed", e);
+  }
   return {
     userId: user.id,
     deviceId,

@@ -48,7 +48,7 @@ export const loadUserPatternsFn = createServerFn({ method: "POST" })
   .inputValidator(parseLoad)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId, requireAccessIfLinked: true });
     if (!identity) return { ok: false as const, patterns: null, blob: null };
     const { loadPatternsBlob } = await import("@/lib/engine/learning-patterns.server");
     const blob = await loadPatternsBlob(identity.userId);

@@ -39,3 +39,6 @@ dist-ssr
 # Supabase CLI local link cache
 supabase/.temp/
 
+# Optional local catalog dump (names only). Never commit third-party media.
+content/exercise-catalog/import/
+

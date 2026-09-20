@@ -1,64 +1,101 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { checkAccessSession } from "@/lib/access.functions";
+import { getAuthSession } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
-const PUBLIC_PATHS = ["/acesso", "/welcome", "/admin"];
+const PUBLIC_PATHS = ["/acesso", "/welcome", "/admin", "/cadastro", "/entrar", "/termos", "/privacidade", "/wearables"];
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 /**
- * Requires server-signed access cookie.
- * localStorage accessGranted alone is not enough after session check.
+ * Dual gate: Supabase Auth (identity) + Shopify paid window (cookie).
+ * Device is a channel, not the person.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
   const { state, hydrated, updateAccessFromSession, revokeAccessLocal } = useStore();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const checkSession = useServerFn(checkAccessSession);
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [sessionOk, setSessionOk] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [hasAuth, setHasAuth] = useState(false);
+  const [shopifyOk, setShopifyOk] = useState(false);
+  const [accountBlocked, setAccountBlocked] = useState(false);
+  const shopifyOkRef = useRef(shopifyOk);
+  shopifyOkRef.current = shopifyOk;
 
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
-    void checkSession()
-      .then((res) => {
+    if (!shopifyOkRef.current && !isPublicPath(pathname)) {
+      setReady(false);
+    }
+    void (async () => {
+      try {
+        const session = await getAuthSession();
+        if (cancelled) return;
+        setHasAuth(Boolean(session?.user));
+      } catch (e) {
+        if (cancelled) return;
+        console.warn("getAuthSession failed", e);
+        setHasAuth(false);
+      }
+      try {
+        const res = await checkSession();
         if (cancelled) return;
         if (res.ok) {
-          setSessionOk(true);
-          updateAccessFromSession({ email: res.email, tier: res.tier });
+          setAccountBlocked(false);
+          setShopifyOk(true);
+          updateAccessFromSession({
+            email: res.email,
+            tier: res.tier,
+            lastPaidAt: res.lastPaidAt,
+          });
         } else {
-          setSessionOk(false);
+          setShopifyOk(false);
+          setAccountBlocked(res.reason === "account_blocked");
           revokeAccessLocal();
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         if (cancelled) return;
         console.warn("checkAccessSession failed", e);
-        // Fail closed for protected routes when server unreachable after hydrate
-        setSessionOk(false);
-      })
-      .finally(() => {
-        if (!cancelled) setSessionChecked(true);
-      });
+        setShopifyOk(false);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [hydrated, checkSession, updateAccessFromSession, revokeAccessLocal]);
+  }, [hydrated, pathname, checkSession, updateAccessFromSession, revokeAccessLocal]);
 
   useEffect(() => {
-    if (!hydrated || !sessionChecked) return;
-    const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-    if (!sessionOk && !isPublic) {
+    if (!hydrated || !ready) return;
+    const isPublic = isPublicPath(pathname);
+    if (!hasAuth && !isPublic) {
       void navigate({ to: "/welcome" });
       return;
     }
-    if (sessionOk && (pathname === "/acesso" || pathname === "/welcome")) {
-      void navigate({ to: state.profile ? "/" : "/onboarding" });
+    if (hasAuth && accountBlocked && !isPublic) {
+      return;
     }
-  }, [hydrated, sessionChecked, sessionOk, state.profile, pathname, navigate]);
+    if (hasAuth && !shopifyOk && !accountBlocked && !isPublic) {
+      void navigate({ to: "/acesso", search: { token: undefined } });
+      return;
+    }
+    if (hasAuth && shopifyOk && (pathname === "/acesso" || pathname === "/welcome" || pathname === "/cadastro" || pathname === "/entrar")) {
+      void navigate({ to: state.profile ? "/" : "/onboarding" });
+      return;
+    }
+    if (hasAuth && !shopifyOk && pathname === "/welcome") {
+      void navigate({ to: "/acesso", search: { token: undefined } });
+    }
+  }, [hydrated, ready, hasAuth, shopifyOk, accountBlocked, state.profile, pathname, navigate]);
 
-  if (!hydrated || !sessionChecked) {
+  if (!hydrated || !ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="size-8 animate-pulse rounded-full bg-primary/40" />
@@ -66,8 +103,19 @@ export function AccessGate({ children }: { children: ReactNode }) {
     );
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (!sessionOk && !isPublic) {
+  const isPublic = isPublicPath(pathname);
+  if (hasAuth && accountBlocked && !isPublic) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 text-center">
+        <h1 className="text-display text-2xl">Conta suspensa</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Esta conta está bloqueada. O progresso é mantido; o acesso volta quando a suspensão terminar.
+        </p>
+      </div>
+    );
+  }
+  const allowed = isPublic || (hasAuth && shopifyOk);
+  if (!allowed) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="size-8 animate-pulse rounded-full bg-primary/40" />

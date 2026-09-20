@@ -1,10 +1,17 @@
 import { monthlyDoseAdherence } from "@/lib/engine/supplements";
+import { mergeRestockWithConsumption } from "@/lib/engine/supplement-inventory";
 import type { AppState } from "@/lib/types";
 import type { Supplements360 } from "@/lib/customer360/types";
 
 export function aggregateSupplements(state: AppState): Supplements360 {
+  const merged = mergeRestockWithConsumption(
+    state.restockEstimates ?? {},
+    state.supplementDoseLogs ?? [],
+    state.supplementFrequencies,
+  );
+
   const restock: Supplements360["restockEstimates"] = {};
-  for (const [id, r] of Object.entries(state.restockEstimates ?? {})) {
+  for (const [id, r] of Object.entries(merged)) {
     const daysLeft = Math.max(
       0,
       Math.round((new Date(r.emptyAt).getTime() - Date.now()) / 86_400_000),
@@ -18,12 +25,12 @@ export function aggregateSupplements(state: AppState): Supplements360 {
     };
   }
 
-  const logDays = Object.values(state.supplementLogs ?? {}).filter((ids) => ids.length > 0).length;
-  if (logDays >= 7) {
+  const doseCount = (state.supplementDoseLogs ?? []).length;
+  if (doseCount >= 3) {
     for (const k of Object.keys(restock)) {
       restock[k] = {
         ...restock[k]!,
-        confidence: Math.min(0.85, (restock[k]!.confidence || 0.45) + logDays * 0.02),
+        confidence: Math.min(0.85, (restock[k]!.confidence || 0.45) + doseCount * 0.015),
       };
     }
   }

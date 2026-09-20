@@ -1,0 +1,8 @@
+{
+  "id": "soldiers-athlete-v1",
+  "name": "Soldiers Athlete",
+  "views": ["front", "three-quarter", "profile"],
+  "promptCore": "Original 3D-realistic athletic adult, short dark hair, focused expression, matte black training tank and shorts, small gold Soldiers mark on chest, dark studio #080808, warm gold rim light, no text, no logos other than the discreet mark, no watermark",
+  "use": "Reference sheet for all exercise and howto stills. Never use third-party photos as character reference.",
+  "stillPath": "content/soldiers-media-v1/bibles/athlete-three-quarter.png"
+}

@@ -13,7 +13,11 @@ export type ExplainDecisionType =
   | "nutrition_protein_bias"
   | "meal_distribution"
   | "block_stims"
-  | "primary_action";
+  | "primary_action"
+  | "behavior_intervention"
+  | "plateau_response"
+  | "progression"
+  | string;
 
 function joinFragments(codes: ReasonCode[]): string {
   const frags = codes

@@ -99,7 +99,7 @@ export const logDecisionsFn = createServerFn({ method: "POST" })
   .inputValidator(parseLog)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId, requireAccessIfLinked: true });
     if (!identity?.userId) return { ok: false };
     const { logRecommendationDecisions } = await import("@/lib/decision-log.server");
     return logRecommendationDecisions({
@@ -114,7 +114,7 @@ export const markDecisionOutcomeFn = createServerFn({ method: "POST" })
   .inputValidator(parseOutcome)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId, requireAccessIfLinked: true });
     if (!identity?.userId) return { ok: false };
     const { markDecisionOutcomes } = await import("@/lib/decision-log.server");
     return markDecisionOutcomes({
@@ -131,7 +131,7 @@ export const recordSessionOutcomeFn = createServerFn({ method: "POST" })
   .inputValidator(parseSessionOutcome)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId, requireAccessIfLinked: true });
     if (!identity?.userId) return { ok: false };
 
     const { metricsFromSessionAndCheckIn, evaluateShortSessionOutcome, applyEvaluationsToPatterns } =
@@ -180,6 +180,31 @@ export const recordSessionOutcomeFn = createServerFn({ method: "POST" })
           },
           patterns: nextPatterns,
         });
+
+        // Phase 5: bridge behavior interventionResponse + optional DB outcome
+        try {
+          const {
+            applyBehaviorOutcomeFromEvaluations,
+            recordBehaviorOutcomeBestEffort,
+          } = await import("@/lib/engine/outcome-learning");
+          const { buildBehaviorProfile } = await import("@/lib/engine/behavior");
+          const { hydrateAppStateFromDb } = await import("@/lib/customer360/hydrate.server");
+          const state = await hydrateAppStateFromDb(identity.userId);
+          const profile = buildBehaviorProfile(state);
+          applyBehaviorOutcomeFromEvaluations(profile, [ev]);
+          await recordBehaviorOutcomeBestEffort({
+            userId: identity.userId,
+            success: ev.result === "success",
+            metrics: {
+              kind: data.express || (data.durationMin ?? 99) < 35 ? "express" : "workout",
+              durationMin: data.durationMin,
+              evaluation: ev.kind,
+              result: ev.result,
+            },
+          });
+        } catch {
+          /* best-effort */
+        }
       }
     }
 
@@ -191,7 +216,7 @@ export const recordNextDayCheckInOutcomeFn = createServerFn({ method: "POST" })
   .inputValidator(parseNextDay)
   .handler(async ({ data }) => {
     const { resolveTrustedIdentity } = await import("@/lib/session-identity.server");
-    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId });
+    const identity = await resolveTrustedIdentity({ deviceId: data.deviceId, requireAccessIfLinked: true });
     if (!identity?.userId) return { ok: false };
 
     const metrics: OutcomeMetrics = {
@@ -214,7 +239,9 @@ export const recordNextDayCheckInOutcomeFn = createServerFn({ method: "POST" })
       userId: identity.userId,
       date: data.yesterday,
     });
-    const volRow = rows.find((r) => r.decision_type === "training_volume");
+    const volRow = rows.find(
+      (r) => r.decision_type === "training_volume" || r.decision_type === "TRAINING_VOLUME",
+    );
     const volumeFactor =
       typeof volRow?.decision_value?.value === "number"
         ? volRow.decision_value.value

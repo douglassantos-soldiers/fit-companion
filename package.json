@@ -10,8 +10,16 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "media:validate": "node scripts/soldiers-media/validate-manifest.mjs",
+    "media:prompts": "node scripts/soldiers-media/render-prompts.mjs",
+    "media:coverage": "node scripts/soldiers-media/coverage-report.mjs",
+    "media:compress": "node scripts/soldiers-media/compress-stills.mjs",
+    "media:motion": "node scripts/soldiers-media/generate-motion.mjs",
+    "media:deploy": "node scripts/soldiers-media/deploy-remote.mjs",
+    "catalog:coverage": "node scripts/exercise-catalog/coverage-diff.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -81,6 +89,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {

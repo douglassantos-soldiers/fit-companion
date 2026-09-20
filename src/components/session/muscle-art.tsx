@@ -1,5 +1,7 @@
 import { motion } from "motion/react";
 import type { MuscleGroup } from "@/data/exercises";
+import { SoldiersMediaFrame } from "@/components/soldiers-media-frame";
+import type { ResolvedMedia } from "@/lib/soldiers-media";
 import { cn } from "@/lib/utils";
 
 const LABELS: Record<MuscleGroup, string> = {
@@ -17,25 +19,31 @@ const LABELS: Record<MuscleGroup, string> = {
 export function MuscleArt({
   group,
   mediaUrl,
+  media,
   className,
 }: {
   group: MuscleGroup;
   mediaUrl?: string;
+  media?: ResolvedMedia;
   className?: string;
 }) {
-  if (mediaUrl) {
+  const pack =
+    media ??
+    (mediaUrl
+      ? {
+          kind: "exercise" as const,
+          entityId: "",
+          source: "legacy" as const,
+          needsMotion: false,
+          posterUrl: mediaUrl,
+        }
+      : undefined);
+
+  if (pack && (pack.posterUrl || pack.webmUrl || pack.mp4Url || pack.gifUrl)) {
     return (
       <div className={cn("relative overflow-hidden bg-muted", className)}>
-        <img
-          src={mediaUrl}
-          alt=""
-          width={800}
-          height={600}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
+        <SoldiersMediaFrame media={pack} alt={LABELS[group]} className="h-full w-full" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
           <p className="text-display text-sm tracking-[0.25em] text-primary">{LABELS[group]}</p>
         </div>
       </div>

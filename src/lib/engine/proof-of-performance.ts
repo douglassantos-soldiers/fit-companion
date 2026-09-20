@@ -1,5 +1,5 @@
 import { sessionsInLastDays } from "@/lib/engine/dimensions";
-import type { AppState } from "@/lib/types";
+import type { AppState, ProofSource, ProofStatus } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 
 export interface ProofOfPerformance {
@@ -13,6 +13,10 @@ export interface ProofOfPerformance {
   consistencyDelta: number;
   weakestImproved: { key: string; label: string; delta: number } | null;
   narrative: string;
+  /** Verified when the window has wearable-verified activity; otherwise self-reported session. */
+  status: ProofStatus;
+  source: ProofSource;
+  verifiedAt: string | null;
 }
 
 function volumeInWindow(sessions: AppState["sessions"], days: number, end = new Date()) {
@@ -107,10 +111,10 @@ export function buildProofOfPerformance(state: AppState, periodDays = 21): Proof
   }
   const narrative =
     narrativeParts.length > 0
-      ? `Proof of Performance: ${narrativeParts.join(" · ")}.`
-      : `Proof of Performance: ${periodDays} dias de jornada Soldiers.`;
+      ? `Prova de desempenho: ${narrativeParts.join(" · ")}.`
+      : `Prova de desempenho: ${periodDays} dias de jornada Soldiers.`;
 
-  return {
+  const base: ProofOfPerformance = {
     periodDays,
     scoreNow: liveScore,
     scoreThen,
@@ -121,7 +125,27 @@ export function buildProofOfPerformance(state: AppState, periodDays = 21): Proof
     consistencyDelta: Math.round(consistencyDelta),
     weakestImproved,
     narrative,
+    status: "self_reported",
+    source: "app_session",
+    verifiedAt: null,
   };
+
+  const verified = (state.activityLogs ?? []).filter((l) => {
+    if (l.status !== "verified") return false;
+    const d = new Date(`${l.date.slice(0, 10)}T12:00:00`);
+    const limit = new Date();
+    limit.setDate(limit.getDate() - periodDays);
+    return d >= limit;
+  });
+  if (verified[0]) {
+    return {
+      ...base,
+      status: "verified",
+      source: verified[0].source,
+      verifiedAt: new Date().toISOString(),
+    };
+  }
+  return base;
 }
 
 /** Pure helper for ranking demos / tests: who wins relative ranking. */

@@ -4,6 +4,7 @@ import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { monthlyDoseAdherence } from "@/lib/engine/supplements";
 import type { AppState, Profile, SessionLog, TrafficLight } from "@/lib/types";
 import { todayKey } from "@/lib/types";
+import { weightPersonalRecords } from "@/lib/training/prs";
 
 export interface Dimension {
   key: string;
@@ -194,19 +195,7 @@ export function weeklyVolumeSeries(sessions: SessionLog[], weeks = 8) {
 }
 
 export function personalRecords(sessions: SessionLog[]) {
-  const records = new Map<string, { weightKg: number; reps: number; date: string }>();
-  for (const session of sessions) {
-    for (const ex of session.exercises) {
-      for (const set of ex.sets) {
-        if (!set.done) continue;
-        const current = records.get(ex.exerciseId);
-        if (!current || set.weightKg > current.weightKg) {
-          records.set(ex.exerciseId, { weightKg: set.weightKg, reps: set.reps, date: session.date });
-        }
-      }
-    }
-  }
-  return [...records.entries()].map(([exerciseId, r]) => ({ exerciseId, ...r }));
+  return weightPersonalRecords(sessions);
 }
 
 export interface WeekOverWeek {

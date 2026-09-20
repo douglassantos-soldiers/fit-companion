@@ -29,7 +29,7 @@ export type VerifyShopifyResult =
       accessTier: AccessTier;
       restockEstimates: Record<string, RestockEstimate>;
     }
-  | { ok: false; reason: "no_purchase" | "not_configured" | "invalid_email" | "upstream" };
+  | { ok: false; reason: "no_purchase" | "not_configured" | "invalid_email" | "upstream" | "stale_purchase" };
 
 export type RedeemMagicResult =
   | {
@@ -221,73 +221,42 @@ export const verifyShopifyPurchase = createServerFn({ method: "POST" })
     }
 
     try {
-      // Prefer snapshot from webhook table when available
-      try {
-        const { findEntitlementByEmail } = await import("@/lib/shopify.server");
-        const row = await findEntitlementByEmail(data.email);
-        if (row) {
-          const { orders, customerId } = await fetchPaidOrdersByEmail(data.email);
-          if (orders.length < 1 && row.productIds.length === 0) {
-            return { ok: false, reason: "no_purchase" };
-          }
-          const fromOrders =
-            orders.length > 0
-              ? profileFromOrders(orders, customerId ?? row.customerId)
-              : {
-                  productIds: row.productIds,
-                  customerId: row.customerId,
-                  accessTier: row.accessTier,
-                  restockEstimates: row.snapshot?.restockEstimates ?? {},
-                  orderCount: 1,
-                };
-          if (orders.length > 0) {
-            void persistOrdersBestEffort(data.email, orders, fromOrders.customerId);
-          }
-          return {
-            ok: true,
-            orderCount: fromOrders.orderCount,
-            customerId: fromOrders.customerId,
-            productIds: fromOrders.productIds.length ? fromOrders.productIds : row.productIds,
-            accessTier: fromOrders.accessTier,
-            restockEstimates: fromOrders.restockEstimates,
-          };
-        }
-      } catch {
-        /* admin may be missing — fall through to Admin API only */
+      const { inspectAccessForEmail } = await import("@/lib/shopify.server");
+      const inspected = await inspectAccessForEmail(data.email);
+      if (!inspected.granted) {
+        return {
+          ok: false,
+          reason:
+            inspected.reason === "not_configured"
+              ? "not_configured"
+              : inspected.reason === "stale_purchase"
+                ? "stale_purchase"
+                : "no_purchase",
+        };
       }
-
-      const { orders, customerId } = await fetchPaidOrdersByEmail(data.email);
-      if (orders.length < 1) {
-        console.info("Shopify verify: no paid order", maskEmail(data.email));
-        return { ok: false, reason: "no_purchase" };
-      }
-      const profile = profileFromOrders(orders, customerId);
-      void persistOrdersBestEffort(data.email, orders, profile.customerId);
-      console.info("Shopify verify: granted", maskEmail(data.email), "orders=", profile.orderCount);
       return {
         ok: true,
-        orderCount: profile.orderCount,
-        customerId: profile.customerId,
-        productIds: profile.productIds,
-        accessTier: profile.accessTier,
-        restockEstimates: profile.restockEstimates,
+        orderCount: inspected.orderCount,
+        customerId: inspected.customerId,
+        productIds: inspected.productIds,
+        accessTier: inspected.accessTier,
+        restockEstimates: inspected.restockEstimates,
       };
     } catch (e) {
-      if (e instanceof Error && e.message === "upstream") {
-        return { ok: false, reason: "upstream" };
-      }
-      console.error("Shopify verify failed", e);
+      console.warn("verifyShopifyPurchase failed", e);
       return { ok: false, reason: "upstream" };
     }
   });
 
+export function parseMagicTokenInput(input: unknown): { token: string } {
+  const value = input as { token?: string } | null;
+  const token = String(value?.token ?? "").trim();
+  if (!token || token.length < 8) throw new Error("Token inválido");
+  return { token };
+}
+
 export const redeemMagicToken = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => {
-    const value = input as { token?: string } | null;
-    const token = String(value?.token ?? "").trim();
-    if (!token || token.length < 8) throw new Error("Token inválido");
-    return { token };
-  })
+  .inputValidator(parseMagicTokenInput)
   .handler(async ({ data }): Promise<RedeemMagicResult> => {
     try {
       const { findEntitlementByMagicToken } = await import("@/lib/shopify.server");

@@ -1,0 +1,21 @@
+{
+  "source": "soldiers",
+  "ownership": "owned",
+  "license": "soldiers-owned",
+  "version": "v1",
+  "allowedReference": [
+    "exercise names and catalog coverage",
+    "equipment and muscle group labels",
+    "movement start/end described in original Portuguese specs"
+  ],
+  "forbidden": [
+    "Using openGym or Gym Visual GIFs, stills, thumbnails, or frames as generation input",
+    "Tracing or restyling third-party exercise media frame-by-frame",
+    "Passing Unsplash photos as image-to-video reference for Soldiers identity",
+    "Claiming third-party media as soldiers-owned"
+  ],
+  "ugc": {
+    "bucket": "checkins",
+    "note": "User photos stay user-owned; not part of Soldiers Media Library production"
+  }
+}

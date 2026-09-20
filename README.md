@@ -84,6 +84,24 @@ Smoke:
 
 Opcional: `VITE_SHOPIFY_STOREFRONT_URL`, `VITE_SHOPIFY_REORDER_DISCOUNT`.
 
+## Admin Console
+
+Backoffice em `/admin` (PIN server-only `ADMIN_PIN`, cookie `soldiers_admin`).
+
+1. Migration: `supabase/migrations/20260923120000_admin_console_v1.sql`  
+   (`cms_overrides` + `admin_audit_log`, service_role only)
+2. No `.env`: `ADMIN_PIN=` (nunca `VITE_`)
+3. Abas:
+   - **Conteúdo** — mídia/notas de exercícios e imagens de refeições (persistido em `cms_overrides`)
+   - **Usuários** — lookup por e-mail, resync Shopify, grant/revoke manual (com audit)
+   - **Sistema** — últimos webhooks + sync cursors
+
+Smoke:
+- PIN ok / errado / logout
+- Salvar CMS → outro aparelho vê media/cue na sessão de treino
+- Lookup e-mail → Resync / Liberar / Revogar grava `admin_audit_log`
+- Admin entra **sem** precisar de `accessGranted` no app atleta
+
 ## Built with
 
 - TanStack Start

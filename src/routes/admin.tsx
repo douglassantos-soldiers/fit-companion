@@ -8,8 +8,11 @@ const AdminPage = lazy(() =>
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin CMS — Soldiers" },
-      { name: "description", content: "Gerencie mídia de treinos, vídeos e imagens dos presets." },
+      { title: "Admin Console — Soldiers" },
+      {
+        name: "description",
+        content: "Console operacional: CMS remoto, acesso Shopify e saúde do sistema.",
+      },
     ],
   }),
   component: AdminRoute,

@@ -3,7 +3,34 @@ import { ensureSocialProfile } from "@/lib/social";
 import { socialWriteFn } from "@/lib/social-write.functions";
 import { notifySocial } from "@/lib/notifications";
 
-/** Magic-link auth. Links social_profiles when possible. */
+export async function signUpWithEmail(email: string, password: string, name: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password,
+    options: { data: { display_name: name.trim().slice(0, 80) } },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function resetPassword(email: string) {
+  const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/entrar` : undefined;
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    ...(redirectTo ? { redirectTo } : {}),
+  });
+  if (error) throw error;
+}
+
+/** Kept for compatibility — not used as an entry path. */
 export async function signInWithMagicLink(email: string) {
   const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/perfil` : undefined;
   const { error } = await supabase.auth.signInWithOtp({
@@ -13,6 +40,7 @@ export async function signInWithMagicLink(email: string) {
   if (error) throw error;
 }
 
+/** Kept for compatibility — not used as an entry path. */
 export async function signInWithGoogle() {
   const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/perfil` : undefined;
   const { error } = await supabase.auth.signInWithOAuth({
@@ -29,6 +57,11 @@ export async function signOutAuth() {
 export async function getAuthUser() {
   const { data } = await supabase.auth.getUser();
   return data.user ?? null;
+}
+
+export async function getAuthSession() {
+  const { data } = await supabase.auth.getSession();
+  return data.session ?? null;
 }
 
 /**

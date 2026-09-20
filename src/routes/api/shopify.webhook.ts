@@ -158,18 +158,17 @@ export const Route = createFileRoute("/api/shopify/webhook")({
             );
           }
 
-          const purchaseEvent: import("@/lib/events/track").TrackUserEventInput = {
+          await trackUserEvent({
             eventType: "purchase",
             source: "shopify_webhook",
+            resolvedUserId: user?.id ?? null,
             payload: {
               orderId: snapshot.orderId,
               productIds: snapshot.productIds,
               topic,
             },
             idempotencyKey: `purchase:${snapshot.orderId ?? payloadHash}`,
-          };
-          if (user?.id) purchaseEvent.userId = user.id;
-          await trackUserEvent(purchaseEvent);
+          });
         }
 
         if (user) {
@@ -188,30 +187,14 @@ export const Route = createFileRoute("/api/shopify/webhook")({
 });
 
 async function handleCustomerTopic(topic: string, payload: Record<string, unknown>) {
-  const email = String(payload["email"] ?? "")
-    .trim()
-    .toLowerCase();
-  const customerId = payload["id"] != null ? String(payload["id"]) : null;
-  if (!email.includes("@") && !customerId) return;
-
-  const { resolveOrCreateUserByEmail, linkShopifyIdentity, findUserByShopifyCustomerId } =
-    await import("@/lib/identity");
-
-  let user = email.includes("@") ? await resolveOrCreateUserByEmail(email) : null;
-  if (!user && customerId) {
-    user = await findUserByShopifyCustomerId(customerId);
-  }
-  if (user && customerId) {
-    await linkShopifyIdentity({
-      userId: user.id,
-      shopifyCustomerId: customerId,
-      externalEmail: email.includes("@") ? email : null,
-    });
-  }
-  if (user) {
-    const { recomputeCustomerProfile } = await import("@/lib/customer360/recompute.server");
-    void recomputeCustomerProfile(user.id).catch(() => undefined);
-  }
+  const { ingestShopifyCustomer, customerCardFromWebhookPayload } = await import(
+    "@/lib/shopify-customers.server"
+  );
+  await ingestShopifyCustomer({
+    customer: customerCardFromWebhookPayload(payload),
+    fetchOrders: false,
+    allowExistingWithoutEmail: true,
+  });
   void topic;
 }
 

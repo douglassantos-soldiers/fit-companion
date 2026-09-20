@@ -2,11 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { rateLimitKey, readAccessSession } from "@/lib/access-session.server";
 import {
   mealAiSystemPrompt,
+  mergeVoiceParseIntoSuggestion,
   parseMealAiInput,
   parseMealAiSuggestion,
   type MealAiError,
   type MealAiSuggestion,
 } from "@/lib/meal-ai-contract";
+import { parseVoiceFoodText } from "@/lib/nutrition/voice-parse";
 
 export type { MealAiSuggestion, MealAiError };
 export { parseMealAiInput, parseMealAiSuggestion, mealAiSystemPrompt };
@@ -15,13 +17,44 @@ type MealAiResult =
   | { suggestion: MealAiSuggestion; transcript?: string; error?: undefined }
   | { suggestion?: undefined; transcript?: string; error: MealAiError };
 
+function enrichWithCatalog(text: string, suggestion: MealAiSuggestion): MealAiSuggestion {
+  const voice = parseVoiceFoodText(text);
+  return mergeVoiceParseIntoSuggestion(suggestion, voice);
+}
+
 async function estimateFromText(text: string, slot: ReturnType<typeof parseMealAiInput>["slot"], key: string) {
+  // Deterministic catalog parse first — high confidence can skip inventing quantities
+  const voice = parseVoiceFoodText(text);
+  if (voice.items.length > 0 && voice.overallConfidence >= 0.75 && !voice.needsConfirmation) {
+    const fromVoice = mergeVoiceParseIntoSuggestion(
+      {
+        label: voice.items.map((i) => i.foodName ?? i.foodId).join(", "),
+        proteinG: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.proteinG, 0)),
+        kcal: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.energyKcal, 0)),
+        carbG: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.carbG, 0)),
+        fatG: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.fatG, 0)),
+        fiberG: Math.round(voice.items.reduce((s, i) => s + (i.nutrientSnapshot.fiberG ?? 0), 0)),
+        quality:
+          voice.items.reduce((s, i) => s + i.nutrientSnapshot.proteinG, 0) >= 30
+            ? "verde"
+            : voice.items.reduce((s, i) => s + i.nutrientSnapshot.proteinG, 0) >= 15
+              ? "amarelo"
+              : "laranja",
+        confidence: voice.overallConfidence,
+        needsConfirmation: false,
+        candidates: [],
+      },
+      voice,
+    );
+    return fromVoice;
+  }
+
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: "gpt-4o",
-      max_tokens: 300,
+      max_tokens: 500,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: mealAiSystemPrompt(slot) },
@@ -32,11 +65,23 @@ async function estimateFromText(text: string, slot: ReturnType<typeof parseMealA
   if (!res.ok) {
     const detail = await res.text();
     console.error("OpenAI meal text error", res.status, detail.slice(0, 200));
+    // Fallback to deterministic parse if LLM fails
+    if (voice.items.length) {
+      return enrichWithCatalog(text, {
+        label: text.slice(0, 80),
+        proteinG: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.proteinG, 0)),
+        kcal: Math.round(voice.items.reduce((s, i) => s + i.nutrientSnapshot.energyKcal, 0)),
+        quality: "amarelo",
+        confidence: voice.overallConfidence,
+        needsConfirmation: true,
+      });
+    }
     return null;
   }
   const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = json.choices?.[0]?.message?.content ?? "";
-  return parseMealAiSuggestion(content);
+  const suggestion = parseMealAiSuggestion(content);
+  return enrichWithCatalog(text, suggestion);
 }
 
 async function estimateFromPhoto(

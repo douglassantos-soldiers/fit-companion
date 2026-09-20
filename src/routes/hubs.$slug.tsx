@@ -2,12 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, LoadingPulse } from "@/components/app-shell";
+import { SoldiersMediaFrame, SoldiersMediaThumb } from "@/components/soldiers-media-frame";
+import { resolveChallengeMedia, resolveHubMedia } from "@/lib/soldiers-media";
 import { Button } from "@/components/ui/button";
 import { challengeById, isRelativeChallenge } from "@/data/challenges";
 import { hubBySlug } from "@/data/hubs";
 import { performanceUpgradeUrl } from "@/data/shopify-product-map";
-import { formatActivityEvent } from "@/components/social/activity-feed";
+import { ProofStatusBadge } from "@/components/social/proof-status-badge";
 import {
   fetchHubLeaderboard,
   getHub,
@@ -97,7 +99,7 @@ function HubDetailPage() {
   if (!hydrated || !hub) {
     return (
       <AppShell title="Hub">
-        <div className="surface-glass h-40 animate-pulse" />
+        <LoadingPulse />
       </AppShell>
     );
   }
@@ -105,6 +107,17 @@ function HubDetailPage() {
   return (
     <AppShell title={hub.name} subtitle={hub.creatorName}>
       <header className="mb-5">
+        {(() => {
+          const cover = resolveHubMedia(hub.slug);
+          if (!cover.posterUrl) return null;
+          return (
+            <SoldiersMediaFrame
+              media={cover}
+              alt={hub.name}
+              className="mb-4 h-36 w-full rounded-2xl"
+            />
+          );
+        })()}
         <p className="eyebrow">{hub.creatorName}</p>
         <h2 className="mt-1 text-display text-3xl leading-none">{hub.name}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{hub.tagline}</p>
@@ -139,10 +152,17 @@ function HubDetailPage() {
           return (
             <article key={cid} className="surface-glass p-4">
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="eyebrow">{relative ? "% evolução" : c.metric}</p>
-                  <h4 className="mt-0.5 text-display text-xl">{c.title}</h4>
-                  <p className="mt-1 text-xs text-muted-foreground">{c.description}</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <SoldiersMediaThumb
+                    media={resolveChallengeMedia(c.category)}
+                    alt={c.category}
+                    className="size-12 rounded-xl"
+                  />
+                  <div>
+                    <p className="eyebrow">{relative ? "% evolução" : c.metric}</p>
+                    <h4 className="mt-0.5 text-display text-xl">{c.title}</h4>
+                    <p className="mt-1 text-xs text-muted-foreground">{c.description}</p>
+                  </div>
                 </div>
                 <Trophy className="size-5 shrink-0 text-muted-foreground" />
               </div>
@@ -171,7 +191,8 @@ function HubDetailPage() {
                         className={`flex justify-between ${row.isYou ? "font-semibold" : "text-muted-foreground"}`}
                       >
                         <span>
-                          {row.rank}. {row.isYou ? "Você" : row.displayName}
+                          {row.rank}. {row.isYou ? "Você" : row.displayName}{" "}
+                          <ProofStatusBadge status={row.proofStatus} flagged={row.flagged} className="ml-1 align-middle" />
                         </span>
                         <span>
                           {relative

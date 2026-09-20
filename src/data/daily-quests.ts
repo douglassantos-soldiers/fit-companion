@@ -1,4 +1,5 @@
 import { nutritionProteinPct, waterGoalReached } from "@/lib/engine/xp";
+import type { BehaviorSelectContext } from "@/lib/engine/behavior/types";
 import type { AppState } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 
@@ -39,11 +40,36 @@ function hashSeed(s: string): number {
   return h >>> 0;
 }
 
-/** Stable 3 quests per day from date + deviceId. */
-export function pickDailyQuests(date: string, deviceId: string): DailyQuest[] {
-  const seed = hashSeed(`${date}:${deviceId || "anon"}`);
+function preferredKinds(ctx?: BehaviorSelectContext | null): QuestKind[] {
+  if (!ctx) return [];
+  const kinds: QuestKind[] = [];
+  for (const t of ctx.triggers.filter((x) => x.active)) {
+    if (t.key === "TIME_CONSTRAINT_PATTERN" || t.key === "LOW_FRIDAY_ADHERENCE" || t.key === "TRAINING_SKIPPING_PATTERN") {
+      kinds.push("train", "xp_goal");
+    }
+    if (t.key === "WEEKEND_MEAL_GAP" || t.key === "MEAL_LOGGING_DROP") {
+      kinds.push("meals2", "protein80");
+    }
+    if (t.key === "LOW_SLEEP_STREAK") {
+      kinds.push("coach", "water");
+    }
+  }
+  return [...new Set(kinds)];
+}
+
+/** Stable 3 quests per day from date + deviceId (+ optional behavior bias). */
+export function pickDailyQuests(
+  date: string,
+  deviceId: string,
+  behaviorCtx?: BehaviorSelectContext | null,
+): DailyQuest[] {
+  const triggerSeed = behaviorCtx?.triggers
+    .filter((t) => t.active)
+    .map((t) => t.key)
+    .sort()
+    .join("|");
+  const seed = hashSeed(`${date}:${deviceId || "anon"}:${triggerSeed || ""}`);
   const pool = [...DAILY_QUEST_POOL];
-  // Fisher-Yates with LCG
   let rng = seed;
   const next = () => {
     rng = (Math.imul(rng, 1664525) + 1013904223) >>> 0;
@@ -53,12 +79,29 @@ export function pickDailyQuests(date: string, deviceId: string): DailyQuest[] {
     const j = Math.floor(next() * (i + 1));
     [pool[i], pool[j]] = [pool[j]!, pool[i]!];
   }
+
+  const prefer = preferredKinds(behaviorCtx);
+  if (prefer.length) {
+    const boosted: DailyQuest[] = [];
+    const rest: DailyQuest[] = [];
+    for (const q of pool) {
+      if (prefer.includes(q.kind)) boosted.push(q);
+      else rest.push(q);
+    }
+    const merged = [...boosted, ...rest];
+    return merged.slice(0, 3);
+  }
   return pool.slice(0, 3);
 }
 
-export function ensureDailyQuests(state: AppState, deviceId: string, date = todayKey()): AppState {
+export function ensureDailyQuests(
+  state: AppState,
+  deviceId: string,
+  date = todayKey(),
+  behaviorCtx?: BehaviorSelectContext | null,
+): AppState {
   if (state.dailyQuestDate === date && (state.dailyQuestIds?.length ?? 0) === 3) return state;
-  const picked = pickDailyQuests(date, deviceId);
+  const picked = pickDailyQuests(date, deviceId, behaviorCtx);
   return {
     ...state,
     dailyQuestDate: date,

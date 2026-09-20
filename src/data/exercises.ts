@@ -1,4 +1,5 @@
-import { exerciseMediaUrl } from "@/lib/cms";
+import { EXERCISE_LIBRARY } from "@/data/exercise-library";
+import { resolveExerciseMedia } from "@/lib/soldiers-media";
 
 export type MuscleGroup =
   | "peito"
@@ -26,109 +27,45 @@ export interface Exercise {
   mediaUrl?: string;
 }
 
-export const EXERCISES: Exercise[] = [
-  {
-    id: "supino-reto",
-    name: "Supino reto",
-    group: "peito",
-    equipment: "academia",
-    baseLoad: 50,
-    unit: "kg",
-    joints: ["ombro", "punho"],
-    swapGroup: "peito-press",
-    priority: 1,
-    mediaUrl: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80&auto=format&fit=crop",
-  },
-  { id: "supino-inclinado-halter", name: "Supino inclinado com halteres", group: "peito", equipment: "academia", baseLoad: 20, unit: "kg", joints: ["ombro", "punho"], swapGroup: "peito-press", priority: 2 },
-  { id: "flexao", name: "Flexão de braço", group: "peito", equipment: "ambos", baseLoad: 0, unit: "corpo", joints: ["ombro", "punho"], swapGroup: "peito-press", priority: 3 },
-  { id: "crucifixo", name: "Crucifixo", group: "peito", equipment: "academia", baseLoad: 14, unit: "kg", joints: ["ombro"], swapGroup: "peito-fly", priority: 1 },
-  {
-    id: "barra-fixa",
-    name: "Barra fixa",
-    group: "costas",
-    equipment: "ambos",
-    baseLoad: 0,
-    unit: "corpo",
-    joints: ["ombro", "punho"],
-    swapGroup: "costas-pull",
-    priority: 2,
-    mediaUrl: "https://images.unsplash.com/photo-1598971639058-fab3c3109cd0?w=800&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "remada-curvada",
-    name: "Remada curvada",
-    group: "costas",
-    equipment: "academia",
-    baseLoad: 40,
-    unit: "kg",
-    joints: ["lombar", "punho"],
-    swapGroup: "costas-row",
-    priority: 1,
-    mediaUrl: "https://images.unsplash.com/photo-1603287681836-b174ce5074c2?w=800&q=80&auto=format&fit=crop",
-  },
-  { id: "remada-unilateral", name: "Remada unilateral", group: "costas", equipment: "ambos", baseLoad: 20, unit: "kg", joints: ["lombar", "punho"], swapGroup: "costas-row", priority: 2 },
-  { id: "pulldown", name: "Puxada alta", group: "costas", equipment: "academia", baseLoad: 45, unit: "kg", joints: ["ombro", "punho"], swapGroup: "costas-pull", priority: 1 },
-  {
-    id: "agachamento",
-    name: "Agachamento livre",
-    group: "pernas",
-    equipment: "academia",
-    baseLoad: 60,
-    unit: "kg",
-    joints: ["joelho", "lombar"],
-    swapGroup: "perna-squat",
-    priority: 1,
-    mediaUrl: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80&auto=format&fit=crop",
-  },
-  { id: "agachamento-corpo", name: "Agachamento com peso do corpo", group: "pernas", equipment: "ambos", baseLoad: 0, unit: "corpo", joints: ["joelho"], swapGroup: "perna-squat", priority: 3 },
-  { id: "leg-press", name: "Leg press", group: "pernas", equipment: "academia", baseLoad: 100, unit: "kg", joints: ["joelho"], swapGroup: "perna-squat", priority: 2 },
-  { id: "afundo", name: "Afundo", group: "pernas", equipment: "ambos", baseLoad: 12, unit: "kg", joints: ["joelho"], swapGroup: "perna-lunge", priority: 1 },
-  {
-    id: "terra-romeno",
-    name: "Levantamento terra romeno",
-    group: "pernas",
-    equipment: "academia",
-    baseLoad: 50,
-    unit: "kg",
-    joints: ["lombar"],
-    swapGroup: "perna-hinge",
-    priority: 1,
-    mediaUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80&auto=format&fit=crop",
-  },
-  { id: "panturrilha", name: "Panturrilha em pé", group: "pernas", equipment: "ambos", baseLoad: 20, unit: "kg", joints: [], swapGroup: "perna-calf", priority: 1 },
-  {
-    id: "desenvolvimento",
-    name: "Desenvolvimento militar",
-    group: "ombros",
-    equipment: "academia",
-    baseLoad: 30,
-    unit: "kg",
-    joints: ["ombro", "punho"],
-    swapGroup: "ombro-press",
-    priority: 1,
-    mediaUrl: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=800&q=80&auto=format&fit=crop",
-  },
-  { id: "elevacao-lateral", name: "Elevação lateral", group: "ombros", equipment: "ambos", baseLoad: 8, unit: "kg", joints: ["ombro"], swapGroup: "ombro-raise", priority: 1 },
-  { id: "pike-push", name: "Flexão pike", group: "ombros", equipment: "casa", baseLoad: 0, unit: "corpo", joints: ["ombro", "punho"], swapGroup: "ombro-press", priority: 2 },
-  { id: "rosca-direta", name: "Rosca direta", group: "biceps", equipment: "ambos", baseLoad: 20, unit: "kg", joints: ["punho"], swapGroup: "biceps-curl", priority: 1 },
-  { id: "rosca-martelo", name: "Rosca martelo", group: "biceps", equipment: "ambos", baseLoad: 12, unit: "kg", joints: ["punho"], swapGroup: "biceps-curl", priority: 2 },
-  { id: "triceps-corda", name: "Tríceps na corda", group: "triceps", equipment: "academia", baseLoad: 20, unit: "kg", joints: ["punho"], swapGroup: "triceps-ext", priority: 1 },
-  { id: "triceps-banco", name: "Tríceps no banco", group: "triceps", equipment: "ambos", baseLoad: 0, unit: "corpo", joints: ["punho"], swapGroup: "triceps-ext", priority: 2 },
-  { id: "prancha", name: "Prancha", group: "core", equipment: "ambos", baseLoad: 0, unit: "min", joints: [], swapGroup: "core-iso", priority: 1 },
-  { id: "abdominal-remador", name: "Abdominal remador", group: "core", equipment: "ambos", baseLoad: 0, unit: "corpo", joints: [], swapGroup: "core-dyn", priority: 1 },
-  { id: "hollow", name: "Hollow hold", group: "core", equipment: "ambos", baseLoad: 0, unit: "min", joints: ["lombar"], swapGroup: "core-iso", priority: 2 },
-  { id: "corrida", name: "Corrida contínua", group: "cardio", equipment: "ambos", baseLoad: 0, unit: "min", joints: ["joelho"], swapGroup: "cardio-steady", priority: 1 },
-  { id: "hiit-bike", name: "HIIT na bike", group: "cardio", equipment: "academia", baseLoad: 0, unit: "min", joints: [], swapGroup: "cardio-hiit", priority: 1 },
-  { id: "burpee", name: "Burpee", group: "cardio", equipment: "ambos", baseLoad: 0, unit: "corpo", joints: ["joelho", "punho"], swapGroup: "cardio-hiit", priority: 2 },
-  { id: "pular-corda", name: "Pular corda", group: "cardio", equipment: "ambos", baseLoad: 0, unit: "min", joints: ["joelho"], swapGroup: "cardio-steady", priority: 2 },
-];
+function plannerFromLibrary(): Exercise[] {
+  return EXERCISE_LIBRARY.filter((e) => e.active && e.plannerEligible).map((e) => ({
+    id: e.id,
+    name: e.name,
+    group: e.group,
+    equipment: e.equipment,
+    baseLoad: e.baseLoad,
+    unit: e.unit,
+    joints: e.joints,
+    swapGroup: e.swapGroup,
+    priority: e.priority,
+  }));
+}
+
+export const EXERCISES: Exercise[] = plannerFromLibrary();
+
+let alternativeIds: Record<string, string[]> = {};
+
+export function replacePlannerExercises(next: Exercise[]): void {
+  EXERCISES.length = 0;
+  EXERCISES.push(...next);
+}
+
+export function setAlternativeIds(next: Record<string, string[]>): void {
+  alternativeIds = next;
+}
+
+export function getAlternativeIds(exerciseId: string): string[] | undefined {
+  const ids = alternativeIds[exerciseId];
+  return ids?.length ? ids : undefined;
+}
 
 export const exerciseById = (id: string) => {
   const ex = EXERCISES.find((e) => e.id === id);
   if (!ex) return undefined;
-  const media = exerciseMediaUrl(id, ex.mediaUrl);
-  if (media && media !== ex.mediaUrl) return { ...ex, mediaUrl: media };
-  if (media && !ex.mediaUrl) return { ...ex, mediaUrl: media };
+  const media = resolveExerciseMedia(id, ex.mediaUrl);
+  const mediaUrl = media.webmUrl || media.mp4Url || media.gifUrl || media.posterUrl;
+  if (mediaUrl && mediaUrl !== ex.mediaUrl) return { ...ex, mediaUrl };
+  if (mediaUrl && !ex.mediaUrl) return { ...ex, mediaUrl };
   return ex;
 };
 
@@ -153,7 +90,7 @@ export function respectsJoints(ex: Exercise, avoided: Joint[]) {
   return !ex.joints.some((j) => avoided.includes(j));
 }
 
-/** Alternativas para trocar na sessão: mesmo swapGroup, depois mesmo grupo muscular. */
+/** Alternativas para trocar na sessão: lista explícita do CMS, senão swapGroup/grupo. */
 export function alternativesFor(
   exerciseId: string,
   equipment: "casa" | "academia",
@@ -162,6 +99,14 @@ export function alternativesFor(
   const current = exerciseById(exerciseId);
   if (!current) return [];
   const avoided = normalizeRestrictions(restrictions);
+  const explicit = getAlternativeIds(exerciseId);
+
+  if (explicit?.length) {
+    return explicit
+      .map((id) => exerciseById(id))
+      .filter((e): e is Exercise => Boolean(e))
+      .filter((e) => e.id !== exerciseId && matchesEquipment(e, equipment) && respectsJoints(e, avoided));
+  }
 
   const pool = EXERCISES.filter(
     (e) =>

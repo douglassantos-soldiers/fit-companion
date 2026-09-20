@@ -60,6 +60,27 @@ describe("Identity Security Core", () => {
     expect(decodeAccessToken(token)).toBeNull();
   });
 
+  it("rejects cookie when lastPaidAt is older than 40 days", () => {
+    const token = encodeAccessToken({
+      email: "a@b.com",
+      tier: "base",
+      userId: "11111111-1111-4111-8111-111111111111",
+      lastPaidAt: new Date(Date.now() - 41 * 24 * 60 * 60 * 1000).toISOString(),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    expect(decodeAccessToken(token)).toBeNull();
+  });
+
+  it("accepts cookie when lastPaidAt is 10 days ago", () => {
+    const token = encodeAccessToken({
+      email: "a@b.com",
+      tier: "base",
+      userId: "11111111-1111-4111-8111-111111111111",
+      lastPaidAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    expect(decodeAccessToken(token)?.email).toBe("a@b.com");
+  });
+
   it("defines user-owned upsert conflict targets (not device_id)", () => {
     expect(USER_OWNED_CONFLICT.profile).toBe("user_id");
     expect(USER_OWNED_CONFLICT.appState).toBe("user_id");

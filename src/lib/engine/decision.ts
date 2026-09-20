@@ -19,7 +19,10 @@ export type DecisionType =
   | "nutrition_protein_bias"
   | "meal_distribution"
   | "block_stims"
-  | "primary_action";
+  | "primary_action"
+  | "behavior_intervention"
+  | "plateau_response"
+  | "progression";
 
 export type EngineDecision = {
   decisionType: DecisionType;
@@ -106,6 +109,7 @@ export function computeDecisions(
   let sessionDuration = hasTrainingDay ? plannedMinutes : 0;
   const modeCodes: ReasonCode[] = [];
   const escalate = safety.escalateCare === true;
+  const accepted = snapshot.acceptedTrainingMode;
 
   if (escalate && hasTrainingDay) {
     // Serious signals → rest path, not routine volume adaptation
@@ -123,6 +127,28 @@ export function computeDecisions(
     trainingVolume = 0;
     sessionDuration = 0;
     modeCodes.push(...allSeeds.filter((c) => c === "recovery_low" || c === "rpe_high"));
+    if (!modeCodes.length) modeCodes.push("sleep_good");
+  } else if (accepted === "rest") {
+    trainingMode = "rest";
+    trainingVolume = 0;
+    sessionDuration = 0;
+    if (!modeCodes.length) modeCodes.push("recovery_low");
+  } else if (accepted === "deload") {
+    trainingMode = "deload";
+    trainingVolume = 0.7;
+    sessionDuration = Math.round(plannedMinutes * trainingVolume);
+    modeCodes.push("deload_week");
+  } else if (accepted === "express") {
+    trainingMode = "express";
+    trainingVolume = 0.65;
+    sessionDuration = Math.min(35, availableMin, Math.round(plannedMinutes * 0.65));
+    modeCodes.push("time_limited");
+  } else if (accepted === "full") {
+    trainingMode = "full";
+    trainingVolume = 1;
+    sessionDuration = plannedMinutes;
+    if (allSeeds.includes("sleep_good")) modeCodes.push("sleep_good");
+    if (allSeeds.includes("energy_high")) modeCodes.push("energy_high");
     if (!modeCodes.length) modeCodes.push("sleep_good");
   } else if (deloadWeek || sleepStress || safety.preferLightTraining || recoveryLow) {
     trainingMode = "deload";
@@ -142,14 +168,15 @@ export function computeDecisions(
     timeLimited ||
     travel ||
     availableMin < plannedMinutes * 0.7 ||
-    (prefersShort && availableMin <= 50)
+    (prefersShort && availableMin <= 50) ||
+    (allSeeds.includes("express_high_adherence") && availableMin < 35)
   ) {
     trainingMode = "express";
     trainingVolume = 0.65;
     sessionDuration = Math.min(35, availableMin, Math.round(plannedMinutes * 0.65));
     modeCodes.push(
       ...allSeeds.filter((c) =>
-        ["time_limited", "travel", "equipment_limited"].includes(c),
+        ["time_limited", "travel", "equipment_limited", "express_high_adherence"].includes(c),
       ),
     );
     if (prefersShort && !modeCodes.includes("time_limited")) modeCodes.push("time_limited");
@@ -163,25 +190,28 @@ export function computeDecisions(
     if (!modeCodes.length) modeCodes.push("sleep_good");
   }
 
-  // Travel + equipment: prefer express even if already full
-  if (hasTrainingDay && (travel || equipmentLimited) && trainingMode === "full") {
+  // Travel + equipment: prefer express even if already full (unless coach/user locked full)
+  if (hasTrainingDay && accepted !== "full" && (travel || equipmentLimited) && trainingMode === "full") {
     trainingMode = "express";
     trainingVolume = 0.65;
     sessionDuration = Math.min(sessionDuration, availableMin, 35);
     modeCodes.push("travel", "equipment_limited");
   }
 
-  // Learning bias: prefers short sessions (never overrides recovery low / safety)
+  // Learning bias: prefers short sessions / express_high_adherence (never overrides recovery)
   if (
     hasTrainingDay &&
-    prefersShort &&
+    accepted !== "full" &&
+    (prefersShort || allSeeds.includes("express_high_adherence")) &&
     trainingMode === "full" &&
     snapshot.recovery.level !== "low" &&
-    !safety.preferLightTraining
+    !safety.preferLightTraining &&
+    availableMin < 45
   ) {
     trainingMode = "express";
     trainingVolume = 0.65;
     sessionDuration = Math.min(35, availableMin);
+    if (allSeeds.includes("express_high_adherence")) modeCodes.push("express_high_adherence");
     if (!modeCodes.includes("time_limited")) modeCodes.push("time_limited");
   }
 
@@ -209,6 +239,12 @@ export function computeDecisions(
   const mealCodes: ReasonCode[] = [
     ...(proteinLow ? (["protein_low"] as ReasonCode[]) : []),
     ...(adherenceDrop ? (["adherence_drop"] as ReasonCode[]) : []),
+    ...(allSeeds.includes("nutrition_adherence_low")
+      ? (["nutrition_adherence_low"] as ReasonCode[])
+      : []),
+    ...(allSeeds.includes("weekend_adherence_pattern")
+      ? (["weekend_adherence_pattern"] as ReasonCode[])
+      : []),
   ];
 
   let primaryAction: DecisionBundle["primaryAction"] = "train";
@@ -224,7 +260,7 @@ export function computeDecisions(
   } else if (trainingMode === "rest" || (sleepLow && (snapshot.sleep.hours ?? 7) < 5)) {
     primaryAction = "sleep";
     actionCodes.push(...allSeeds.filter((c) => c === "sleep_low" || c === "recovery_low"));
-  } else if (trainingMode === "rest" || (sleepStress && recoveryLow && hardCountHigh(snapshot))) {
+  } else if (sleepStress && recoveryLow && hardCountHigh(snapshot)) {
     primaryAction = "rest";
     actionCodes.push(...modeCodes);
   } else if (proteinLow && (adherenceDrop || trainingMode === "deload")) {
@@ -285,6 +321,25 @@ export function computeDecisions(
     primaryAction,
     actionCodes.length ? actionCodes : modeCodes,
   );
+
+  if (allSeeds.includes("plateau_detected")) {
+    pushDecision(decisions, snapshot, "plateau_response", true, ["plateau_detected"]);
+  }
+  if (allSeeds.includes("progression_ready")) {
+    pushDecision(decisions, snapshot, "progression", true, ["progression_ready"]);
+  }
+  if (allSeeds.includes("weekend_adherence_pattern") || allSeeds.includes("express_high_adherence")) {
+    const codes: ReasonCode[] = allSeeds.filter(
+      (c) => c === "weekend_adherence_pattern" || c === "express_high_adherence",
+    );
+    pushDecision(
+      decisions,
+      snapshot,
+      "behavior_intervention",
+      codes.includes("weekend_adherence_pattern") ? "weekend_support" : "express_bias",
+      codes,
+    );
+  }
 
   return {
     decisions,

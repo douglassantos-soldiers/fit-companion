@@ -65,6 +65,21 @@ export const clearRemoteStateFn = createServerFn({ method: "POST" })
     return clearRemoteStateServer(data.deviceId);
   });
 
+/** Explicit wipe of internal account domain data (not Shopify external). */
+export const clearUserDataFn = createServerFn({ method: "POST" })
+  .inputValidator(parseDevice)
+  .handler(async ({ data }) => {
+    const { clearUserDataServer } = await import("@/lib/sync.server");
+    return clearUserDataServer(data.deviceId);
+  });
+
+export const exportUserDataFn = createServerFn({ method: "POST" })
+  .inputValidator(parseDevice)
+  .handler(async ({ data }) => {
+    const { exportUserDataServer } = await import("@/lib/sync.server");
+    return exportUserDataServer(data.deviceId);
+  });
+
 /** Granular day_checkin upsert with version conflict detection. */
 export const upsertDayCheckInFn = createServerFn({ method: "POST" })
   .inputValidator(parseDayCheckIn)

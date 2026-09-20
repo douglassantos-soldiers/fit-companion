@@ -13,10 +13,10 @@ import {
   type Goal,
   type Level,
   type MealEntry,
-  type MealQuality,
-  type MealSlot,
   type SessionRpe,
 } from "@/lib/types";
+import { mapMealEntryRow } from "@/lib/sync/meal-map";
+import { normalizeSocialPrivacy } from "@/lib/social/visibility";
 
 type Row = Record<string, unknown>;
 
@@ -38,6 +38,9 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       accessGranted: false,
       accessEmail: null,
       accessGrantedAt: null,
+      lastPurchaseAt: null,
+      accessExpiresAt: null,
+      shopifyDisplayName: null,
       accessTier: "base",
       purchaseProductIds: [],
       restockEstimates: {},
@@ -45,8 +48,12 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       routineFromPurchaseDismissed: false,
       upsellShownDate: null,
       challengeBaselines: {},
+      challengePersonalTargets: {},
+      activityLogs: [],
       joinedHubIds: [],
       dayCheckIns: {},
+      supplementDoseLogs: [],
+      supplementFrequencies: {},
     };
   }
   const r = raw as Record<string, unknown>;
@@ -66,6 +73,9 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     accessGranted: r["accessGranted"] === true,
     accessEmail: typeof r["accessEmail"] === "string" ? r["accessEmail"] : null,
     accessGrantedAt: typeof r["accessGrantedAt"] === "string" ? r["accessGrantedAt"] : null,
+    lastPurchaseAt: typeof r["lastPurchaseAt"] === "string" ? r["lastPurchaseAt"] : null,
+    accessExpiresAt: typeof r["accessExpiresAt"] === "string" ? r["accessExpiresAt"] : null,
+    shopifyDisplayName: typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
     accessTier: r["accessTier"] === "performance" ? "performance" : "base",
     purchaseProductIds: Array.isArray(r["purchaseProductIds"])
       ? (r["purchaseProductIds"] as string[])
@@ -81,30 +91,56 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       r["challengeBaselines"] && typeof r["challengeBaselines"] === "object"
         ? (r["challengeBaselines"] as Record<string, number>)
         : {},
+    challengePersonalTargets:
+      r["challengePersonalTargets"] && typeof r["challengePersonalTargets"] === "object"
+        ? (r["challengePersonalTargets"] as Record<string, number>)
+        : {},
+    activityLogs: Array.isArray(r["activityLogs"])
+      ? (r["activityLogs"] as AppState["activityLogs"])
+      : [],
     joinedHubIds: Array.isArray(r["joinedHubIds"]) ? (r["joinedHubIds"] as string[]) : [],
     dayCheckIns:
       r["dayCheckIns"] && typeof r["dayCheckIns"] === "object"
         ? (r["dayCheckIns"] as Record<string, DayCheckIn>)
         : {},
+    supplementDoseLogs: Array.isArray(r["supplementDoseLogs"])
+      ? (r["supplementDoseLogs"] as import("@/lib/types").SupplementDoseLog[])
+      : [],
+    supplementFrequencies:
+      r["supplementFrequencies"] && typeof r["supplementFrequencies"] === "object"
+        ? (r["supplementFrequencies"] as Record<string, import("@/lib/types").DoseFrequency>)
+        : {},
+    earnedBadges: Array.isArray(r["earnedBadges"]) ? (r["earnedBadges"] as string[]) : [],
+    socialPrivacy: normalizeSocialPrivacy(r["socialPrivacy"], r["shareProgress"] !== false),
+    livingPlanFeedback:
+      r["livingPlanFeedback"] && typeof r["livingPlanFeedback"] === "object"
+        ? (r["livingPlanFeedback"] as AppState["livingPlanFeedback"])
+        : {},
+    challengeInvitesSent:
+      typeof r["challengeInvitesSent"] === "number" ? r["challengeInvitesSent"] : 0,
+    coachNudgeDismissedAt:
+      typeof r["coachNudgeDismissedAt"] === "string" ? r["coachNudgeDismissedAt"] : null,
+    coachNudgeShownAt: typeof r["coachNudgeShownAt"] === "string" ? r["coachNudgeShownAt"] : null,
+    reminderHour: typeof r["reminderHour"] === "number" ? r["reminderHour"] : 18,
+    ...(r["pushPrefs"] && typeof r["pushPrefs"] === "object"
+      ? { pushPrefs: r["pushPrefs"] as AppState["pushPrefs"] }
+      : {}),
+    termsAcceptedAt: typeof r["termsAcceptedAt"] === "string" ? r["termsAcceptedAt"] : null,
+    privacyAcceptedAt: typeof r["privacyAcceptedAt"] === "string" ? r["privacyAcceptedAt"] : null,
+    healthPurposeAckAt: typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
+    favoriteMealPresetIds: Array.isArray(r["favoriteMealPresetIds"])
+      ? (r["favoriteMealPresetIds"] as string[])
+      : [],
+    savedMeals: Array.isArray(r["savedMeals"]) ? (r["savedMeals"] as AppState["savedMeals"]) : [],
+    wearableConnections: Array.isArray(r["wearableConnections"])
+      ? (r["wearableConnections"] as AppState["wearableConnections"])
+      : [],
+    lastFraudWarning: typeof r["lastFraudWarning"] === "string" ? r["lastFraudWarning"] : null,
   };
 }
 
 function mapMeals(rows: Row[]): MealEntry[] {
-  return rows.map((row) => {
-    const payload = (row["payload"] as Record<string, unknown> | null) ?? {};
-    const entry: MealEntry = {
-      id: String(row["client_id"] || row["id"] || crypto.randomUUID()),
-      date: String(row["date"] ?? ""),
-      slot: (payload["slot"] as MealSlot) || ((row["meal_type"] as MealSlot) ?? "almoco"),
-      label: String(row["name"] || payload["label"] || "Refeição"),
-      proteinG: Number(row["protein_g"] ?? payload["proteinG"] ?? 0),
-      kcal: Number(row["kcal"] ?? payload["kcal"] ?? 0),
-      quality: (payload["quality"] as MealQuality) ?? "ok",
-    };
-    if (typeof payload["presetId"] === "string") entry.presetId = payload["presetId"];
-    if (typeof payload["servings"] === "number") entry.servings = payload["servings"];
-    return entry;
-  });
+  return rows.map(mapMealEntryRow);
 }
 
 function parseRpe(raw: unknown): SessionRpe | undefined {
@@ -196,6 +232,10 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
   }
 
   const profileRow = profileRes.data as Row | null;
+  const prefs =
+    profileRow?.["prefs"] && typeof profileRow["prefs"] === "object"
+      ? (profileRow["prefs"] as Record<string, unknown>)
+      : {};
   const profile = profileRow
     ? {
         name: String(profileRow["name"] ?? ""),
@@ -208,6 +248,26 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
         equipment: (profileRow["equipment"] as Equipment) ?? "academia",
         restrictions: (profileRow["restrictions"] as string[]) ?? [],
         createdAt: String(profileRow["created_at"] ?? new Date().toISOString()),
+        ...(prefs["skipBreakfast"] === true ? { skipBreakfast: true } : {}),
+        ...(prefs["lunchOutOften"] === true ? { lunchOutOften: true } : {}),
+        ...(typeof prefs["typicalSleepHours"] === "number"
+          ? { typicalSleepHours: prefs["typicalSleepHours"] }
+          : {}),
+        ...(typeof prefs["primaryBlocker"] === "string"
+          ? { primaryBlocker: prefs["primaryBlocker"] as import("@/lib/types").PrimaryBlocker }
+          : {}),
+        ...(prefs["nutritionProfile"] && typeof prefs["nutritionProfile"] === "object"
+          ? { nutritionProfile: prefs["nutritionProfile"] as import("@/lib/types").NutritionProfile }
+          : {}),
+        ...(Array.isArray(prefs["equipmentInventory"])
+          ? { equipmentInventory: prefs["equipmentInventory"] as import("@/lib/types").GymGear[] }
+          : {}),
+        ...(typeof prefs["typicalSessionMin"] === "number"
+          ? { typicalSessionMin: prefs["typicalSessionMin"] }
+          : {}),
+        ...(prefs["onboardingComplete"] === true || prefs["onboardingComplete"] === false
+          ? { onboardingComplete: prefs["onboardingComplete"] === true }
+          : {}),
       }
     : null;
 
@@ -235,10 +295,16 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     chat,
     theme: ((stateRow?.["theme"] as AppState["theme"]) ?? "dark") as AppState["theme"],
     dimensionSnapshots: (stateRow?.["dimension_snapshots"] as AppState["dimensionSnapshots"]) ?? [],
-    earnedBadges: (stateRow?.["earned_badges"] as string[]) ?? [],
+    earnedBadges:
+      (retention.earnedBadges?.length ? retention.earnedBadges : (stateRow?.["earned_badges"] as string[])) ?? [],
     shareProgress: stateRow?.["share_progress"] !== false,
+    socialPrivacy: normalizeSocialPrivacy(retention.socialPrivacy, stateRow?.["share_progress"] !== false),
     sessionFx: stateRow?.["session_fx"] !== false,
-    favoriteMealPresetIds: (stateRow?.["favorite_meal_preset_ids"] as string[]) ?? [],
+    favoriteMealPresetIds:
+      (retention.favoriteMealPresetIds?.length
+        ? retention.favoriteMealPresetIds
+        : (stateRow?.["favorite_meal_preset_ids"] as string[])) ?? [],
+    savedMeals: retention.savedMeals ?? [],
     remindersEnabled: stateRow?.["reminders_enabled"] === true,
     reminderHour: Number(stateRow?.["reminder_hour"] ?? 18),
     seenOnboardingTips: (stateRow?.["seen_onboarding_tips"] as string[]) ?? [],

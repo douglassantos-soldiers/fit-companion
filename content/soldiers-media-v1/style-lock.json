@@ -1,0 +1,51 @@
+{
+  "id": "soldiers-v1",
+  "name": "Soldiers Animation Style v1",
+  "palette": {
+    "background": "#080808",
+    "surface": "#111111",
+    "primary": "#c5a059",
+    "glow": "rgba(197, 160, 89, 0.35)",
+    "text": "#f4f1ea"
+  },
+  "camera": {
+    "angle": "three-quarter",
+    "locked": true,
+    "lens": "50mm equivalent",
+    "framing": "full-body or movement-focused, subject centered"
+  },
+  "motion": {
+    "durationSec": 4,
+    "howtoDurationSec": 3,
+    "heroDurationSec": 4,
+    "loop": true,
+    "tempo": "controlled",
+    "textOnFrame": false
+  },
+  "branding": {
+    "placement": "discreet bottom gradient",
+    "label": "Soldiers Training",
+    "neverCoverSubject": true
+  },
+  "character": {
+    "id": "soldiers-athlete-v1",
+    "wardrobe": "matte black training set, gold-thread Soldiers mark small on chest",
+    "body": "athletic, realistic proportions, not hyper-illustrated"
+  },
+  "food": {
+    "surface": "dark stone / black ceramic",
+    "lighting": "warm key from 3/4, no lifestyle clutter",
+    "noStockLook": true
+  },
+  "product": {
+    "backdrop": "#080808",
+    "shot": "pack shot 3/4, matte black tub/bottle with gold Soldiers mark",
+    "noLifestyle": true
+  },
+  "forbiddenInputs": [
+    "openGym GIFs",
+    "Gym Visual frames",
+    "Unsplash as image-to-video reference",
+    "third-party thumbnails"
+  ]
+}

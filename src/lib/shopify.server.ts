@@ -234,12 +234,13 @@ export async function findEntitlementByEmail(email: string): Promise<{
   productIds: string[];
   accessTier: AccessTier;
   snapshot: OrderSnapshot | null;
+  lastOrderAt: string | null;
 } | null> {
   const db = await adminDb();
   if (!db) return null;
   const { data, error } = await db
     .from("app_entitlement_emails")
-    .select("email, shopify_customer_id, product_ids, access_tier, order_snapshot")
+    .select("email, shopify_customer_id, product_ids, access_tier, order_snapshot, last_order_at")
     .eq("email", email.trim().toLowerCase())
     .maybeSingle();
   if (error || !data) return null;
@@ -250,6 +251,7 @@ export async function findEntitlementByEmail(email: string): Promise<{
     productIds: (data.product_ids as string[]) ?? snapshot?.productIds ?? [],
     accessTier: (data.access_tier as AccessTier) ?? "base",
     snapshot,
+    lastOrderAt: (data.last_order_at as string | null) ?? snapshot?.orderedAt ?? null,
   };
 }
 
@@ -271,33 +273,59 @@ export async function insertEngagementEvent(opts: {
   }
 }
 
-/**
- * Server-authoritative purchase profile for an email.
- * Never trust client-sent tier/productIds — always resolve from entitlement row + Shopify Admin.
- */
-export async function resolveAccessProfileForEmail(email: string): Promise<{
+export type GrantedAccessProfile = {
+  granted: true;
   email: string;
   customerId: string | null;
   productIds: string[];
   accessTier: AccessTier;
   orderCount: number;
   restockEstimates: Record<string, RestockEstimate>;
-} | null> {
+  lastPaidAt: string;
+  customerFirstName: string | null;
+  customerLastName: string | null;
+  customerTags: string[];
+};
+
+export type DeniedAccessProfile = {
+  granted: false;
+  email: string;
+  reason: "no_purchase" | "stale_purchase" | "not_configured";
+  lastPaidAt: string | null;
+};
+
+export type AccessInspection = GrantedAccessProfile | DeniedAccessProfile;
+
+function shopifyConfigured(): boolean {
+  const domain = (process.env["SHOPIFY_STORE_DOMAIN"] ?? "")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+  const token = process.env["SHOPIFY_ADMIN_ACCESS_TOKEN"] ?? "";
+  return Boolean(domain && token);
+}
+
+/**
+ * Lookup Shopify customer by the account email (Admin search — not a full dump).
+ * Access only if there is a paid order in the last 40 days.
+ * Entitlement fallback does not grant if last_order_at is missing or older than 40 days.
+ */
+export async function inspectAccessForEmail(email: string): Promise<AccessInspection> {
+  const { isPurchaseWithinWindow, latestPaidAt } = await import("@/lib/access-window");
   const normalized = email.trim().toLowerCase();
-  if (!normalized.includes("@")) return null;
+  if (!normalized.includes("@")) {
+    return { granted: false, email: normalized, reason: "no_purchase", lastPaidAt: null };
+  }
 
   const row = await findEntitlementByEmail(normalized);
 
-  // Prefer live Admin API when configured
-  try {
-    const domain = (process.env["SHOPIFY_STORE_DOMAIN"] ?? "")
-      .replace(/^https?:\/\//, "")
-      .replace(/\/$/, "");
-    const token = process.env["SHOPIFY_ADMIN_ACCESS_TOKEN"] ?? "";
-    if (domain && token) {
-      const { fetchPaidOrdersByEmailServer } = await import("@/lib/shopify-orders.server");
+  if (shopifyConfigured()) {
+    try {
+      const { fetchPaidOrdersByEmailServer, fetchShopifyCustomerServer } = await import(
+        "@/lib/shopify-orders.server"
+      );
       const { orders, customerId } = await fetchPaidOrdersByEmailServer(normalized);
-      if (orders.length > 0) {
+      const lastPaidAt = latestPaidAt(orders) ?? row?.lastOrderAt ?? null;
+      if (orders.length > 0 && lastPaidAt && isPurchaseWithinWindow(lastPaidAt)) {
         const sorted = [...orders].sort((a, b) => {
           const ta = new Date(a.processed_at || a.created_at || 0).getTime();
           const tb = new Date(b.processed_at || b.created_at || 0).getTime();
@@ -312,32 +340,95 @@ export async function resolveAccessProfileForEmail(email: string): Promise<{
           .map((t) => t.trim())
           .filter(Boolean);
         const accessTier = resolveAccessTier(productIds, tags);
-        const orderedAt = latest.processed_at || latest.created_at || new Date().toISOString();
+        const cid = customerId ?? row?.customerId ?? null;
+        let firstName: string | null = null;
+        let lastName: string | null = null;
+        let customerTags = tags;
+        if (cid) {
+          const customer = await fetchShopifyCustomerServer(cid);
+          if (customer) {
+            firstName = customer.firstName;
+            lastName = customer.lastName;
+            if (customer.tags.length) customerTags = customer.tags;
+          }
+        }
         return {
+          granted: true,
           email: normalized,
-          customerId: customerId ?? row?.customerId ?? null,
+          customerId: cid,
           productIds,
           accessTier,
           orderCount: orders.length,
-          restockEstimates: estimateRestock(productIds, latest.line_items ?? [], orderedAt),
+          restockEstimates: estimateRestock(productIds, latest.line_items ?? [], lastPaidAt),
+          lastPaidAt,
+          customerFirstName: firstName,
+          customerLastName: lastName,
+          customerTags,
         };
       }
+      if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt)) {
+        return { granted: false, email: normalized, reason: "stale_purchase", lastPaidAt };
+      }
+      if (orders.length === 0 && row?.lastOrderAt && isPurchaseWithinWindow(row.lastOrderAt)) {
+        return grantFromEntitlementRow(normalized, row);
+      }
+      if (orders.length === 0 && row?.lastOrderAt) {
+        return {
+          granted: false,
+          email: normalized,
+          reason: "stale_purchase",
+          lastPaidAt: row.lastOrderAt,
+        };
+      }
+      return { granted: false, email: normalized, reason: "no_purchase", lastPaidAt };
+    } catch (e) {
+      console.warn("inspectAccessForEmail Admin fetch failed", e);
     }
-  } catch (e) {
-    console.warn("resolveAccessProfileForEmail Admin fetch failed", e);
   }
 
-  if (row && (row.productIds.length > 0 || row.customerId || row.snapshot)) {
+  if (row?.lastOrderAt && isPurchaseWithinWindow(row.lastOrderAt)) {
+    return grantFromEntitlementRow(normalized, row);
+  }
+  if (row?.lastOrderAt) {
     return {
+      granted: false,
       email: normalized,
-      customerId: row.customerId,
-      productIds: row.productIds,
-      accessTier: row.accessTier,
-      orderCount: 1,
-      restockEstimates: row.snapshot?.restockEstimates ?? {},
+      reason: "stale_purchase",
+      lastPaidAt: row.lastOrderAt,
     };
   }
+  if (!shopifyConfigured() && !row) {
+    return { granted: false, email: normalized, reason: "not_configured", lastPaidAt: null };
+  }
+  return { granted: false, email: normalized, reason: "no_purchase", lastPaidAt: null };
+}
 
-  return null;
+function grantFromEntitlementRow(
+  email: string,
+  row: NonNullable<Awaited<ReturnType<typeof findEntitlementByEmail>>>,
+): GrantedAccessProfile {
+  return {
+    granted: true,
+    email,
+    customerId: row.customerId,
+    productIds: row.productIds,
+    accessTier: row.accessTier,
+    orderCount: 1,
+    restockEstimates: row.snapshot?.restockEstimates ?? {},
+    lastPaidAt: row.lastOrderAt ?? new Date().toISOString(),
+    customerFirstName: null,
+    customerLastName: null,
+    customerTags: [],
+  };
+}
+
+/**
+ * Server-authoritative purchase profile for an email.
+ * Never trust client-sent tier/productIds — always resolve from entitlement row + Shopify Admin.
+ * Returns null when there is no paid order in the last 40 days.
+ */
+export async function resolveAccessProfileForEmail(email: string): Promise<GrantedAccessProfile | null> {
+  const inspected = await inspectAccessForEmail(email);
+  return inspected.granted ? inspected : null;
 }
 

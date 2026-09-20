@@ -1,7 +1,7 @@
 /**
  * Day check-in mapping between AppState and day_checkins table.
  */
-import type { DayCheckIn, DayEnergy } from "@/lib/types";
+import type { DayCheckIn, DayEnergy, Equipment } from "@/lib/types";
 
 export function dayCheckInToRow(
   checkIn: DayCheckIn,
@@ -16,7 +16,7 @@ export function dayCheckInToRow(
     soreness: checkIn.soreness ?? null,
     stress: checkIn.stress ?? null,
     available_time: checkIn.availableMin,
-    equipment: checkIn.noEquipment ? "none" : null,
+    equipment: checkIn.noEquipment ? "none" : (checkIn.equipment ?? null),
     notes: checkIn.notes ? String(checkIn.notes).slice(0, 280) : null,
     version,
     updated_at: new Date().toISOString(),
@@ -36,6 +36,7 @@ export function rowToDayCheckIn(row: Record<string, unknown>): DayCheckIn {
     version: Number(row["version"] ?? 1),
   };
   if (equipment === "none" || equipment === false) checkIn.noEquipment = true;
+  if (equipment === "casa" || equipment === "academia") checkIn.equipment = equipment as Equipment;
   const soreness = Number(row["soreness"]);
   if (Number.isFinite(soreness) && soreness >= 1) checkIn.soreness = Math.min(5, Math.round(soreness));
   const stress = Number(row["stress"]);

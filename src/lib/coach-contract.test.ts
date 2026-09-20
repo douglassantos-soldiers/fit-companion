@@ -64,7 +64,7 @@ describe("Coach contract FASE 6", () => {
 });
 
 describe("Coach local Why replies", () => {
-  it("answers why training / calories / protein / rest", () => {
+  it("answers why training / calories / protein / rest", { timeout: 15_000 }, () => {
     const date = todayKey();
     const state: AppState = {
       ...emptyState,

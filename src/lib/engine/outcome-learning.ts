@@ -7,6 +7,11 @@ import {
   type LearnedPattern,
   type PatternKind,
 } from "@/lib/engine/learned-patterns";
+import {
+  applyBehaviorOutcome,
+  type BehaviorProfile,
+  type InterventionType,
+} from "@/lib/engine/behavior";
 import type { DayCheckIn, DayEnergy, SessionRpe } from "@/lib/types";
 
 export type OutcomeMetrics = {
@@ -136,4 +141,57 @@ export function metricsFromSessionAndCheckIn(opts: {
     nextDayEnergy: opts.nextDay?.energy ?? null,
     nextDaySleep: opts.nextDay?.sleepHours ?? null,
   };
+}
+
+export function patternKeyFromEvaluation(ev: InterventionEvaluation): string {
+  if (ev.kind === "volume_reduction_helps" && ev.result === "success") {
+    return "USER_RESPONDS_WELL_TO_VOLUME_REDUCTION_UNDER_LOW_RECOVERY";
+  }
+  if (ev.kind === "prefers_short_sessions" && ev.result === "success") {
+    return "EXPRESS_WORKOUT_HAS_HIGHER_ADHERENCE_WHEN_TIME_CONSTRAINED";
+  }
+  return "";
+}
+
+/** Bridge outcome → Behavior Engine interventionResponse + optional DB row. */
+export function interventionTypeFromEvaluation(
+  ev: InterventionEvaluation,
+): InterventionType | null {
+  if (ev.kind === "prefers_short_sessions") return "express_workout";
+  if (ev.kind === "volume_reduction_helps") return "micro_goal";
+  return null;
+}
+
+export function applyBehaviorOutcomeFromEvaluations(
+  profile: BehaviorProfile,
+  evaluations: InterventionEvaluation[],
+): BehaviorProfile {
+  let next = profile;
+  for (const ev of evaluations) {
+    if (ev.result === "inconclusive") continue;
+    const type = interventionTypeFromEvaluation(ev);
+    if (!type) continue;
+    next = applyBehaviorOutcome(next, type, ev.result === "success");
+  }
+  return next;
+}
+
+export async function recordBehaviorOutcomeBestEffort(opts: {
+  userId?: string | null;
+  interventionId?: string | null;
+  success: boolean;
+  metrics?: Record<string, unknown>;
+}): Promise<void> {
+  if (!opts.userId) return;
+  try {
+    const { recordBehaviorOutcome } = await import("@/lib/engine/behavior/persist.server");
+    await recordBehaviorOutcome({
+      userId: opts.userId,
+      success: opts.success,
+      ...(opts.interventionId !== undefined ? { interventionId: opts.interventionId } : {}),
+      ...(opts.metrics !== undefined ? { metrics: opts.metrics } : {}),
+    });
+  } catch {
+    /* best-effort */
+  }
 }

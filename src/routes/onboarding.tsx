@@ -1,38 +1,48 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Minus, Plus } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SoldiersLogo } from "@/components/soldiers-logo";
-import { performanceDimensions, performanceScore } from "@/lib/engine/dimensions";
-import { emptyState, GOAL_LABEL, LEVEL_LABEL, BLOCKER_LABEL, type Equipment, type Goal, type Level, type PrimaryBlocker, type Profile } from "@/lib/types";
+import {
+  GOAL_LABEL,
+  GYM_GEAR_LABEL,
+  LEVEL_LABEL,
+  type Equipment,
+  type Goal,
+  type GymGear,
+  type Level,
+  type Profile,
+} from "@/lib/types";
+import { SESSION_DURATION_LABEL, SESSION_DURATION_OPTIONS } from "@/lib/engine/session-time";
+import { defaultInventory, GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
+import { resolveTrainingWeekdays, WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Monte seu perfil — Soldiers Training" },
+      { title: "Monte seu treino — Soldiers Training" },
       {
         name: "description",
-        content: "Objetivo, rotina, sono e o que mais te impede — plano adaptativo em minutos.",
+        content: "Objetivo, dias e equipamentos — o treino do dia em 3 passos.",
       },
-      { property: "og:title", content: "Monte seu perfil de performance" },
-      { property: "og:description", content: "Descobrimos o que te impede, não só o objetivo." },
+      { property: "og:title", content: "Monte seu treino de performance" },
+      { property: "og:description", content: "Três passos e o plano do dia está pronto." },
     ],
   }),
   component: Onboarding,
 });
 
-const RESTRICTIONS = ["Joelho", "Ombro", "Lombar", "Punho", "Nenhuma"];
-const BLOCKERS = Object.keys(BLOCKER_LABEL) as PrimaryBlocker[];
+const STEPS = ["Objetivo", "Rotina", "Equipamentos"];
 
 function Onboarding() {
   const navigate = useNavigate();
-  const { state, setProfile } = useStore();
+  const { state, setProfile, acceptLegal } = useStore();
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(state.shopifyDisplayName || state.profile?.name || "");
   const suggestedGoal = useMemo(() => {
     const ids = state.purchaseProductIds ?? [];
     if (!ids.length) return "massa" as Goal;
@@ -45,56 +55,65 @@ function Onboarding() {
   const [goal, setGoal] = useState<Goal>(suggestedGoal);
   const [level, setLevel] = useState<Level>("iniciante");
   const [daysPerWeek, setDays] = useState(3);
-  const [age, setAge] = useState(28);
-  const [heightCm, setHeight] = useState(178);
-  const [weightKg, setWeight] = useState(80);
+  const [trainingWeekdays, setTrainingWeekdays] = useState<number[]>([1, 3, 5]);
+  const [typicalSessionMin, setTypicalSessionMin] = useState<number>(60);
   const [equipment, setEquipment] = useState<Equipment>("academia");
-  const [restrictions, setRestrictions] = useState<string[]>([]);
-  const [typicalSleepHours, setTypicalSleepHours] = useState(7);
-  const [primaryBlocker, setPrimaryBlocker] = useState<PrimaryBlocker>("consistencia");
-  const [skipBreakfast, setSkipBreakfast] = useState(false);
-  const [lunchOutOften, setLunchOutOften] = useState(false);
-  const [readyProfile, setReadyProfile] = useState<Profile | null>(null);
+  const [inventory, setInventory] = useState<GymGear[]>(() => defaultInventory("academia"));
+  const [termsAck, setTermsAck] = useState(Boolean(state.termsAcceptedAt));
+  const [privacyAck, setPrivacyAck] = useState(Boolean(state.privacyAcceptedAt));
 
-  const steps = ["Objetivo", "Nível", "Rotina", "Corpo", "Limites", "Contexto", "Perfil"];
-  const collectLast = step === 5;
-  const resultStep = step === 6;
+  useEffect(() => {
+    setInventory(defaultInventory(equipment));
+  }, [equipment]);
 
-  const dims = useMemo(() => {
-    if (!readyProfile) return [];
-    return performanceDimensions({ ...emptyState, profile: readyProfile }, readyProfile);
-  }, [readyProfile]);
-
-  const score = performanceScore(dims);
+  const lastStep = step === STEPS.length - 1;
 
   const buildProfile = (): Profile => ({
     name: name.trim(),
     goal,
     level,
-    daysPerWeek,
-    age,
-    heightCm,
-    weightKg,
+    daysPerWeek: trainingWeekdays.length >= 2 ? trainingWeekdays.length : daysPerWeek,
+    age: 0,
+    heightCm: 0,
+    weightKg: 0,
     equipment,
-    restrictions,
-    typicalSleepHours,
-    primaryBlocker,
-    skipBreakfast,
-    lunchOutOften,
+    restrictions: [],
+    trainingWeekdays: resolveTrainingWeekdays({
+      daysPerWeek,
+      trainingWeekdays,
+    }),
+    equipmentInventory: inventory.length ? inventory : defaultInventory(equipment),
+    typicalSessionMin,
+    onboardingComplete: false,
     createdAt: new Date().toISOString(),
   });
 
-  const goToResult = () => {
-    if (!name.trim()) return;
-    const profile = buildProfile();
-    setReadyProfile(profile);
-    setProfile(profile);
-    setStep(6);
+  const finish = () => {
+    if (!name.trim() || !termsAck || !privacyAck) return;
+    acceptLegal("terms");
+    acceptLegal("privacy");
+    setProfile(buildProfile());
+    navigate({ to: "/" });
   };
 
-  const canContinueFromStep0 = name.trim().length >= 2;
+  const canContinue =
+    step === 0
+      ? name.trim().length >= 2
+      : step === 2
+        ? inventory.length > 0 && termsAck && privacyAck
+        : true;
 
-  const goHome = () => navigate({ to: "/" });
+  const startWithDefaults = () => {
+    setGoal(suggestedGoal);
+    setLevel("iniciante");
+    setDays(3);
+    setTrainingWeekdays([1, 3, 5]);
+    setTypicalSessionMin(60);
+    setEquipment("academia");
+    setInventory(defaultInventory("academia"));
+    setStarted(true);
+    setStep(STEPS.length - 1);
+  };
 
   if (!started) {
     return (
@@ -107,11 +126,11 @@ function Onboarding() {
           <div className="pb-8">
             <p className="eyebrow">Soldiers Training</p>
             <h1 className="mt-3 text-display text-4xl leading-none">
-              Seu plano de
-              <span className="text-glow block text-primary"> performance</span>
+              Seu treino do dia em
+              <span className="text-glow block text-primary"> 3 passos</span>
             </h1>
             <p className="mt-4 text-sm text-muted-foreground">
-              Não só o objetivo — descobrimos o que te impede de chegar lá.
+              Objetivo, dias e equipamentos. Corpo e preferências ficam no perfil — depois do primeiro treino.
             </p>
             <Button
               size="lg"
@@ -120,6 +139,16 @@ function Onboarding() {
             >
               Começar <ArrowRight className="size-4" />
             </Button>
+            {name.trim().length >= 2 ? (
+              <Button
+                size="lg"
+                variant="secondary"
+                className="mt-3 h-12 w-full font-bold uppercase tracking-wide"
+                onClick={startWithDefaults}
+              >
+                Montar treino com padrão
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -134,7 +163,7 @@ function Onboarding() {
         <SoldiersLogo />
 
         <div className="mt-6 flex gap-1.5">
-          {steps.map((s, i) => (
+          {STEPS.map((s, i) => (
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -145,7 +174,7 @@ function Onboarding() {
         </div>
 
         <p className="eyebrow mt-4">
-          Passo {step + 1} de {steps.length}
+          Passo {step + 1} de {STEPS.length}
         </p>
 
         {step === 0 && (
@@ -182,8 +211,8 @@ function Onboarding() {
 
         {step === 1 && (
           <section className="mt-3">
-            <h1 className="text-3xl">Seu nível de treino</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Usamos isso para calibrar as cargas iniciais.</p>
+            <h1 className="text-3xl">Sua rotina</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Nível, dias, tempo e onde você treina — o plano segue isso.</p>
             <div className="mt-5 space-y-2">
               {(Object.keys(LEVEL_LABEL) as Level[]).map((l) => (
                 <OptionCard
@@ -201,26 +230,41 @@ function Onboarding() {
                 />
               ))}
             </div>
-          </section>
-        )}
-
-        {step === 2 && (
-          <section className="mt-3">
-            <h1 className="text-3xl">Quantos dias por semana?</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Escolha o que você realmente consegue cumprir.</p>
-            <div className="mt-5 grid grid-cols-5 gap-2">
-              {[2, 3, 4, 5, 6].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDays(d)}
-                  className={`text-display rounded-xl border py-4 text-xl transition-colors ${
-                    daysPerWeek === d
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-foreground"
-                  }`}
-                >
-                  {d}
-                </button>
+            <h2 className="mt-8 text-xl">Quais dias você treina?</h2>
+            <div className="mt-3 grid grid-cols-7 gap-1.5">
+              {WEEKDAY_LABELS.map((label, weekday) => {
+                const on = trainingWeekdays.includes(weekday);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() =>
+                      setTrainingWeekdays((prev) => {
+                        const next = prev.includes(weekday)
+                          ? prev.filter((d) => d !== weekday)
+                          : [...prev, weekday].sort((a, b) => a - b);
+                        setDays(Math.min(6, Math.max(2, next.length || 3)));
+                        return next;
+                      })
+                    }
+                    className={`rounded-xl border py-3 text-[0.65rem] font-bold uppercase ${
+                      on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <h2 className="mt-8 text-xl">Quanto tempo você normalmente tem?</h2>
+            <div className="mt-3 space-y-2">
+              {SESSION_DURATION_OPTIONS.map((min) => (
+                <OptionCard
+                  key={min}
+                  selected={typicalSessionMin === min}
+                  onClick={() => setTypicalSessionMin(min)}
+                  title={SESSION_DURATION_LABEL[min]}
+                />
               ))}
             </div>
             <h2 className="mt-8 text-xl">Onde você treina?</h2>
@@ -241,151 +285,109 @@ function Onboarding() {
           </section>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <section className="mt-3">
-            <h1 className="text-3xl">Seus números</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Base para acompanhar sua evolução.</p>
-            <div className="mt-5 space-y-4">
-              <NumberField label="Idade" value={age} onChange={setAge} unit="anos" />
-              <NumberField label="Altura" value={heightCm} onChange={setHeight} unit="cm" />
-              <NumberField label="Peso" value={weightKg} onChange={setWeight} unit="kg" />
-            </div>
-          </section>
-        )}
-
-        {step === 4 && (
-          <section className="mt-3">
-            <h1 className="text-3xl">Alguma limitação?</h1>
+            <h1 className="text-3xl">Quais equipamentos?</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Selecione o que precisa de cuidado — evitamos sobrecarregar essas regiões.
+              Confirmamos o que você tem — o plano só usa o que está marcado.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {RESTRICTIONS.map((r) => {
-                const active = restrictions.includes(r);
+              {GYM_GEAR_OPTIONS.map((g) => {
+                const on = inventory.includes(g);
                 return (
                   <button
-                    key={r}
+                    key={g}
+                    type="button"
                     onClick={() =>
-                      setRestrictions((prev) =>
-                        r === "Nenhuma" ? [] : prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r],
-                      )
+                      setInventory((prev) => (on ? prev.filter((x) => x !== g) : [...prev, g]))
                     }
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card text-muted-foreground"
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                      on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"
                     }`}
                   >
-                    {r}
+                    {GYM_GEAR_LABEL[g]}
                   </button>
                 );
               })}
             </div>
-          </section>
-        )}
-
-        {step === 5 && (
-          <section className="mt-3">
-            <h1 className="text-3xl">O que mais te impede?</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              O plano adapta a isso — não só ao objetivo.
-            </p>
-            <div className="mt-5 space-y-2">
-              {BLOCKERS.map((b) => (
-                <OptionCard
-                  key={b}
-                  selected={primaryBlocker === b}
-                  onClick={() => setPrimaryBlocker(b)}
-                  title={BLOCKER_LABEL[b]}
+            {inventory.length === 0 ? (
+              <p className="mt-3 text-xs text-destructive">Marque pelo menos um equipamento.</p>
+            ) : null}
+            <dl className="mt-6 space-y-3">
+              <ReadyRow label="Objetivo" value={GOAL_LABEL[goal]} />
+              <ReadyRow label="Frequência" value={`${trainingWeekdays.length || daysPerWeek}x / semana`} />
+              <ReadyRow
+                label="Tempo"
+                value={SESSION_DURATION_LABEL[(typicalSessionMin as 30 | 45 | 60 | 90) ?? 60]}
+              />
+            </dl>
+            <div className="mt-6 space-y-3">
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-primary"
+                  checked={termsAck}
+                  onChange={(e) => setTermsAck(e.target.checked)}
                 />
-              ))}
-            </div>
-            <h2 className="mt-8 text-xl">Sono típico</h2>
-            <div className="mt-3">
-              <NumberField
-                label="Horas por noite"
-                value={typicalSleepHours}
-                onChange={(n) => setTypicalSleepHours(Math.min(12, Math.max(4, n)))}
-                unit="h"
-              />
-            </div>
-            <h2 className="mt-8 text-xl">Alimentação</h2>
-            <div className="mt-3 space-y-2">
-              <OptionCard
-                selected={skipBreakfast}
-                onClick={() => setSkipBreakfast((v) => !v)}
-                title="Pulo o café da manhã"
-                hint="Redistribuímos proteína no resto do dia"
-              />
-              <OptionCard
-                selected={lunchOutOften}
-                onClick={() => setLunchOutOften((v) => !v)}
-                title="Almoço fora com frequência"
-                hint="Priorizamos presets práticos no almoço"
-              />
-            </div>
-          </section>
-        )}
-
-        {resultStep && readyProfile && (
-          <section className="mt-3">
-            <h1 className="text-3xl">Perfil de Performance</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Baseline para {readyProfile.name}. Bloqueio atual:{" "}
-              {readyProfile.primaryBlocker ? BLOCKER_LABEL[readyProfile.primaryBlocker] : "—"}.
-            </p>
-            <div className="surface-glass mt-5 p-5">
-              <p className="text-display text-glow text-4xl text-primary">{score}</p>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Score geral / 100</p>
-              <ul className="mt-5 space-y-3">
-                {dims.map((d) => (
-                  <li key={d.key}>
-                    <div className="flex justify-between text-sm">
-                      <span>{d.label}</span>
-                      <span className="text-muted-foreground">{d.score}</span>
-                    </div>
-                    <div className="mt-1 h-2 rounded-full bg-muted/60">
-                      <div
-                        className="h-2 rounded-full bg-primary shadow-[0_0_10px_var(--glow-primary)] transition-all"
-                        style={{ width: `${d.score}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                <span>
+                  Aceito os{" "}
+                  <Link to="/termos" className="text-primary underline">
+                    Termos de uso
+                  </Link>
+                  .
+                </span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-primary"
+                  checked={privacyAck}
+                  onChange={(e) => setPrivacyAck(e.target.checked)}
+                />
+                <span>
+                  Li a{" "}
+                  <Link to="/privacidade" className="text-primary underline">
+                    Política de privacidade
+                  </Link>
+                  .
+                </span>
+              </label>
             </div>
           </section>
         )}
 
         <div className="mt-10 flex gap-3">
-          {step > 0 && step < 6 && (
+          {step > 0 ? (
             <Button variant="secondary" className="h-12 flex-1" onClick={() => setStep((s) => s - 1)}>
               <ArrowLeft className="size-4" /> Voltar
             </Button>
-          )}
-          {resultStep ? (
-            <Button className="glow-primary h-12 w-full font-bold uppercase tracking-wide" onClick={goHome}>
-              Ir para Hoje <ArrowRight className="size-4" />
-            </Button>
-          ) : (
-            <Button
-              className="glow-primary h-12 flex-[2] font-bold uppercase tracking-wide"
-              disabled={step === 0 && !canContinueFromStep0}
-              onClick={() => (collectLast ? goToResult() : setStep((s) => s + 1))}
-            >
-              {collectLast ? (
-                <>
-                  Gerar meu perfil <Check className="size-4" />
-                </>
-              ) : (
-                <>
-                  Continuar <ArrowRight className="size-4" />
-                </>
-              )}
-            </Button>
-          )}
+          ) : null}
+          <Button
+            className="glow-primary h-12 flex-[2] font-bold uppercase tracking-wide"
+            disabled={!canContinue}
+            onClick={() => (lastStep ? finish() : setStep((s) => s + 1))}
+          >
+            {lastStep ? (
+              <>
+                Montar meu treino <Check className="size-4" />
+              </>
+            ) : (
+              <>
+                Continuar <ArrowRight className="size-4" />
+              </>
+            )}
+          </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReadyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-card/50 px-4 py-3">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-display text-lg">{value}</p>
     </div>
   );
 }
@@ -422,35 +424,5 @@ function OptionCard({
         {selected ? <Check className="size-3 text-primary-foreground" /> : null}
       </span>
     </button>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-  unit,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  unit: string;
-}) {
-  return (
-    <div className="surface-glass flex items-center justify-between p-4">
-      <div>
-        <p className="text-display text-base">{label}</p>
-        <p className="text-xs text-muted-foreground">{unit}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button variant="secondary" size="icon" onClick={() => onChange(Math.max(1, value - 1))} aria-label="Diminuir">
-          <Minus className="size-4" />
-        </Button>
-        <span className="text-display w-12 text-center text-2xl">{value}</span>
-        <Button variant="secondary" size="icon" onClick={() => onChange(value + 1)} aria-label="Aumentar">
-          <Plus className="size-4" />
-        </Button>
-      </div>
-    </div>
   );
 }

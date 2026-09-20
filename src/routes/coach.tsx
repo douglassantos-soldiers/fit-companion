@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { toast } from "sonner";
@@ -6,7 +6,12 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askAiCoach, type CoachStructuredReply } from "@/lib/coach.functions";
+import { acceptCoachProposal, proposalAcceptLabel } from "@/lib/coach/apply-proposal";
+import { makeProposal } from "@/lib/coach/proposals";
+import type { CoachProposal } from "@/lib/coach/types";
+import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
+import { buildDailyMealPlan } from "@/lib/engine/nutrition";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import type { AppState, ChatMessage } from "@/lib/types";
@@ -38,8 +43,46 @@ function mapChat(messages: ChatMessage[]): Array<{ role: "user" | "assistant"; c
     }));
 }
 
+function localProposalForPrompt(promptId: string): CoachProposal | null {
+  switch (promptId) {
+    case "sem-tempo":
+      return makeProposal("EXPRESS_WORKOUT", true, ["limited_time"], {}, 0.8);
+    case "dor":
+      return makeProposal("DELOAD", true, ["soreness"], {}, 0.75);
+    case "por-que-descanso":
+      return makeProposal("REST", true, ["recovery"], {}, 0.75);
+    case "hoje":
+      return makeProposal("FULL_WORKOUT", true, ["today_plan"], {}, 0.65);
+    case "nutricao":
+    case "por-que-proteina":
+      return makeProposal("NUTRITION_FOCUS", true, ["protein_low"], {}, 0.7);
+    default:
+      return null;
+  }
+}
+
+function localProposalForFreeform(value: string): CoachProposal | null {
+  const t = value.toLowerCase();
+  if (t.includes("minuto") || t.includes("tempo") || t.includes("express")) {
+    return makeProposal("EXPRESS_WORKOUT", true, ["limited_time"], {}, 0.75);
+  }
+  if (t.includes("dolor") || t.includes("deload")) {
+    return makeProposal("DELOAD", true, ["soreness"], {}, 0.7);
+  }
+  if (t.includes("descans") || t.includes("sono")) {
+    return makeProposal("REST", true, ["recovery"], {}, 0.7);
+  }
+  if (t.includes("água") || t.includes("agua") || t.includes("hidrata")) {
+    return makeProposal("HYDRATION_FOCUS", true, ["hydration"], {}, 0.7);
+  }
+  if (t.includes("prote") || t.includes("refei") || t.includes("nutri") || t.includes("comida")) {
+    return makeProposal("NUTRITION_FOCUS", true, ["protein_low"], {}, 0.7);
+  }
+  return null;
+}
+
 function formatCoachReply(text: string, structured?: CoachStructuredReply | null): string {
-  if (!structured?.why?.length && !structured?.safetyNotice) return text;
+  if (!structured) return text;
   const parts = [text];
   if (structured.safetyNotice) {
     parts.push(`\n\nAtenção: ${structured.safetyNotice}`);
@@ -47,14 +90,27 @@ function formatCoachReply(text: string, structured?: CoachStructuredReply | null
   if (structured.kind === "why" && structured.why.length) {
     parts.push(`\n\nPor quê:\n${structured.why.slice(0, 4).map((w) => `• ${w}`).join("\n")}`);
   }
+  if (structured.evidence) {
+    const e = structured.evidence;
+    const bits: string[] = [];
+    if (e.sleepHours != null) bits.push(`sono ${e.sleepHours}h`);
+    if (e.hardRpeStreak != null && e.hardRpeStreak > 0) bits.push(`RPE difícil ×${e.hardRpeStreak}`);
+    if (e.decisionSummary) bits.push(e.decisionSummary);
+    if (e.trainingMode) bits.push(`modo ${e.trainingMode}`);
+    if (bits.length) parts.push(`\n\nEvidências: ${bits.join(" · ")}`);
+  }
   return parts.join("");
 }
 
 function CoachPage() {
-  const { state, hydrated, pushChat, markQuestCoachOpened } = useStore();
+  const navigate = useNavigate();
+  const { state, hydrated, pushChat, markQuestCoachOpened, saveDayCheckIn, refreshLivingPlan, addWater, addMealEntry } =
+    useStore();
   const askAi = useServerFn(askAiCoach);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lastActions, setLastActions] = useState<NonNullable<CoachStructuredReply["actions"]>>([]);
+  const [lastProposals, setLastProposals] = useState<NonNullable<CoachStructuredReply["proposals"]>>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const offlineToastShown = useRef(false);
   const stateRef = useRef(state);
@@ -105,10 +161,16 @@ function CoachPage() {
       const result = await askAi({
         data: {
           provider: "chatgpt",
-          deviceId: deviceId || undefined,
+          ...(deviceId ? { deviceId } : {}),
           messages,
         },
       });
+      if (result?.structured?.actions?.length) {
+        setLastActions(result.structured.actions);
+      }
+      if (result?.structured?.proposals?.length) {
+        setLastProposals(result.structured.proposals);
+      }
       if (result?.error) {
         return {
           text: formatCoachReply(offlineReply, result.structured),
@@ -142,9 +204,15 @@ function CoachPage() {
     const snapshot = stateRef.current;
     pushChat("user", label);
     setBusy(true);
+    setLastProposals([]);
     void runAi(snapshot, label, coachReply(promptId, snapshot)).then(({ text: reply, offline, reason }) => {
       pushChat("coach", reply);
       if (offline) notifyOfflineOnce(reason);
+      setLastProposals((prev) => {
+        if (prev.length) return prev;
+        const local = localProposalForPrompt(promptId);
+        return local ? [local] : [];
+      });
       setBusy(false);
     });
   };
@@ -156,15 +224,33 @@ function CoachPage() {
     pushChat("user", value);
     setText("");
     setBusy(true);
+    setLastProposals([]);
     void runAi(snapshot, value, coachFreeform(value, snapshot)).then(({ text: reply, offline, reason }) => {
       pushChat("coach", reply);
       if (offline) notifyOfflineOnce(reason);
+      setLastProposals((prev) => {
+        if (prev.length) return prev;
+        const local = localProposalForFreeform(value);
+        return local ? [local] : [];
+      });
       setBusy(false);
     });
   };
 
   return (
     <AppShell title="Coach" subtitle={busy ? "Pensando…" : "Treino, comida e suplementos com base nos seus dados"}>
+      {coachNudgeFromState({
+        ...state,
+        coachNudgeDismissedAt: null,
+        coachNudgeShownAt: null,
+      }).show ? (
+        <Link
+          to="/progresso/resumo"
+          className="mb-3 inline-flex rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
+        >
+          Volume subiu — ver análise
+        </Link>
+      ) : null}
       <div className="space-y-3">
         {state.chat.map((m) => (
           <div
@@ -183,6 +269,67 @@ function CoachPage() {
         ) : null}
         <div ref={endRef} />
       </div>
+
+      {lastProposals.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {lastProposals.map((p, i) => (
+            <button
+              key={`${p.type}-${i}`}
+              type="button"
+              className="rounded-full border border-primary bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary"
+              onClick={() => {
+                const todayCheck = state.dayCheckIns?.[todayKey()];
+                const mealPlan = state.profile ? buildDailyMealPlan(state.profile, state, todayKey()) : null;
+                const result = acceptCoachProposal(p, {
+                  ...(todayCheck ? { checkIn: todayCheck } : {}),
+                  mealPlan,
+                });
+                if (result.kind === "water") {
+                  addWater(result.ml);
+                  toast.success(`${result.ml} ml de água registrados`);
+                  setLastProposals([]);
+                  return;
+                }
+                if (result.kind === "meal") {
+                  addMealEntry(result.entry);
+                  toast.success(`${result.label} registrado`);
+                  setLastProposals([]);
+                  return;
+                }
+                if (result.kind === "navigate") {
+                  void navigate({ to: "/nutricao" });
+                  return;
+                }
+                if (result.kind === "checkin") {
+                  saveDayCheckIn(result.patch);
+                  refreshLivingPlan();
+                  toast.success("Proposta aceita — plano de hoje atualizado");
+                  setLastProposals([]);
+                  return;
+                }
+                toast.message("Essa proposta abre o treino de hoje.");
+                void navigate({ to: "/" });
+              }}
+            >
+              {proposalAcceptLabel(p)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {lastActions.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {lastActions.map((a) => (
+            <Link
+              key={a.id}
+              to={a.href}
+              className="rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
+            >
+              {a.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
         {COACH_PROMPTS.map((p) => (

@@ -48,6 +48,8 @@ describe("event types used by store emitters", () => {
       "onboarding_completed",
       "workout_completed",
       "access_granted",
+      "access_denied",
+      "app_opened",
       "auth_linked",
     ];
     expect(kinds.every((k) => typeof k === "string" && k.length > 0)).toBe(true);

@@ -35,7 +35,7 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: "tip-supplements",
     title: "Monte a rotina",
-    body: "Abra Suplementos na barra ou pelo Perfil e marque as doses do dia.",
+    body: "Pelo Perfil → Suplementos, marque as doses do dia.",
     ctaLabel: "Suplementos",
     ctaTo: "/suplementos",
     minDay: 2,
@@ -51,7 +51,7 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: "tip-progress",
     title: "Olhe o Progresso",
-    body: "Volume, heatmap e PRs aparecem depois de algumas sessões. Ícone no topo.",
+    body: "Volume, heatmap e PRs ficam na aba Progresso.",
     ctaLabel: "Progresso",
     ctaTo: "/progresso",
     minDay: 3,
@@ -59,7 +59,7 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: "tip-club",
     title: "Entre no Social",
-    body: "Desafios, clubes e feed na aba Social. Código de 6 letras para clube.",
+    body: "Desafios, clubes e feed na aba Social.",
     ctaLabel: "Social",
     ctaTo: "/social",
     minDay: 5,

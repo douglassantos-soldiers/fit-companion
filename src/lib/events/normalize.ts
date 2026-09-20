@@ -9,7 +9,7 @@ import {
 } from "@/lib/events/types";
 
 const SENSITIVE_KEY_RE =
-  /^(email|password|token|secret|authorization|cookie|ssn|cpf|phone|raw_snapshot|access_token|refresh_token)$/i;
+  /^(email|password|token|secret|authorization|cookie|ssn|cpf|phone|raw_snapshot|access_token|refresh_token|waist_cm|arm_cm|chest_cm|hip_cm|thigh_cm|waistcm|armcm|chestcm|hipcm|thighcm|storage_path|storagepath)$/i;
 
 const MAX_METADATA_KEYS = 40;
 const MAX_STRING_LEN = 500;
@@ -94,6 +94,10 @@ export function buildIdempotencyKey(
       return date ? `checkin:${date}` : id ? `checkin:${id}` : undefined;
     case "weight_logged":
       return date ? `weight:${date}` : undefined;
+    case "measurements_logged":
+      return date ? `measurements:${date}` : undefined;
+    case "progress_photo_uploaded":
+      return id ? `progress_photo:${id}` : undefined;
     case "supplement_taken":
     case "supplement_skipped":
       return id && date ? `supplement:${id}:${type}:${date}` : undefined;

@@ -5,24 +5,72 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   clearAccessSessionCookie,
+  clearAdminSessionCookie,
   readAccessSession,
   setAccessSessionCookie,
   setAdminSessionCookie,
   readAdminSession,
+  readAppAccessSession,
   rateLimitKey,
+  authenticateAdmin,
 } from "@/lib/access-session.server";
-import { parseEstablishAccessInput } from "@/lib/access-parse";
+import { parseEstablishAccessInput, parseAdminLogin, parseCompleteAccountInput } from "@/lib/access-parse";
 
-export { parseEstablishAccessInput } from "@/lib/access-parse";
+export { parseEstablishAccessInput, parseAdminLogin, parseCompleteAccountInput } from "@/lib/access-parse";
 
 export const checkAccessSession = createServerFn({ method: "GET" }).handler(async () => {
-  const session = readAccessSession();
+  let session = readAccessSession();
+  if (!session) {
+    const admin = readAppAccessSession();
+    if (admin) {
+      try {
+        const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
+        const user = await resolveOrCreateUserByEmail(admin.email);
+        if (user) {
+          setAccessSessionCookie({
+            email: admin.email,
+            tier: "performance",
+            userId: user.id,
+          });
+          session = {
+            email: admin.email,
+            tier: "performance",
+            exp: admin.exp,
+            userId: user.id,
+          };
+        } else {
+          session = admin;
+        }
+      } catch (e) {
+        console.warn("admin access bootstrap failed", e);
+        session = admin;
+      }
+    }
+  }
   if (!session) return { ok: false as const };
+  if (session.lastPaidAt) {
+    const { isPurchaseWithinWindow } = await import("@/lib/access-window");
+    if (!isPurchaseWithinWindow(session.lastPaidAt)) {
+      clearAccessSessionCookie();
+      return { ok: false as const, reason: "stale_purchase" as const };
+    }
+  }
+  try {
+    const { isUserBlocked } = await import("@/lib/account-status.server");
+    const blocked = await isUserBlocked({
+      userId: session.userId ?? null,
+      email: session.email,
+    });
+    if (blocked) return { ok: false as const, reason: "account_blocked" as const };
+  } catch (e) {
+    console.warn("account status check failed", e);
+  }
   return {
     ok: true as const,
     email: session.email,
     tier: session.tier,
     userId: session.userId ?? null,
+    lastPaidAt: session.lastPaidAt ?? null,
   };
 });
 
@@ -35,18 +83,21 @@ export const establishAccessSession = createServerFn({ method: "POST" })
   .inputValidator(parseEstablishAccessInput)
   .handler(async ({ data }) => {
     const {
-      resolveAccessProfileForEmail,
+      inspectAccessForEmail,
       upsertDeviceEntitlementAdmin,
       upsertEntitlementEmail,
       buildOrderSnapshot,
     } = await import("@/lib/shopify.server");
     const { resolveOrCreateUserByEmail, linkDeviceToShopifyUser } = await import("@/lib/identity");
     const { upsertOrdersFromPaidList } = await import("@/lib/orders.server");
+    const { accessExpiresAtIso } = await import("@/lib/access-window");
+    const { shopifyDisplayName } = await import("@/lib/shopify-orders.server");
 
-    const profile = await resolveAccessProfileForEmail(data.email);
-    if (!profile) {
-      return { ok: false as const, reason: "no_entitlement" as const };
+    const inspected = await inspectAccessForEmail(data.email);
+    if (!inspected.granted) {
+      return { ok: false as const, reason: inspected.reason };
     }
+    const profile = inspected;
 
     // Always resolve app user by email BEFORE cookie (identity is user, not device)
     const appUser = await resolveOrCreateUserByEmail(data.email);
@@ -65,11 +116,11 @@ export const establishAccessSession = createServerFn({ method: "POST" })
           orderId: null,
           email: data.email,
           customerId: profile.customerId,
-          tags: [],
+          tags: profile.customerTags,
           lineItems: [],
           productIds: profile.productIds,
           accessTier: profile.accessTier,
-          orderedAt: new Date().toISOString(),
+          orderedAt: profile.lastPaidAt,
           restockEstimates: profile.restockEstimates,
         },
         magicTokenPlain: magicToken,
@@ -125,11 +176,17 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       .then(({ recomputeCustomerProfile }) => recomputeCustomerProfile(userId))
       .catch((e) => console.warn("recomputeCustomerProfile skipped", e));
 
+    const displayName = shopifyDisplayName({
+      firstName: profile.customerFirstName,
+      lastName: profile.customerLastName,
+    });
+
     // Cookie ALWAYS includes userId after access
     setAccessSessionCookie({
       email: data.email,
       tier: profile.accessTier,
       userId,
+      lastPaidAt: profile.lastPaidAt,
     });
 
     return {
@@ -141,31 +198,125 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       orderCount: profile.orderCount,
       restockEstimates: profile.restockEstimates,
       userId,
+      lastPaidAt: profile.lastPaidAt,
+      accessExpiresAt: accessExpiresAtIso(profile.lastPaidAt),
+      shopifyDisplayName: displayName,
     };
   });
 
-function parseAdminPin(input: unknown) {
-  const pin = String((input as { pin?: string } | null)?.pin ?? "");
-  if (!pin) throw new Error("PIN ausente");
-  return { pin };
-}
+export const completeAccountAccess = createServerFn({ method: "POST" })
+  .inputValidator(parseCompleteAccountInput)
+  .handler(async ({ data }) => {
+    const { inspectAccessForEmail } = await import("@/lib/shopify.server");
+    const { linkDeviceToShopifyUser, linkAuthUserId, resolveOrCreateUserByEmail } = await import(
+      "@/lib/identity"
+    );
+    const { trackUserEvent } = await import("@/lib/events/track");
+
+    const appUser = data.deviceId
+      ? await linkDeviceToShopifyUser({ deviceId: data.deviceId, email: data.email })
+      : await resolveOrCreateUserByEmail(data.email);
+    if (!appUser) {
+      return { ok: false as const, reason: "invalid" as const, lastPaidAt: null, userId: null };
+    }
+
+    if (data.authUserId) {
+      await linkAuthUserId({ userId: appUser.id, authUserId: data.authUserId });
+    }
+
+    if (data.isNewUser) {
+      void trackUserEvent({
+        deviceId: data.deviceId || null,
+        resolvedUserId: appUser.id,
+        eventType: "user_created",
+        source: "auth",
+        metadata: { via: "email_password" },
+        idempotencyKey: `user_created:${appUser.id}`,
+      });
+    }
+
+    const inspected = await inspectAccessForEmail(data.email);
+    if (!inspected.granted) {
+      void trackUserEvent({
+        deviceId: data.deviceId || null,
+        resolvedUserId: appUser.id,
+        eventType: "access_denied",
+        source: "access",
+        metadata: {
+          reason: inspected.reason,
+          ...(inspected.reason === "stale_purchase" ? { stale_purchase: true } : {}),
+        },
+      });
+      return {
+        ok: false as const,
+        reason: inspected.reason,
+        lastPaidAt: inspected.lastPaidAt,
+        userId: appUser.id,
+      };
+    }
+
+    const { accessExpiresAtIso } = await import("@/lib/access-window");
+    const { shopifyDisplayName } = await import("@/lib/shopify-orders.server");
+    const displayName = shopifyDisplayName({
+      firstName: inspected.customerFirstName,
+      lastName: inspected.customerLastName,
+    });
+
+    void trackUserEvent({
+      deviceId: data.deviceId || null,
+      resolvedUserId: appUser.id,
+      eventType: "access_granted",
+      source: "access",
+      metadata: { via: data.isNewUser ? "signup" : "signin", windowDays: 40 },
+    });
+
+    return {
+      ok: true as const,
+      email: data.email,
+      tier: inspected.accessTier,
+      productIds: inspected.productIds,
+      shopifyCustomerId: inspected.customerId,
+      orderCount: inspected.orderCount,
+      restockEstimates: inspected.restockEstimates,
+      userId: appUser.id,
+      lastPaidAt: inspected.lastPaidAt,
+      accessExpiresAt: accessExpiresAtIso(inspected.lastPaidAt),
+      shopifyDisplayName: displayName,
+    };
+  });
 
 export const loginAdmin = createServerFn({ method: "POST" })
-  .inputValidator(parseAdminPin)
+  .inputValidator(parseAdminLogin)
   .handler(async ({ data }) => {
-    const expected = process.env["ADMIN_PIN"] || "";
-    if (!expected) {
-      console.error("ADMIN_PIN not configured");
-      return { ok: false as const, reason: "not_configured" as const };
-    }
-    if (!rateLimitKey(`admin:${data.pin.slice(0, 2)}`, 8, 15 * 60_000)) {
+    if (!rateLimitKey(`admin:${data.email}`, 8, 15 * 60_000)) {
       return { ok: false as const, reason: "rate_limited" as const };
     }
-    if (data.pin !== expected) return { ok: false as const, reason: "invalid" as const };
-    setAdminSessionCookie();
-    return { ok: true as const };
+    const result = await authenticateAdmin(data.email, data.password);
+    if (result === "ok") {
+      setAdminSessionCookie(data.email);
+      try {
+        const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
+        const user = await resolveOrCreateUserByEmail(data.email);
+        if (user) {
+          setAccessSessionCookie({
+            email: data.email,
+            tier: "performance",
+            userId: user.id,
+          });
+        }
+      } catch (e) {
+        console.warn("admin app access cookie skipped", e);
+      }
+      return { ok: true as const, email: data.email, tier: "performance" as const };
+    }
+    return { ok: false as const, reason: result };
   });
 
 export const checkAdminSession = createServerFn({ method: "GET" }).handler(async () => {
   return { ok: readAdminSession() };
+});
+
+export const logoutAdmin = createServerFn({ method: "POST" }).handler(async () => {
+  clearAdminSessionCookie();
+  return { ok: true as const };
 });

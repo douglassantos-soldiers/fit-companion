@@ -4,6 +4,7 @@ import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 export const XP = {
   session: 15,
   express: 10,
+  pr: 2,
   meal: 2,
   mealCap: 4,
   waterGoal: 2,
@@ -12,6 +13,10 @@ export const XP = {
   kudosCap: 3,
   questsCompleteBonus: 5,
 } as const;
+
+export function lifetimeXp(state: Pick<AppState, "xpByDate">): number {
+  return Object.values(state.xpByDate ?? {}).reduce((sum, n) => sum + Math.max(0, n), 0);
+}
 
 export function dailyXp(state: AppState, date = todayKey()): number {
   return Math.max(0, state.xpByDate?.[date] ?? 0);

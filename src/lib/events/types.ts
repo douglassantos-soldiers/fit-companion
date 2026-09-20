@@ -48,12 +48,16 @@ export const EXTENDED_EVENT_TYPES = [
   "onboarding_completed",
   "goal_changed",
   "access_granted",
+  "access_denied",
   "auth_linked",
+  "app_opened",
   "living_plan_followed",
   "living_plan_skipped",
   "meal_ai_used",
   "express_chosen",
   "deload_applied",
+  "measurements_logged",
+  "progress_photo_uploaded",
 ] as const;
 
 export type ExtendedEventType = (typeof EXTENDED_EVENT_TYPES)[number];
@@ -65,6 +69,8 @@ export type EventEntityType =
   | "session"
   | "meal"
   | "weight"
+  | "body_measurement"
+  | "progress_photo"
   | "day_checkin"
   | "supplement"
   | "challenge"
