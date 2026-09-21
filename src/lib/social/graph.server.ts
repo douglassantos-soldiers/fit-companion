@@ -3,12 +3,8 @@
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
-import {
-  contentExcerpt,
-  matchesTarget,
-  pickEditorialItems,
-  type PublicContentItem,
-} from "@/lib/content-match";
+import { contentExcerpt, matchesTarget, type PublicContentItem } from "@/lib/content-match";
+import { pickEditorialItems } from "@/lib/content/recommend";
 import { isEditorialDismissed, rankForYou } from "@/lib/social/feed-rank";
 import {
   DEFAULT_SOCIAL_PRIVACY,
@@ -53,15 +49,16 @@ export async function loadGraphContext(userId: string) {
     };
   }
 
-  const [following, followers, blocksOut, blocksIn, mutes, memberships, dismissals] = await Promise.all([
-    db.from("social_follows").select("following_id").eq("follower_id", userId),
-    db.from("social_follows").select("follower_id").eq("following_id", userId),
-    db.from("social_blocks").select("blocked_id").eq("blocker_id", userId),
-    db.from("social_blocks").select("blocker_id").eq("blocked_id", userId),
-    db.from("social_mutes").select("muted_id").eq("user_id", userId),
-    db.from("club_members").select("club_id").eq("user_id", userId),
-    db.from("feed_dismissals").select("author_user_id, kind, created_at").eq("user_id", userId),
-  ]);
+  const [following, followers, blocksOut, blocksIn, mutes, memberships, dismissals] =
+    await Promise.all([
+      db.from("social_follows").select("following_id").eq("follower_id", userId),
+      db.from("social_follows").select("follower_id").eq("following_id", userId),
+      db.from("social_blocks").select("blocked_id").eq("blocker_id", userId),
+      db.from("social_blocks").select("blocker_id").eq("blocked_id", userId),
+      db.from("social_mutes").select("muted_id").eq("user_id", userId),
+      db.from("club_members").select("club_id").eq("user_id", userId),
+      db.from("feed_dismissals").select("author_user_id, kind, created_at").eq("user_id", userId),
+    ]);
 
   const followingIds = ((following.data ?? []) as Row[]).map((r) => String(r["following_id"]));
   const followerIds = ((followers.data ?? []) as Row[]).map((r) => String(r["follower_id"]));
@@ -70,12 +67,19 @@ export async function loadGraphContext(userId: string) {
     ...((blocksIn.data ?? []) as Row[]).map((r) => String(r["blocker_id"])),
   ];
   const mutedIds = ((mutes.data ?? []) as Row[]).map((r) => String(r["muted_id"]));
-  const clubIds = ((memberships.data ?? []) as Row[]).map((r) => String(r["club_id"])).filter(Boolean);
+  const clubIds = ((memberships.data ?? []) as Row[])
+    .map((r) => String(r["club_id"]))
+    .filter(Boolean);
 
   let clubUserIds: string[] = [];
   if (clubIds.length) {
-    const { data: members } = await db.from("club_members").select("user_id").in("club_id", clubIds);
-    clubUserIds = [...new Set(((members ?? []) as Row[]).map((r) => String(r["user_id"] ?? "")).filter(Boolean))];
+    const { data: members } = await db
+      .from("club_members")
+      .select("user_id")
+      .in("club_id", clubIds);
+    clubUserIds = [
+      ...new Set(((members ?? []) as Row[]).map((r) => String(r["user_id"] ?? "")).filter(Boolean)),
+    ];
   }
 
   return {
@@ -92,7 +96,9 @@ export async function loadGraphContext(userId: string) {
   };
 }
 
-function jsonRecord(payload: Record<string, unknown>): Record<string, string | number | boolean | null> {
+function jsonRecord(
+  payload: Record<string, unknown>,
+): Record<string, string | number | boolean | null> {
   const out: Record<string, string | number | boolean | null> = {};
   for (const [k, v] of Object.entries(payload)) {
     if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = v;
@@ -194,17 +200,24 @@ export async function getForYouFeedServer(
   const myReaction: Record<string, ReactionKind> = {};
   const commentCount: Record<string, number> = {};
 
-  const [impressionRes, contentImpressionRes, contentDismissRes, contentRes] = await Promise.all([
-    db.from("feed_impressions").select("event_id").eq("user_id", identity.userId),
-    db.from("content_impressions").select("content_id").eq("user_id", identity.userId),
-    db.from("content_dismissals").select("content_id, created_at").eq("user_id", identity.userId),
-    db
-      .from("content_items")
-      .select("id, kind, title, body, media_url, goals, levels, published, sort_order")
-      .eq("published", true)
-      .order("sort_order", { ascending: true })
-      .limit(40),
-  ]);
+  const [impressionRes, contentImpressionRes, contentDismissRes, contentRes, contentProgressRes] =
+    await Promise.all([
+      db.from("feed_impressions").select("event_id").eq("user_id", identity.userId),
+      db.from("content_impressions").select("content_id").eq("user_id", identity.userId),
+      db.from("content_dismissals").select("content_id, created_at").eq("user_id", identity.userId),
+      db
+        .from("content_items")
+        .select(
+          "id, kind, title, body, media_url, goals, levels, published, sort_order, expert_id, collection_id, media_id, publish_at, unpublish_at, visible",
+        )
+        .eq("published", true)
+        .order("sort_order", { ascending: true })
+        .limit(40),
+      db
+        .from("content_progress")
+        .select("content_id, dismissed, saved")
+        .eq("user_id", identity.userId),
+    ]);
 
   if (socialIds.length) {
     const { data: reacts } = await db
@@ -267,12 +280,35 @@ export async function getForYouFeedServer(
     contentId: String(r["content_id"] ?? ""),
     createdAt: String(r["created_at"] ?? ""),
   }));
+  const progress = [
+    ...((contentProgressRes.data ?? []) as Row[]).map((r) => ({
+      contentId: String(r["content_id"] ?? ""),
+      dismissed: r["dismissed"] === true,
+      saved: r["saved"] === true,
+    })),
+    ...contentDismissals.map((d) => ({ contentId: d.contentId, dismissed: true })),
+  ];
 
-  const editorial = pickEditorialItems(
-    published,
-    { goal: targeting?.goal, level: targeting?.level, date: new Date() },
-    2,
-  )
+  let snapshot: import("@/lib/engine/decision-context-snapshot").DecisionContextSnapshot | null =
+    null;
+  try {
+    const { loadStoredDecisionContext } = await import("@/lib/engine/decision-context.server");
+    const { todayKey } = await import("@/lib/types");
+    const stored = await loadStoredDecisionContext(identity.userId, todayKey());
+    snapshot = stored?.payload ?? null;
+  } catch {
+    snapshot = null;
+  }
+
+  const editorialOpts: Parameters<typeof pickEditorialItems>[1] = {
+    date: new Date(),
+    progress,
+  };
+  if (targeting?.goal !== undefined) editorialOpts.goal = targeting.goal;
+  if (targeting?.level !== undefined) editorialOpts.level = targeting.level;
+  if (snapshot) editorialOpts.snapshot = snapshot;
+
+  const editorial = pickEditorialItems(published, editorialOpts, 2)
     .filter((item) => item.id && !isEditorialDismissed(item.id, contentDismissals))
     .map((item) => ({
       id: `editorial:${item.id}`,
@@ -382,7 +418,10 @@ export type SocialProfileResult =
       evolution: { sessionCount: number; prCount: number };
     };
 
-export async function getSocialProfileServer(deviceId: string, targetUserId: string): Promise<SocialProfileResult> {
+export async function getSocialProfileServer(
+  deviceId: string,
+  targetUserId: string,
+): Promise<SocialProfileResult> {
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false as const };
   const db = await adminDbLoose();
@@ -415,8 +454,14 @@ export async function getSocialProfileServer(deviceId: string, targetUserId: str
   }
 
   const [{ count: followerCount }, { count: followingCount }] = await Promise.all([
-    db.from("social_follows").select("*", { count: "exact", head: true }).eq("following_id", targetUserId),
-    db.from("social_follows").select("*", { count: "exact", head: true }).eq("follower_id", targetUserId),
+    db
+      .from("social_follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", targetUserId),
+    db
+      .from("social_follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", targetUserId),
   ]);
 
   const since = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
@@ -429,9 +474,11 @@ export async function getSocialProfileServer(deviceId: string, targetUserId: str
     .order("created_at", { ascending: false })
     .limit(40);
 
-  const { canSeeContent, privacyKeyForEvent, stripSensitiveSocialPayload: strip } = await import(
-    "@/lib/social/visibility"
-  );
+  const {
+    canSeeContent,
+    privacyKeyForEvent,
+    stripSensitiveSocialPayload: strip,
+  } = await import("@/lib/social/visibility");
   const visibleEvents = ((events ?? []) as Row[])
     .filter((r) => {
       const payload = (r["payload"] as Record<string, unknown>) ?? {};
@@ -465,7 +512,8 @@ export async function getSocialProfileServer(deviceId: string, targetUserId: str
     .select("retention, challenges, earned_badges")
     .eq("user_id", targetUserId)
     .maybeSingle();
-  const retention = ((stateRow as Row | null)?.["retention"] as Record<string, unknown> | undefined) ?? {};
+  const retention =
+    ((stateRow as Row | null)?.["retention"] as Record<string, unknown> | undefined) ?? {};
   const earnedBadges = Array.isArray(stateRow?.["earned_badges"])
     ? (stateRow!["earned_badges"] as string[])
     : Array.isArray(retention["earnedBadges"])
@@ -501,14 +549,117 @@ export async function getSocialProfileServer(deviceId: string, targetUserId: str
     challenges,
     evolution: {
       sessionCount: visibleEvents.filter((e) => e.kind === "session").length,
-      prCount: visibleEvents.filter((e) => e.kind === "proof" && e.payload["cardKind"] === "pr").length,
+      prCount: visibleEvents.filter((e) => e.kind === "proof" && e.payload["cardKind"] === "pr")
+        .length,
     },
   };
 }
 
-export async function listFollowsServer(deviceId: string, targetUserId: string, dir: "followers" | "following") {
+export async function getAthleteProfileServer(deviceId: string, targetUserId: string) {
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
-  if (!identity) return { ok: false as const, people: [] as Array<{ userId: string; displayName: string }> };
+  if (!identity) return { ok: false as const };
+  const db = await adminDbLoose();
+  if (!db) return { ok: false as const };
+
+  const ctx = await loadGraphContext(identity.userId);
+  const blocked = ctx.blockedIds.includes(targetUserId);
+  const muted = ctx.mutedIds.includes(targetUserId);
+  const { data: profile } = await db
+    .from("social_profiles")
+    .select("*")
+    .eq("app_user_id", targetUserId)
+    .maybeSingle();
+  const privacy = mapPrivacy((profile ?? null) as Row | null);
+  const viewerFollows = ctx.followingIds.includes(targetUserId);
+  const followsViewer = ctx.followerIds.includes(targetUserId);
+  const sameClub = ctx.clubUserIds.includes(targetUserId);
+
+  const { athleteProfileVisibleToViewer, buildAthleteProfile } =
+    await import("@/lib/athlete/profile");
+  const visible = athleteProfileVisibleToViewer({
+    viewerId: identity.userId,
+    authorId: targetUserId,
+    privacy,
+    viewerFollowsAuthor: viewerFollows,
+    authorFollowsViewer: followsViewer,
+    sameClub,
+    blockedEitherWay: blocked,
+    muted,
+  });
+  if (!visible) {
+    return { ok: true as const, unavailable: true as const, viewerUserId: identity.userId };
+  }
+
+  const { listActivitiesForUser } = await import("@/lib/athlete/persist.server");
+  const activities = await listActivitiesForUser(targetUserId);
+  const [{ count: followerCount }, { count: followingCount }, sessionsRes, challengeRes, prRes] =
+    await Promise.all([
+      db
+        .from("social_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", targetUserId),
+      db
+        .from("social_follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", targetUserId),
+      db
+        .from("sessions")
+        .select("id, date, duration_min, volume_kg, title, day_id")
+        .eq("user_id", targetUserId)
+        .limit(200),
+      db.from("challenge_progress").select("challenge_id, value").eq("user_id", targetUserId),
+      db
+        .from("personal_records")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", targetUserId),
+    ]);
+
+  const sessions = ((sessionsRes.data ?? []) as Row[]).map((r) => ({
+    id: String(r["id"] ?? ""),
+    dayId: String(r["day_id"] ?? ""),
+    title: String(r["title"] ?? ""),
+    date: String(r["date"] ?? ""),
+    durationMin: Number(r["duration_min"] ?? 0),
+    exercises: [],
+    volumeKg: Number(r["volume_kg"] ?? 0),
+  }));
+  const since = new Date();
+  since.setDate(since.getDate() - 28);
+  const sinceKey = since.toISOString().slice(0, 10);
+  const sessions28d = sessions.filter((s) => s.date >= sinceKey).length;
+
+  const athlete = buildAthleteProfile({
+    userId: targetUserId,
+    performance: { sessions28d, prCount: Number(prRes.count ?? 0) },
+    sessions,
+    activities,
+    challenges: ((challengeRes.data ?? []) as Row[]).map((r) => ({
+      challengeId: String(r["challenge_id"] ?? ""),
+      value: Number(r["value"] ?? 0),
+    })),
+    graph: {
+      followerCount: Number(followerCount ?? 0),
+      followingCount: Number(followingCount ?? 0),
+    },
+  });
+
+  return {
+    ok: true as const,
+    unavailable: false as const,
+    viewerUserId: identity.userId,
+    isSelf: identity.userId === targetUserId,
+    athlete,
+  };
+}
+
+export async function listFollowsServer(
+  deviceId: string,
+  targetUserId: string,
+  dir: "followers" | "following",
+) {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity)
+    return { ok: false as const, people: [] as Array<{ userId: string; displayName: string }> };
   const db = await adminDbLoose();
   if (!db) return { ok: false as const, people: [] };
   const ctx = await loadGraphContext(identity.userId);
@@ -525,7 +676,10 @@ export async function listFollowsServer(deviceId: string, targetUserId: string, 
     .select("app_user_id, display_name")
     .in("app_user_id", ids);
   const nameMap = new Map(
-    ((profiles ?? []) as Row[]).map((p) => [String(p["app_user_id"]), String(p["display_name"] ?? "Soldado")]),
+    ((profiles ?? []) as Row[]).map((p) => [
+      String(p["app_user_id"]),
+      String(p["display_name"] ?? "Soldado"),
+    ]),
   );
   return {
     ok: true as const,
@@ -536,7 +690,8 @@ export async function listFollowsServer(deviceId: string, targetUserId: string, 
 
 export async function listFollowingForInviteServer(deviceId: string) {
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
-  if (!identity) return { ok: false as const, people: [] as Array<{ userId: string; displayName: string }> };
+  if (!identity)
+    return { ok: false as const, people: [] as Array<{ userId: string; displayName: string }> };
   const listed = await listFollowsServer(deviceId, identity.userId, "following");
   return listed;
 }

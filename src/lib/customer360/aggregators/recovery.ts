@@ -1,27 +1,30 @@
-import { computeRecoveryV2 } from "@/lib/engine/recovery-v2";
+import { computeRecoverySnapshot, type RecoverySnapshot } from "@/lib/engine/recovery";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
-import type { AppState } from "@/lib/types";
+import { todayKey, type AppState } from "@/lib/types";
 import type { Recovery360 } from "@/lib/customer360/types";
 
-export function aggregateRecovery(state: AppState, hardStreak: number): Recovery360 {
-  const v2 = computeRecoveryV2(state);
+export function aggregateRecovery(
+  state: AppState,
+  hardStreak: number,
+  date = todayKey(),
+  recovery?: RecoverySnapshot,
+): Recovery360 {
+  const snap = recovery ?? computeRecoverySnapshot(state, date);
   const sleepEntries = recentDayCheckIns(state.dayCheckIns, 7);
   const sleepAvg = sleepEntries.length
     ? sleepEntries.reduce((s, c) => s + c.sleepHours, 0) / sleepEntries.length
-    : v2.signals.manual.sleepDuration;
+    : snap.sleep;
 
-  const fatigueSignal =
-    hardStreak >= 2 ||
-    v2.level === "low" ||
-    (sleepAvg != null && sleepAvg < 6);
+  const fatigueSignal = snap.fatigueSignal || hardStreak >= 2;
 
-  return {
-    recoveryScore: v2.score,
+  const row: Recovery360 = {
+    recoveryScore: snap.score,
     sleepAvg7d: sleepAvg != null ? Math.round(sleepAvg * 10) / 10 : null,
     fatigueSignal,
-    level: v2.level,
-    explanation: v2.explanation,
-    manualOnly: true,
-    confidence: v2.confidence,
+    level: snap.level === "unknown" ? null : snap.level,
+    explanation: snap.explanation,
+    manualOnly: snap.wearableConfidence === 0,
+    confidence: snap.confidence,
   };
+  return row;
 }

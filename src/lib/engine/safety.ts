@@ -3,7 +3,7 @@
  * Pure TypeScript; no network. Does not diagnose.
  * Date-aware: always evaluate against the same calendar date as Living Plan / Today.
  */
-import { computeRecoveryV2 } from "@/lib/engine/recovery-v2";
+import { computeRecoverySnapshot, type RecoverySnapshot } from "@/lib/engine/recovery";
 import type { AppState, Goal } from "@/lib/types";
 import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
 
@@ -46,7 +46,11 @@ export type SafetyInput = Pick<AppState, "dayCheckIns" | "sessions" | "profile">
  * Evaluate safety for a specific calendar date (YYYY-MM-DD).
  * Prefer this over evaluateSafety when building plans for a target day.
  */
-export function evaluateSafetyForDate(state: SafetyInput, date: string): SafetyVerdict {
+export function evaluateSafetyForDate(
+  state: SafetyInput,
+  date: string,
+  recovery?: RecoverySnapshot,
+): SafetyVerdict {
   const flags: SafetyFlag[] = ["medical_disclaimer"];
   const reasons: string[] = [
     "O Coach não substitui orientação médica — ajuste se sentir dor ou mal-estar.",
@@ -123,12 +127,12 @@ export function evaluateSafetyForDate(state: SafetyInput, date: string): SafetyV
   }
 
   try {
-    const v2 = computeRecoveryV2(state as AppState, date);
-    if (v2.level === "low") {
+    const snap = recovery ?? computeRecoverySnapshot(state as AppState, date);
+    if (snap.readiness === "low") {
       flags.push("under_recovery");
-      reasons.push(v2.explanation);
+      reasons.push(snap.explanation);
       preferLightTraining = true;
-      if (v2.reasonCodes.includes("sleep_low")) {
+      if (snap.reasonCodes.includes("sleep_low")) {
         blockStims = true;
       }
     }

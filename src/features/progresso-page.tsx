@@ -246,16 +246,18 @@ export function ProgressPage() {
         name={state.profile.name}
         sharing={proofSharing}
         state={state}
+      />
       <section className="surface-glass relative overflow-hidden p-6">
         <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/20 blur-3xl" />
         <p className="eyebrow">Semana</p>
-        <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="mt-2 flex items-center justify-between gap-3">
           <div>
             <p className="text-display text-glow text-5xl leading-none text-primary">
               <NumberTicker value={score} />
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Score / 100 · streak {currentStreak}d</p>
           </div>
+          <MetricRing value={score} max={100} label="Score" size="lg" />
         </div>
 
         <div className="mt-6 grid grid-cols-3 gap-3">

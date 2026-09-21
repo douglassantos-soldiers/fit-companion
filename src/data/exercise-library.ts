@@ -1,67 +1,22 @@
 /**
- * Soldiers exercise library (Lote 1). Authored in PT.
+ * Soldiers exercise library (Lote 1 + 2 + 2b + 2c + 3). Authored in PT.
  * Coverage inspired by typical gym catalogs — no licensed third-party data copied.
- * Planner pool is derived from plannerEligible rows (lote 1 inteiro).
+ * Planner pool is derived from plannerEligible rows.
  */
-import type { Exercise, Joint, MuscleGroup } from "@/data/exercises";
-import type { Difficulty, MovementPattern } from "@/lib/training/exercise-catalog";
-import type { AnimationSpec } from "@/lib/soldiers-media-types";
+import type { MuscleGroup } from "@/data/exercises";
+import { EXERCISE_LIBRARY_LOTE2 } from "@/data/exercise-library-lote2";
+import { EXERCISE_LIBRARY_LOTE2B } from "@/data/exercise-library-lote2b";
+import { EXERCISE_LIBRARY_LOTE2C } from "@/data/exercise-library-lote2c";
+import { EXERCISE_LIBRARY_LOTE3 } from "@/data/exercise-library-lote3";
+import {
+  ex,
+  PLANNER_ELIGIBLE as PLANNER,
+  type LibraryExercise,
+} from "@/data/exercise-library-helpers";
 
-export interface LibraryExercise {
-  id: string;
-  name: string;
-  group: MuscleGroup;
-  equipment: Exercise["equipment"];
-  swapGroup: string;
-  joints: Joint[];
-  unit: Exercise["unit"];
-  baseLoad: number;
-  priority: number;
-  primaryMuscles: MuscleGroup[];
-  secondaryMuscles: MuscleGroup[];
-  movementPattern: MovementPattern;
-  difficulty: Difficulty;
-  plannerEligible: boolean;
-  active: boolean;
-  instructions: string[];
-  animationSpec: AnimationSpec;
-}
+export type { LibraryExercise };
 
-const SPEC: Pick<AnimationSpec, "tempo" | "durationSec" | "loop" | "camera"> = {
-  tempo: "controlled",
-  durationSec: 4,
-  loop: true,
-  camera: "three-quarter",
-};
-
-function ex(
-  partial: Omit<LibraryExercise, "active" | "animationSpec" | "primaryMuscles"> & {
-    start: string;
-    end: string;
-    tempo?: AnimationSpec["tempo"];
-    camera?: AnimationSpec["camera"];
-  },
-): LibraryExercise {
-  return {
-    ...partial,
-    primaryMuscles: [partial.group],
-    active: true,
-    animationSpec: {
-      start: partial.start,
-      end: partial.end,
-      tempo: partial.tempo ?? SPEC.tempo,
-      durationSec: SPEC.durationSec,
-      loop: SPEC.loop,
-      camera: partial.camera ?? SPEC.camera,
-    },
-  };
-}
-
-const PLANNER = true;
-/** Lote 1: todos entram no pool do planner (swaps + seleção). Lotes 2–4 podem voltar a false. */
-const LIB = true;
-
-export const EXERCISE_LIBRARY: LibraryExercise[] = [
+const LOTE1: LibraryExercise[] = [
   // —— Peito ——
   ex({
     id: "supino-reto",
@@ -168,7 +123,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Trave os pés no banco declinado.",
       "Desça a barra à parte baixa do peito.",
@@ -191,7 +146,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Junte os indicadores e polegares em losango sob o peito.",
       "Desça com cotovelos junto ao tronco.",
@@ -214,7 +169,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "fly",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Passo à frente, tronco estável.",
       "Traga as polias em arco até a frente do peito.",
@@ -237,7 +192,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "fly",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Encoste as escápulas no encosto.",
       "Feche os braços até as almofadas se tocarem.",
@@ -260,7 +215,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Ajuste o assento para as pegadas na linha do peito.",
       "Empurre até a extensão controlada.",
@@ -283,7 +238,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Mãos em um banco ou parede, corpo alinhado.",
       "Desça o peito em direção ao apoio.",
@@ -306,7 +261,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "fly",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Banco 30 graus, arco amplo com cotovelos moles.",
       "Abra até o peito alongar.",
@@ -329,7 +284,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros", "triceps"],
     movementPattern: "press",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pés elevados em um banco.",
       "Desça o peito ao chão.",
@@ -446,7 +401,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps"],
     movementPattern: "pull",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pés na plataforma, tronco estável.",
       "Puxe o cabo ao umbigo.",
@@ -469,7 +424,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["peito", "core"],
     movementPattern: "pull",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite e leve o halter atrás da cabeça com cotovelos moles.",
       "Puxe o halter de volta sobre o peito.",
@@ -492,7 +447,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps"],
     movementPattern: "pull",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pegada supinada na largura dos ombros.",
       "Puxe o peito à barra.",
@@ -515,7 +470,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps", "core"],
     movementPattern: "pull",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Peito no apoio da máquina.",
       "Puxe os cotovelos para trás.",
@@ -538,7 +493,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "pull",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Polia alta com corda.",
       "Puxe em direção ao rosto, cotovelos altos.",
@@ -561,7 +516,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps"],
     movementPattern: "pull",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite de bruços no banco inclinado.",
       "Reme os halteres até o banco.",
@@ -584,7 +539,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps"],
     movementPattern: "pull",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Use o triangulo ou barra paralela.",
       "Puxe até o peito alto.",
@@ -607,7 +562,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["biceps", "core"],
     movementPattern: "pull",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite sob uma barra baixa, corpo rígido.",
       "Puxe o peito até a barra.",
@@ -630,7 +585,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Barra ou halteres ao lado do corpo.",
       "Eleve os ombros em direção às orelhas.",
@@ -794,7 +749,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "squat",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Segure um halter junto ao peito.",
       "Desça entre os joelhos.",
@@ -817,7 +772,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "lunge",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pé de trás no banco.",
       "Desça o joelho da frente até 90 graus.",
@@ -840,7 +795,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "hinge",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Joelhos quase estendidos.",
       "Desça a barra próxima às pernas.",
@@ -863,7 +818,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "extension",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Ajuste o rolo acima do tornozelo.",
       "Estenda os joelhos.",
@@ -886,7 +841,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite de bruços, rolo na panturrilha.",
       "Flexione os calcanhares em direção ao glúteo.",
@@ -909,7 +864,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "squat",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Costas no encosto, pés médios na plataforma.",
       "Desça até a profundidade confortável.",
@@ -932,7 +887,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "lunge",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Passo largo para o lado.",
       "Desça o quadril sobre a perna da frente.",
@@ -955,7 +910,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "hinge",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Ombros no banco, barra sobre o quadril.",
       "Empurre o quadril para cima.",
@@ -978,7 +933,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Rolo sobre os joelhos.",
       "Suba na ponta dos pés.",
@@ -1001,7 +956,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "squat",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pés bem abertos, pontas para fora.",
       "Desça o quadril entre os joelhos.",
@@ -1024,7 +979,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "lunge",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Afundo contínuo para frente.",
       "Joelho de trás desce perto do chão.",
@@ -1047,7 +1002,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["costas", "core"],
     movementPattern: "hinge",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Barra sobre o meio do pé, quadril atrás.",
       "Puxe a barra raspando as pernas.",
@@ -1141,7 +1096,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Sentado ou em pé, halteres na linha das orelhas.",
       "Empurre para cima.",
@@ -1164,7 +1119,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "raise",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Halteres à frente das coxas.",
       "Eleve até a linha dos ombros.",
@@ -1187,7 +1142,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["costas"],
     movementPattern: "raise",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Barra na frente das coxas.",
       "Puxe até a clavícula, cotovelos altos.",
@@ -1210,7 +1165,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Comece com palmas à frente do peito.",
       "Gire e empurre acima da cabeça.",
@@ -1233,7 +1188,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["costas"],
     movementPattern: "fly",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Incline o tronco, halteres pendurados.",
       "Abra os braços até a linha dos ombros.",
@@ -1256,7 +1211,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["triceps"],
     movementPattern: "press",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Ajuste o assento para as pegadas na linha dos ombros.",
       "Empurre para cima.",
@@ -1279,7 +1234,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "raise",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Polia baixa cruzada atrás do corpo.",
       "Eleve o braço até a linha do ombro.",
@@ -1302,7 +1257,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core", "triceps"],
     movementPattern: "carry_iso",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Encontre a parede com os pés.",
       "Trave ombros e core.",
@@ -1374,7 +1329,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Banco 45–60 graus, braços pendurados.",
       "Flexione até o pico do bíceps.",
@@ -1397,7 +1352,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Braços apoiados no banco scott.",
       "Flexione até o pico.",
@@ -1420,7 +1375,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Cotovelo apoiado na coxa interna.",
       "Flexione o halter até o ombro.",
@@ -1443,7 +1398,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Polia baixa, barra reta ou W.",
       "Flexione mantendo cotovelos fixos.",
@@ -1466,7 +1421,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "7 reps da metade inferior, 7 da superior, 7 completas.",
       "Cotovelos colados.",
@@ -1489,7 +1444,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["costas"],
     movementPattern: "carry_iso",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Puxe até o queixo ficar acima da barra.",
       "Segure a posição.",
@@ -1561,7 +1516,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "extension",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite, barra acima da testa.",
       "Flexione só os cotovelos descendo a barra.",
@@ -1584,7 +1539,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "extension",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Halter atrás da cabeça, cotovelos altos.",
       "Estenda acima da cabeça.",
@@ -1607,7 +1562,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["peito", "ombros"],
     movementPattern: "press",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Tronco mais vertical para ênfase no tríceps.",
       "Desça até os ombros confortáveis.",
@@ -1630,7 +1585,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "extension",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Tronco inclinado, cotovelo colado.",
       "Estenda o halter para trás.",
@@ -1653,7 +1608,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "extension",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Barra reta na polia alta.",
       "Estenda até os cotovelos travarem com controle.",
@@ -1676,7 +1631,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["peito"],
     movementPattern: "carry_iso",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Desça até o meio da flexão diamante.",
       "Segure a posição.",
@@ -1773,7 +1728,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite ou pendure, pernas juntas.",
       "Eleve até 90 graus.",
@@ -1796,7 +1751,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "carry_iso",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Apoio no antebraço, corpo de lado.",
       "Quadril elevado.",
@@ -1820,7 +1775,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "other",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Joelhos no chão, roda à frente.",
       "Role para frente sem deixar a lombar cair.",
@@ -1843,7 +1798,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite, braços e joelhos a 90 graus.",
       "Estenda braço e perna opostos.",
@@ -1866,7 +1821,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["cardio"],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Prancha alta.",
       "Alterne os joelhos em direção ao peito.",
@@ -1890,7 +1845,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "carry_iso",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "De lado para a polia, cabo no peito.",
       "Empurre os braços à frente resistindo à rotação.",
@@ -1913,7 +1868,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Deite, joelhos dobrados.",
       "Eleve as escápulas do chão.",
@@ -1936,7 +1891,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "carry_iso",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Halteres pesados ao lado do corpo.",
       "Caminhe com tronco alto.",
@@ -1959,7 +1914,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Sentado, tronco recuado, pés elevados se possível.",
       "Gire o implemento de um lado ao outro.",
@@ -2080,7 +2035,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["costas"],
     movementPattern: "cardio",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pernas, quadril e braços nessa ordem.",
       "Volta reversa: braços, quadril, pernas.",
@@ -2103,7 +2058,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "cardio",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Postura alta, impulso nos pés e braços.",
       "Cadência constante.",
@@ -2126,7 +2081,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "cardio",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Salte abrindo pés e braços.",
       "Volte ao centro.",
@@ -2150,7 +2105,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "cardio",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Joelhos moles, tronco estável.",
       "Ondas alternadas com as cordas.",
@@ -2174,7 +2129,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["pernas"],
     movementPattern: "lunge",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pise com o pé inteiro na caixa.",
       "Suba estendendo o quadril.",
@@ -2197,7 +2152,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "cardio",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Empurre e puxe os braços junto com as pernas.",
       "Sprints curtos.",
@@ -2221,7 +2176,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["ombros"],
     movementPattern: "fly",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Polias baixas, passo à frente.",
       "Suba os cabos em arco até a frente do peito.",
@@ -2244,7 +2199,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "hinge",
     difficulty: "advanced",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Barra no trapézio, joelhos moles.",
       "Incline o tronco empurrando o quadril para trás.",
@@ -2267,7 +2222,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Joelhos nas almofadas da máquina.",
       "Feche as pernas contra a resistência.",
@@ -2290,7 +2245,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "beginner",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Joelhos nas almofadas.",
       "Abra as pernas contra a resistência.",
@@ -2313,7 +2268,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "curl",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pegada pronada na barra.",
       "Flexione até a barra chegar perto dos ombros.",
@@ -2336,7 +2291,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: [],
     movementPattern: "other",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Pendure na barra, ombros ativos.",
       "Eleve os joelhos ao peito.",
@@ -2359,7 +2314,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core", "ombros"],
     movementPattern: "hinge",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Hinge, kettlebell entre as pernas.",
       "Estenda o quadril projetando o peso à frente.",
@@ -2383,7 +2338,7 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     secondaryMuscles: ["core"],
     movementPattern: "cardio",
     difficulty: "intermediate",
-    plannerEligible: LIB,
+    plannerEligible: PLANNER,
     instructions: [
       "Puxe as alças de cima para baixo com o quadril.",
       "Estenda o quadril no final da puxada.",
@@ -2396,6 +2351,14 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
   }),
 ];
 
+export const EXERCISE_LIBRARY: LibraryExercise[] = [
+  ...LOTE1,
+  ...EXERCISE_LIBRARY_LOTE2,
+  ...EXERCISE_LIBRARY_LOTE2B,
+  ...EXERCISE_LIBRARY_LOTE2C,
+  ...EXERCISE_LIBRARY_LOTE3,
+];
+
 let byId = new Map(EXERCISE_LIBRARY.map((e) => [e.id, e]));
 let liveLibrary: LibraryExercise[] | null = null;
 
@@ -2404,13 +2367,16 @@ export function setResolvedLibrary(next: LibraryExercise[]): void {
   byId = new Map(next.map((e) => [e.id, e]));
 }
 
+export function resolvedLibrary(): LibraryExercise[] {
+  return liveLibrary ?? EXERCISE_LIBRARY;
+}
+
 export function libraryById(id: string): LibraryExercise | undefined {
   return byId.get(id);
 }
 
 export function listLibrary(opts?: { plannerOnly?: boolean; group?: MuscleGroup }) {
-  const source = liveLibrary ?? EXERCISE_LIBRARY;
-  return source.filter((e) => {
+  return resolvedLibrary().filter((e) => {
     if (!e.active) return false;
     if (opts?.plannerOnly && !e.plannerEligible) return false;
     if (opts?.group && e.group !== opts.group) return false;
@@ -2418,4 +2384,13 @@ export function listLibrary(opts?: { plannerOnly?: boolean; group?: MuscleGroup 
   });
 }
 
-export const PLANNER_EXERCISE_IDS = EXERCISE_LIBRARY.filter((e) => e.plannerEligible).map((e) => e.id);
+/** Seed snapshot (lote 1). Runtime pool after hydrate: plannerExerciseIds(). */
+export const PLANNER_EXERCISE_IDS = EXERCISE_LIBRARY.filter((e) => e.plannerEligible).map(
+  (e) => e.id,
+);
+
+export function plannerExerciseIds(): string[] {
+  return resolvedLibrary()
+    .filter((e) => e.active && e.plannerEligible)
+    .map((e) => e.id);
+}

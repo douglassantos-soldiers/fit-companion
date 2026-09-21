@@ -3,7 +3,8 @@
  */
 import { requireAdminSession } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
-import type { CmsState } from "@/lib/cms";
+import { emptyCmsState, type CmsState } from "@/lib/cms";
+import { isSoldiersOwnedUrl } from "@/lib/soldiers-media-governance";
 import type { AccessTier } from "@/data/shopify-product-map";
 import { isAccountBlocked, normalizeAccountStatus } from "@/lib/account-status";
 
@@ -22,12 +23,16 @@ export type AdminAuditAction =
   | "training_rules_save"
   | "content_item_save"
   | "content_item_delete"
+  | "expert_save"
+  | "program_save"
+  | "collection_save"
   | "content_report_resolve"
   | "activity_hide"
   | "activity_unhide"
   | "comment_hide"
   | "comment_unhide"
-  | "shopify_customers_import";
+  | "shopify_customers_import"
+  | "media_status_change";
 
 export type AdminUserLookup = {
   email: string;
@@ -72,11 +77,7 @@ export type ShopifyOpsSnapshot = {
   cursors: Array<{ id: string; cursorValue: string | null; updatedAt: string }>;
 };
 
-const emptyCms = (): CmsState => ({
-  exerciseMedia: {},
-  mealImages: {},
-  workoutNotes: {},
-});
+const emptyCms = (): CmsState => emptyCmsState();
 
 export function assertAdmin() {
   requireAdminSession();
@@ -100,9 +101,15 @@ export async function writeAudit(
 export async function readCmsOverrides(): Promise<CmsState> {
   const db = await adminDbLoose();
   if (!db) return emptyCms();
-  const { data, error } = await db
+  let { data, error } = await db
     .from("cms_overrides")
-    .select("entity_type, entity_id, media_url, note");
+    .select("entity_type, entity_id, media_url, note, authorized");
+  if (error) {
+    console.warn("cms_overrides authorized column missing, falling back", error.message);
+    const retry = await db.from("cms_overrides").select("entity_type, entity_id, media_url, note");
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) {
     console.error("cms_overrides read failed", error);
     return emptyCms();
@@ -113,11 +120,14 @@ export async function readCmsOverrides(): Promise<CmsState> {
     const id = String(row.entity_id);
     const media = row.media_url != null ? String(row.media_url) : "";
     const note = row.note != null ? String(row.note) : "";
+    const authorized = Boolean(row.authorized) && isSoldiersOwnedUrl(media);
     if (type === "exercise") {
       if (media) state.exerciseMedia[id] = media;
       if (note) state.workoutNotes[id] = note;
+      if (media) state.exerciseMediaAuthorized[id] = authorized;
     } else if (type === "meal") {
       if (media) state.mealImages[id] = media;
+      if (media) state.mealImagesAuthorized[id] = authorized;
     }
   }
   return state;
@@ -136,6 +146,9 @@ export async function upsertCmsOverrides(
     entity_id: string;
     media_url: string | null;
     note: string | null;
+    authorized: boolean;
+    authorized_at: string | null;
+    authorized_by: string | null;
     updated_at: string;
     updated_by: string;
   }> = [];
@@ -148,11 +161,15 @@ export async function upsertCmsOverrides(
     const media = (cms.exerciseMedia[id] ?? "").trim();
     const note = (cms.workoutNotes[id] ?? "").trim();
     if (!media && !note) continue;
+    const authorized = Boolean(cms.exerciseMediaAuthorized[id]) && isSoldiersOwnedUrl(media);
     rows.push({
       entity_type: "exercise",
       entity_id: id,
       media_url: media || null,
       note: note || null,
+      authorized,
+      authorized_at: authorized ? now : null,
+      authorized_by: authorized ? actor : null,
       updated_at: now,
       updated_by: actor,
     });
@@ -161,11 +178,15 @@ export async function upsertCmsOverrides(
   for (const [id, url] of Object.entries(cms.mealImages)) {
     const media = url.trim();
     if (!media) continue;
+    const authorized = Boolean(cms.mealImagesAuthorized[id]) && isSoldiersOwnedUrl(media);
     rows.push({
       entity_type: "meal",
       entity_id: id,
       media_url: media,
       note: null,
+      authorized,
+      authorized_at: authorized ? now : null,
+      authorized_by: authorized ? actor : null,
       updated_at: now,
       updated_by: actor,
     });
@@ -211,9 +232,8 @@ export async function lookupUserByEmail(email: string): Promise<AdminUserLookup>
   if (!normalized.includes("@")) return empty;
 
   const db = await adminDbLoose();
-  const { resolveAccessProfileForEmail, findEntitlementByEmail } = await import(
-    "@/lib/shopify.server"
-  );
+  const { resolveAccessProfileForEmail, findEntitlementByEmail } =
+    await import("@/lib/shopify.server");
 
   const profile = await resolveAccessProfileForEmail(normalized);
   const ent = await findEntitlementByEmail(normalized);
@@ -327,11 +347,8 @@ export async function resyncEntitlementForEmail(
   const normalized = email.trim().toLowerCase();
   if (!normalized.includes("@")) return { ok: false, reason: "invalid_email" };
 
-  const {
-    resolveAccessProfileForEmail,
-    upsertEntitlementEmail,
-    upsertDeviceEntitlementAdmin,
-  } = await import("@/lib/shopify.server");
+  const { resolveAccessProfileForEmail, upsertEntitlementEmail, upsertDeviceEntitlementAdmin } =
+    await import("@/lib/shopify.server");
   const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
   const { upsertOrdersFromPaidList } = await import("@/lib/orders.server");
 
@@ -409,9 +426,8 @@ export async function setEntitlementManual(opts: {
   if (!db) return { ok: false, reason: "db_unavailable" };
 
   const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
-  const { upsertEntitlementEmail, upsertDeviceEntitlementAdmin } = await import(
-    "@/lib/shopify.server"
-  );
+  const { upsertEntitlementEmail, upsertDeviceEntitlementAdmin } =
+    await import("@/lib/shopify.server");
 
   if (opts.action === "revoke") {
     const { data: user } = await db

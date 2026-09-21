@@ -20,18 +20,26 @@ export type WearableProvidersStatus = {
   health_connect: "needs_native";
 };
 
-export type WearableFnError = "unauthorized" | "rate_limited" | "not_configured" | "needs_native" | "upstream" | "invalid";
+export type WearableFnError =
+  "unauthorized" | "rate_limited" | "not_configured" | "needs_native" | "upstream" | "invalid";
 
 export function stravaOAuthConfigured(): boolean {
-  return Boolean(process.env["STRAVA_CLIENT_ID"]?.trim() && process.env["STRAVA_CLIENT_SECRET"]?.trim());
+  return Boolean(
+    process.env["STRAVA_CLIENT_ID"]?.trim() && process.env["STRAVA_CLIENT_SECRET"]?.trim(),
+  );
 }
 
 export function garminOAuthConfigured(): boolean {
-  return Boolean(process.env["GARMIN_CLIENT_ID"]?.trim() && process.env["GARMIN_CLIENT_SECRET"]?.trim());
+  return Boolean(
+    process.env["GARMIN_CLIENT_ID"]?.trim() && process.env["GARMIN_CLIENT_SECRET"]?.trim(),
+  );
 }
 
 function appOrigin(): string {
-  const raw = process.env["APP_URL"]?.trim() || process.env["VITE_APP_URL"]?.trim() || "http://localhost:8081";
+  const raw =
+    process.env["APP_URL"]?.trim() ||
+    process.env["VITE_APP_URL"]?.trim() ||
+    "http://localhost:8081";
   return raw.replace(/\/$/, "");
 }
 
@@ -102,7 +110,21 @@ async function saveTokens(
   });
 }
 
-async function loadToken(userId: string | undefined, provider: "strava" | "garmin"): Promise<string | null> {
+async function persistWearableActivities(
+  userId: string | undefined,
+  provider: "strava" | "garmin",
+  logs: ActivityLogEntry[],
+) {
+  if (!userId || !logs.length) return;
+  const { activitiesFromWearableLogs } = await import("@/lib/athlete/normalize");
+  const { upsertActivities } = await import("@/lib/athlete/persist.server");
+  await upsertActivities(userId, activitiesFromWearableLogs(userId, logs, provider));
+}
+
+async function loadToken(
+  userId: string | undefined,
+  provider: "strava" | "garmin",
+): Promise<string | null> {
   if (!userId) return null;
   const db = await adminDbLoose();
   if (!db) return null;
@@ -121,7 +143,9 @@ export const syncWearableFn = createServerFn({ method: "POST" })
   .handler(
     async ({
       data,
-    }): Promise<{ ok: true; logs: ActivityLogEntry[] } | { ok: false; reason: WearableFnError }> => {
+    }): Promise<
+      { ok: true; logs: ActivityLogEntry[] } | { ok: false; reason: WearableFnError }
+    > => {
       const session = readAccessSession();
       if (!session) return { ok: false, reason: "unauthorized" };
       if (!rateLimitKey(`wearable-sync:${session.email}`, 30, 60 * 60_000)) {
@@ -169,7 +193,9 @@ export const syncWearableFn = createServerFn({ method: "POST" })
           if (!act.ok) return { ok: false, reason: "upstream" };
           const payload = await act.json();
           const samples = normalizeStravaActivities(payload);
-          return { ok: true, logs: samplesToActivityLogs(samples, "oauth") };
+          const logs = samplesToActivityLogs(samples, "oauth");
+          await persistWearableActivities(session.userId, "strava", logs);
+          return { ok: true, logs };
         } catch {
           return { ok: false, reason: "upstream" };
         }
@@ -216,7 +242,9 @@ export const syncWearableFn = createServerFn({ method: "POST" })
         if (!act.ok) return { ok: false, reason: "upstream" };
         const payload = await act.json();
         const samples = normalizeGarminActivities(payload);
-        return { ok: true, logs: samplesToActivityLogs(samples, "oauth") };
+        const logs = samplesToActivityLogs(samples, "oauth");
+        await persistWearableActivities(session.userId, "garmin", logs);
+        return { ok: true, logs };
       } catch {
         return { ok: false, reason: "upstream" };
       }

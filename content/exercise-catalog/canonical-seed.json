@@ -1,0 +1,6130 @@
+[
+  {
+    "id": "supino-reto",
+    "canonicalName": "supino-reto",
+    "displayNamePt": "Supino reto",
+    "name": "Supino reto",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 1,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "ombros"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite no banco com os pés no chão e as escápulas estáveis.",
+      "Segure a barra um pouco além da largura dos ombros.",
+      "Desça a barra de forma controlada até próximo do peito.",
+      "Empurre até a extensão dos braços sem perder o contato das costas no banco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "supino-reto",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra próxima ao peito, cotovelos flexionados",
+      "end": "braços estendidos, barra sobre o peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "supino-inclinado-halter",
+    "canonicalName": "supino-inclinado-halter",
+    "displayNamePt": "Supino inclinado com halteres",
+    "name": "Supino inclinado com halteres",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "ombros"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ajuste o banco entre 30 e 45 graus.",
+      "Halteres na linha do peito, palmas à frente.",
+      "Empurre para cima convergindo levemente no topo.",
+      "Desça até o peito alongar sem perder estabilidade do ombro."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "supino-inclinado-halter",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres ao lado do peito no banco inclinado",
+      "end": "halteres acima do peito, cotovelos quase estendidos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "flexao",
+    "canonicalName": "flexao",
+    "displayNamePt": "Flexão de braço",
+    "name": "Flexão de braço",
+    "version": 1,
+    "group": "peito",
+    "equipment": "ambos",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "core"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Mãos na largura dos ombros, corpo em linha reta.",
+      "Desça o peito em direção ao chão.",
+      "Empurre até os braços estenderem.",
+      "Mantenha o core firme o tempo todo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "flexao",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corpo baixo, peito próximo ao chão",
+      "end": "braços estendidos em prancha",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crucifixo",
+    "canonicalName": "crucifixo",
+    "displayNamePt": "Crucifixo",
+    "name": "Crucifixo",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-fly",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 14,
+    "priority": 1,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite no banco com halteres acima do peito, cotovelos levemente flexionados.",
+      "Abra os braços em arco até sentir o peito alongar.",
+      "Feche o arco até os halteres se aproximarem no topo.",
+      "Não deixe os cotovelos travarem."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crucifixo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres abertos ao lado do tronco",
+      "end": "halteres juntos acima do peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "supino-declinado",
+    "canonicalName": "supino-declinado",
+    "displayNamePt": "Supino declinado",
+    "name": "Supino declinado",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 45,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Trave os pés no banco declinado.",
+      "Desça a barra à parte baixa do peito.",
+      "Empurre em linha controlada.",
+      "Não deixe os ombros subirem."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "supino-declinado",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra na parte baixa do peito",
+      "end": "braços estendidos no declínio",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "flexao-diamante",
+    "canonicalName": "flexao-diamante",
+    "displayNamePt": "Flexão diamante",
+    "name": "Flexão diamante",
+    "version": 1,
+    "group": "peito",
+    "equipment": "casa",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Junte os indicadores e polegares em losango sob o peito.",
+      "Desça com cotovelos junto ao tronco.",
+      "Empurre sem abrir o losango.",
+      "Mantenha o quadril alinhado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "flexao-diamante",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "peito próximo às mãos em losango",
+      "end": "braços estendidos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crossover-polia",
+    "canonicalName": "crossover-polia",
+    "displayNamePt": "Crossover na polia",
+    "name": "Crossover na polia",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-fly",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Passo à frente, tronco estável.",
+      "Traga as polias em arco até a frente do peito.",
+      "Controle a volta.",
+      "Cotovelos levemente flexionados."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crossover-polia",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços abertos nas polias altas",
+      "end": "mãos se encontrando à frente do peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "peck-deck",
+    "canonicalName": "peck-deck",
+    "displayNamePt": "Peck deck",
+    "name": "Peck deck",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-fly",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Encoste as escápulas no encosto.",
+      "Feche os braços até as almofadas se tocarem.",
+      "Abra com controle.",
+      "Não encoste os cotovelos atrás da linha do tronco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "peck-deck",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços abertos na máquina",
+      "end": "almofadas unidas à frente",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "supino-maquina",
+    "canonicalName": "supino-maquina",
+    "displayNamePt": "Supino na máquina",
+    "name": "Supino na máquina",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ajuste o assento para as pegadas na linha do peito.",
+      "Empurre até a extensão controlada.",
+      "Volte sem perder o contato das costas.",
+      "Expire na subida."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "supino-maquina",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pegadas próximas ao peito",
+      "end": "braços estendidos na máquina",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "flexao-inclinada",
+    "canonicalName": "flexao-inclinada",
+    "displayNamePt": "Flexão inclinada",
+    "name": "Flexão inclinada",
+    "version": 1,
+    "group": "peito",
+    "equipment": "casa",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Mãos em um banco ou parede, corpo alinhado.",
+      "Desça o peito em direção ao apoio.",
+      "Empurre até estender.",
+      "Útil para quem está começando."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "flexao-inclinada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "peito próximo ao banco",
+      "end": "braços estendidos na inclinação",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crucifixo-inclinado",
+    "canonicalName": "crucifixo-inclinado",
+    "displayNamePt": "Crucifixo inclinado",
+    "name": "Crucifixo inclinado",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-fly",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Banco 30 graus, arco amplo com cotovelos moles.",
+      "Abra até o peito alongar.",
+      "Feche sem bater os halteres.",
+      "Evite hiperextensão do ombro."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crucifixo-inclinado",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres abertos no inclinado",
+      "end": "halteres acima da linha dos olhos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "flexao-declinada",
+    "canonicalName": "flexao-declinada",
+    "displayNamePt": "Flexão declinada",
+    "name": "Flexão declinada",
+    "version": 1,
+    "group": "peito",
+    "equipment": "casa",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros",
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pés elevados em um banco.",
+      "Desça o peito ao chão.",
+      "Empurre mantendo o core.",
+      "Não deixe o quadril cair."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "flexao-declinada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "peito baixo com pés elevados",
+      "end": "prancha declinada estendida",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "barra-fixa",
+    "canonicalName": "barra-fixa",
+    "displayNamePt": "Barra fixa",
+    "name": "Barra fixa",
+    "version": 1,
+    "group": "costas",
+    "equipment": "ambos",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pegada pronada um pouco além dos ombros.",
+      "Puxe o peito em direção à barra.",
+      "Desça até os braços quase estenderem.",
+      "Evite balanço excessivo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "barra-fixa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corpo pendurado, braços estendidos",
+      "end": "queixo acima da barra",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-curvada",
+    "canonicalName": "remada-curvada",
+    "displayNamePt": "Remada curvada",
+    "name": "Remada curvada",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [
+      "lombar",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 1,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Incline o tronco com coluna neutra.",
+      "Puxe a barra em direção ao umbigo.",
+      "Aperte as escápulas no topo.",
+      "Desça com controle sem arredondar as costas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-curvada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra pendurada, tronco inclinado",
+      "end": "barra no tronco, cotovelos atrás",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-unilateral",
+    "canonicalName": "remada-unilateral",
+    "displayNamePt": "Remada unilateral",
+    "name": "Remada unilateral",
+    "version": 1,
+    "group": "costas",
+    "equipment": "ambos",
+    "swapGroup": "costas-row",
+    "joints": [
+      "lombar",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Apoie um joelho e uma mão no banco.",
+      "Puxe o halter até o quadril.",
+      "Desça sem girar o tronco.",
+      "Troque o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-unilateral",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halter baixo, braço estendido",
+      "end": "halter junto ao quadril",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pulldown",
+    "canonicalName": "pulldown",
+    "displayNamePt": "Puxada alta",
+    "name": "Puxada alta",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 45,
+    "priority": 1,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Sente com o peito aberto e pegada pronada.",
+      "Puxe a barra até a clavícula.",
+      "Controle a subida.",
+      "Não incline demais o tronco para trás."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "pulldown",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra alta, braços estendidos",
+      "end": "barra na clavícula",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-baixa",
+    "canonicalName": "remada-baixa",
+    "displayNamePt": "Remada baixa",
+    "name": "Remada baixa",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [
+      "lombar",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 1,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pés na plataforma, tronco estável.",
+      "Puxe o cabo ao umbigo.",
+      "Escápulas juntas no final.",
+      "Estenda os braços na volta."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-baixa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cabo à frente, braços longos",
+      "end": "pegador no tronco",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pullover",
+    "canonicalName": "pullover",
+    "displayNamePt": "Pullover",
+    "name": "Pullover",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 3,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "peito",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite e leve o halter atrás da cabeça com cotovelos moles.",
+      "Puxe o halter de volta sobre o peito.",
+      "Sinta o alongamento da grande dorsal.",
+      "Não arqueie demais a lombar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "pullover",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halter atrás da cabeça",
+      "end": "halter acima do peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "barra-fixa-supinada",
+    "canonicalName": "barra-fixa-supinada",
+    "displayNamePt": "Barra fixa supinada",
+    "name": "Barra fixa supinada",
+    "version": 1,
+    "group": "costas",
+    "equipment": "ambos",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pegada supinada na largura dos ombros.",
+      "Puxe o peito à barra.",
+      "Desça controlado.",
+      "Evite encolher os ombros."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "barra-fixa-supinada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pendurado em supinação",
+      "end": "peito próximo à barra",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-cavalinho",
+    "canonicalName": "remada-cavalinho",
+    "displayNamePt": "Remada cavalinho",
+    "name": "Remada cavalinho",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [
+      "lombar",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 35,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Peito no apoio da máquina.",
+      "Puxe os cotovelos para trás.",
+      "Aperte as escápulas.",
+      "Não levante o tronco do apoio."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-cavalinho",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços pendurados na máquina",
+      "end": "cotovelos atrás da linha do tronco",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "face-pull",
+    "canonicalName": "face-pull",
+    "displayNamePt": "Face pull",
+    "name": "Face pull",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Polia alta com corda.",
+      "Puxe em direção ao rosto, cotovelos altos.",
+      "Gire os punhos para fora no final.",
+      "Controle a volta."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "face-pull",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corda à frente dos olhos",
+      "end": "cordas ao lado da cabeça",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-halter-peito",
+    "canonicalName": "remada-halter-peito",
+    "displayNamePt": "Remada com peito apoiado",
+    "name": "Remada com peito apoiado",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite de bruços no banco inclinado.",
+      "Reme os halteres até o banco.",
+      "Aperte as costas no topo.",
+      "Útil para isolar sem sobrecarregar a lombar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-halter-peito",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres pendurados",
+      "end": "halteres na linha do banco",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "puxada-neutra",
+    "canonicalName": "puxada-neutra",
+    "displayNamePt": "Puxada pegada neutra",
+    "name": "Puxada pegada neutra",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Use o triangulo ou barra paralela.",
+      "Puxe até o peito alto.",
+      "Desça sem perder a postura.",
+      "Cotovelos próximos ao tronco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "puxada-neutra",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços estendidos na polia",
+      "end": "triangulo no peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "australian-row",
+    "canonicalName": "australian-row",
+    "displayNamePt": "Remada australiana",
+    "name": "Remada australiana",
+    "version": 1,
+    "group": "costas",
+    "equipment": "casa",
+    "swapGroup": "costas-row",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite sob uma barra baixa, corpo rígido.",
+      "Puxe o peito até a barra.",
+      "Desça até os braços estenderem.",
+      "Quanto mais horizontal, mais difícil."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "australian-row",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corpo suspenso, braços longos",
+      "end": "peito tocando a barra baixa",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "encolhimento",
+    "canonicalName": "encolhimento",
+    "displayNamePt": "Encolhimento de ombros",
+    "name": "Encolhimento de ombros",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-row",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 3,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra ou halteres ao lado do corpo.",
+      "Eleve os ombros em direção às orelhas.",
+      "Desça com controle.",
+      "Não role os ombros para trás."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "encolhimento",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "ombros baixos, braços longos",
+      "end": "ombros elevados",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento",
+    "canonicalName": "agachamento",
+    "displayNamePt": "Agachamento livre",
+    "name": "Agachamento livre",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 60,
+    "priority": 1,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra no trapézio, pés na largura dos ombros.",
+      "Desça com joelhos no rumo dos pés.",
+      "Suba empurrando o chão.",
+      "Mantenha o peito aberto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "agachamento",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado, coxas próximas da paralela",
+      "end": "em pé, quadril e joelhos estendidos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-corpo",
+    "canonicalName": "agachamento-corpo",
+    "displayNamePt": "Agachamento com peso do corpo",
+    "name": "Agachamento com peso do corpo",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pés na largura do quadril.",
+      "Desça como se fosse sentar.",
+      "Suba sem jogar os joelhos para dentro.",
+      "Calcanhares no chão."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "agachamento-corpo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado sem carga",
+      "end": "em pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "leg-press",
+    "canonicalName": "leg-press",
+    "displayNamePt": "Leg press",
+    "name": "Leg press",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 100,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pés na plataforma na largura do quadril.",
+      "Desça até cerca de 90 graus.",
+      "Empurre sem travar o joelho de forma brusca.",
+      "Lombar apoiada."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "leg-press",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "joelhos flexionados no press",
+      "end": "pernas quase estendidas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "afundo",
+    "canonicalName": "afundo",
+    "displayNamePt": "Afundo",
+    "name": "Afundo",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-lunge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 1,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "lunge",
+    "movementPatternRaw": "lunge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Dê um passo à frente.",
+      "Desça o joelho de trás em direção ao chão.",
+      "Suba sem perder o equilíbrio.",
+      "Tronco alto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "afundo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "joelho de trás próximo ao chão",
+      "end": "em pé após o passo",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "terra-romeno",
+    "canonicalName": "terra-romeno",
+    "displayNamePt": "Levantamento terra romeno",
+    "name": "Levantamento terra romeno",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 1,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra junto às coxas, joelhos moles.",
+      "Empurre o quadril para trás descendo a barra.",
+      "Sinta o posterior alongar.",
+      "Volte estendendo o quadril."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "terra-romeno",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra abaixo dos joelhos, quadril atrás",
+      "end": "em pé, quadril estendido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "panturrilha",
+    "canonicalName": "panturrilha",
+    "displayNamePt": "Panturrilha em pé",
+    "name": "Panturrilha em pé",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-calf",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 1,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Antepé em um degrau, calcanhar livre.",
+      "Suba na ponta dos pés.",
+      "Desça alongando a panturrilha.",
+      "Movimento completo, sem bounce."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "panturrilha",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "calcanhar baixo no degrau",
+      "end": "em ponta de pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-goblet",
+    "canonicalName": "agachamento-goblet",
+    "displayNamePt": "Agachamento goblet",
+    "name": "Agachamento goblet",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Segure um halter junto ao peito.",
+      "Desça entre os joelhos.",
+      "Suba empurrando o chão.",
+      "Cotovelos por dentro das coxas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "agachamento-goblet",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado com halter no peito",
+      "end": "em pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-bulgaro",
+    "canonicalName": "agachamento-bulgaro",
+    "displayNamePt": "Agachamento búlgaro",
+    "name": "Agachamento búlgaro",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-lunge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "lunge",
+    "movementPatternRaw": "lunge",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pé de trás no banco.",
+      "Desça o joelho da frente até 90 graus.",
+      "Suba sem jogar o tronco à frente demais.",
+      "Troque o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "agachamento-bulgaro",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "joelho da frente flexionado, pé traseiro no banco",
+      "end": "perna da frente quase estendida",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "stiff",
+    "canonicalName": "stiff",
+    "displayNamePt": "Stiff",
+    "name": "Stiff",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Joelhos quase estendidos.",
+      "Desça a barra próxima às pernas.",
+      "Suba contraindo o glúteo.",
+      "Coluna neutra."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "stiff",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra baixa, quadril em hinge",
+      "end": "em pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "cadeira-extensora",
+    "canonicalName": "cadeira-extensora",
+    "displayNamePt": "Cadeira extensora",
+    "name": "Cadeira extensora",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ajuste o rolo acima do tornozelo.",
+      "Estenda os joelhos.",
+      "Desça controlado.",
+      "Evite estalo no travamento."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "cadeira-extensora",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "joelhos flexionados na cadeira",
+      "end": "pernas estendidas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "mesa-flexora",
+    "canonicalName": "mesa-flexora",
+    "displayNamePt": "Mesa flexora",
+    "name": "Mesa flexora",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 25,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite de bruços, rolo na panturrilha.",
+      "Flexione os calcanhares em direção ao glúteo.",
+      "Desça sem bater o peso.",
+      "Quadril no banco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "mesa-flexora",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pernas estendidas na mesa",
+      "end": "calcanhares próximos ao glúteo",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "hack-squat",
+    "canonicalName": "hack-squat",
+    "displayNamePt": "Hack squat",
+    "name": "Hack squat",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Costas no encosto, pés médios na plataforma.",
+      "Desça até a profundidade confortável.",
+      "Empurre pelos calcanhares.",
+      "Joelhos alinhados."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "hack-squat",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado no hack",
+      "end": "pernas estendidas no sled",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "passo-lateral",
+    "canonicalName": "passo-lateral",
+    "displayNamePt": "Afundo lateral",
+    "name": "Afundo lateral",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-lunge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "lunge",
+    "movementPatternRaw": "lunge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Passo largo para o lado.",
+      "Desça o quadril sobre a perna da frente.",
+      "Volte ao centro.",
+      "Pé de apoio firme."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "passo-lateral",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "afundo lateral baixo",
+      "end": "em pé no centro",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "elevacao-pelvica",
+    "canonicalName": "elevacao-pelvica",
+    "displayNamePt": "Elevação pélvica",
+    "name": "Elevação pélvica",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-hinge",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ombros no banco, barra sobre o quadril.",
+      "Empurre o quadril para cima.",
+      "Aperte o glúteo no topo.",
+      "Desça com controle."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "elevacao-pelvica",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "quadril baixo, ombros no banco",
+      "end": "ponte com quadril estendido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "panturrilha-sentado",
+    "canonicalName": "panturrilha-sentado",
+    "displayNamePt": "Panturrilha sentado",
+    "name": "Panturrilha sentado",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-calf",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 25,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Rolo sobre os joelhos.",
+      "Suba na ponta dos pés.",
+      "Desça alongando.",
+      "Pausa curta no topo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "panturrilha-sentado",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "calcanhar baixo sentado",
+      "end": "ponta de pé sentado",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-sumo",
+    "canonicalName": "agachamento-sumo",
+    "displayNamePt": "Agachamento sumô",
+    "name": "Agachamento sumô",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pés bem abertos, pontas para fora.",
+      "Desça o quadril entre os joelhos.",
+      "Suba contraindo adutores e glúteo.",
+      "Peito alto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "agachamento-sumo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado amplo",
+      "end": "em pé em base sumô",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "passada-caminhada",
+    "canonicalName": "passada-caminhada",
+    "displayNamePt": "Passada caminhando",
+    "name": "Passada caminhando",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "perna-lunge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "lunge",
+    "movementPatternRaw": "lunge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Afundo contínuo para frente.",
+      "Joelho de trás desce perto do chão.",
+      "Alterne as pernas.",
+      "Passos estáveis."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "passada-caminhada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "afundo em deslocamento",
+      "end": "próximo passo em pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "terra-convencional",
+    "canonicalName": "terra-convencional",
+    "displayNamePt": "Levantamento terra",
+    "name": "Levantamento terra",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "lombar",
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 70,
+    "priority": 1,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "costas",
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra sobre o meio do pé, quadril atrás.",
+      "Puxe a barra raspando as pernas.",
+      "Trave o quadril no topo.",
+      "Desça com a mesma trajetória."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "terra-convencional",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra no chão, quadril baixo",
+      "end": "em pé, barra nas coxas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "desenvolvimento",
+    "canonicalName": "desenvolvimento",
+    "displayNamePt": "Desenvolvimento militar",
+    "name": "Desenvolvimento militar",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 1,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra na clavícula, core firme.",
+      "Empurre acima da cabeça.",
+      "Desça controlado à clavícula.",
+      "Não jogue a lombar à frente."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "desenvolvimento",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra na clavícula",
+      "end": "barra acima da cabeça",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "elevacao-lateral",
+    "canonicalName": "elevacao-lateral",
+    "displayNamePt": "Elevação lateral",
+    "name": "Elevação lateral",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "ambos",
+    "swapGroup": "ombro-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 1,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Braços levemente flexionados ao lado do corpo.",
+      "Eleve até a linha dos ombros.",
+      "Desça com controle.",
+      "Não encolha o trapézio."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "elevacao-lateral",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres ao lado das coxas",
+      "end": "halteres na linha dos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pike-push",
+    "canonicalName": "pike-push",
+    "displayNamePt": "Flexão pike",
+    "name": "Flexão pike",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "casa",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Quadril alto, corpo em V invertido.",
+      "Desça a cabeça entre as mãos.",
+      "Empurre de volta.",
+      "Peso nos ombros, não no peito."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "pike-push",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cabeça próxima ao chão no pike",
+      "end": "braços estendidos no V",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "desenvolvimento-halter",
+    "canonicalName": "desenvolvimento-halter",
+    "displayNamePt": "Desenvolvimento com halteres",
+    "name": "Desenvolvimento com halteres",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "ambos",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 1,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Sentado ou em pé, halteres na linha das orelhas.",
+      "Empurre para cima.",
+      "Desça até os cotovelos a 90 graus.",
+      "Punhos firmes."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "desenvolvimento-halter",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres na altura das orelhas",
+      "end": "halteres acima da cabeça",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "elevacao-frontal",
+    "canonicalName": "elevacao-frontal",
+    "displayNamePt": "Elevação frontal",
+    "name": "Elevação frontal",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "ambos",
+    "swapGroup": "ombro-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Halteres à frente das coxas.",
+      "Eleve até a linha dos ombros.",
+      "Desça lento.",
+      "Não balançe o tronco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "elevacao-frontal",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres nas coxas",
+      "end": "halteres à frente na linha dos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-alta",
+    "canonicalName": "remada-alta",
+    "displayNamePt": "Remada alta",
+    "name": "Remada alta",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-raise",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 3,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "costas"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra na frente das coxas.",
+      "Puxe até a clavícula, cotovelos altos.",
+      "Desça controlado.",
+      "Evite se a articulação do ombro incomodar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remada-alta",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nas coxas",
+      "end": "barra na clavícula, cotovelos altos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "arnold-press",
+    "canonicalName": "arnold-press",
+    "displayNamePt": "Arnold press",
+    "name": "Arnold press",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Comece com palmas à frente do peito.",
+      "Gire e empurre acima da cabeça.",
+      "Volte girando as palmas.",
+      "Movimento contínuo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "arnold-press",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres à frente do peito, palmas para você",
+      "end": "halteres acima, palmas à frente",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crucifixo-inverso",
+    "canonicalName": "crucifixo-inverso",
+    "displayNamePt": "Crucifixo inverso",
+    "name": "Crucifixo inverso",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "costas"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Incline o tronco, halteres pendurados.",
+      "Abra os braços até a linha dos ombros.",
+      "Aperte o deltoide posterior.",
+      "Pescoço neutro."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crucifixo-inverso",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres pendurados à frente",
+      "end": "braços abertos na linha dos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "desenvolvimento-maquina",
+    "canonicalName": "desenvolvimento-maquina",
+    "displayNamePt": "Desenvolvimento na máquina",
+    "name": "Desenvolvimento na máquina",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 25,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ajuste o assento para as pegadas na linha dos ombros.",
+      "Empurre para cima.",
+      "Desça até 90 graus.",
+      "Costas no encosto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "desenvolvimento-maquina",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pegadas na linha dos ombros",
+      "end": "braços estendidos na máquina",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "elevacao-lateral-polia",
+    "canonicalName": "elevacao-lateral-polia",
+    "displayNamePt": "Elevação lateral na polia",
+    "name": "Elevação lateral na polia",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombro-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 6,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Polia baixa cruzada atrás do corpo.",
+      "Eleve o braço até a linha do ombro.",
+      "Desça sem perder a tensão.",
+      "Tronco estável."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "elevacao-lateral-polia",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "mão baixa junto à coxa",
+      "end": "braço na linha do ombro",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "handstand-hold",
+    "canonicalName": "handstand-hold",
+    "displayNamePt": "Parada de mãos na parede",
+    "name": "Parada de mãos na parede",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "casa",
+    "swapGroup": "ombro-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "core",
+      "triceps"
+    ],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Encontre a parede com os pés.",
+      "Trave ombros e core.",
+      "Respire sem desabar os ombros.",
+      "Desça com controle."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "handstand-hold",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corpo invertido na parede",
+      "end": "mesma posição isométrica",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-direta",
+    "canonicalName": "rosca-direta",
+    "displayNamePt": "Rosca direta",
+    "name": "Rosca direta",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "ambos",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 1,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra na largura dos ombros, cotovelos junto ao tronco.",
+      "Flexione até a barra chegar perto dos ombros.",
+      "Desça até quase estender.",
+      "Não jogue o tronco para trás."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-direta",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nas coxas, braços longos",
+      "end": "barra junto aos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-martelo",
+    "canonicalName": "rosca-martelo",
+    "displayNamePt": "Rosca martelo",
+    "name": "Rosca martelo",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "ambos",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 2,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Halteres em pegada neutra.",
+      "Flexione até a altura do ombro.",
+      "Desça controlado.",
+      "Cotovelos parados."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-martelo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres ao lado das coxas",
+      "end": "halteres na linha dos ombros, pegada neutra",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-inclinada",
+    "canonicalName": "rosca-inclinada",
+    "displayNamePt": "Rosca inclinada",
+    "name": "Rosca inclinada",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 2,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Banco 45–60 graus, braços pendurados.",
+      "Flexione até o pico do bíceps.",
+      "Desça alongando.",
+      "Não encolha os ombros."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-inclinada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres pendurados no inclinado",
+      "end": "halteres junto aos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-scott",
+    "canonicalName": "rosca-scott",
+    "displayNamePt": "Rosca scott",
+    "name": "Rosca scott",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 2,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Braços apoiados no banco scott.",
+      "Flexione até o pico.",
+      "Desça sem estender por completo se o cotovelo incomodar.",
+      "Tronco colado no apoio."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-scott",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra baixa no scott",
+      "end": "barra no pico da flexão",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-concentrada",
+    "canonicalName": "rosca-concentrada",
+    "displayNamePt": "Rosca concentrada",
+    "name": "Rosca concentrada",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "ambos",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 3,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Cotovelo apoiado na coxa interna.",
+      "Flexione o halter até o ombro.",
+      "Desça lento.",
+      "Sem balanço."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-concentrada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halter baixo, cotovelo na coxa",
+      "end": "halter próximo ao ombro",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-polia",
+    "canonicalName": "rosca-polia",
+    "displayNamePt": "Rosca na polia",
+    "name": "Rosca na polia",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 18,
+    "priority": 2,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Polia baixa, barra reta ou W.",
+      "Flexione mantendo cotovelos fixos.",
+      "Tensão constante na volta.",
+      "Postura alta."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-polia",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra baixa à frente",
+      "end": "barra junto aos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-banco",
+    "canonicalName": "rosca-banco",
+    "displayNamePt": "Rosca no banco 21",
+    "name": "Rosca no banco 21",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "ambos",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 3,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "7 reps da metade inferior, 7 da superior, 7 completas.",
+      "Cotovelos colados.",
+      "Carga moderada.",
+      "Respire a cada bloco."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-banco",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nas coxas",
+      "end": "barra no pico da rosca",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "chin-hold",
+    "canonicalName": "chin-hold",
+    "displayNamePt": "Isometria na barra supinada",
+    "name": "Isometria na barra supinada",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "casa",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "costas"
+    ],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Puxe até o queixo ficar acima da barra.",
+      "Segure a posição.",
+      "Desça controlado ao final.",
+      "Ombros longe das orelhas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "chin-hold",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "queixo acima da barra",
+      "end": "mesma isometria",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-corda",
+    "canonicalName": "triceps-corda",
+    "displayNamePt": "Tríceps na corda",
+    "name": "Tríceps na corda",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 1,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Cotovelos colados ao tronco.",
+      "Estenda a corda para baixo abrindo no final.",
+      "Volte até 90 graus.",
+      "Não abra os cotovelos para o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-corda",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corda na altura do peito, cotovelos dobrados",
+      "end": "braços estendidos, corda aberta",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-banco",
+    "canonicalName": "triceps-banco",
+    "displayNamePt": "Tríceps no banco",
+    "name": "Tríceps no banco",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "ambos",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Mãos no banco atrás do corpo, pés à frente.",
+      "Desça flexionando os cotovelos.",
+      "Empurre até estender.",
+      "Ombros estáveis."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-banco",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "quadril baixo, cotovelos flexionados",
+      "end": "braços estendidos no mergulho",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-testa",
+    "canonicalName": "triceps-testa",
+    "displayNamePt": "Tríceps testa",
+    "name": "Tríceps testa",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 1,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite, barra acima da testa.",
+      "Flexione só os cotovelos descendo a barra.",
+      "Estenda de volta.",
+      "Cotovelos apontando para cima."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-testa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra próxima à testa",
+      "end": "barra acima do peito, braços longos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-frances",
+    "canonicalName": "triceps-frances",
+    "displayNamePt": "Tríceps francês",
+    "name": "Tríceps francês",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "ambos",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 2,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Halter atrás da cabeça, cotovelos altos.",
+      "Estenda acima da cabeça.",
+      "Desça alongando o tríceps.",
+      "Não abra os cotovelos."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-frances",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halter atrás da cabeça",
+      "end": "halter acima da cabeça",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "mergulho-paralelas",
+    "canonicalName": "mergulho-paralelas",
+    "displayNamePt": "Mergulho nas paralelas",
+    "name": "Mergulho nas paralelas",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "peito",
+      "ombros"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Tronco mais vertical para ênfase no tríceps.",
+      "Desça até os ombros confortáveis.",
+      "Empurre até estender.",
+      "Não encolha o pescoço."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "mergulho-paralelas",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "ombros baixos nas barras",
+      "end": "braços estendidos nas paralelas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-coice",
+    "canonicalName": "triceps-coice",
+    "displayNamePt": "Tríceps coice",
+    "name": "Tríceps coice",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "ambos",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 3,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Tronco inclinado, cotovelo colado.",
+      "Estenda o halter para trás.",
+      "Volte até 90 graus.",
+      "Sem balanço."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-coice",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "antebraço paralelo ao chão",
+      "end": "braço estendido para trás",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "triceps-polia-barra",
+    "canonicalName": "triceps-polia-barra",
+    "displayNamePt": "Tríceps na polia com barra",
+    "name": "Tríceps na polia com barra",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 22,
+    "priority": 2,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra reta na polia alta.",
+      "Estenda até os cotovelos travarem com controle.",
+      "Volte até o antebraço ficar paralelo.",
+      "Peito aberto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "triceps-polia-barra",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra na altura do peito",
+      "end": "barra baixa, braços longos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "diamond-hold",
+    "canonicalName": "diamond-hold",
+    "displayNamePt": "Isometria flexão diamante",
+    "name": "Isometria flexão diamante",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "casa",
+    "swapGroup": "triceps-ext",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "peito"
+    ],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Desça até o meio da flexão diamante.",
+      "Segure a posição.",
+      "Core firme.",
+      "Suba ao final."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "diamond-hold",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "meio da flexão diamante",
+      "end": "mesma isometria",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "prancha",
+    "canonicalName": "prancha",
+    "displayNamePt": "Prancha",
+    "name": "Prancha",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-iso",
+    "joints": [],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 1,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Antebraços e pontas dos pés no chão.",
+      "Corpo em linha reta.",
+      "Não deixe o quadril cair nem subir demais.",
+      "Respire sem perder a tensão."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "prancha",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "prancha baixa alinhada",
+      "end": "mesma posição isométrica",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "abdominal-remador",
+    "canonicalName": "abdominal-remador",
+    "displayNamePt": "Abdominal remador",
+    "name": "Abdominal remador",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-dyn",
+    "joints": [],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 1,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite, joelhos e tronco sobem juntos.",
+      "Estenda na volta sem bater no chão.",
+      "Movimento controlado.",
+      "Pescoço relaxado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "abdominal-remador",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corpo estendido no chão",
+      "end": "joelhos e tronco unidos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "hollow",
+    "canonicalName": "hollow",
+    "displayNamePt": "Hollow hold",
+    "name": "Hollow hold",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-iso",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Lombar colada no chão.",
+      "Braços e pernas levemente elevados.",
+      "Mantenha a posição.",
+      "Se a lombar sair, encurte a alavanca."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "hollow",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "hollow com membros elevados",
+      "end": "mesma isometria",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "abdominal-infra",
+    "canonicalName": "abdominal-infra",
+    "displayNamePt": "Elevação de pernas",
+    "name": "Elevação de pernas",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-dyn",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite ou pendure, pernas juntas.",
+      "Eleve até 90 graus.",
+      "Desça sem arquear a lombar.",
+      "Movimento lento."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "abdominal-infra",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pernas baixas",
+      "end": "pernas a 90 graus",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "prancha-lateral",
+    "canonicalName": "prancha-lateral",
+    "displayNamePt": "Prancha lateral",
+    "name": "Prancha lateral",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-iso",
+    "joints": [],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Apoio no antebraço, corpo de lado.",
+      "Quadril elevado.",
+      "Troque o lado.",
+      "Ombro empilhado sobre o cotovelo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "prancha-lateral",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "prancha lateral alinhada",
+      "end": "mesma isometria",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "ab-wheel",
+    "canonicalName": "ab-wheel",
+    "displayNamePt": "Roda abdominal",
+    "name": "Roda abdominal",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-dyn",
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Joelhos no chão, roda à frente.",
+      "Role para frente sem deixar a lombar cair.",
+      "Volte contraindo o abdômen.",
+      "Amplitude que você controla."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "ab-wheel",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "joelhos abaixo do quadril",
+      "end": "corpo alongado na roda",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "dead-bug",
+    "canonicalName": "dead-bug",
+    "displayNamePt": "Dead bug",
+    "name": "Dead bug",
+    "version": 1,
+    "group": "core",
+    "equipment": "casa",
+    "swapGroup": "core-dyn",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite, braços e joelhos a 90 graus.",
+      "Estenda braço e perna opostos.",
+      "Volte e alterne.",
+      "Lombar colada."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "dead-bug",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "posição 90/90 no chão",
+      "end": "membro oposto estendido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "mountain-climber",
+    "canonicalName": "mountain-climber",
+    "displayNamePt": "Mountain climber",
+    "name": "Mountain climber",
+    "version": 1,
+    "group": "core",
+    "equipment": "casa",
+    "swapGroup": "core-dyn",
+    "joints": [
+      "joelho",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "cardio"
+    ],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Prancha alta.",
+      "Alterne os joelhos em direção ao peito.",
+      "Quadril estável.",
+      "Ritmo constante."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "mountain-climber",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "prancha alta",
+      "end": "joelho avançado sob o tronco",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pallof",
+    "canonicalName": "pallof",
+    "displayNamePt": "Pallof press",
+    "name": "Pallof press",
+    "version": 1,
+    "group": "core",
+    "equipment": "academia",
+    "swapGroup": "core-iso",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "De lado para a polia, cabo no peito.",
+      "Empurre os braços à frente resistindo à rotação.",
+      "Volte ao peito.",
+      "Quadril travado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "pallof",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cabo no peito",
+      "end": "braços estendidos à frente",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crunch",
+    "canonicalName": "crunch",
+    "displayNamePt": "Abdominal crunch",
+    "name": "Abdominal crunch",
+    "version": 1,
+    "group": "core",
+    "equipment": "casa",
+    "swapGroup": "core-dyn",
+    "joints": [],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite, joelhos dobrados.",
+      "Eleve as escápulas do chão.",
+      "Desça sem relaxar por completo.",
+      "Não puxe o pescoço."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crunch",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "escápulas no chão",
+      "end": "tronco levemente fletido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "farmers-carry",
+    "canonicalName": "farmers-carry",
+    "displayNamePt": "Farmer walk",
+    "name": "Farmer walk",
+    "version": 1,
+    "group": "core",
+    "equipment": "academia",
+    "swapGroup": "core-iso",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 24,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "carry_iso",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Halteres pesados ao lado do corpo.",
+      "Caminhe com tronco alto.",
+      "Passos curtos e estáveis.",
+      "Ombros longe das orelhas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "farmers-carry",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "em pé com cargas nas mãos",
+      "end": "passada com tronco travado",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "russian-twist",
+    "canonicalName": "russian-twist",
+    "displayNamePt": "Russian twist",
+    "name": "Russian twist",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-dyn",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 6,
+    "priority": 3,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Sentado, tronco recuado, pés elevados se possível.",
+      "Gire o implemento de um lado ao outro.",
+      "Respire a cada giro.",
+      "Não arredonde demais a lombar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "russian-twist",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "tronco centralizado",
+      "end": "rotação para um lado",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "corrida",
+    "canonicalName": "corrida",
+    "displayNamePt": "Corrida contínua",
+    "name": "Corrida contínua",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "ambos",
+    "swapGroup": "cardio-steady",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 1,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ritmo conversável.",
+      "Passada leve, tronco alto.",
+      "Respire pelo nariz e boca conforme precisar.",
+      "Termine com desaquecimento."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "corrida",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "passada de corrida, um pé no ar",
+      "end": "passada oposta",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "hiit-bike",
+    "canonicalName": "hiit-bike",
+    "displayNamePt": "HIIT na bike",
+    "name": "HIIT na bike",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-hiit",
+    "joints": [],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 1,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Alterne sprints curtos e recuperação.",
+      "Postura firme no selim.",
+      "Não prenda a respiração.",
+      "Ajuste a carga para completar os intervalos."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "hiit-bike",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "sprint na bike",
+      "end": "pedalada de recuperação",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "burpee",
+    "canonicalName": "burpee",
+    "displayNamePt": "Burpee",
+    "name": "Burpee",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "ambos",
+    "swapGroup": "cardio-hiit",
+    "joints": [
+      "joelho",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "peito",
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Agache, mãos no chão, jogue os pés para trás.",
+      "Flexão opcional, volte os pés e salte.",
+      "Ritmo sustentável.",
+      "Aterrisse macio."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "burpee",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado com mãos no chão",
+      "end": "salto com braços acima",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pular-corda",
+    "canonicalName": "pular-corda",
+    "displayNamePt": "Pular corda",
+    "name": "Pular corda",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "ambos",
+    "swapGroup": "cardio-steady",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Saltos baixos na ponta dos pés.",
+      "Punhos giram a corda, não os braços inteiros.",
+      "Ritmo constante.",
+      "Joelhos moles."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "pular-corda",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "corda atrás dos pés",
+      "end": "salto com corda passando embaixo",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remo-ergometro",
+    "canonicalName": "remo-ergometro",
+    "displayNamePt": "Remo ergômetro",
+    "name": "Remo ergômetro",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-steady",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "costas"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pernas, quadril e braços nessa ordem.",
+      "Volta reversa: braços, quadril, pernas.",
+      "Cadência estável.",
+      "Não arredonde as costas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "remo-ergometro",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "catch com joelhos flexionados",
+      "end": "finish com pernas estendidas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "eliptico",
+    "canonicalName": "eliptico",
+    "displayNamePt": "Elíptico",
+    "name": "Elíptico",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-steady",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Postura alta, impulso nos pés e braços.",
+      "Cadência constante.",
+      "Não trave os joelhos.",
+      "Use para baixo impacto."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "eliptico",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "passada no elíptico",
+      "end": "passada oposta",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "jumping-jack",
+    "canonicalName": "jumping-jack",
+    "displayNamePt": "Polichinelo",
+    "name": "Polichinelo",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "casa",
+    "swapGroup": "cardio-hiit",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Salte abrindo pés e braços.",
+      "Volte ao centro.",
+      "Ritmo constante.",
+      "Aterrisse macio."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "jumping-jack",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pés juntos, braços ao lado",
+      "end": "pés abertos, braços acima",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "battle-rope",
+    "canonicalName": "battle-rope",
+    "displayNamePt": "Corda naval",
+    "name": "Corda naval",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-hiit",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Joelhos moles, tronco estável.",
+      "Ondas alternadas com as cordas.",
+      "Intervalos curtos.",
+      "Não encolha os ombros."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "battle-rope",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cordas no chão, braços baixos",
+      "end": "onda alta nas cordas",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "subida-caixa",
+    "canonicalName": "subida-caixa",
+    "displayNamePt": "Subida na caixa",
+    "name": "Subida na caixa",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "ambos",
+    "swapGroup": "cardio-steady",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas"
+    ],
+    "movementPattern": "lunge",
+    "movementPatternRaw": "lunge",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pise com o pé inteiro na caixa.",
+      "Suba estendendo o quadril.",
+      "Desça com controle.",
+      "Alterne as pernas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "subida-caixa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "um pé na caixa",
+      "end": "em pé sobre a caixa",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "assalto-bike",
+    "canonicalName": "assalto-bike",
+    "displayNamePt": "Assault bike",
+    "name": "Assault bike",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-hiit",
+    "joints": [],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Empurre e puxe os braços junto com as pernas.",
+      "Sprints curtos.",
+      "Recupere sem parar de pedalar.",
+      "Tronco estável."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "assalto-bike",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "sprint na assault bike",
+      "end": "pedalada de recuperação",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "crucifixo-polia-baixa",
+    "canonicalName": "crucifixo-polia-baixa",
+    "displayNamePt": "Crucifixo na polia baixa",
+    "name": "Crucifixo na polia baixa",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-fly",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "fly",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Polias baixas, passo à frente.",
+      "Suba os cabos em arco até a frente do peito.",
+      "Desça alongando.",
+      "Cotovelos moles."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "crucifixo-polia-baixa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cabos baixos ao lado do quadril",
+      "end": "mãos à frente do peito alto",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "good-morning",
+    "canonicalName": "good-morning",
+    "displayNamePt": "Good morning",
+    "name": "Good morning",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra no trapézio, joelhos moles.",
+      "Incline o tronco empurrando o quadril para trás.",
+      "Volte estendendo o quadril.",
+      "Carga conservadora."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "good-morning",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "tronco inclinado, barra nas costas",
+      "end": "em pé",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "adutora",
+    "canonicalName": "adutora",
+    "displayNamePt": "Cadeira adutora",
+    "name": "Cadeira adutora",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Joelhos nas almofadas da máquina.",
+      "Feche as pernas contra a resistência.",
+      "Abra com controle.",
+      "Tronco apoiado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "adutora",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pernas abertas na adutora",
+      "end": "pernas fechadas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "abdutora",
+    "canonicalName": "abdutora",
+    "displayNamePt": "Cadeira abdutora",
+    "name": "Cadeira abdutora",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-squat",
+    "joints": [],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Joelhos nas almofadas.",
+      "Abra as pernas contra a resistência.",
+      "Feche controlado.",
+      "Não arqueie a lombar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "abdutora",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pernas juntas na abdutora",
+      "end": "pernas abertas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-inversa",
+    "canonicalName": "rosca-inversa",
+    "displayNamePt": "Rosca inversa",
+    "name": "Rosca inversa",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 3,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pegada pronada na barra.",
+      "Flexione até a barra chegar perto dos ombros.",
+      "Desça lento.",
+      "Punhos firmes."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "rosca-inversa",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra pronada nas coxas",
+      "end": "barra no pico da rosca inversa",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "hanging-knee-raise",
+    "canonicalName": "hanging-knee-raise",
+    "displayNamePt": "Elevação de joelhos na barra",
+    "name": "Elevação de joelhos na barra",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-dyn",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "mobility",
+    "movementPatternRaw": "other",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pendure na barra, ombros ativos.",
+      "Eleve os joelhos ao peito.",
+      "Desça sem balanço excessivo.",
+      "Não encolha o pescoço."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "hanging-knee-raise",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pendurado, pernas longas",
+      "end": "joelhos junto ao peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "kettlebell-swing",
+    "canonicalName": "kettlebell-swing",
+    "displayNamePt": "Swing com kettlebell",
+    "name": "Swing com kettlebell",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "perna-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 16,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core",
+      "ombros"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Hinge, kettlebell entre as pernas.",
+      "Estenda o quadril projetando o peso à frente.",
+      "Deixe o peso flutuar até a linha dos ombros.",
+      "Não levante com os braços."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "kettlebell-swing",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "kettlebell entre as pernas no hinge",
+      "end": "peso flutuando na linha dos ombros",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "ski-erg",
+    "canonicalName": "ski-erg",
+    "displayNamePt": "SkiErg",
+    "name": "SkiErg",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-hiit",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Puxe as alças de cima para baixo com o quadril.",
+      "Estenda o quadril no final da puxada.",
+      "Recupere os braços alto.",
+      "Cadência rítmica."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [],
+    "mediaId": "ski-erg",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços altos no SkiErg",
+      "end": "puxada baixa junto às coxas",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "supino-chao",
+    "canonicalName": "supino-chao",
+    "displayNamePt": "Supino no chão",
+    "name": "Supino no chão",
+    "version": 1,
+    "group": "peito",
+    "equipment": "ambos",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "ombros"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite no chão com os joelhos flexionados e a barra ou halteres acima do peito.",
+      "Desça até os tríceps tocarem o chão, sem perder as escápulas estáveis.",
+      "Empurre até a extensão dos braços.",
+      "O chão limita a amplitude — útil com ombro irritado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra",
+      "halteres"
+    ],
+    "mediaId": "supino-chao",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "cotovelos no chão, carga sobre o peito",
+      "end": "braços estendidos acima do peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "landmine-press",
+    "canonicalName": "landmine-press",
+    "displayNamePt": "Landmine press",
+    "name": "Landmine press",
+    "version": 1,
+    "group": "peito",
+    "equipment": "academia",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 3,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "ombros",
+      "core"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Encaixe uma ponta da barra no landmine ou canto.",
+      "Segure a outra ponta à altura do ombro, tronco firme.",
+      "Empurre a barra para cima e um pouco para frente.",
+      "Desça com controle até o ombro."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "landmine-press",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "ponta da barra no ombro",
+      "end": "braço estendido na diagonal",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-pendlay",
+    "canonicalName": "remada-pendlay",
+    "displayNamePt": "Remada Pendlay",
+    "name": "Remada Pendlay",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 2,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra no chão, quadril em dobradiça, tronco paralelo.",
+      "Puxe a barra até o baixo peito e devolva ao chão a cada repetição.",
+      "Sem balanço do tronco.",
+      "Reset no chão antes da próxima puxada."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "remada-pendlay",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra no chão, tronco paralelo",
+      "end": "barra no baixo peito",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "remada-meadows",
+    "canonicalName": "remada-meadows",
+    "displayNamePt": "Remada Meadows",
+    "name": "Remada Meadows",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 25,
+    "priority": 3,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "core"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Uma ponta da barra no landmine; fique de lado e segure a outra ponta.",
+      "Puxe o cotovelo para trás junto à costela.",
+      "Controle a descida até o alongamento da dorsal.",
+      "Troque o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "remada-meadows",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braço alongado na ponta da barra",
+      "end": "cotovelo atrás da linha do tronco",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-frontal",
+    "canonicalName": "agachamento-frontal",
+    "displayNamePt": "Agachamento frontal",
+    "name": "Agachamento frontal",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-squat",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core",
+      "ombros"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra nos deltoides anteriores, cotovelos altos.",
+      "Desça mantendo o tronco mais vertical que no agachamento nas costas.",
+      "Joelhos acompanham a ponta dos pés.",
+      "Suba empurrando o chão sem perder os cotovelos altos."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "agachamento-frontal",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra na frente dos ombros, em pé",
+      "end": "quadris abaixo da linha dos joelhos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "terra-hex-bar",
+    "canonicalName": "terra-hex-bar",
+    "displayNamePt": "Terra com barra hexagonal",
+    "name": "Terra com barra hexagonal",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 70,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "costas",
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Entre na hex bar, pés na largura do quadril.",
+      "Pegue as alças, peito aberto, latas ativas.",
+      "Empurre o chão até ficar ereto.",
+      "Desça com controle até as anilhas tocarem o chão."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "terra-hex-bar",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "alças da hex bar nas mãos, quadril baixo",
+      "end": "em pé, quadril estendido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rack-pull",
+    "canonicalName": "rack-pull",
+    "displayNamePt": "Rack pull",
+    "name": "Rack pull",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 80,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "costas",
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra no rack na altura dos joelhos ou um pouco acima.",
+      "Pegada firme, escápulas para baixo.",
+      "Estenda o quadril até ficar ereto.",
+      "Desça a barra de volta aos pinos."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "rack-pull",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nos pinos, quadril em dobradiça",
+      "end": "em pé, barra nas coxas",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "nordic-curl",
+    "canonicalName": "nordic-curl",
+    "displayNamePt": "Nordic curl",
+    "name": "Nordic curl",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "ambos",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Fixe os pés (parceiro, barra ou pad).",
+      "Desça o tronco com o quadril estendido, resistindo com os posteriores.",
+      "Use as mãos no chão se precisar e empurre para voltar.",
+      "Mantenha a linha do corpo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "nordic-curl",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "ajoelhado, tronco ereto",
+      "end": "tronco próximo do chão",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "glute-ham-raise",
+    "canonicalName": "glute-ham-raise",
+    "displayNamePt": "Glute ham raise",
+    "name": "Glute ham raise",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Ajuste o GHD com os pés presos e joelhos no apoio.",
+      "Desça o tronco com controle e suba contraindo glúteo e posterior.",
+      "Evite puxar com a lombar.",
+      "Amplitude completa sem hiperextensão cervical."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "maquinas"
+    ],
+    "mediaId": "glute-ham-raise",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "tronco alinhado com as coxas no GHD",
+      "end": "tronco baixo, posteriores alongados",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "extensao-lombar",
+    "canonicalName": "extensao-lombar",
+    "displayNamePt": "Extensão lombar",
+    "name": "Extensão lombar",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Banco romano ou GHD: quadril no apoio, pés fixos.",
+      "Desça o tronco com a coluna neutra.",
+      "Suba até alinhar tronco e pernas, sem hiperextender.",
+      "Pode segurar anilha no peito."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "maquinas"
+    ],
+    "mediaId": "extensao-lombar",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "tronco alinhado com as pernas",
+      "end": "tronco flexionado na dobradiça",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "hip-thrust-maquina",
+    "canonicalName": "hip-thrust-maquina",
+    "displayNamePt": "Hip thrust na máquina",
+    "name": "Hip thrust na máquina",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 2,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Sente com as costas no apoio e a faixa/almofada no quadril.",
+      "Pés firmes, joelhos a 90 graus no topo.",
+      "Empurre o quadril até a extensão completa.",
+      "Desça com controle sem perder o contato das costas."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "maquinas"
+    ],
+    "mediaId": "hip-thrust-maquina",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "quadril baixo na máquina",
+      "end": "quadril estendido, linha ombro-joelho",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "coice-polia",
+    "canonicalName": "coice-polia",
+    "displayNamePt": "Coice na polia",
+    "name": "Coice na polia",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-hinge",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 15,
+    "priority": 3,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "hinge",
+    "movementPatternRaw": "hinge",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Tornozeleira na polia baixa, tronco levemente inclinado.",
+      "Estenda o quadril para trás sem girar a pelve.",
+      "Volte sem deixar o peso puxar a lombar.",
+      "Troque a perna."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cabos"
+    ],
+    "mediaId": "coice-polia",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "perna de trabalho à frente, cabo tenso",
+      "end": "perna estendida atrás",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "push-press",
+    "canonicalName": "push-press",
+    "displayNamePt": "Push press",
+    "name": "Push press",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombros-press",
+    "joints": [
+      "ombro",
+      "punho",
+      "joelho"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 2,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "pernas",
+      "core"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Barra nos ombros, pés na largura do quadril.",
+      "Flexione levemente os joelhos e estenda para impulsionar a barra.",
+      "Trave os braços acima da cabeça.",
+      "Desça a barra de volta aos ombros com controle."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra",
+      "halteres"
+    ],
+    "mediaId": "push-press",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nos ombros, joelhos semiflexionados",
+      "end": "barra acima da cabeça, pernas estendidas",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rotacao-externa-cabo",
+    "canonicalName": "rotacao-externa-cabo",
+    "displayNamePt": "Rotação externa no cabo",
+    "name": "Rotação externa no cabo",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombros-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 5,
+    "priority": 3,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "rotation",
+    "movementPatternRaw": "rotation",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Cotovelo a 90 graus colado no tronco, cabo na altura do cotovelo.",
+      "Gire o antebraço para fora sem abrir o cotovelo.",
+      "Volte com controle.",
+      "Carga leve — qualidade do manguito."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cabos"
+    ],
+    "mediaId": "rotacao-externa-cabo",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "antebraço à frente do tronco",
+      "end": "antebraço aberto para o lado",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "pull-apart-elastico",
+    "canonicalName": "pull-apart-elastico",
+    "displayNamePt": "Pull-apart com elástico",
+    "name": "Pull-apart com elástico",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "casa",
+    "swapGroup": "ombros-raise",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "costas"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Segure o elástico à frente com os braços estendidos.",
+      "Abra até o elástico tocar o peito, apertando as escápulas.",
+      "Volte sem perder a tensão.",
+      "Punhos neutros."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "elasticos"
+    ],
+    "mediaId": "pull-apart-elastico",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "elástico tenso à frente do peito",
+      "end": "elástico aberto na linha do peito",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-spider",
+    "canonicalName": "rosca-spider",
+    "displayNamePt": "Rosca spider",
+    "name": "Rosca spider",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 3,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Peito no banco inclinado, braços pendurados à frente.",
+      "Flexione os cotovelos sem balançar o tronco.",
+      "Desça até o alongamento.",
+      "Cotovelos fixos."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "halteres",
+      "barra"
+    ],
+    "mediaId": "rosca-spider",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços pendurados, cotovelos estendidos",
+      "end": "halteres próximos aos ombros",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "jm-press",
+    "canonicalName": "jm-press",
+    "displayNamePt": "JM press",
+    "name": "JM press",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-extension",
+    "joints": [
+      "punho",
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 30,
+    "priority": 3,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "peito",
+      "ombros"
+    ],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Deite no banco como no supino, pegada um pouco mais fechada.",
+      "Desça a barra em direção ao queixo/pescoço alto, cotovelos à frente.",
+      "Estenda os cotovelos para subir.",
+      "Híbrido de supino fechado e testa."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "jm-press",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra sobre o peito alto, cotovelos flexionados",
+      "end": "braços estendidos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "kickback-polia",
+    "canonicalName": "kickback-polia",
+    "displayNamePt": "Kickback na polia",
+    "name": "Kickback na polia",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-extension",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 10,
+    "priority": 3,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "extension",
+    "movementPatternRaw": "extension",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Incline o tronco, cotovelo colado ao tronco, polia baixa.",
+      "Estenda o antebraço para trás até o cotovelo travar.",
+      "Volte sem abrir o cotovelo.",
+      "Troque o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cabos"
+    ],
+    "mediaId": "kickback-polia",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "antebraço flexionado, cabo tenso",
+      "end": "braço estendido para trás",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "toes-to-bar",
+    "canonicalName": "toes-to-bar",
+    "displayNamePt": "Toes to bar",
+    "name": "Toes to bar",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-raise",
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "raise",
+    "movementPatternRaw": "raise",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pendurado na barra, ombros ativos (não encolher).",
+      "Eleve as pernas até os pés tocarem a barra.",
+      "Desça com controle sem balançar demais.",
+      "Regressão: knees to chest."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "toes-to-bar",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "pendurado, pernas estendidas",
+      "end": "pés tocando a barra",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "copenhagen-plank",
+    "canonicalName": "copenhagen-plank",
+    "displayNamePt": "Copenhagen plank",
+    "name": "Copenhagen plank",
+    "version": 1,
+    "group": "core",
+    "equipment": "ambos",
+    "swapGroup": "core-iso",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 3,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "pernas"
+    ],
+    "movementPattern": "anti_rotation",
+    "movementPatternRaw": "anti_rotation",
+    "difficulty": "advanced",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Apoie a perna de cima num banco, corpo em prancha lateral.",
+      "A perna de baixo pode ficar suspensa ou apoiada (regressão).",
+      "Mantenha quadril alinhado.",
+      "Troque o lado."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "copenhagen-plank",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "prancha lateral com perna no banco",
+      "end": "mesma linha, isometria",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "suitcase-carry",
+    "canonicalName": "suitcase-carry",
+    "displayNamePt": "Suitcase carry",
+    "name": "Suitcase carry",
+    "version": 1,
+    "group": "core",
+    "equipment": "academia",
+    "swapGroup": "core-carry",
+    "joints": [
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 20,
+    "priority": 2,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "ombros"
+    ],
+    "movementPattern": "carry",
+    "movementPatternRaw": "carry",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Pegue um halter ou kettlebell numa mão, ao lado da coxa.",
+      "Caminhe ereto sem inclinar para o lado da carga.",
+      "Troque a mão no retorno.",
+      "Passos curtos e estáveis."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "halteres",
+      "kettlebell"
+    ],
+    "mediaId": "suitcase-carry",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "carga numa mão, em pé",
+      "end": "mesma postura após os passos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "sled-push",
+    "canonicalName": "sled-push",
+    "displayNamePt": "Sled push",
+    "name": "Sled push",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-locomotion",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas",
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Mãos no trenó, tronco inclinado, pés atrás.",
+      "Empurre em passos poderosos sem deixar o quadril subir demais.",
+      "Respire em ritmo.",
+      "Distância ou tempo definido."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cardio"
+    ],
+    "mediaId": "sled-push",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "tronco inclinado no trenó parado",
+      "end": "passada longa, trenó em movimento",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "escada-ergometrica",
+    "canonicalName": "escada-ergometrica",
+    "displayNamePt": "Escada ergométrica",
+    "name": "Escada ergométrica",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-machine",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas",
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Segure os apoios sem pendurar o peso nas mãos.",
+      "Pise o degrau inteiro, joelho alinhado.",
+      "Cadência constante, peito aberto.",
+      "Ajuste nível para manter conversa difícil mas possível."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cardio"
+    ],
+    "mediaId": "escada-ergometrica",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "em pé na escada, um pé em cada degrau",
+      "end": "ciclo de subida contínua",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "esteira-inclinada",
+    "canonicalName": "esteira-inclinada",
+    "displayNamePt": "Esteira inclinada",
+    "name": "Esteira inclinada",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-machine",
+    "joints": [
+      "joelho"
+    ],
+    "unit": "min",
+    "baseLoad": 0,
+    "priority": 2,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "beginner",
+    "plannerEligible": true,
+    "active": true,
+    "instructions": [
+      "Incline 5–12% e caminhe sem correr se o objetivo for zona estável.",
+      "Passada natural, tronco levemente à frente.",
+      "Não segure o painel para aliviar o esforço.",
+      "Ajuste velocidade para manter o ritmo."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cardio"
+    ],
+    "mediaId": "esteira-inclinada",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "em pé na esteira inclinada",
+      "end": "ciclo de caminhada",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "flexao-archer",
+    "canonicalName": "flexao-archer",
+    "displayNamePt": "Flexão archer",
+    "name": "Flexão archer",
+    "version": 1,
+    "group": "peito",
+    "equipment": "casa",
+    "swapGroup": "peito-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 4,
+    "primaryMuscles": [
+      "peito"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "core"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "advanced",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Posição de flexão com as mãos mais abertas.",
+      "Desça deslocando o peito sobre um braço; o outro fica estendido.",
+      "Empurre de volta e alterne o lado.",
+      "Quadril estável."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "flexao-archer",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "flexão larga, braços estendidos",
+      "end": "peito sobre um braço, outro estendido",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "seal-row",
+    "canonicalName": "seal-row",
+    "displayNamePt": "Seal row",
+    "name": "Seal row",
+    "version": 1,
+    "group": "costas",
+    "equipment": "academia",
+    "swapGroup": "costas-pull",
+    "joints": [
+      "ombro"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 4,
+    "primaryMuscles": [
+      "costas"
+    ],
+    "secondaryMuscles": [
+      "biceps"
+    ],
+    "movementPattern": "pull",
+    "movementPatternRaw": "pull",
+    "difficulty": "intermediate",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Deite de bruços num banco elevado, barra ou halteres abaixo.",
+      "Puxe até o banco, escápulas juntas.",
+      "Sem impulso das pernas.",
+      "Desça com controle."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra",
+      "halteres"
+    ],
+    "mediaId": "seal-row",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braços pendurados sob o banco",
+      "end": "carga junto ao banco",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-zercher",
+    "canonicalName": "agachamento-zercher",
+    "displayNamePt": "Agachamento Zercher",
+    "name": "Agachamento Zercher",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-squat",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 40,
+    "priority": 4,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core",
+      "biceps"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "advanced",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Barra na dobra dos cotovelos, mãos unidas.",
+      "Agache mantendo o tronco o mais vertical possível.",
+      "Empurre o chão para subir.",
+      "Use toalha ou pad nos cotovelos se precisar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "agachamento-zercher",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "barra nos cotovelos, em pé",
+      "end": "quadris baixos, tronco vertical",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "agachamento-safety-bar",
+    "canonicalName": "agachamento-safety-bar",
+    "displayNamePt": "Agachamento com safety bar",
+    "name": "Agachamento com safety bar",
+    "version": 1,
+    "group": "pernas",
+    "equipment": "academia",
+    "swapGroup": "pernas-squat",
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "unit": "kg",
+    "baseLoad": 50,
+    "priority": 4,
+    "primaryMuscles": [
+      "pernas"
+    ],
+    "secondaryMuscles": [
+      "core"
+    ],
+    "movementPattern": "squat",
+    "movementPatternRaw": "squat",
+    "difficulty": "intermediate",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Encaixe a safety bar nos ombros, mãos nas alças.",
+      "Agache com o tronco um pouco mais inclinado que no front squat.",
+      "Joelhos acompanham os pés.",
+      "Suba mantendo as alças firmes."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra"
+    ],
+    "mediaId": "agachamento-safety-bar",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "safety bar nos ombros, em pé",
+      "end": "agachamento profundo",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "desenvolvimento-arnold-sentado",
+    "canonicalName": "desenvolvimento-arnold-sentado",
+    "displayNamePt": "Desenvolvimento Arnold sentado",
+    "name": "Desenvolvimento Arnold sentado",
+    "version": 1,
+    "group": "ombros",
+    "equipment": "academia",
+    "swapGroup": "ombros-press",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 4,
+    "primaryMuscles": [
+      "ombros"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "intermediate",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Sentado, halteres à frente do peito, palmas para você.",
+      "Gire e pressione até as palmas ficarem para frente no topo.",
+      "Desça revertendo a rotação.",
+      "Não arqueie a lombar."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "halteres"
+    ],
+    "mediaId": "desenvolvimento-arnold-sentado",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "halteres à frente do peito, palmas internas",
+      "end": "halteres acima da cabeça, palmas à frente",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-bayesian",
+    "canonicalName": "rosca-bayesian",
+    "displayNamePt": "Rosca bayesian",
+    "name": "Rosca bayesian",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 12,
+    "priority": 4,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "intermediate",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "De costas para a polia baixa, um passo à frente, cabo na mão.",
+      "Braço alongado atrás do tronco; flexione o cotovelo.",
+      "Desça até o alongamento do bíceps.",
+      "Tronco estável."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cabos"
+    ],
+    "mediaId": "rosca-bayesian",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "braço alongado atrás, cabo tenso",
+      "end": "cotovelo flexionado à frente",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "rosca-punho",
+    "canonicalName": "rosca-punho",
+    "displayNamePt": "Rosca de punho",
+    "name": "Rosca de punho",
+    "version": 1,
+    "group": "biceps",
+    "equipment": "academia",
+    "swapGroup": "biceps-curl",
+    "joints": [
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 8,
+    "priority": 4,
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [],
+    "movementPattern": "curl",
+    "movementPatternRaw": "curl",
+    "difficulty": "beginner",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Antebraços apoiados no banco, punhos para fora da borda.",
+      "Flexione só os punhos para cima.",
+      "Desça alongando os flexores.",
+      "Carga leve."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "halteres",
+      "barra"
+    ],
+    "mediaId": "rosca-punho",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "punhos estendidos, barra na ponta dos dedos",
+      "end": "punhos flexionados",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "mergulho-argolas",
+    "canonicalName": "mergulho-argolas",
+    "displayNamePt": "Mergulho nas argolas",
+    "name": "Mergulho nas argolas",
+    "version": 1,
+    "group": "triceps",
+    "equipment": "academia",
+    "swapGroup": "triceps-extension",
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 4,
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "peito",
+      "ombros"
+    ],
+    "movementPattern": "press",
+    "movementPatternRaw": "press",
+    "difficulty": "advanced",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Argolas na largura dos ombros, suporte estável no topo.",
+      "Desça até os ombros abaixo dos cotovelos, se a mobilidade permitir.",
+      "Empurre até travar os cotovelos, argolas junto ao corpo.",
+      "Não deixar as argolas abrirem."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "mergulho-argolas",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "suporte nas argolas, braços estendidos",
+      "end": "ombros abaixo dos cotovelos",
+      "tempo": "controlled",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "l-sit",
+    "canonicalName": "l-sit",
+    "displayNamePt": "L-sit",
+    "name": "L-sit",
+    "version": 1,
+    "group": "core",
+    "equipment": "casa",
+    "swapGroup": "core-iso",
+    "joints": [
+      "punho",
+      "lombar"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 4,
+    "primaryMuscles": [
+      "core"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "ombros"
+    ],
+    "movementPattern": "isometric",
+    "movementPatternRaw": "isometric",
+    "difficulty": "advanced",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Apoie as mãos no chão, paralletes ou barras.",
+      "Eleve as pernas estendidas à frente até formar um L.",
+      "Empurre o chão, ombros para baixo.",
+      "Regressão: joelhos flexionados (tuck)."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "peso_corporal"
+    ],
+    "mediaId": "l-sit",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "suporte com as mãos, quadril no ar",
+      "end": "pernas estendidas na horizontal",
+      "tempo": "hold",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "wall-ball",
+    "canonicalName": "wall-ball",
+    "displayNamePt": "Wall ball",
+    "name": "Wall ball",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-cond",
+    "joints": [
+      "joelho",
+      "ombro"
+    ],
+    "unit": "corpo",
+    "baseLoad": 0,
+    "priority": 4,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas",
+      "ombros",
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "intermediate",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Medicine ball no peito, frente a uma parede alta.",
+      "Agache e estenda para arremessar a bola no alvo.",
+      "Receba e desça de novo na mesma cadência.",
+      "Sem hiperextender a lombar no arremesso."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "cardio"
+    ],
+    "mediaId": "wall-ball",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado, bola no peito",
+      "end": "bola no alvo da parede, quadril estendido",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  },
+  {
+    "id": "thruster",
+    "canonicalName": "thruster",
+    "displayNamePt": "Thruster",
+    "name": "Thruster",
+    "version": 1,
+    "group": "cardio",
+    "equipment": "academia",
+    "swapGroup": "cardio-cond",
+    "joints": [
+      "joelho",
+      "ombro",
+      "punho"
+    ],
+    "unit": "kg",
+    "baseLoad": 25,
+    "priority": 4,
+    "primaryMuscles": [
+      "cardio"
+    ],
+    "secondaryMuscles": [
+      "pernas",
+      "ombros",
+      "core"
+    ],
+    "movementPattern": "cardio",
+    "movementPatternRaw": "cardio",
+    "difficulty": "advanced",
+    "plannerEligible": false,
+    "active": true,
+    "instructions": [
+      "Barra ou halteres nos ombros.",
+      "Agache completo e, na subida, pressione a carga acima da cabeça.",
+      "Um movimento só — não pause no pé.",
+      "Desça a carga aos ombros e repita."
+    ],
+    "alternativeIds": [],
+    "equipmentInventory": [
+      "barra",
+      "halteres"
+    ],
+    "mediaId": "thruster",
+    "mediaStatus": "missing",
+    "animationSpec": {
+      "start": "agachado, carga nos ombros",
+      "end": "em pé, carga acima da cabeça",
+      "tempo": "explosive",
+      "durationSec": 4,
+      "loop": true,
+      "camera": "three-quarter"
+    }
+  }
+]

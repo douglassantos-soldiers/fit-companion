@@ -21,7 +21,7 @@ export function CoachNudgeOverlay({
       description={`Volume ${delta} na semana e recuperação em queda. Vale olhar a análise antes de empilhar mais carga.`}
     >
       <div className="space-y-2">
-        <Link to="/progresso/resumo" onClick={onClose} className="block">
+        <Link to="/progresso/resumo" search={{ period: "week" }} onClick={onClose} className="block">
           <Button className="h-11 w-full font-bold uppercase">Ver análise</Button>
         </Link>
         <Button variant="secondary" className="h-11 w-full" onClick={onClose}>

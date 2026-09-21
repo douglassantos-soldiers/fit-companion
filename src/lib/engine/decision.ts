@@ -4,11 +4,9 @@
  */
 import type { ContextSnapshot } from "@/lib/engine/context-snapshot";
 import { decisionConfidence, explainWhy } from "@/lib/engine/explain";
-import {
-  reasonCodesFromSafetyFlags,
-  type ReasonCode,
-} from "@/lib/engine/reason-codes";
+import { reasonCodesFromSafetyFlags, type ReasonCode } from "@/lib/engine/reason-codes";
 import type { SafetyVerdict } from "@/lib/engine/safety";
+import { learningBiasAllowed } from "@/lib/engine/learning-guardrails";
 import type { LivingPlanSnapshot } from "@/lib/types";
 
 export type DecisionType =
@@ -81,7 +79,11 @@ export function computeDecisions(
   const safetyCodes = reasonCodesFromSafetyFlags(safety.flags);
   const allSeeds = [...new Set([...seeds, ...safetyCodes])];
 
-  const sleepLow = allSeeds.includes("sleep_low") || (snapshot.sleep.hours != null && snapshot.sleep.hours < 6);
+  const sleepLow =
+    allSeeds.includes("sleep_low") ||
+    (snapshot.sleep.source === "checkin" &&
+      snapshot.sleep.hours != null &&
+      snapshot.sleep.hours < 6);
   const energyLow = allSeeds.includes("energy_low") || snapshot.energy === "baixa";
   const timeLimited =
     allSeeds.includes("time_limited") ||
@@ -91,13 +93,17 @@ export function computeDecisions(
   const recoveryLow =
     allSeeds.includes("recovery_low") ||
     allSeeds.includes("rpe_high") ||
-    snapshot.recovery.level === "low";
+    snapshot.recovery.level === "low" ||
+    snapshot.recovery.readiness === "low";
   const travel = allSeeds.includes("travel") || snapshot.travel;
-  const equipmentLimited = allSeeds.includes("equipment_limited") || snapshot.equipment.limitedToday;
+  const equipmentLimited =
+    allSeeds.includes("equipment_limited") || snapshot.equipment.limitedToday;
   const proteinLow = allSeeds.includes("protein_low");
   const adherenceDrop = allSeeds.includes("adherence_drop");
   const sleepStress = sleepLow || energyLow;
-  const prefersShort = (snapshot.activePatterns ?? []).some((p) => p.kind === "prefers_short_sessions");
+  const prefersShort = (snapshot.activePatterns ?? []).some(
+    (p) => p.kind === "prefers_short_sessions",
+  );
 
   const blockStims = safety.blockStims || sleepLow;
   if (blockStims && !allSeeds.includes("stim_restriction")) {
@@ -159,9 +165,14 @@ export function computeDecisions(
     sessionDuration = Math.round(plannedMinutes * trainingVolume);
     modeCodes.push(
       ...allSeeds.filter((c) =>
-        ["sleep_low", "energy_low", "rpe_high", "recovery_low", "deload_week", "stim_restriction"].includes(
-          c,
-        ),
+        [
+          "sleep_low",
+          "energy_low",
+          "rpe_high",
+          "recovery_low",
+          "deload_week",
+          "stim_restriction",
+        ].includes(c),
       ),
     );
   } else if (
@@ -190,8 +201,35 @@ export function computeDecisions(
     if (!modeCodes.length) modeCodes.push("sleep_good");
   }
 
+  if (snapshot.training.weekHint === "push" && trainingMode === "full" && trainingVolume >= 1) {
+    const recoveryLevel =
+      snapshot.recovery.level === "low" ||
+      snapshot.recovery.level === "moderate" ||
+      snapshot.recovery.level === "recovered"
+        ? snapshot.recovery.level
+        : "moderate";
+    if (
+      !learningBiasAllowed({
+        recoveryLevel,
+        blockStims: safety.blockStims,
+        preferLightTraining: safety.preferLightTraining,
+        suggestedVolumeIncrease: true,
+      })
+    ) {
+      trainingMode = "deload";
+      trainingVolume = 0.7;
+      sessionDuration = Math.round(plannedMinutes * trainingVolume);
+      if (!modeCodes.includes("deload_week")) modeCodes.push("deload_week");
+    }
+  }
+
   // Travel + equipment: prefer express even if already full (unless coach/user locked full)
-  if (hasTrainingDay && accepted !== "full" && (travel || equipmentLimited) && trainingMode === "full") {
+  if (
+    hasTrainingDay &&
+    accepted !== "full" &&
+    (travel || equipmentLimited) &&
+    trainingMode === "full"
+  ) {
     trainingMode = "express";
     trainingVolume = 0.65;
     sessionDuration = Math.min(sessionDuration, availableMin, 35);
@@ -205,6 +243,7 @@ export function computeDecisions(
     (prefersShort || allSeeds.includes("express_high_adherence")) &&
     trainingMode === "full" &&
     snapshot.recovery.level !== "low" &&
+    snapshot.recovery.readiness !== "low" &&
     !safety.preferLightTraining &&
     availableMin < 45
   ) {
@@ -312,7 +351,9 @@ export function computeDecisions(
     snapshot,
     "block_stims",
     blockStims,
-    blockStims ? ["stim_restriction", ...allSeeds.filter((c) => c === "sleep_low")] : ["sleep_good"],
+    blockStims
+      ? ["stim_restriction", ...allSeeds.filter((c) => c === "sleep_low")]
+      : ["sleep_good"],
   );
   pushDecision(
     decisions,
@@ -328,7 +369,10 @@ export function computeDecisions(
   if (allSeeds.includes("progression_ready")) {
     pushDecision(decisions, snapshot, "progression", true, ["progression_ready"]);
   }
-  if (allSeeds.includes("weekend_adherence_pattern") || allSeeds.includes("express_high_adherence")) {
+  if (
+    allSeeds.includes("weekend_adherence_pattern") ||
+    allSeeds.includes("express_high_adherence")
+  ) {
     const codes: ReasonCode[] = allSeeds.filter(
       (c) => c === "weekend_adherence_pattern" || c === "express_high_adherence",
     );
@@ -375,12 +419,18 @@ export function sanitizeSnapshotForLog(snapshot: ContextSnapshot): Record<string
     recovery: {
       score: snapshot.recovery.score,
       level: snapshot.recovery.level,
+      ...(snapshot.recovery.readiness ? { readiness: snapshot.recovery.readiness } : {}),
       fatigueSignal: snapshot.recovery.fatigueSignal,
       sorenessAvg: snapshot.recovery.sorenessAvg,
       stressAvg: snapshot.recovery.stressAvg,
       explanation: snapshot.recovery.explanation,
+      ...(snapshot.recovery.confidence != null ? { confidence: snapshot.recovery.confidence } : {}),
     },
-    sleep: { hours: snapshot.sleep.hours, avg7d: snapshot.sleep.avg7d, source: snapshot.sleep.source },
+    sleep: {
+      hours: snapshot.sleep.hours,
+      avg7d: snapshot.sleep.avg7d,
+      source: snapshot.sleep.source,
+    },
     energy: snapshot.energy,
     adherence: snapshot.adherence,
     recentWorkload: snapshot.recentWorkload,

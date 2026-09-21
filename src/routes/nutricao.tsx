@@ -1,11 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { BookOpen, BookmarkPlus, Copy, Droplets, Pencil, Plus, Settings2, Star, Trash2, Utensils } from "lucide-react";
+import {
+  BookOpen,
+  BookmarkPlus,
+  Copy,
+  Droplets,
+  Pencil,
+  Plus,
+  Settings2,
+  Star,
+  Trash2,
+  Utensils,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { MealEditSheet } from "@/components/meal-edit-sheet";
 import { MealPickerSheet } from "@/components/meal-picker-sheet";
 import { MealPresetThumb } from "@/components/meal-preset-thumb";
+import { MetricRing } from "@/components/metric-ring";
 import { NutritionAjustesSheet } from "@/components/today/nutrition-ajustes-sheet";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -13,25 +25,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { lessonForToday } from "@/data/habit-lessons";
 import type { MealPreset } from "@/data/meal-presets";
 import { computeLearningInsights } from "@/lib/engine/learning";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import { selectNutritionOpts } from "@/lib/engine/decision-context-snapshot";
 import {
   addMealFromPreset,
   buildDailyMealPlan,
   buildMultiDayMealPlan,
   dayNutritionTotalsFromState,
-  mealProvenanceLabel,
   nutritionGoals,
   QUALITY_LABEL,
   scalePreset,
   weeklyNutritionSeries,
 } from "@/lib/engine/nutrition";
-import { clampServings, copyMealToSlot, lastMealForSlot, proteinGapLine } from "@/lib/nutrition/log-loop";
+import {
+  clampServings,
+  copyMealToSlot,
+  lastMealForSlot,
+  proteinGapLine,
+} from "@/lib/nutrition/log-loop";
 import { customPickFromSaved, nutritionLibrary, savedMealFromEntry } from "@/lib/nutrition/library";
 import { dayMicrosFromMeals } from "@/lib/nutrition/nutrients";
-import { mealPlanOptsFromState } from "@/lib/nutrition/plan-opts";
 import { wheyMacrosFromDoses } from "@/lib/nutrition/whey";
 import { useStore } from "@/lib/store";
-import { MEAL_SLOT_LABEL, todayKey, type MealEntry, type MealSlot, type SavedMeal } from "@/lib/types";
+import {
+  MEAL_SLOT_LABEL,
+  todayKey,
+  type MealEntry,
+  type MealSlot,
+  type SavedMeal,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SupplementsPanel } from "@/features/suplementos-panel";
 
@@ -40,7 +62,13 @@ type NutritionTab = "hoje" | "semana" | "biblioteca" | "historico" | "doses";
 export const Route = createFileRoute("/nutricao")({
   validateSearch: (search: Record<string, unknown>): { tab?: NutritionTab } => {
     const tab = search["tab"];
-    if (tab === "historico" || tab === "doses" || tab === "hoje" || tab === "semana" || tab === "biblioteca") {
+    if (
+      tab === "historico" ||
+      tab === "doses" ||
+      tab === "hoje" ||
+      tab === "semana" ||
+      tab === "biblioteca"
+    ) {
       return { tab };
     }
     return {};
@@ -93,8 +121,19 @@ function NutritionPage() {
   const tab = search.tab ?? "hoje";
   const visibleTab = tab === "doses" ? "hoje" : tab === "historico" ? "biblioteca" : tab;
   const navigate = useNavigate({ from: "/nutricao" });
-  const { state, hydrated, addMealEntry, removeMealEntry, updateMealEntry, addWater, patchProfile, saveDayCheckIn, toggleFavoriteMeal, saveMealTemplate, removeSavedMeal } =
-    useStore();
+  const {
+    state,
+    hydrated,
+    addMealEntry,
+    removeMealEntry,
+    updateMealEntry,
+    addWater,
+    patchProfile,
+    saveDayCheckIn,
+    toggleFavoriteMeal,
+    saveMealTemplate,
+    removeSavedMeal,
+  } = useStore();
   const [pickerSlot, setPickerSlot] = useState<MealSlot | null>(null);
   const [pickerDate, setPickerDate] = useState(todayKey());
   const [editing, setEditing] = useState<MealEntry | null>(null);
@@ -117,13 +156,17 @@ function NutritionPage() {
   }
 
   const insights = computeLearningInsights(state);
-  const livingBundle = buildLivingPlanWithDecisions(state, todayKey());
-  const engine = mealPlanOptsFromState(state, todayKey(), livingBundle?.decisions);
+  const decisionCtx = decisionContextForUi(state, todayKey());
+  const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
   const goals = nutritionGoals(state.profile, insights, engine);
   const totals = dayNutritionTotalsFromState(state);
   const mealPlan = buildDailyMealPlan(state.profile, state, todayKey(), insights, engine);
   const weekPlan = buildMultiDayMealPlan(state.profile, state, todayKey(), 7, insights);
-  const library = nutritionLibrary(state.meals ?? [], state.favoriteMealPresetIds ?? [], state.savedMeals ?? []);
+  const library = nutritionLibrary(
+    state.meals ?? [],
+    state.favoriteMealPresetIds ?? [],
+    state.savedMeals ?? [],
+  );
   const metrics = state.days[todayKey()] ?? { date: todayKey(), waterMl: 0, meals: 0 };
   const whey = wheyMacrosFromDoses(
     state.supplementDoseLogs,
@@ -142,7 +185,9 @@ function NutritionPage() {
     focusSlot === "todos"
       ? mealPlan.slots.filter((s) => s.status !== "skipped")
       : mealPlan.slots.filter((s) => s.slot === focusSlot && s.status !== "skipped");
-  const history = weeklyNutritionSeries(state.meals ?? [], 14).slice().reverse();
+  const history = weeklyNutritionSeries(state.meals ?? [], 14)
+    .slice()
+    .reverse();
 
   const addPreset = (preset: MealPreset, slot: MealSlot, servings = 1, date = todayKey()) => {
     addMealEntry({ ...addMealFromPreset(preset, slot, servings), date });
@@ -208,8 +253,7 @@ function NutritionPage() {
         value={visibleTab}
         onValueChange={(v) => {
           void navigate({
-            search:
-              v === "semana" || v === "biblioteca" ? { tab: v as NutritionTab } : {},
+            search: v === "semana" || v === "biblioteca" ? { tab: v as NutritionTab } : {},
           });
         }}
       >
@@ -226,272 +270,323 @@ function NutritionPage() {
         </TabsList>
 
         <TabsContent value="hoje" className="mt-4">
+          {insights?.reasons[0] ? (
+            <p className="surface-glass mb-3 p-3 text-xs text-muted-foreground">
+              {insights.reasons[0]}
+            </p>
+          ) : null}
 
-      {insights?.reasons[0] ? (
-        <p className="surface-glass mb-3 p-3 text-xs text-muted-foreground">{insights.reasons[0]}</p>
-      ) : null}
+          {gap ? (
+            <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+              {gap}
+              {whey.scoops ? ` · ${whey.scoops} scoop whey` : ""}
+            </p>
+          ) : null}
+          {qualityLine ? <p className="mb-3 text-xs text-muted-foreground">{qualityLine}</p> : null}
 
-      {gap ? (
-        <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-          {gap}
-          {whey.scoops ? ` · ${whey.scoops} scoop whey` : ""}
-        </p>
-      ) : null}
-      {qualityLine ? (
-        <p className="mb-3 text-xs text-muted-foreground">{qualityLine}</p>
-      ) : null}
-
-      <section className="surface-glass space-y-4 p-4">
-        <div>
-          <p className="text-display text-2xl">Hoje</p>
-          <p className="text-xs text-muted-foreground">
-            Diário · {totals.count} registro{totals.count === 1 ? "" : "s"}
-          </p>
-        </div>
-        <MacroBar label="Proteína" current={totals.proteinG} goal={goals.proteinG} unit=" g" />
-        <MacroBar label="Carboidrato" current={totals.carbG} goal={goals.carbG ?? Math.round((goals.kcal * 0.45) / 4)} unit=" g" />
-        <MacroBar label="Gordura" current={totals.fatG} goal={goals.fatG ?? Math.round((goals.kcal * 0.25) / 9)} unit=" g" />
-        <MacroBar label="Fibra" current={totals.fiberG} goal={30} unit=" g" />
-        <MacroBar label="Kcal" current={totals.kcal} goal={goals.kcal} />
-        <MacroBar label="Água" current={metrics.waterMl} goal={goals.waterMl} unit=" ml" />
-      </section>
-
-      {micros ? (
-        <section className="surface-glass mt-3 space-y-2 p-4">
-          <p className="text-sm font-semibold">Micronutrientes</p>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {micros.map((m) => (
-              <li key={m.key} className="flex items-baseline justify-between gap-2">
-                <span>{m.label}</span>
-                <span className="font-semibold text-foreground">
-                  {m.value} {m.unit}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <Button
-        variant="secondary"
-        className="mt-3 h-11 w-full"
-        onClick={() => {
-          addWater(500);
-          toast.success("Hidratação registrada");
-        }}
-      >
-        <Droplets className="size-4" /> Água +500 ml
-      </Button>
-
-      <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
-        <button
-          type="button"
-          onClick={() => setFocusSlot("todos")}
-          className={cn(
-            "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
-            focusSlot === "todos"
-              ? "border-primary bg-primary text-primary-foreground glow-primary"
-              : "border-white/10 bg-card/40 text-muted-foreground",
-          )}
-        >
-          Todos
-        </button>
-        {SLOTS.map((slot) => (
-          <button
-            key={slot}
-            type="button"
-            onClick={() => setFocusSlot(slot)}
-            className={cn(
-              "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
-              focusSlot === slot
-                ? "border-primary bg-primary text-primary-foreground glow-primary"
-                : "border-white/10 bg-card/40 text-muted-foreground",
-            )}
-          >
-            {MEAL_SLOT_LABEL[slot]}
-          </button>
-        ))}
-      </div>
-
-      <section className="mt-4 space-y-2">
-        <div className="flex items-end justify-between gap-2">
-          <h2 className="text-lg">Plano de hoje</h2>
-          <p className="text-[0.65rem] text-muted-foreground">
-            Projeção {mealPlan.projectedProteinG} g · {mealPlan.projectedKcal} kcal
-            {mealPlan.redistributed ? " · redistribuído" : ""}
-          </p>
-        </div>
-        {visibleSlots.map((row) => (
-          <article key={row.slot} className="surface-glass p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-display text-base">{MEAL_SLOT_LABEL[row.slot]}</p>
-              <div className="flex gap-1">
-                {row.status === "suggested" ? (
-                  <Button size="sm" variant="ghost" onClick={() => skipSlot(row.slot)}>
-                    Pulei
-                  </Button>
-                ) : null}
-                {row.logged[0] ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const target = mealPlan.slots.find((s) => s.status === "suggested")?.slot ?? "jantar";
-                      addMealEntry(copyMealToSlot(row.logged[0]!, target));
-                      toast.success(`Copiado para ${MEAL_SLOT_LABEL[target]}`);
-                    }}
-                  >
-                    <Copy className="size-3.5" /> Copiar
-                  </Button>
-                ) : null}
-                <Button size="sm" variant="outline" onClick={() => openPicker(row.slot)}>
-                  <Plus className="size-3.5" /> Outro
-                </Button>
-              </div>
+          <section className="surface-glass space-y-4 p-4">
+            <div>
+              <p className="text-display text-2xl">Hoje</p>
+              <p className="text-xs text-muted-foreground">
+                Diário · {totals.count} registro{totals.count === 1 ? "" : "s"}
+              </p>
             </div>
+            <div className="grid grid-cols-3 gap-2">
+              <MetricRing value={totals.proteinG} max={goals.proteinG} label="Proteína" unit="g" />
+              <MetricRing value={totals.kcal} max={goals.kcal} label="Kcal" />
+              <MetricRing value={metrics.waterMl} max={goals.waterMl} label="Água" unit="ml" />
+            </div>
+            <MacroBar
+              label="Carboidrato"
+              current={totals.carbG}
+              goal={goals.carbG ?? Math.round((goals.kcal * 0.45) / 4)}
+              unit=" g"
+            />
+            <MacroBar
+              label="Gordura"
+              current={totals.fatG}
+              goal={goals.fatG ?? Math.round((goals.kcal * 0.25) / 9)}
+              unit=" g"
+            />
+            <MacroBar label="Fibra" current={totals.fiberG} goal={30} unit=" g" />
+          </section>
 
-            {row.logged.length ? (
-              <ul className="mt-3 space-y-2">
-                {row.logged.map((e) => (
-                  <li key={e.id} className="flex items-start justify-between gap-2 border-t border-white/10 pt-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{e.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {e.proteinG} g P
-                        {e.carbG != null ? ` · ${e.carbG} g C` : ""}
-                        {e.fatG != null ? ` · ${e.fatG} g G` : ""}
-                        {` · ${e.kcal} kcal`} · {QUALITY_LABEL[e.quality]}
-                        {(e.servings ?? 1) !== 1 ? ` · ${e.servings}×` : ""}
-                        {" · "}
-                        {mealProvenanceLabel(e)}
-                        {e.sourceKind === "estimated" && e.confidence != null
-                          ? ` · ${Math.round(e.confidence * 100)}%`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label="Salvar esta refeição"
-                        onClick={() => {
-                          saveMealTemplate(savedMealFromEntry(e));
-                          toast.success("Refeição salva na biblioteca");
-                        }}
-                      >
-                        <BookmarkPlus className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        aria-label="Editar"
-                        onClick={() => setEditing(e)}
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
-                        aria-label="Remover"
-                        onClick={() => {
-                          removeMealEntry(e.id);
-                          toast.success("Removido");
-                        }}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
+          {micros ? (
+            <section className="surface-glass mt-3 space-y-2 p-4">
+              <p className="text-sm font-semibold">Micronutrientes</p>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                {micros.map((m) => (
+                  <li key={m.key} className="flex items-baseline justify-between gap-2">
+                    <span>{m.label}</span>
+                    <span className="font-semibold text-foreground">
+                      {m.value} {m.unit}
+                    </span>
                   </li>
                 ))}
               </ul>
-            ) : row.preset ? (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <MealPresetThumb preset={row.preset} />
-                    <p className="text-sm text-muted-foreground">
-                      Sugerido: {row.preset.label} ·{" "}
-                      {scalePreset(row.preset, servingsBySlot[row.slot] ?? row.suggestedServings ?? 1).proteinG}g ·{" "}
-                      {QUALITY_LABEL[row.preset.quality]}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="glow-primary shrink-0"
-                    onClick={() =>
-                      addPreset(row.preset!, row.slot, servingsBySlot[row.slot] ?? row.suggestedServings ?? 1)
-                    }
-                  >
-                    <Utensils className="size-3.5" /> Aplicar
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-full border border-white/10 px-2 py-1 text-xs"
-                    onClick={() =>
-                      setServingsBySlot((s) => ({
-                        ...s,
-                        [row.slot]: clampServings((s[row.slot] ?? row.suggestedServings ?? 1) - 0.25),
-                      }))
-                    }
-                  >
-                    −
-                  </button>
-                  <span className="text-xs font-semibold">
-                    {servingsBySlot[row.slot] ?? row.suggestedServings ?? 1}×
-                  </span>
-                  <button
-                    type="button"
-                    className="rounded-full border border-white/10 px-2 py-1 text-xs"
-                    onClick={() =>
-                      setServingsBySlot((s) => ({
-                        ...s,
-                        [row.slot]: clampServings((s[row.slot] ?? row.suggestedServings ?? 1) + 0.25),
-                      }))
-                    }
-                  >
-                    +
-                  </button>
-                  {lastMealForSlot(state.meals ?? [], row.slot) ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="ml-auto"
-                      onClick={() => {
-                        addMealEntry(copyMealToSlot(lastMealForSlot(state.meals ?? [], row.slot)!, row.slot));
-                        toast.success("Igual ontem");
-                      }}
-                    >
-                      Igual ontem
+            </section>
+          ) : null}
+
+          <Button
+            variant="secondary"
+            className="mt-3 h-11 w-full"
+            onClick={() => {
+              addWater(500);
+              toast.success("Hidratação registrada");
+            }}
+          >
+            <Droplets className="size-4" /> Água +500 ml
+          </Button>
+
+          <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setFocusSlot("todos")}
+              className={cn(
+                "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
+                focusSlot === "todos"
+                  ? "border-primary bg-primary text-primary-foreground glow-primary"
+                  : "border-white/10 bg-card/40 text-muted-foreground",
+              )}
+            >
+              Todos
+            </button>
+            {SLOTS.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => setFocusSlot(slot)}
+                className={cn(
+                  "whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
+                  focusSlot === slot
+                    ? "border-primary bg-primary text-primary-foreground glow-primary"
+                    : "border-white/10 bg-card/40 text-muted-foreground",
+                )}
+              >
+                {MEAL_SLOT_LABEL[slot]}
+              </button>
+            ))}
+          </div>
+
+          <section className="mt-4 space-y-2">
+            <div className="flex items-end justify-between gap-2">
+              <h2 className="text-lg">Plano de hoje</h2>
+              <p className="text-[0.65rem] text-muted-foreground">
+                Projeção {mealPlan.projectedProteinG} g · {mealPlan.projectedKcal} kcal
+                {mealPlan.redistributed ? " · redistribuído" : ""}
+              </p>
+            </div>
+            {visibleSlots.map((row) => (
+              <article key={row.slot} className="surface-glass p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-display text-base">{MEAL_SLOT_LABEL[row.slot]}</p>
+                  <div className="flex gap-1">
+                    {row.status === "suggested" ? (
+                      <Button size="sm" variant="ghost" onClick={() => skipSlot(row.slot)}>
+                        Pulei
+                      </Button>
+                    ) : null}
+                    {row.logged[0] ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const target =
+                            mealPlan.slots.find((s) => s.status === "suggested")?.slot ?? "jantar";
+                          addMealEntry(copyMealToSlot(row.logged[0]!, target));
+                          toast.success(`Copiado para ${MEAL_SLOT_LABEL[target]}`);
+                        }}
+                      >
+                        <Copy className="size-3.5" /> Copiar
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="outline" onClick={() => openPicker(row.slot)}>
+                      <Plus className="size-3.5" /> Outro
                     </Button>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">Nada registrado</p>
-            )}
-          </article>
-        ))}
-      </section>
 
-      <section className="surface-glass mt-4 p-5">
-        <div className="flex items-center gap-2">
-          <BookOpen className="size-4 text-primary" />
-          <h2 className="text-lg">Lição de hoje</h2>
-        </div>
-        <p className="mt-2 text-display text-xl">{lesson.title}</p>
-        <p className="mt-2 text-sm text-muted-foreground">{lesson.body}</p>
-        <p className="mt-3 text-xs font-semibold text-primary">Dica: {lesson.tip}</p>
-        <Link to="/coach" className="mt-3 inline-block text-xs font-semibold text-muted-foreground underline">
-          Falar com o coach sobre isso
-        </Link>
-      </section>
+                {row.logged.length ? (
+                  <ul className="mt-3 space-y-2">
+                    {row.logged.map((e) => (
+                      <li
+                        key={e.id}
+                        className="flex items-center gap-3 border-t border-white/10 pt-3"
+                      >
+                        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                          <Utensils className="size-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {MEAL_SLOT_LABEL[row.slot]}
+                          </p>
+                          <p className="truncate text-sm font-semibold">{e.label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {e.proteinG} g P
+                            {e.carbG != null ? ` · ${e.carbG} g C` : ""}
+                            {e.fatG != null ? ` · ${e.fatG} g G` : ""}
+                            {(e.servings ?? 1) !== 1 ? ` · ${e.servings}×` : ""}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-bold text-primary">{e.kcal} kcal</p>
+                        <div className="flex shrink-0 gap-0.5">
+                          <button
+                            type="button"
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Salvar esta refeição"
+                            onClick={() => {
+                              saveMealTemplate(savedMealFromEntry(e));
+                              toast.success("Refeição salva na biblioteca");
+                            }}
+                          >
+                            <BookmarkPlus className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Editar"
+                            onClick={() => setEditing(e)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
+                            aria-label="Remover"
+                            onClick={() => {
+                              removeMealEntry(e.id);
+                              toast.success("Removido");
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : row.preset ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <MealPresetThumb preset={row.preset} className="size-14 rounded-2xl" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Sugerido
+                          </p>
+                          <p className="truncate text-sm font-semibold">{row.preset.label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {
+                              scalePreset(
+                                row.preset,
+                                servingsBySlot[row.slot] ?? row.suggestedServings ?? 1,
+                              ).proteinG
+                            }{" "}
+                            g P · {QUALITY_LABEL[row.preset.quality]}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-bold text-primary">
+                          {
+                            scalePreset(
+                              row.preset,
+                              servingsBySlot[row.slot] ?? row.suggestedServings ?? 1,
+                            ).kcal
+                          }{" "}
+                          kcal
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="glow-primary shrink-0"
+                        onClick={() =>
+                          addPreset(
+                            row.preset!,
+                            row.slot,
+                            servingsBySlot[row.slot] ?? row.suggestedServings ?? 1,
+                          )
+                        }
+                      >
+                        <Utensils className="size-3.5" /> Aplicar
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full border border-white/10 px-2 py-1 text-xs"
+                        onClick={() =>
+                          setServingsBySlot((s) => ({
+                            ...s,
+                            [row.slot]: clampServings(
+                              (s[row.slot] ?? row.suggestedServings ?? 1) - 0.25,
+                            ),
+                          }))
+                        }
+                      >
+                        −
+                      </button>
+                      <span className="text-xs font-semibold">
+                        {servingsBySlot[row.slot] ?? row.suggestedServings ?? 1}×
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-full border border-white/10 px-2 py-1 text-xs"
+                        onClick={() =>
+                          setServingsBySlot((s) => ({
+                            ...s,
+                            [row.slot]: clampServings(
+                              (s[row.slot] ?? row.suggestedServings ?? 1) + 0.25,
+                            ),
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                      {lastMealForSlot(state.meals ?? [], row.slot) ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-auto"
+                          onClick={() => {
+                            addMealEntry(
+                              copyMealToSlot(
+                                lastMealForSlot(state.meals ?? [], row.slot)!,
+                                row.slot,
+                              ),
+                            );
+                            toast.success("Igual ontem");
+                          }}
+                        >
+                          Igual ontem
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">Nada registrado</p>
+                )}
+              </article>
+            ))}
+          </section>
 
-      <section className="mt-4">
-        <h2 className="mb-2 px-1 text-sm font-semibold">Doses</h2>
-        <SupplementsPanel />
-      </section>
+          <section className="surface-glass mt-4 p-5">
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-4 text-primary" />
+              <h2 className="text-lg">Lição de hoje</h2>
+            </div>
+            <p className="mt-2 text-display text-xl">{lesson.title}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{lesson.body}</p>
+            <p className="mt-3 text-xs font-semibold text-primary">Dica: {lesson.tip}</p>
+            <Link
+              to="/coach"
+              className="mt-3 inline-block text-xs font-semibold text-muted-foreground underline"
+            >
+              Falar com o coach sobre isso
+            </Link>
+          </section>
+
+          <section className="mt-4">
+            <h2 className="mb-2 px-1 text-sm font-semibold">Doses</h2>
+            <SupplementsPanel />
+          </section>
         </TabsContent>
 
         <TabsContent value="semana" className="mt-4 space-y-3">
@@ -515,7 +610,10 @@ function NutritionPage() {
                 </div>
                 <ul className="mt-2 space-y-2">
                   {day.slots.map((row) => (
-                    <li key={`${day.date}-${row.slot}`} className="flex items-center justify-between gap-2 text-xs">
+                    <li
+                      key={`${day.date}-${row.slot}`}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
                       <span className="min-w-0">
                         <span className="font-semibold">{MEAL_SLOT_LABEL[row.slot]}</span>
                         {" · "}
@@ -528,7 +626,12 @@ function NutritionPage() {
                               : "—"}
                       </span>
                       {row.status !== "skipped" ? (
-                        <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={() => openPicker(row.slot, day.date)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0"
+                          onClick={() => openPicker(row.slot, day.date)}
+                        >
                           Registrar
                         </Button>
                       ) : null}
@@ -571,7 +674,12 @@ function NutritionPage() {
                       {p.proteinG} g · {p.kcal} kcal
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => toggleFavoriteMeal(p.id)} aria-label="Desfavoritar">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggleFavoriteMeal(p.id)}
+                    aria-label="Desfavoritar"
+                  >
                     <Star className="size-3.5 fill-primary text-primary" />
                   </Button>
                   <Button size="sm" onClick={() => addPreset(p, libSlot, 1, todayKey())}>
@@ -587,18 +695,28 @@ function NutritionPage() {
           <section className="space-y-2">
             <h2 className="text-sm font-semibold">Recentes</h2>
             {library.recentPresets.map((p) => (
-              <article key={`rp-${p.id}`} className="surface-glass flex items-center justify-between gap-2 p-3">
+              <article
+                key={`rp-${p.id}`}
+                className="surface-glass flex items-center justify-between gap-2 p-3"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{p.label}</p>
                   <p className="text-xs text-muted-foreground">Preset · {p.proteinG} g</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => addPreset(p, libSlot, 1, todayKey())}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => addPreset(p, libSlot, 1, todayKey())}
+                >
                   Registrar
                 </Button>
               </article>
             ))}
             {library.recentCustom.map((m) => (
-              <article key={`rc-${m.id}`} className="surface-glass flex items-center justify-between gap-2 p-3">
+              <article
+                key={`rc-${m.id}`}
+                className="surface-glass flex items-center justify-between gap-2 p-3"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">{m.label}</p>
                   <p className="text-xs text-muted-foreground">
@@ -650,7 +768,9 @@ function NutritionPage() {
                 </article>
               ))
             ) : (
-              <p className="text-xs text-muted-foreground">Salve uma refeição no diário para reusar depois</p>
+              <p className="text-xs text-muted-foreground">
+                Salve uma refeição no diário para reusar depois
+              </p>
             )}
           </section>
 
@@ -669,7 +789,10 @@ function NutritionPage() {
                   {meals.length ? (
                     <ul className="mt-2 space-y-1">
                       {meals.map((m) => (
-                        <li key={m.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <li
+                          key={m.id}
+                          className="flex items-center justify-between gap-2 text-xs text-muted-foreground"
+                        >
                           <span>
                             {MEAL_SLOT_LABEL[m.slot]} · {m.label}
                           </span>

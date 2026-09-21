@@ -10,19 +10,47 @@ function eanDigits(raw: string): string | null {
   return null;
 }
 
+export function normalizeFoodToken(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+}
+
+export function tokenizeFoodQuery(value: string): string[] {
+  return normalizeFoodToken(value)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2);
+}
+
 let items: FoodItem[] = [...FOOD_ITEMS];
 let servings: FoodServing[] = [...FOOD_SERVINGS];
 let byId = new Map<string, FoodItem>();
 let byEan = new Map<string, FoodItem>();
 let servingsByFood = new Map<string, FoodServing[]>();
+/** token → food ids (name, brand, synonyms, category, ean) */
+let tokenIndex = new Map<string, Set<string>>();
+
+function indexField(id: string, raw: string | undefined): void {
+  if (!raw) return;
+  for (const token of tokenizeFoodQuery(raw)) {
+    const set = tokenIndex.get(token) ?? new Set<string>();
+    set.add(id);
+    tokenIndex.set(token, set);
+  }
+}
 
 function rebuild() {
   byId = new Map(items.map((f) => [f.id, f]));
   byEan = new Map();
+  tokenIndex = new Map();
   for (const f of items) {
-    if (!f.ean) continue;
-    const ean = eanDigits(f.ean);
-    if (ean) byEan.set(ean, f);
+    if (f.ean) {
+      const ean = eanDigits(f.ean);
+      if (ean) byEan.set(ean, f);
+    }
+    indexField(f.id, f.name);
+    indexField(f.id, f.brand);
+    indexField(f.id, f.category);
+    indexField(f.id, f.ean);
+    for (const syn of f.synonyms ?? []) indexField(f.id, syn);
   }
   servingsByFood = new Map();
   for (const s of servings) {
@@ -96,5 +124,41 @@ export function catalogStats() {
     foods: items.length,
     servings: servings.length,
     active: items.filter((f) => f.active).length,
+    indexTokens: tokenIndex.size,
   };
+}
+
+export function foodSearchIndexSize(): number {
+  return tokenIndex.size;
+}
+
+/**
+ * Candidate ids from the inverted index. Null → caller should scan linearly
+ * (empty query, empty index, or no token hits).
+ */
+export function lookupFoodCandidateIds(query: string): Set<string> | null {
+  if (!tokenIndex.size) return null;
+  const tokens = tokenizeFoodQuery(query);
+  if (!tokens.length) return null;
+
+  const digits = eanDigits(query.trim());
+  const hits = new Set<string>();
+  if (digits) {
+    const exact = byEan.get(digits);
+    if (exact) hits.add(exact.id);
+  }
+
+  for (const token of tokens) {
+    const exact = tokenIndex.get(token);
+    if (exact) {
+      for (const id of exact) hits.add(id);
+    }
+    for (const [key, ids] of tokenIndex) {
+      if (key !== token && (key.startsWith(token) || token.startsWith(key))) {
+        for (const id of ids) hits.add(id);
+      }
+    }
+  }
+
+  return hits.size ? hits : null;
 }

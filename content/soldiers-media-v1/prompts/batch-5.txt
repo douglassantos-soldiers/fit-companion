@@ -1,0 +1,119 @@
+# exercise/remada-baixa
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-baixa. Motion: start cabo à frente, braços longos; end pegador no tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-cavalinho
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-cavalinho. Motion: start braços pendurados na máquina; end cotovelos atrás da linha do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-elastico
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-elastico. Motion: start elástico ancorado à frente, braços estendidos; end cotovelos atrás do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-ergometro-intervalo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-ergometro-intervalo. Motion: start sentado no ergômetro; end sprints alternados com pausa; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-halter-peito
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-halter-peito. Motion: start halteres pendurados; end halteres na linha do banco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-kettlebell
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-kettlebell. Motion: start quadril em dobradiça, kettlebell pendurado; end kettlebell ao quadril; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-meadows
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-meadows. Motion: start braço alongado na ponta da barra; end cotovelo atrás da linha do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-peito-suportada
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-peito-suportada. Motion: start peito no banco inclinado, braços pendurados; end cotovelos atrás do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-pendlay
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-pendlay. Motion: start barra no chão, tronco paralelo; end barra no baixo peito; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-polia-baixa-unilateral
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-polia-baixa-unilateral. Motion: start alça baixa, braço estendido; end cotovelo atrás do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-sentada-neutra
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-sentada-neutra. Motion: start alça neutra, braços estendidos; end cotovelos atrás do tronco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-smith
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-smith. Motion: start barra pendurada, tronco inclinado; end barra ao abdômen; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-t-barra
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-t-barra. Motion: start tronco inclinado, braços estendidos; end placa junto ao peito; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remada-unilateral
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remada-unilateral. Motion: start halter baixo, braço estendido; end halter junto ao quadril; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/remo-ergometro
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=remo-ergometro. Motion: start catch com joelhos flexionados; end finish com pernas estendidas; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-21
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-21. Motion: start barra pendurada; end série parcial completa; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-banco
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-banco. Motion: start barra nas coxas; end barra no pico da rosca; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-bayesian
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-bayesian. Motion: start braço alongado atrás, cabo tenso; end cotovelo flexionado à frente; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-cabo-unica
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-cabo-unica. Motion: start alça baixa, braço estendido; end mão junto ao ombro; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-concentrada
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-concentrada. Motion: start halter baixo, cotovelo na coxa; end halter próximo ao ombro; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-concentrada-cabo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-concentrada-cabo. Motion: start cotovelo no joelho, alça baixa; end mão próxima ao ombro; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-elastico
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-elastico. Motion: start elástico sob os pés, braços estendidos; end mãos junto aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-inclinada
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-inclinada. Motion: start halteres pendurados no inclinado; end halteres junto aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-inclinada-martelo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-inclinada-martelo. Motion: start sentado inclinado, braços pendurados; end halteres junto aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-inversa
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-inversa. Motion: start barra pronada nas coxas; end barra no pico da rosca inversa; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-martelo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-martelo. Motion: start halteres ao lado das coxas; end halteres na linha dos ombros, pegada neutra; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-martelo-cabo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-martelo-cabo. Motion: start corda ou alça neutra, braços ao lado; end mãos junto aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-polia
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-polia. Motion: start barra baixa à frente; end barra junto aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-punho
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-punho. Motion: start punhos estendidos, barra na ponta dos dedos; end punhos flexionados; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-scott
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-scott. Motion: start barra baixa no scott; end barra no pico da flexão; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-scott-maquina
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-scott-maquina. Motion: start braços no apoio, cotovelos fixos; end flexão completa; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rosca-spider
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rosca-spider. Motion: start braços pendurados, cotovelos estendidos; end halteres próximos aos ombros; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/rotacao-externa-cabo
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=rotacao-externa-cabo. Motion: start antebraço à frente do tronco; end antebraço aberto para o lado; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/russian-twist
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=russian-twist. Motion: start tronco centralizado; end rotação para um lado; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/russian-twist-carga
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=russian-twist-carga. Motion: start sentado inclinado, peso nas mãos; end peso tocando cada lado; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/scapular-pullup
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=scapular-pullup. Motion: start pendurado, braços estendidos; end escápulas retraídas sem flexionar cotovelos; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/seal-row
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=seal-row. Motion: start braços pendurados sob o banco; end carga junto ao banco; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/shadow-boxing
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=shadow-boxing. Motion: start guarda alta, base de luta; end jab e deslocamentos contínuos; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/shrug-halter
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=shrug-halter. Motion: start halteres ao lado, ombros baixos; end ombros elevados perto das orelhas; 4s loop xfade. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.
+
+# exercise/side-plank-hip
+Soldiers Animation Style v1. Dark studio #080808, gold rim light, original Soldiers athlete, matte black kit, 3/4 camera locked, no text, no watermark, no third-party likeness. Kind=exercise id=side-plank-hip. Motion: isometric hold 4s loop; start prancha lateral. Input: Soldiers still of this exercise only. Never use openGym, Gym Visual, or Unsplash as a frame.

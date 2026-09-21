@@ -3,6 +3,7 @@
  * Deploy all local public/soldiers-media/v1 packages to Supabase Storage + soldiers_media.
  * Reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from .env (never prints secrets).
  */
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,9 +66,26 @@ async function putObject(objectPath, body, contentType) {
   }
 }
 
+async function existingStatus(kind, entityId) {
+  const qs = new URLSearchParams({
+    kind: `eq.${kind}`,
+    entity_id: `eq.${entityId}`,
+    version: "eq.v1",
+    variant: "eq.default",
+    region: "eq.global",
+    select: "status",
+  });
+  const res = await fetch(`${url}/rest/v1/soldiers_media?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${key}`, apikey: key },
+  });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows[0]?.status ?? null;
+}
+
 async function upsertRow(row) {
   const res = await fetch(
-    `${url}/rest/v1/soldiers_media?on_conflict=kind,entity_id,version`,
+    `${url}/rest/v1/soldiers_media?on_conflict=kind,entity_id,version,variant,region`,
     {
       method: "POST",
       headers: {
@@ -102,32 +120,44 @@ let ok = 0;
 const failures = [];
 for (const pkg of packages) {
   try {
+    const checksums = {};
     const uploaded = {};
     for (const file of pkg.files) {
       const objectPath = `v1/${pkg.kind}/${pkg.entityId}/${file}`;
       const body = readFileSync(join(pkg.dir, file));
+      const hash = createHash("sha256").update(body).digest("hex");
+      if (file.startsWith("poster.")) checksums.poster = hash;
+      if (file.startsWith("thumb.")) checksums.thumbnail = hash;
+      if (file === "animation.webm") checksums.webm = hash;
+      if (file === "animation.mp4") checksums.mp4 = hash;
+      if (file === "animation.gif") checksums.gif = hash;
       await putObject(objectPath, body, mime(file));
       uploaded[file] = publicUrl(objectPath);
     }
+    const prev = await existingStatus(pkg.kind, pkg.entityId);
+    const status = prev === "published" ? "published" : "generated";
     await upsertRow({
       kind: pkg.kind,
       entity_id: pkg.entityId,
       version: "v1",
+      variant: "default",
+      region: "global",
       style: "soldiers-v1",
       source: "soldiers",
       ownership: "owned",
       license: "soldiers-owned",
-      status: "published",
+      status,
       needs_motion: MOTION_KINDS.has(pkg.kind),
       poster_url: uploaded["poster.webp"] ?? uploaded["poster.png"] ?? null,
       thumbnail_url: uploaded["thumb.webp"] ?? uploaded["thumb.png"] ?? uploaded["poster.webp"] ?? uploaded["poster.png"] ?? null,
       webm_url: uploaded["animation.webm"] ?? null,
       mp4_url: uploaded["animation.mp4"] ?? null,
       gif_url: uploaded["animation.gif"] ?? null,
+      checksums,
       updated_at: new Date().toISOString(),
     });
     ok += 1;
-    console.log("published", pkg.kind, pkg.entityId);
+    console.log(status, pkg.kind, pkg.entityId);
   } catch (err) {
     failures.push(`${pkg.kind}/${pkg.entityId}: ${err instanceof Error ? err.message : String(err)}`);
     console.error("failed", pkg.kind, pkg.entityId);

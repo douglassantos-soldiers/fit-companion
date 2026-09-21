@@ -10,7 +10,11 @@ import {
   type MuscleGroup,
 } from "@/data/exercises";
 import { hitsForExercise } from "@/lib/engine/exercise-history";
-import { freshnessForGroups, sortGroupsByFreshness } from "@/lib/engine/recovery";
+import {
+  freshnessForGroups,
+  sortGroupsByFreshness,
+  type RecoveryContext,
+} from "@/lib/engine/recovery";
 import { analyzePlateau } from "@/lib/training/plateau";
 import { isAvoided, isPreferred, migrateLegacyPrefs } from "@/lib/training/preferences";
 import {
@@ -25,7 +29,13 @@ import { matchesInventory } from "@/lib/training/inventory";
 import { withWarmupPrescriptions } from "@/lib/training/warmup";
 import { resolveTrainingWeekdays } from "@/lib/training/weekdays";
 import { getTrainingRules } from "@/lib/training/training-rules";
-import type { AppState, ExercisePreferenceValue, FocusMuscle, Profile, SessionLog } from "@/lib/types";
+import type {
+  AppState,
+  ExercisePreferenceValue,
+  FocusMuscle,
+  Profile,
+  SessionLog,
+} from "@/lib/types";
 
 export interface PlannedExercise {
   exerciseId: string;
@@ -68,17 +78,25 @@ export interface ExercisePrefs {
   likedExerciseIds?: string[];
   dislikedExerciseIds?: string[];
   exercisePreferences?: Record<string, ExercisePreferenceValue>;
+  recoveryCtx?: RecoveryContext;
 }
 
 function activeSplits() {
   return getTrainingRules().splits;
 }
 
-function sortGroupsForPlan(groups: MuscleGroup[], sessions: SessionLog[], focus?: FocusMuscle[]) {
-  const ordered = sortGroupsByFreshness(groups, sessions);
+function sortGroupsForPlan(
+  groups: MuscleGroup[],
+  sessions: SessionLog[],
+  focus?: FocusMuscle[],
+  ctx: RecoveryContext = {},
+) {
+  const ordered = sortGroupsByFreshness(groups, sessions, ctx);
   if (!focus?.length) return ordered;
   const focusSet = new Set(focus);
-  return [...ordered].sort((a, b) => Number(focusSet.has(b as FocusMuscle)) - Number(focusSet.has(a as FocusMuscle)));
+  return [...ordered].sort(
+    (a, b) => Number(focusSet.has(b as FocusMuscle)) - Number(focusSet.has(a as FocusMuscle)),
+  );
 }
 
 function activeGoalScheme() {
@@ -115,9 +133,10 @@ function pickExercises(
   prefMap: Record<string, ExercisePreferenceValue>,
   inventory?: Profile["equipmentInventory"],
   focusMuscles?: FocusMuscle[],
+  recoveryCtx: RecoveryContext = {},
 ) {
   const avoided = normalizeRestrictions(restrictions);
-  const orderedGroups = sortGroupsForPlan(groups, sessions, focusMuscles);
+  const orderedGroups = sortGroupsForPlan(groups, sessions, focusMuscles, recoveryCtx);
   const available = EXERCISES.filter(
     (e) =>
       matchesInventory(e, equipment, inventory) &&
@@ -187,17 +206,11 @@ export function buildWeeklyPlanFromState(
   learningHint?: WeekMode | null,
 ): WeeklyPlanResult | null {
   if (!state.profile) return null;
-  return buildWeeklyPlanDetailed(
-    state.profile,
-    state.sessions,
-    equipmentOverride,
-    learningHint,
-    {
-      likedExerciseIds: state.likedExerciseIds,
-      dislikedExerciseIds: state.dislikedExerciseIds,
-      exercisePreferences: state.exercisePreferences,
-    },
-  );
+  return buildWeeklyPlanDetailed(state.profile, state.sessions, equipmentOverride, learningHint, {
+    likedExerciseIds: state.likedExerciseIds,
+    dislikedExerciseIds: state.dislikedExerciseIds,
+    exercisePreferences: state.exercisePreferences,
+  });
 }
 
 export function buildWeeklyPlanDetailed(
@@ -220,7 +233,7 @@ export function buildWeeklyPlanDetailed(
   let plateauCount = 0;
 
   const planned = split!.map((block, i) => {
-    const recoveryScore = freshnessForGroups(block.groups, sessions);
+    const recoveryScore = freshnessForGroups(block.groups, sessions, prefs.recoveryCtx ?? {});
     const recoveryOk = recoveryScore >= 35;
     const extraFocus = focusMuscles?.some((m) => block.groups.includes(m as MuscleGroup)) ? 1 : 0;
     const count = (profile.goal === "performance" ? 4 : 5) + extraFocus;
@@ -235,6 +248,7 @@ export function buildWeeklyPlanDetailed(
       prefMap,
       inventory,
       focusMuscles,
+      prefs.recoveryCtx ?? {},
     );
 
     const already = new Set<string>();
@@ -250,7 +264,10 @@ export function buildWeeklyPlanDetailed(
       already.add(ex.id);
 
       const base = ex.baseLoad * activeLevelFactor()[profile.level] * scheme.loadFactor;
-      const baseSets = Math.max(2, Math.round((ex.group === "cardio" ? 1 : scheme.sets) * volumeFactor));
+      const baseSets = Math.max(
+        2,
+        Math.round((ex.group === "cardio" ? 1 : scheme.sets) * volumeFactor),
+      );
       const baseReps = ex.group === "cardio" ? "15 min" : ex.unit === "min" ? "45 s" : scheme.reps;
       const prog = progressionForExercise(
         ex,

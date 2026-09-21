@@ -4,27 +4,23 @@
 import { buildCustomer360FromState } from "@/lib/customer360";
 import { buildCoachContextFromState } from "@/lib/engine/coach-context";
 import { buildUserContext } from "@/lib/engine/context";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
-import { extractUserPatterns, patternInsights, computeLearningInsights } from "@/lib/engine/learning";
+import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
+import {
+  extractUserPatterns,
+  patternInsights,
+  computeLearningInsights,
+} from "@/lib/engine/learning";
 import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { evaluateSafetyForDate } from "@/lib/engine/safety";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
 import { sessionsInLastDays, streak } from "@/lib/engine/dimensions";
 import { currentPersonalRecords } from "@/lib/training/prs";
 import { estimated1RM } from "@/lib/training/one-rm";
 import { listExercisesWithHistory, hitsForExercise } from "@/lib/engine/exercise-history";
 import { buildNutritionContext } from "@/lib/nutrition/nutrition-context";
+import { consecutiveHardRpeStreak } from "@/lib/engine/recovery";
 import type { CoachContext, CoachMemoryEntry } from "@/lib/coach/types";
-import { GOAL_LABEL, LEVEL_LABEL, todayKey, type AppState } from "@/lib/types";
-
-function hardRpeStreak(sessions: AppState["sessions"]): number {
-  const sorted = [...sessions].sort((a, b) => b.date.localeCompare(a.date));
-  let n = 0;
-  for (const s of sorted) {
-    if (s.rpe === "dificil") n += 1;
-    else break;
-  }
-  return n;
-}
+import { GOAL_LABEL, LEVEL_LABEL, emptyState, todayKey, type AppState } from "@/lib/types";
 
 function top1rmEstimates(sessions: AppState["sessions"], limit = 5) {
   const summaries = listExercisesWithHistory(sessions, 20);
@@ -56,21 +52,28 @@ export function buildTypedCoachContextFromState(
     recentDecisions?: CoachContext["recentDecisions"];
     recentOutcomes?: CoachContext["recentOutcomes"];
     loggedTodayDecisions?: CoachContext["todayDecisions"];
+    decisionSnapshot?: DecisionContextSnapshot | null;
   },
 ): CoachContext {
   const date = opts?.date ?? todayKey();
   const p = state.profile;
+  const decisionSnapshot =
+    opts?.decisionSnapshot ??
+    state.decisionContextByDate?.[date] ??
+    (p ? assembleDecisionContext(state, { date, source: "offline_legacy" }) : null);
   const insights = p ? computeLearningInsights(state) : null;
   const goals = p ? nutritionGoals(p, insights) : null;
-  const safety = evaluateSafetyForDate(state, date);
-  const built = p ? buildLivingPlanWithDecisions(state, date) : null;
-  const living = state.livingPlans?.[date] ?? built?.plan ?? null;
+  const safety = decisionSnapshot?.safety ?? evaluateSafetyForDate(state, date);
+  const living = decisionSnapshot?.livingPlan ?? state.livingPlans?.[date] ?? null;
   const checkIn = state.dayCheckIns?.[date];
   const totals = dayNutritionTotals(state.meals ?? [], date);
   const nutCtx = goals
     ? buildNutritionContext(state.meals ?? [], { ...goals, waterMl: goals.waterMl }, date)
     : null;
-  const c360 = buildCustomer360FromState(state);
+  const c360 = buildCustomer360FromState(
+    state,
+    state.userId != null ? { userId: state.userId, date } : { date },
+  );
   const patterns = extractUserPatterns(state);
   const patternLines = patternInsights(patterns);
   const ctx = buildUserContext(state, state.userId);
@@ -79,25 +82,26 @@ export function buildTypedCoachContextFromState(
   const sessions28 = sessionsInLastDays(state.sessions ?? [], 28);
   const last = [...(state.sessions ?? [])].sort((a, b) => b.date.localeCompare(a.date))[0];
 
-  const recomputed =
-    built?.decisions.decisions.map((d) => ({
+  const fromSnapshot =
+    decisionSnapshot?.decisions.decisions.map((d) => ({
       type: d.decisionType,
       value: String(d.decisionValue),
       reasonCodes: d.reasonCodes,
       confidence: d.confidence,
       explanation: d.explanation,
-      source: "recomputed_live" as const,
+      source: "server_snapshot" as const,
     })) ?? [];
 
-  const todayDecisions =
-    opts?.loggedTodayDecisions?.length
+  const todayDecisions = fromSnapshot.length
+    ? fromSnapshot
+    : opts?.loggedTodayDecisions?.length
       ? opts.loggedTodayDecisions.map((d) => ({
           ...d,
           source: d.source ?? ("decision_log" as const),
         }))
-      : recomputed;
+      : [];
 
-  const bundle = buildCoachContextFromState(state);
+  const bundle = buildCoachContextFromState(state, { decisionSnapshot });
 
   return {
     userId: state.userId ?? "",
@@ -114,9 +118,7 @@ export function buildTypedCoachContextFromState(
           ...(p.primaryBlocker ? { primaryBlocker: p.primaryBlocker } : {}),
         }
       : null,
-    goals: goals
-      ? { proteinG: goals.proteinG, kcal: goals.kcal, waterMl: goals.waterMl }
-      : null,
+    goals: goals ? { proteinG: goals.proteinG, kcal: goals.kcal, waterMl: goals.waterMl } : null,
     training: {
       streak: streak(state.sessions ?? []),
       sessions7d: sessions7.length,
@@ -132,11 +134,27 @@ export function buildTypedCoachContextFromState(
       top1rm: top1rmEstimates(state.sessions ?? []),
     },
     recovery: {
-      level: c360.recovery.level ?? null,
-      score: c360.recovery.recoveryScore,
-      sleepHours: checkIn?.sleepHours ?? p?.typicalSleepHours ?? null,
+      level: decisionSnapshot?.context.recovery.level ?? c360.recovery.level ?? null,
+      score: decisionSnapshot?.context.recovery.score ?? c360.recovery.recoveryScore,
+      sleepHours: checkIn?.sleepHours ?? null,
       energy: checkIn?.energy ?? null,
-      hardRpeStreak: hardRpeStreak(state.sessions ?? []) || (c360.performance.avgRpeHardStreak ?? 0),
+      hardRpeStreak:
+        decisionSnapshot?.context.training.hardRpeStreak ??
+        consecutiveHardRpeStreak(state.sessions ?? []) ??
+        c360.performance.avgRpeHardStreak ??
+        0,
+      ...(decisionSnapshot?.context.recovery.readiness
+        ? { readiness: decisionSnapshot.context.recovery.readiness }
+        : {}),
+      ...(decisionSnapshot?.context.recovery.sleepConfidence != null
+        ? { sleepConfidence: decisionSnapshot.context.recovery.sleepConfidence }
+        : {}),
+      ...(decisionSnapshot?.context.recovery.checkInConfidence != null
+        ? { checkInConfidence: decisionSnapshot.context.recovery.checkInConfidence }
+        : {}),
+      ...(decisionSnapshot?.context.recovery.wearableConfidence != null
+        ? { wearableConfidence: decisionSnapshot.context.recovery.wearableConfidence }
+        : {}),
     },
     nutrition: {
       proteinG: totals.proteinG,
@@ -212,13 +230,11 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
   );
 
   if (ctx.exercisePerformance.recentPrs.length) {
-    lines.push(
-      `PRs recentes: ${ctx.exercisePerformance.recentPrs.map((p) => p.label).join("; ")}`,
-    );
+    lines.push(`PRs recentes: ${ctx.exercisePerformance.recentPrs.map((p) => p.label).join("; ")}`);
   }
 
   lines.push(
-    `Recovery: level=${ctx.recovery.level ?? "—"} score=${ctx.recovery.score ?? "—"} sleep=${ctx.recovery.sleepHours ?? "—"}h energy=${ctx.recovery.energy ?? "—"} hardRpeStreak=${ctx.recovery.hardRpeStreak}`,
+    `Recovery: level=${ctx.recovery.level ?? "—"} readiness=${ctx.recovery.readiness ?? "—"} score=${ctx.recovery.score ?? "—"} sleep=${ctx.recovery.sleepHours ?? "—"}h energy=${ctx.recovery.energy ?? "—"} hardRpeStreak=${ctx.recovery.hardRpeStreak}`,
     `Nutrição hoje: P=${ctx.nutrition.proteinG}g C=${ctx.nutrition.carbG}g G=${ctx.nutrition.fatG}g kcal=${ctx.nutrition.kcal} meals=${ctx.nutrition.mealsLogged} targetP=${ctx.nutrition.proteinTarget ?? "—"}`,
     `Supps: ${ctx.supplements.routineIds.join(", ") || "nenhum"} | aderência30d=${ctx.supplements.adherence30d ?? "—"}`,
     `C360: nutritionAdherence=${ctx.customer360.nutritionAdherence ?? "—"} recovery=${ctx.customer360.recoveryScore ?? "—"} sessions28d=${ctx.customer360.performanceScore ?? "—"}`,
@@ -230,7 +246,7 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
   );
 
   if (ctx.todayDecisions.length) {
-    const src = ctx.todayDecisions[0]?.source === "decision_log" ? "decision_log" : "recomputed_live";
+    const src = ctx.todayDecisions[0]?.source ?? "server_snapshot";
     lines.push(`Decisões de hoje (fonte=${src}; NÃO recalcule):`);
     for (const d of ctx.todayDecisions) {
       lines.push(
@@ -283,7 +299,10 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
 /**
  * Hydrate DB + build typed CoachContext for trusted userId.
  */
-export async function buildCoachContext(userId: string, date?: string): Promise<{
+export async function buildCoachContext(
+  userId: string,
+  date?: string,
+): Promise<{
   typed: CoachContext;
   contextText: string;
   safetyNotice?: string;
@@ -292,27 +311,13 @@ export async function buildCoachContext(userId: string, date?: string): Promise<
   livingSummary: string;
   state: AppState;
 }> {
-  const { hydrateAppStateFromDb } = await import("@/lib/customer360/hydrate.server");
-  let state = await hydrateAppStateFromDb(userId);
+  const { getOrBuildDecisionContext } = await import("@/lib/engine/decision-context.server");
+  const built = await getOrBuildDecisionContext(userId, date);
+  let state = built?.state ?? { ...emptyState, userId };
   state = { ...state, userId };
+  const decisionSnapshot = built?.snapshot ?? null;
 
-  try {
-    const { loadCustomerProfile } = await import("@/lib/customer360/recompute.server");
-    const c360 = await loadCustomerProfile(userId);
-    if (c360?.commerce) {
-      state = {
-        ...state,
-        purchaseProductIds:
-          state.purchaseProductIds?.length
-            ? state.purchaseProductIds
-            : (c360.commerce.productIds ?? state.purchaseProductIds ?? []),
-      };
-    }
-  } catch {
-    /* optional */
-  }
-
-  const day = date ?? todayKey();
+  const day = date ?? decisionSnapshot?.date ?? todayKey();
   let memory: CoachMemoryEntry[] = [];
   let recentDecisions: CoachContext["recentDecisions"] = [];
   let recentOutcomes: CoachContext["recentOutcomes"] = [];
@@ -342,6 +347,56 @@ export async function buildCoachContext(userId: string, date?: string): Promise<
             `${r.decision_type}=${String(r.decision_value?.value ?? "")}`,
           source: "decision_log" as const,
         }));
+        const ids = todayRows.map((r) => r.id).filter((id): id is string => Boolean(id));
+        if (ids.length) {
+          const [{ data: actions }, { data: outs }] = await Promise.all([
+            db
+              .from("decision_actions")
+              .select("decision_id, expected_action, status")
+              .in("decision_id", ids),
+            db
+              .from("decision_outcomes")
+              .select("decision_id, attribution_type, learning_signal, observed_at")
+              .in("decision_id", ids)
+              .order("observed_at", { ascending: false }),
+          ]);
+          const actionById = new Map(
+            (
+              (actions ?? []) as Array<{
+                decision_id: string;
+                expected_action: string;
+                status: string;
+              }>
+            ).map((a) => [a.decision_id, a]),
+          );
+          const outById = new Map<
+            string,
+            { attribution_type: string; learning_signal: string | null }
+          >();
+          for (const o of (outs ?? []) as Array<{
+            decision_id: string;
+            attribution_type: string;
+            learning_signal: string | null;
+          }>) {
+            if (!outById.has(o.decision_id)) outById.set(o.decision_id, o);
+          }
+          loggedTodayDecisions = loggedTodayDecisions.map((d, i) => {
+            const id = todayRows[i]?.id;
+            if (!id) return d;
+            const a = actionById.get(id);
+            const o = outById.get(id);
+            if (!a && !o) return d;
+            return {
+              ...d,
+              attribution: {
+                ...(a?.expected_action ? { expectedAction: a.expected_action } : {}),
+                ...(a?.status ? { actionStatus: a.status } : {}),
+                ...(o?.attribution_type ? { attributionType: o.attribution_type } : {}),
+                ...(o ? { learningSignal: o.learning_signal } : {}),
+              },
+            };
+          });
+        }
       }
       recentOutcomes = (await loadRecentOutcomes({ userId, limit: 15 })).map((o) => ({
         outcomeType: o.outcome_type,
@@ -364,9 +419,7 @@ export async function buildCoachContext(userId: string, date?: string): Promise<
           date: String(r["date"] ?? ""),
           type: String(r["decision_type"] ?? ""),
           value,
-          reasonCodes: Array.isArray(r["reason_codes"])
-            ? (r["reason_codes"] as string[])
-            : [],
+          reasonCodes: Array.isArray(r["reason_codes"]) ? (r["reason_codes"] as string[]) : [],
           outcome: (r["outcome"] as string | null) ?? null,
         };
       });
@@ -381,22 +434,23 @@ export async function buildCoachContext(userId: string, date?: string): Promise<
     recentDecisions,
     recentOutcomes,
     loggedTodayDecisions,
+    decisionSnapshot,
   });
   const contextText = formatCoachContextForPrompt(typed);
-  const legacy = buildCoachContextFromState(state);
+  const legacy = buildCoachContextFromState(state, { decisionSnapshot });
 
   const safetyNotice = typed.safety.escalateCare
-    ? typed.safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
-      "Há um sinal no check-in que merece atenção profissional — não trate como adaptação de treino."
+    ? (typed.safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
+      "Há um sinal no check-in que merece atenção profissional — não trate como adaptação de treino.")
     : undefined;
 
   return {
     typed,
     contextText,
-    safetyNotice,
     why: typed.why,
     decisions: legacy.decisions,
     livingSummary: typed.livingSummary,
     state,
+    ...(safetyNotice ? { safetyNotice } : {}),
   };
 }

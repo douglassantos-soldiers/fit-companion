@@ -1,0 +1,922 @@
+[
+  {
+    "targetNamePt": "Supino guilhotina",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "supino-guilhotina"
+  },
+  {
+    "targetNamePt": "Crucifixo no chão",
+    "muscleHint": "peito",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "crucifixo-chao"
+  },
+  {
+    "targetNamePt": "Supino no cabo sentado",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "supino-cabo-sentado"
+  },
+  {
+    "targetNamePt": "Flexão diamante pés elevados",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "flexao-diamond-elevada"
+  },
+  {
+    "targetNamePt": "Remada inclinada com peito apoiado",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "remada-peito-suportada"
+  },
+  {
+    "targetNamePt": "Puxada pegada aberta",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "puxada-pegada-aberta"
+  },
+  {
+    "targetNamePt": "Remada com elástico",
+    "muscleHint": "costas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "remada-elastico"
+  },
+  {
+    "targetNamePt": "Pullover com halter",
+    "muscleHint": "costas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "pullover-halter"
+  },
+  {
+    "targetNamePt": "Agachamento na caixa",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "agachamento-caixa"
+  },
+  {
+    "targetNamePt": "Afundo reverso",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "afundo-reverso"
+  },
+  {
+    "targetNamePt": "Stiff unilateral",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "stiff-unilateral"
+  },
+  {
+    "targetNamePt": "Elevação de gêmeos em máquina",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "elevacao-gemeos-maquina"
+  },
+  {
+    "targetNamePt": "Step-up",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "step-up"
+  },
+  {
+    "targetNamePt": "Desenvolvimento pegada neutra",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "desenvolvimento-neutro"
+  },
+  {
+    "targetNamePt": "Elevação em Y no cabo",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "elevacao-y-cabo"
+  },
+  {
+    "targetNamePt": "Face pull com elástico",
+    "muscleHint": "ombros",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "face-pull-elastico"
+  },
+  {
+    "targetNamePt": "Rosca inclinada martelo",
+    "muscleHint": "biceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "rosca-inclinada-martelo"
+  },
+  {
+    "targetNamePt": "Rosca no cabo unilateral",
+    "muscleHint": "biceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "rosca-cabo-unica"
+  },
+  {
+    "targetNamePt": "Tríceps overhead no cabo",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "triceps-overhead-cabo"
+  },
+  {
+    "targetNamePt": "Supino pegada fechada",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "supino-fechado"
+  },
+  {
+    "targetNamePt": "Bird dog",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "bird-dog"
+  },
+  {
+    "targetNamePt": "Elevação de pernas na barra",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "hanging-leg-raise"
+  },
+  {
+    "targetNamePt": "Pallof com elástico",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "pallof-elastico"
+  },
+  {
+    "targetNamePt": "Farmers carry com halteres",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "farmers-carry-halter"
+  },
+  {
+    "targetNamePt": "Agachamento livre sem carga",
+    "muscleHint": "pernas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "air-squat"
+  },
+  {
+    "targetNamePt": "Flexão militar",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "flexao-militar"
+  },
+  {
+    "targetNamePt": "Remada T-bar",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "remada-t-barra"
+  },
+  {
+    "targetNamePt": "Flexão de pernas na bola",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "leg-curl-bola"
+  },
+  {
+    "targetNamePt": "Elevação lateral sentada",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "elevacao-lateral-halter-sentado"
+  },
+  {
+    "targetNamePt": "Crunch no cabo",
+    "muscleHint": "core",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "crunch-cabo"
+  },
+  {
+    "targetNamePt": "Bike ergômetro",
+    "muscleHint": "cardio",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "bike-erg"
+  },
+  {
+    "targetNamePt": "Shadow boxing",
+    "muscleHint": "cardio",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "shadow-boxing"
+  },
+  {
+    "targetNamePt": "Afundo goblet com kettlebell",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "kettlebell-goblet-lunge"
+  },
+  {
+    "targetNamePt": "Levantamento terra com kettlebell",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "kettlebell-deadlift"
+  },
+  {
+    "targetNamePt": "Flexão plus",
+    "muscleHint": "ombros",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2b",
+    "soldiersId": "push-up-plus"
+  },
+  {
+    "targetNamePt": "Supino no Smith",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "supino-smith"
+  },
+  {
+    "targetNamePt": "Supino inclinado com barra",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "supino-inclinado-barra"
+  },
+  {
+    "targetNamePt": "Crucifixo na máquina",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "crucifixo-maquina"
+  },
+  {
+    "targetNamePt": "Crossover alto",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "crossover-alto"
+  },
+  {
+    "targetNamePt": "Flexão larga",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "flexao-larga"
+  },
+  {
+    "targetNamePt": "Flexão apoiando os joelhos",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "flexao-joelhos"
+  },
+  {
+    "targetNamePt": "Supino unilateral com halter",
+    "muscleHint": "peito",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "supino-unilateral-halter"
+  },
+  {
+    "targetNamePt": "Squeeze press",
+    "muscleHint": "peito",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "squeeze-press"
+  },
+  {
+    "targetNamePt": "Remada no Smith",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "remada-smith"
+  },
+  {
+    "targetNamePt": "Puxada supinada na máquina",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "puxada-supinada-maquina"
+  },
+  {
+    "targetNamePt": "Remada sentada pegada neutra",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "remada-sentada-neutra"
+  },
+  {
+    "targetNamePt": "Remada australiana pés elevados",
+    "muscleHint": "costas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "australian-row-elevada"
+  },
+  {
+    "targetNamePt": "Pulldown unilateral",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "pulldown-unilateral"
+  },
+  {
+    "targetNamePt": "Remada com kettlebell",
+    "muscleHint": "costas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "remada-kettlebell"
+  },
+  {
+    "targetNamePt": "Encolhimento com halteres",
+    "muscleHint": "costas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "shrug-halter"
+  },
+  {
+    "targetNamePt": "Agachamento no Smith",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "agachamento-smith"
+  },
+  {
+    "targetNamePt": "Agachamento sumô com halter",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "agachamento-sumo-halter"
+  },
+  {
+    "targetNamePt": "Leg press unilateral",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "leg-press-unilateral"
+  },
+  {
+    "targetNamePt": "Cadeira flexora em pé",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "cadeira-flexora-em-pe"
+  },
+  {
+    "targetNamePt": "Abdução com elástico",
+    "muscleHint": "pernas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "abducao-elastico"
+  },
+  {
+    "targetNamePt": "Ponte de glúteo unilateral",
+    "muscleHint": "pernas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "ponte-gluteo-unilateral"
+  },
+  {
+    "targetNamePt": "Good morning com halter",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "good-morning-halter"
+  },
+  {
+    "targetNamePt": "Panturrilha unilateral",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "panturrilha-unilateral"
+  },
+  {
+    "targetNamePt": "Afundo lateral com carga",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "afundo-lateral"
+  },
+  {
+    "targetNamePt": "Desenvolvimento no Smith",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "desenvolvimento-smith"
+  },
+  {
+    "targetNamePt": "Elevação frontal no cabo",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "elevacao-frontal-cabo"
+  },
+  {
+    "targetNamePt": "Crucifixo inverso no cabo",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "crucifixo-inverso-cabo"
+  },
+  {
+    "targetNamePt": "Arnold press em pé",
+    "muscleHint": "ombros",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "arnold-press-em-pe"
+  },
+  {
+    "targetNamePt": "Elevação lateral com elástico",
+    "muscleHint": "ombros",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "elevacao-lateral-elastico"
+  },
+  {
+    "targetNamePt": "Rosca 21",
+    "muscleHint": "biceps",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "rosca-21"
+  },
+  {
+    "targetNamePt": "Rosca concentrada no cabo",
+    "muscleHint": "biceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "rosca-concentrada-cabo"
+  },
+  {
+    "targetNamePt": "Rosca martelo no cabo",
+    "muscleHint": "biceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "rosca-martelo-cabo"
+  },
+  {
+    "targetNamePt": "Rosca com elástico",
+    "muscleHint": "biceps",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "rosca-elastico"
+  },
+  {
+    "targetNamePt": "Tríceps no banco com pesos",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "triceps-banco-pesos"
+  },
+  {
+    "targetNamePt": "Tríceps testa com halteres",
+    "muscleHint": "triceps",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "triceps-testa-halter"
+  },
+  {
+    "targetNamePt": "Tríceps corda polia alta",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "triceps-corda-alta"
+  },
+  {
+    "targetNamePt": "Tríceps com elástico",
+    "muscleHint": "triceps",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "triceps-elastico"
+  },
+  {
+    "targetNamePt": "Tríceps coice com halter",
+    "muscleHint": "triceps",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "kickback-halter"
+  },
+  {
+    "targetNamePt": "Dead bug com halter",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "dead-bug-halter"
+  },
+  {
+    "targetNamePt": "Prancha com toque no ombro",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "prancha-ombro-toque"
+  },
+  {
+    "targetNamePt": "Russian twist com carga",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "russian-twist-carga"
+  },
+  {
+    "targetNamePt": "Hollow rock",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "hollow-rock"
+  },
+  {
+    "targetNamePt": "Roda abdominal nos joelhos",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "ab-wheel-joelho"
+  },
+  {
+    "targetNamePt": "Suitcase carry com kettlebell",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "suitcase-carry-kettlebell"
+  },
+  {
+    "targetNamePt": "Corrida estacionária",
+    "muscleHint": "cardio",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "corrida-estacionaria"
+  },
+  {
+    "targetNamePt": "Polichinelo com passo lateral",
+    "muscleHint": "cardio",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "polichinelo-passo"
+  },
+  {
+    "targetNamePt": "Burpee com step",
+    "muscleHint": "cardio",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "burpee-step"
+  },
+  {
+    "targetNamePt": "Remo ergômetro intervalado",
+    "muscleHint": "cardio",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "remada-ergometro-intervalo"
+  },
+  {
+    "targetNamePt": "Elíptico inclinado",
+    "muscleHint": "cardio",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "eliptico-inclinado"
+  },
+  {
+    "targetNamePt": "Kettlebell clean",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "kettlebell-clean"
+  },
+  {
+    "targetNamePt": "Desenvolvimento com kettlebell",
+    "muscleHint": "ombros",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "kettlebell-press"
+  },
+  {
+    "targetNamePt": "Turkish get-up parcial",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "turkish-getup-parcial"
+  },
+  {
+    "targetNamePt": "Remada landmine",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "landmine-row"
+  },
+  {
+    "targetNamePt": "Agachamento landmine",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "landmine-squat"
+  },
+  {
+    "targetNamePt": "Pull-through no cabo",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "cable-pull-through"
+  },
+  {
+    "targetNamePt": "Hip thrust com barra",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "hip-thrust-barra"
+  },
+  {
+    "targetNamePt": "Peck deck reverso",
+    "muscleHint": "ombros",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "pec-deck-reverso"
+  },
+  {
+    "targetNamePt": "Chin-up assistido",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "chin-up-assistido"
+  },
+  {
+    "targetNamePt": "Mergulho assistido",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "dip-assistido"
+  },
+  {
+    "targetNamePt": "Agachamento na parede",
+    "muscleHint": "pernas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "wall-sit"
+  },
+  {
+    "targetNamePt": "Pull-up escapular",
+    "muscleHint": "costas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "scapular-pullup"
+  },
+  {
+    "targetNamePt": "Ponte de glúteo com marcha",
+    "muscleHint": "pernas",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "glute-bridge-march"
+  },
+  {
+    "targetNamePt": "Prancha lateral com elevação de quadril",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "side-plank-hip"
+  },
+  {
+    "targetNamePt": "Woodchop no cabo",
+    "muscleHint": "core",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "cable-woodchop"
+  },
+  {
+    "targetNamePt": "Sissy squat",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "sissy-squat"
+  },
+  {
+    "targetNamePt": "Jefferson curl",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "jefferson-curl"
+  },
+  {
+    "targetNamePt": "Supino inclinado na máquina",
+    "muscleHint": "peito",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "supino-inclinado-maquina"
+  },
+  {
+    "targetNamePt": "Flexão pike nos joelhos",
+    "muscleHint": "ombros",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "flexao-pike-joelhos"
+  },
+  {
+    "targetNamePt": "Prancha com alcance alternado",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "prancha-alcance-alternado"
+  },
+  {
+    "targetNamePt": "Agachamento com calcanhares elevados",
+    "muscleHint": "pernas",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "agachamento-talonetes"
+  },
+  {
+    "targetNamePt": "Cadeira extensora unilateral",
+    "muscleHint": "pernas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "cadeira-extensora-unilateral"
+  },
+  {
+    "targetNamePt": "Remada polia baixa unilateral",
+    "muscleHint": "costas",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "remada-polia-baixa-unilateral"
+  },
+  {
+    "targetNamePt": "Rosca Scott na máquina",
+    "muscleHint": "biceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "rosca-scott-maquina"
+  },
+  {
+    "targetNamePt": "Flexão rápida",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "flexao-rapida"
+  },
+  {
+    "targetNamePt": "Caminhada do urso",
+    "muscleHint": "core",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "caminhada-urso"
+  },
+  {
+    "targetNamePt": "Windmill com kettlebell",
+    "muscleHint": "core",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "kettlebell-windmill"
+  },
+  {
+    "targetNamePt": "Bike horizontal",
+    "muscleHint": "cardio",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "bike-horizontal"
+  },
+  {
+    "targetNamePt": "Elevação posterior no banco",
+    "muscleHint": "ombros",
+    "equipmentHint": "ambos",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "elevacao-posterior-banco"
+  },
+  {
+    "targetNamePt": "Tríceps banco inclinado",
+    "muscleHint": "triceps",
+    "equipmentHint": "academia",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "triceps-banco-inclinado"
+  },
+  {
+    "targetNamePt": "Flexão parafuso",
+    "muscleHint": "peito",
+    "equipmentHint": "casa",
+    "status": "covered",
+    "loteHint": "2c",
+    "soldiersId": "flexao-parafuso"
+  }
+]

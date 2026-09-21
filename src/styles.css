@@ -182,12 +182,14 @@ html[data-theme="light"] {
 
 @utility surface-card {
   background-color: var(--color-card);
+  color: var(--color-card-foreground);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
 }
 
 @utility surface-glass {
   background-color: var(--glass-bg);
+  color: var(--color-foreground);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-2xl);
   backdrop-filter: blur(20px);
@@ -283,17 +285,106 @@ html[data-theme="dark"] {
 .mantine-Modal-content {
   background-color: var(--color-card) !important;
   border: 1px solid var(--color-border);
-  color: var(--color-foreground);
+  color: var(--color-foreground) !important;
 }
 
 .mantine-Modal-header {
   background-color: var(--color-card) !important;
+  color: var(--color-foreground) !important;
 }
 
 .mantine-Modal-title {
   font-family: var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.01em;
+  color: var(--color-foreground) !important;
+}
+
+.mantine-Modal-body,
+.mantine-InputWrapper-label {
+  color: var(--color-foreground) !important;
+}
+
+/* Sonner toasts — dark Soldiers + layout (never DaisyUI .toast) */
+[data-sonner-toaster][data-sonner-theme="dark"] {
+  --normal-bg: var(--card);
+  --normal-text: var(--foreground);
+  --normal-border: var(--border);
+  --success-bg: var(--card);
+  --success-text: var(--foreground);
+  --success-border: var(--primary);
+  --error-bg: var(--card);
+  --error-text: var(--foreground);
+  --error-border: var(--destructive);
+}
+
+/* Neutralize DaisyUI .toast if it ever leaks onto Sonner nodes */
+[data-sonner-toaster].toaster .toast,
+[data-sonner-toast].toast {
+  position: static;
+  inset: auto;
+  transform: none;
+  width: auto;
+  max-width: none;
+  flex-direction: unset;
+  gap: unset;
+  padding: unset;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+[data-sonner-toast] {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.75rem !important;
+  width: auto !important;
+  max-width: min(356px, calc(100vw - 2rem)) !important;
+  min-height: 3rem !important;
+  height: auto !important;
+  padding: 0.875rem 1.125rem !important;
+  box-sizing: border-box !important;
+  background: var(--normal-bg, var(--card)) !important;
+  color: var(--normal-text, var(--foreground)) !important;
+  border: 1px solid var(--normal-border, var(--border)) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45) !important;
+  pointer-events: auto !important;
+}
+
+[data-sonner-toast] [data-icon] {
+  position: static !important;
+  inset: auto !important;
+  display: flex !important;
+  flex-shrink: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  transform: none !important;
+  color: inherit !important;
+}
+
+[data-sonner-toast] [data-content] {
+  position: static !important;
+  inset: auto !important;
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 0.125rem !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  color: inherit !important;
+}
+
+[data-sonner-toast] [data-title],
+[data-sonner-toast] [data-description] {
+  position: static !important;
+  margin: 0 !important;
+  color: inherit !important;
 }
 
 .badge-soldiers {

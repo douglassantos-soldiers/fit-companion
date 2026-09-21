@@ -1,33 +1,34 @@
 /**
- * Client helper: persist Decision Engine output best-effort.
+ * Client helper: hydrate authoritative DecisionContext from the server.
+ * Never treat client-computed engines as the write path.
  */
-import { buildContextSnapshot } from "@/lib/engine/context-snapshot";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
 import type { AppState, SessionLog, SessionRpe } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 import type { OutcomeMetrics } from "@/lib/engine/outcome-learning";
 
-export function persistDecisionsBestEffort(deviceId: string, state: AppState, date = todayKey()): void {
-  if (!deviceId || typeof window === "undefined") return;
+export async function refreshDecisionContextBestEffort(
+  deviceId: string,
+  date = todayKey(),
+): Promise<DecisionContextSnapshot | null> {
+  if (!deviceId || typeof window === "undefined") return null;
   try {
-    const built = buildLivingPlanWithDecisions(state, date);
-    const snapshot = buildContextSnapshot(state, date, state.userId);
-    if (!built || !snapshot) return;
-    void import("@/lib/decision.functions")
-      .then(({ logDecisionsFn }) =>
-        logDecisionsFn({
-          data: {
-            deviceId,
-            date,
-            decisions: built.decisions.decisions,
-            snapshot,
-          },
-        }),
-      )
-      .catch(() => undefined);
+    const { getDecisionContextFn } = await import("@/lib/decision.functions");
+    const res = await getDecisionContextFn({ data: { deviceId, date } });
+    return res.snapshot ?? null;
   } catch {
-    /* best-effort */
+    return null;
   }
+}
+
+/** Compatibility: formerly computed locally and logged. Now server-assembles. */
+export function persistDecisionsBestEffort(
+  deviceId: string,
+  _state: AppState,
+  date = todayKey(),
+): void {
+  if (!deviceId || typeof window === "undefined") return;
+  void refreshDecisionContextBestEffort(deviceId, date).catch(() => undefined);
 }
 
 export function markDecisionOutcomeBestEffort(
@@ -69,6 +70,44 @@ export function recordSessionOutcomeBestEffort(
     .catch(() => undefined);
 }
 
+export function recordDecisionActionBestEffort(opts: {
+  deviceId: string;
+  date?: string;
+  actionKind: string;
+  status?: string;
+  entityType?: string;
+  entityId?: string;
+  mealSlot?: string;
+  primaryKind?: "train" | "rest" | "sleep" | "meal";
+  express?: boolean;
+}): void {
+  if (!opts.deviceId || typeof window === "undefined") return;
+  const payload: {
+    deviceId: string;
+    date: string;
+    actionKind: string;
+    status?: string;
+    entityType?: string;
+    entityId?: string;
+    mealSlot?: string;
+    primaryKind?: "train" | "rest" | "sleep" | "meal";
+    express?: boolean;
+  } = {
+    deviceId: opts.deviceId,
+    date: (opts.date ?? todayKey()).slice(0, 10),
+    actionKind: opts.actionKind,
+  };
+  if (opts.status) payload.status = opts.status;
+  if (opts.entityType) payload.entityType = opts.entityType;
+  if (opts.entityId) payload.entityId = opts.entityId;
+  if (opts.mealSlot) payload.mealSlot = opts.mealSlot;
+  if (opts.primaryKind) payload.primaryKind = opts.primaryKind;
+  if (opts.express != null) payload.express = opts.express;
+  void import("@/lib/decision.functions")
+    .then(({ recordDecisionActionFn }) => recordDecisionActionFn({ data: payload }))
+    .catch(() => undefined);
+}
+
 function yesterdayKey(from = todayKey()): string {
   const d = new Date(`${from}T12:00:00`);
   d.setDate(d.getDate() - 1);
@@ -82,7 +121,6 @@ export function recordNextDayCheckInBestEffort(
 ): void {
   if (!deviceId || typeof window === "undefined") return;
   const today = checkIn.date.slice(0, 10);
-  // Only when checking in "today" do we close yesterday's loop
   if (today !== todayKey()) return;
   const yesterday = yesterdayKey(today);
   void import("@/lib/decision.functions")

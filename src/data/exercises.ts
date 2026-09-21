@@ -1,3 +1,7 @@
+/**
+ * Planner exercise pool — facade over the canonical library (lote 1).
+ * EXERCISES is the active + plannerEligible projection; hydrate may replace it.
+ */
 import { EXERCISE_LIBRARY } from "@/data/exercise-library";
 import { resolveExerciseMedia } from "@/lib/soldiers-media";
 

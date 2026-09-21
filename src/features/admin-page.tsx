@@ -1,12 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EXERCISES } from "@/data/exercises";
 import { MEAL_PRESETS } from "@/data/meal-presets";
 import { checkAdminSession, loginAdmin, logoutAdmin } from "@/lib/access.functions";
 import {
@@ -32,7 +31,16 @@ import {
   saveCmsRemote,
   setEntitlementManual,
   setUserStatus,
+  listAdminExperts,
+  saveAdminExpert,
+  listAdminTrails,
+  saveAdminTrail,
+  listAdminCollections,
+  saveAdminCollection,
 } from "@/lib/admin.functions";
+import { listAdminSoldiersMedia, updateSoldiersMediaStatus } from "@/lib/soldiers-media.functions";
+import { SOLDIERS_MEDIA_MANIFEST } from "@/data/soldiers-media-manifest";
+import type { SoldiersMediaAsset } from "@/lib/soldiers-media-types";
 import type { AdminUserLookup, ShopifyOpsSnapshot } from "@/lib/admin.server";
 import {
   accumulateShopifyCustomerImport,
@@ -40,19 +48,28 @@ import {
   type ShopifyCustomerImportTotals,
 } from "@/lib/shopify-customers";
 import type { ProductAnalytics } from "@/lib/analytics.server";
-import { loadCms, setCmsCache, type CmsState } from "@/lib/cms";
+import { emptyCmsState, loadCms, setCmsCache, type CmsState } from "@/lib/cms";
 import type { ResolvedLibraryExercise } from "@/lib/training/resolve-catalog";
 import type { AdminChallengeRow } from "@/lib/catalog.server";
 import type { PublicContentItem } from "@/lib/content-match";
+import type { ContentCollection, ContentProgram, Expert } from "@/lib/content/types";
 import type { TrainingRules } from "@/lib/training/training-rules";
 import type { ContentReportRow } from "@/lib/moderation.server";
-import { ALL_ADMIN_TABS, ADMIN_CATALOG_TABS, ADMIN_OPS_TABS, type AdminTabId } from "@/features/admin/nav";
+import {
+  ALL_ADMIN_TABS,
+  ADMIN_CATALOG_TABS,
+  ADMIN_OPS_TABS,
+  type AdminTabId,
+} from "@/features/admin/nav";
 import { DashboardTab } from "@/features/admin/dashboard-tab";
 import { UsersTab } from "@/features/admin/users-tab";
 import { ExercisesTab } from "@/features/admin/exercises-tab";
 import { ProgramsTab } from "@/features/admin/programs-tab";
 import { ChallengesTab } from "@/features/admin/challenges-tab";
 import { ContentTab } from "@/features/admin/content-tab";
+import { ExpertsTab } from "@/features/admin/experts-tab";
+import { TrailsTab } from "@/features/admin/trails-tab";
+import { CollectionsTab } from "@/features/admin/collections-tab";
 import { MediaTab } from "@/features/admin/media-tab";
 import { ModerationTab } from "@/features/admin/moderation-tab";
 import { SystemTab } from "@/features/admin/system-tab";
@@ -79,9 +96,14 @@ export function AdminPage() {
   const [exercises, setExercises] = useState<ResolvedLibraryExercise[]>([]);
   const [challenges, setChallenges] = useState<AdminChallengeRow[]>([]);
   const [content, setContent] = useState<PublicContentItem[]>([]);
+  const [experts, setExperts] = useState<Expert[]>([]);
+  const [trails, setTrails] = useState<ContentProgram[]>([]);
+  const [collections, setCollections] = useState<ContentCollection[]>([]);
   const [rules, setRules] = useState<TrainingRules | null>(null);
   const [reports, setReports] = useState<ContentReportRow[]>([]);
   const [catalogBusy, setCatalogBusy] = useState(false);
+  const [mediaPackages, setMediaPackages] = useState<SoldiersMediaAsset[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
 
   const doLogin = useServerFn(loginAdmin);
   const doCheck = useServerFn(checkAdminSession);
@@ -108,11 +130,37 @@ export function AdminPage() {
   const doResolveReport = useServerFn(resolveAdminReport);
   const doHideActivity = useServerFn(hideAdminActivity);
   const doHideComment = useServerFn(hideAdminComment);
+  const doListExperts = useServerFn(listAdminExperts);
+  const doSaveExpert = useServerFn(saveAdminExpert);
+  const doListTrails = useServerFn(listAdminTrails);
+  const doSaveTrail = useServerFn(saveAdminTrail);
+  const doListCollections = useServerFn(listAdminCollections);
+  const doSaveCollection = useServerFn(saveAdminCollection);
+  const doListMedia = useServerFn(listAdminSoldiersMedia);
+  const doUpdateMedia = useServerFn(updateSoldiersMediaStatus);
 
-  const featured = useMemo(
-    () => EXERCISES.filter((e) => e.priority === 1 || e.mediaUrl).slice(0, 24),
-    [],
-  );
+  const loadMediaPackages = () => {
+    setMediaBusy(true);
+    void doListMedia()
+      .then((rows) => {
+        const map = new Map<string, SoldiersMediaAsset>();
+        for (const pack of SOLDIERS_MEDIA_MANIFEST) {
+          map.set(
+            `${pack.kind}:${pack.entityId}:${pack.version}:${pack.variant}:${pack.region}`,
+            pack,
+          );
+        }
+        for (const pack of rows) {
+          map.set(
+            `${pack.kind}:${pack.entityId}:${pack.version}:${pack.variant}:${pack.region}`,
+            pack,
+          );
+        }
+        setMediaPackages([...map.values()]);
+      })
+      .catch(() => toast.error("Falha ao listar mídia"))
+      .finally(() => setMediaBusy(false));
+  };
 
   useEffect(() => {
     void doCheck()
@@ -156,28 +204,28 @@ export function AdminPage() {
   const tryAuth = () => {
     void doLogin({ data: { email, password } })
       .then(async (r) => {
-        if (r.ok) {
-          setAuthed(true);
-          toast.success("Admin liberado");
-          try {
-            const remote = await doLoadCms();
-            setCms(remote);
-            setCmsCache(remote);
-          } catch {
-            setCms(loadCms());
-          }
-        } else if (r.reason === "not_configured") {
-          toast.error("Admin não configurado no servidor");
-        } else if (r.reason === "rate_limited") {
-          toast.error("Muitas tentativas — aguarde");
-        } else {
-          toast.error("E-mail ou senha inválidos");
+      if (r.ok) {
+        setAuthed(true);
+        toast.success("Admin liberado");
+        try {
+          const remote = await doLoadCms();
+          setCms(remote);
+          setCmsCache(remote);
+        } catch {
+          setCms(loadCms());
         }
+      } else if (r.reason === "not_configured") {
+          toast.error("Admin não configurado no servidor");
+      } else if (r.reason === "rate_limited") {
+        toast.error("Muitas tentativas — aguarde");
+      } else {
+          toast.error("E-mail ou senha inválidos");
+      }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Falha no login admin";
         toast.error(msg);
-      });
+    });
   };
 
   if (!authed) {
@@ -262,7 +310,9 @@ export function AdminPage() {
           setLookup(r.lookup);
           toast.success("Entitlement resincronizado");
         } else {
-          toast.error(r.reason === "no_entitlement" ? "Sem entitlement / pedidos" : "Falha no resync");
+          toast.error(
+            r.reason === "no_entitlement" ? "Sem entitlement / pedidos" : "Falha no resync",
+          );
         }
       })
       .catch(() => toast.error("Falha no resync"))
@@ -384,6 +434,30 @@ export function AdminPage() {
       .finally(() => setCatalogBusy(false));
   };
 
+  const loadExperts = () => {
+    setCatalogBusy(true);
+    void doListExperts()
+      .then((r) => setExperts(r))
+      .catch(() => toast.error("Falha ao listar experts"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadTrails = () => {
+    setCatalogBusy(true);
+    void doListTrails()
+      .then((r) => setTrails(r))
+      .catch(() => toast.error("Falha ao listar trilhas"))
+      .finally(() => setCatalogBusy(false));
+  };
+
+  const loadCollections = () => {
+    setCatalogBusy(true);
+    void doListCollections()
+      .then((r) => setCollections(r))
+      .catch(() => toast.error("Falha ao listar coleções"))
+      .finally(() => setCatalogBusy(false));
+  };
+
   const loadRules = () => {
     setCatalogBusy(true);
     void doLoadRules()
@@ -407,19 +481,28 @@ export function AdminPage() {
     if (next === "exercicios" && !exercises.length) loadExercises();
     if (next === "desafios" && !challenges.length) loadChallenges();
     if (next === "conteudo" && !content.length) loadContent();
+    if (next === "experts" && !experts.length) loadExperts();
+    if (next === "trilhas" && !trails.length) loadTrails();
+    if (next === "colecoes" && !collections.length) loadCollections();
     if (next === "programas" && !rules) loadRules();
     if (next === "moderacao" && !reports.length) loadReports();
+    if (next === "midia") loadMediaPackages();
   };
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-6xl bg-background px-4 py-6 pb-20">
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/perfil" className="rounded-full border border-white/10 p-2 text-muted-foreground">
+        <Link
+          to="/perfil"
+          className="rounded-full border border-white/10 p-2 text-muted-foreground"
+        >
           <ArrowLeft className="size-4" />
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="text-display text-2xl">Admin Console</h1>
-          <p className="text-xs text-muted-foreground">Backoffice de produto · sem dados de saúde</p>
+          <p className="text-xs text-muted-foreground">
+            Backoffice de produto · sem dados de saúde
+          </p>
         </div>
         <Button
           variant="secondary"
@@ -539,6 +622,19 @@ export function AdminPage() {
                     mediaUrl: row.mediaUrl ?? null,
                     cues: row.cues ?? null,
                     alternativeIds: row.alternativeIds,
+                    canonicalName: row.canonicalName,
+                    displayNameEn: row.displayNameEn ?? null,
+                    version: row.version,
+                    aliases: row.aliases ?? [],
+                    searchTerms: row.searchTerms ?? [],
+                    equipmentInventory: row.equipmentInventory ?? [],
+                    exerciseFamily: row.exerciseFamily ?? null,
+                    movementFamily: row.movementFamily ?? null,
+                    progressionFamily: row.progressionFamily ?? null,
+                    regressionFamily: row.regressionFamily ?? null,
+                    contraindicationTags: row.contraindicationTags ?? [],
+                    mediaId: row.mediaId,
+                    mediaStatus: row.mediaStatus,
                   },
                 })
                   .then((r) => {
@@ -566,6 +662,63 @@ export function AdminPage() {
                     else toast.error("Falha ao salvar regras");
                   })
                   .catch(() => toast.error("Falha ao salvar regras"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "experts" ? (
+            <ExpertsTab
+              rows={experts}
+              busy={catalogBusy}
+              onReload={loadExperts}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveExpert({ data: row })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Expert salvo");
+                      loadExperts();
+                    } else toast.error("Falha ao salvar expert");
+                  })
+                  .catch(() => toast.error("Falha ao salvar expert"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "trilhas" ? (
+            <TrailsTab
+              rows={trails}
+              busy={catalogBusy}
+              onReload={loadTrails}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveTrail({ data: row })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Trilha salva");
+                      loadTrails();
+                    } else toast.error("Falha ao salvar trilha");
+                  })
+                  .catch(() => toast.error("Falha ao salvar trilha"))
+                  .finally(() => setCatalogBusy(false));
+              }}
+            />
+          ) : null}
+          {tab === "colecoes" ? (
+            <CollectionsTab
+              rows={collections}
+              busy={catalogBusy}
+              onReload={loadCollections}
+              onSave={(row) => {
+                setCatalogBusy(true);
+                void doSaveCollection({ data: row })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success("Coleção salva");
+                      loadCollections();
+                    } else toast.error("Falha ao salvar coleção");
+                  })
+                  .catch(() => toast.error("Falha ao salvar coleção"))
                   .finally(() => setCatalogBusy(false));
               }}
             />
@@ -629,6 +782,12 @@ export function AdminPage() {
                     levels: row.levels,
                     published: row.published,
                     sortOrder: row.sortOrder,
+                    visible: row.visible !== false,
+                    ...(row.expertId ? { expertId: row.expertId } : {}),
+                    ...(row.collectionId ? { collectionId: row.collectionId } : {}),
+                    ...(row.mediaId ? { mediaId: row.mediaId } : {}),
+                    ...(row.publishAt ? { publishAt: row.publishAt } : {}),
+                    ...(row.unpublishAt ? { unpublishAt: row.unpublishAt } : {}),
                   },
                 })
                   .then((r) => {
@@ -659,10 +818,40 @@ export function AdminPage() {
             <MediaTab
               cms={cms}
               setCms={(updater) => setCms(updater)}
-              featured={featured}
               meals={MEAL_PRESETS}
+              packages={mediaPackages}
               saving={saving}
+              statusBusy={mediaBusy}
               onSave={persistCms}
+              onStatusChange={(pack, status) => {
+                setMediaBusy(true);
+                void doUpdateMedia({
+                  data: {
+                    kind: pack.kind,
+                    entityId: pack.entityId,
+                    version: pack.version,
+                    variant: pack.variant,
+                    region: pack.region,
+                    status,
+                  },
+                })
+                  .then((r) => {
+                    if (r.ok) {
+                      toast.success(`Status: ${status}`);
+                      loadMediaPackages();
+                    } else if (r.reason === "illegal_transition") {
+                      toast.error("Transição de status inválida");
+                    } else if (r.reason === "validation_failed") {
+                      toast.error("Package incompleto para published");
+                    } else if (r.reason === "not_found") {
+                      toast.error("Persista o package no servidor antes de mudar status");
+                    } else {
+                      toast.error("Falha ao atualizar mídia");
+                    }
+                  })
+                  .catch(() => toast.error("Falha ao atualizar mídia"))
+                  .finally(() => setMediaBusy(false));
+              }}
             />
           ) : null}
           {tab === "moderacao" ? (
@@ -703,7 +892,7 @@ export function AdminPage() {
                   .finally(() => setCatalogBusy(false));
               }}
             />
-          ) : null}
+              ) : null}
           {tab === "sistema" ? (
             <SystemTab
               ops={ops}
@@ -716,13 +905,13 @@ export function AdminPage() {
                 importAbortRef.current = true;
               }}
             />
-          ) : null}
-        </div>
-      </div>
+                        ) : null}
+              </div>
+            </div>
     </div>
   );
 }
 
 function emptyCms(): CmsState {
-  return { exerciseMedia: {}, mealImages: {}, workoutNotes: {} };
+  return emptyCmsState();
 }

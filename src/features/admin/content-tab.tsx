@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ContentKind, PublicContentItem } from "@/lib/content-match";
+import { CONTENT_KINDS } from "@/lib/content-match";
 
-const KINDS: ContentKind[] = ["article", "tip", "technique", "nutrition", "recovery", "motivation"];
+const KINDS: ContentKind[] = [...CONTENT_KINDS];
 const GOALS = ["massa", "gordura", "performance", "saude"];
 const LEVELS = ["iniciante", "intermediario", "avancado"];
 
@@ -18,6 +19,7 @@ function emptyItem(): PublicContentItem {
     levels: [],
     published: false,
     sortOrder: 0,
+    visible: true,
   };
 }
 
@@ -79,7 +81,10 @@ export function ContentTab({
             ))}
           </select>
           <Label className="text-xs">título</Label>
-          <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <Input
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          />
           <Label className="text-xs">corpo</Label>
           <textarea
             className="min-h-28 w-full rounded-md border border-white/10 bg-background p-2 text-sm"
@@ -120,6 +125,25 @@ export function ContentTab({
             />
             publicado
           </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={draft.visible !== false}
+              onChange={(e) => setDraft({ ...draft, visible: e.target.checked })}
+            />
+            visível
+          </label>
+          <Label className="text-xs">publicar em</Label>
+          <Input
+            type="datetime-local"
+            value={draft.publishAt ? draft.publishAt.slice(0, 16) : ""}
+            onChange={(e) => {
+              const next = { ...draft };
+              if (e.target.value) next.publishAt = e.target.value;
+              else delete next.publishAt;
+              setDraft(next);
+            }}
+          />
           <div className="flex gap-2">
             <Button disabled={busy} onClick={() => onSave(draft)}>
               Salvar
@@ -138,11 +162,15 @@ export function ContentTab({
       <ul className="space-y-2">
         {filtered.map((c) => (
           <li key={c.id}>
-            <button type="button" className="surface-glass w-full p-3 text-left" onClick={() => setDraft({ ...c })}>
+            <button
+              type="button"
+              className="surface-glass w-full p-3 text-left"
+              onClick={() => setDraft({ ...c })}
+            >
               <p className="text-sm font-semibold">{c.title}</p>
               <p className="text-xs text-muted-foreground">
-                {c.kind} · {c.published ? "publicado" : "rascunho"} · {c.goals.join("/") || "todos"} ·{" "}
-                {c.levels.join("/") || "todos"}
+                {c.kind} · {c.published ? "publicado" : "rascunho"} · {c.goals.join("/") || "todos"}{" "}
+                · {c.levels.join("/") || "todos"}
               </p>
             </button>
           </li>

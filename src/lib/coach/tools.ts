@@ -3,20 +3,21 @@
  */
 import { buildTypedCoachContextFromState } from "@/lib/coach/context.server";
 import type { CoachToolName } from "@/lib/coach/types";
-import { muscleRecoveryMap } from "@/lib/engine/recovery";
+import { consecutiveHardRpeStreak, muscleRecoveryMap } from "@/lib/engine/recovery";
 import { plateauExerciseIds } from "@/lib/engine/exercise-history";
-import { rankRecommendations } from "@/lib/engine/recommendation";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
-import { evaluateSafetyForDate } from "@/lib/engine/safety";
 import { currentPersonalRecords } from "@/lib/training/prs";
 import { estimated1RM } from "@/lib/training/one-rm";
 import { hitsForExercise, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { buildNutritionContext } from "@/lib/nutrition/nutrition-context";
 import { nutritionGoals } from "@/lib/engine/nutrition";
-import { computeLearningInsights, extractUserPatterns, patternInsights } from "@/lib/engine/learning";
+import {
+  computeLearningInsights,
+  extractUserPatterns,
+  patternInsights,
+} from "@/lib/engine/learning";
 import { runBehaviorLoop } from "@/lib/engine/behavior";
 import { todayKey, type AppState } from "@/lib/types";
-import { EXERCISE_LIBRARY, libraryById } from "@/data/exercise-library";
+import { libraryById, resolvedLibrary } from "@/data/exercise-library";
 import { PRODUCTS, productById } from "@/data/products";
 import { resolveExerciseMedia, resolveHowtoMedia, resolveProductMedia } from "@/lib/soldiers-media";
 
@@ -51,6 +52,9 @@ export type CoachToolArgs = {
 };
 
 async function loadState(trustedUserId: string): Promise<AppState> {
+  const { getOrBuildDecisionContext } = await import("@/lib/engine/decision-context.server");
+  const built = await getOrBuildDecisionContext(trustedUserId);
+  if (built?.state) return { ...built.state, userId: trustedUserId };
   const { hydrateAppStateFromDb } = await import("@/lib/customer360/hydrate.server");
   const state = await hydrateAppStateFromDb(trustedUserId);
   return { ...state, userId: trustedUserId };
@@ -132,20 +136,30 @@ export async function runCoachTool(
       if (args.exerciseId) {
         const hits = hitsForExercise(args.exerciseId, state.sessions ?? []);
         const latest = hits[0];
-        if (!latest || latest.maxWeightKg <= 0) return { exerciseId: args.exerciseId, estimated1rm: null };
+        if (!latest || latest.maxWeightKg <= 0)
+          return { exerciseId: args.exerciseId, estimated1rm: null };
         return {
           exerciseId: args.exerciseId,
-          estimated1rm: Math.round(
-            estimated1RM(latest.maxWeightKg, Math.max(1, Math.round(latest.avgReps))) * 10,
-          ) / 10,
+          estimated1rm:
+            Math.round(
+              estimated1RM(latest.maxWeightKg, Math.max(1, Math.round(latest.avgReps))) * 10,
+            ) / 10,
           at: latest.date,
         };
       }
       return { top: ctx.exercisePerformance.top1rm };
     }
 
-    case "get_muscle_recovery":
-      return { recovery: muscleRecoveryMap(state.sessions ?? []) };
+    case "get_muscle_recovery": {
+      const check = state.dayCheckIns?.[date];
+      return {
+        recovery: muscleRecoveryMap(state.sessions ?? [], new Date(), {
+          ...(check?.sleepHours != null ? { sleepHours: check.sleepHours } : {}),
+          ...(check?.energy ? { energy: check.energy } : {}),
+          sessionRpeHardStreak: consecutiveHardRpeStreak(state.sessions ?? []),
+        }),
+      };
+    }
 
     case "get_nutrition_context": {
       if (!state.profile) return { error: "no_profile" };
@@ -154,16 +168,21 @@ export async function runCoachTool(
       return buildNutritionContext(state.meals ?? [], goals, date);
     }
 
-    case "get_recovery_context":
+    case "get_recovery_context": {
       return {
         recovery: ctx.recovery,
         safety: ctx.safety,
         checkIn: state.dayCheckIns?.[date] ?? null,
+        readiness: ctx.recovery.readiness ?? ctx.recovery.level ?? "unknown",
+        score: ctx.recovery.score,
+        disclaimer: "Recuperação não é diagnóstico médico.",
       };
+    }
 
     case "get_behavior_patterns": {
       const legacy = extractUserPatterns(state);
-      const loop = runBehaviorLoop(state);
+      const loop =
+        state.decisionContextByDate?.[date]?.behavior ?? runBehaviorLoop(state, { date });
       return {
         patterns: loop.patterns.map((p) => ({
           key: p.key,
@@ -180,20 +199,24 @@ export async function runCoachTool(
     }
 
     case "get_active_triggers": {
-      const loop = runBehaviorLoop(state);
+      const loop =
+        state.decisionContextByDate?.[date]?.behavior ?? runBehaviorLoop(state, { date });
       return {
-        triggers: loop.triggers.filter((t) => t.active).map((t) => ({
-          key: t.key,
-          description: t.description,
-          supportCount: t.supportCount,
-          confidence: t.confidence,
-        })),
+        triggers: loop.triggers
+          .filter((t) => t.active)
+          .map((t) => ({
+            key: t.key,
+            description: t.description,
+            supportCount: t.supportCount,
+            confidence: t.confidence,
+          })),
         disclaimer: "Triggers exigem ≥2 evidências — não diagnosticam psicologia.",
       };
     }
 
     case "get_recent_interventions": {
-      const loop = runBehaviorLoop(state);
+      const loop =
+        state.decisionContextByDate?.[date]?.behavior ?? runBehaviorLoop(state, { date });
       let fromDb: unknown[] = [];
       try {
         const { loadRecentInterventions } = await import("@/lib/engine/behavior/persist.server");
@@ -213,7 +236,8 @@ export async function runCoachTool(
     }
 
     case "get_experiment_status": {
-      const loop = runBehaviorLoop(state);
+      const loop =
+        state.decisionContextByDate?.[date]?.behavior ?? runBehaviorLoop(state, { date });
       let fromDb: unknown[] = [];
       try {
         const { loadBehaviorExperiments } = await import("@/lib/engine/behavior/persist.server");
@@ -232,37 +256,23 @@ export async function runCoachTool(
         today: ctx.todayDecisions,
         fromLog: await loadRecentDecisionLog(trustedUserId, limit),
         outcomes: ctx.recentOutcomes ?? [],
-        decisionSource: ctx.todayDecisions[0]?.source ?? "recomputed_live",
+        decisionSource: ctx.todayDecisions[0]?.source ?? "server_snapshot",
       };
 
     case "get_today_plan": {
-      const built = buildLivingPlanWithDecisions(state, date);
-      const safety = evaluateSafetyForDate(state, date);
-      const { buildUserContext } = await import("@/lib/engine/context");
-      const userCtx = buildUserContext(state, trustedUserId);
-      const behavior = runBehaviorLoop(state);
-      const recs = built
-        ? rankRecommendations({
-            livingPlan: built.plan,
-            safety,
-            context: userCtx,
-            decisions: built.decisions,
-            purchaseProductIds: state.purchaseProductIds ?? [],
-            behavior,
-            weekday: new Date(`${date}T12:00:00`).getDay(),
-          })
-        : [];
+      const snap = state.decisionContextByDate?.[date] ?? null;
+      const recs = snap?.recommendations ?? [];
       return {
-        living: built?.plan
+        living: snap?.livingPlan
           ? {
-              mode: built.plan.workout.mode,
-              title: built.plan.workout.title,
-              volumeFactor: built.plan.workout.volumeFactor,
-              proteinG: built.plan.nutrition.proteinG,
-              kcal: built.plan.nutrition.kcal,
-              sleepTargetHours: built.plan.sleepTargetHours,
-              narrative: built.plan.narrative,
-              why: built.plan.why,
+              mode: snap.livingPlan.workout.mode,
+              title: snap.livingPlan.workout.title,
+              volumeFactor: snap.livingPlan.workout.volumeFactor,
+              proteinG: snap.livingPlan.nutrition.proteinG,
+              kcal: snap.livingPlan.nutrition.kcal,
+              sleepTargetHours: snap.livingPlan.sleepTargetHours,
+              narrative: snap.livingPlan.narrative,
+              why: snap.livingPlan.why,
             }
           : null,
         decisions: ctx.todayDecisions,
@@ -358,9 +368,20 @@ function findLibraryExercise(exerciseId?: string, query?: string) {
   }
   const q = query ? normalizeQuery(query) : "";
   if (!q) return undefined;
-  return EXERCISE_LIBRARY.find(
-    (e) => normalizeQuery(e.id) === q || normalizeQuery(e.name).includes(q) || q.includes(normalizeQuery(e.name)),
-  );
+  return resolvedLibrary().find((e) => {
+    const hay = [
+      e.id,
+      e.name,
+      e.canonicalName,
+      e.displayNamePt,
+      e.displayNameEn ?? "",
+      ...(e.aliases ?? []),
+      ...(e.searchTerms ?? []),
+    ]
+      .map(normalizeQuery)
+      .filter(Boolean);
+    return hay.some((h) => h === q || h.includes(q) || q.includes(h));
+  });
 }
 
 function matchProduct(query?: string) {
@@ -445,6 +466,9 @@ export function coachToolSchemas(): Array<{ name: CoachToolName; description: st
       name: "get_exercise_guide",
       description: "Como executar um exercício: instruções, mídia Soldiers e último treino",
     },
-    { name: "get_howto", description: "How-to de produto (logar refeição, misturar whey) ou pack shot" },
+    {
+      name: "get_howto",
+      description: "How-to de produto (logar refeição, misturar whey) ou pack shot",
+    },
   ];
 }

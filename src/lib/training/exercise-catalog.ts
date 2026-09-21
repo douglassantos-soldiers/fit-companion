@@ -1,5 +1,5 @@
 /**
- * Exercise catalog — enriched view over the planner pool (lote 1 library).
+ * Exercise catalog — view over the canonical resolved library.
  * Conceptual reference only (openGym / wger / GymMane); no licensed data copied.
  */
 import {
@@ -13,24 +13,18 @@ import {
   type Joint,
   type MuscleGroup,
 } from "@/data/exercises";
-import { libraryById } from "@/data/exercise-library";
+import { libraryById, resolvedLibrary } from "@/data/exercise-library";
 import { resolveExerciseMedia } from "@/lib/soldiers-media";
+import {
+  normalizeMovementPattern,
+  toCanonicalExercise,
+  type CanonicalExercise,
+  type CanonicalMovementPattern,
+  type Difficulty,
+} from "@/lib/training/canonical-exercise";
 
-export type MovementPattern =
-  | "press"
-  | "pull"
-  | "squat"
-  | "hinge"
-  | "lunge"
-  | "fly"
-  | "raise"
-  | "curl"
-  | "extension"
-  | "carry_iso"
-  | "cardio"
-  | "other";
-
-export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type MovementPattern = CanonicalMovementPattern;
+export type { Difficulty, CanonicalMovementPattern };
 
 export interface CatalogExercise {
   id: string;
@@ -51,39 +45,18 @@ export interface CatalogExercise {
   priority?: number;
 }
 
-/** Secondary muscle hints by swapGroup (product heuristic, not clinical). */
-const SECONDARY_BY_SWAP: Record<string, MuscleGroup[]> = {
-  "peito-press": ["triceps", "ombros"],
-  "peito-fly": ["ombros"],
-  "costas-pull": ["biceps"],
-  "costas-row": ["biceps", "core"],
-  "perna-squat": ["core"],
-  "perna-lunge": ["core"],
-  "perna-hinge": ["core"],
-  "ombro-press": ["triceps"],
-  "ombro-raise": [],
-  "biceps-curl": [],
-  "triceps-ext": [],
-  "core-iso": [],
-  "core-dyn": [],
-  "cardio-steady": [],
-  "cardio-hiit": [],
-  "perna-calf": [],
-};
-
 function patternFromSwap(swapGroup: string): MovementPattern {
   if (swapGroup.includes("press")) return "press";
   if (swapGroup.includes("pull") || swapGroup.includes("row")) return "pull";
   if (swapGroup.includes("squat")) return "squat";
   if (swapGroup.includes("hinge")) return "hinge";
   if (swapGroup.includes("lunge")) return "lunge";
-  if (swapGroup.includes("fly")) return "fly";
-  if (swapGroup.includes("raise")) return "raise";
+  if (swapGroup.includes("fly") || swapGroup.includes("raise")) return "raise";
   if (swapGroup.includes("curl")) return "curl";
   if (swapGroup.includes("ext")) return "extension";
-  if (swapGroup.includes("iso") || swapGroup.includes("dyn")) return "carry_iso";
+  if (swapGroup.includes("iso") || swapGroup.includes("dyn")) return "isometric";
   if (swapGroup.includes("cardio")) return "cardio";
-  return "other";
+  return "mobility";
 }
 
 function difficultyFromPriority(priority?: number): Difficulty {
@@ -92,40 +65,65 @@ function difficultyFromPriority(priority?: number): Difficulty {
   return "intermediate";
 }
 
-export function normalizeExercise(ex: Exercise): CatalogExercise {
-  const lib = libraryById(ex.id);
-  const secondary =
-    lib?.secondaryMuscles ?? (SECONDARY_BY_SWAP[ex.swapGroup] ?? []).filter((m) => m !== ex.group);
-  const media = resolveExerciseMedia(ex.id, ex.mediaUrl);
-  const mediaUrl = media.posterUrl ?? media.gifUrl ?? ex.mediaUrl;
-  const instructions = lib?.instructions?.join(" ");
+function catalogFromCanonical(lib: CanonicalExercise): CatalogExercise {
+  const media = resolveExerciseMedia(lib.id, lib.mediaUrl ?? lib.videoUrl);
+  const mediaUrl = media.posterUrl ?? media.gifUrl ?? lib.mediaUrl ?? lib.videoUrl;
+  const instructions = lib.instructions.join(" ");
   return {
-    id: ex.id,
-    name: ex.name,
-    group: ex.group,
-    primaryMuscles: lib?.primaryMuscles ?? [ex.group],
-    secondaryMuscles: secondary,
-    equipment: ex.equipment,
-    movementPattern: lib?.movementPattern ?? patternFromSwap(ex.swapGroup),
-    difficulty: lib?.difficulty ?? difficultyFromPriority(ex.priority),
-    unit: ex.unit,
-    joints: ex.joints,
-    swapGroup: ex.swapGroup,
+    id: lib.id,
+    name: lib.name,
+    group: lib.group,
+    primaryMuscles: lib.primaryMuscles.length ? lib.primaryMuscles : [lib.group],
+    secondaryMuscles: lib.secondaryMuscles,
+    equipment: lib.equipment,
+    movementPattern: lib.movementPattern,
+    difficulty: lib.difficulty,
+    unit: lib.unit,
+    joints: lib.joints,
+    swapGroup: lib.swapGroup,
     ...(mediaUrl ? { media: mediaUrl } : {}),
     ...(instructions ? { instructions } : {}),
-    active: true,
-    baseLoad: ex.baseLoad,
-    ...(ex.priority != null ? { priority: ex.priority } : {}),
+    active: lib.active,
+    baseLoad: lib.baseLoad,
+    ...(lib.priority != null ? { priority: lib.priority } : {}),
   };
 }
 
+export function normalizeExercise(ex: Exercise): CatalogExercise {
+  const lib = libraryById(ex.id);
+  if (lib) return catalogFromCanonical(toCanonicalExercise(lib));
+  const fallback = toCanonicalExercise({
+    id: ex.id,
+    name: ex.name,
+    group: ex.group,
+    equipment: ex.equipment,
+    swapGroup: ex.swapGroup,
+    joints: ex.joints,
+    unit: ex.unit,
+    baseLoad: ex.baseLoad,
+    priority: ex.priority ?? 2,
+    movementPattern: patternFromSwap(ex.swapGroup),
+    difficulty: difficultyFromPriority(ex.priority),
+    plannerEligible: true,
+    active: true,
+    ...(ex.mediaUrl ? { mediaUrl: ex.mediaUrl } : {}),
+  });
+  return catalogFromCanonical(fallback);
+}
+
+/** Resolved live catalog (full library), not only the planner pool. */
 export function catalogById(id: string): CatalogExercise | undefined {
+  const lib = libraryById(id);
+  if (lib) return catalogFromCanonical(toCanonicalExercise(lib));
   const ex = exerciseById(id);
   return ex ? normalizeExercise(ex) : undefined;
 }
 
 export function listCatalog(activeOnly = true): CatalogExercise[] {
-  return EXERCISES.map(normalizeExercise).filter((e) => (activeOnly ? e.active : true));
+  return resolvedLibrary()
+    .filter((e) => e.plannerEligible)
+    .filter((e) => (activeOnly ? e.active : true))
+    .map((e) => catalogFromCanonical(toCanonicalExercise(e)));
 }
 
 export {
@@ -137,3 +135,4 @@ export {
   respectsJoints,
 };
 export type { Exercise, Joint, MuscleGroup };
+export { normalizeMovementPattern };

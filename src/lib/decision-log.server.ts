@@ -71,6 +71,8 @@ export async function logRecommendationDecisions(opts: {
   decisions: EngineDecision[];
   snapshot: ContextSnapshot;
   engine?: string;
+  snapshotVersion?: number;
+  inputFingerprint?: string;
 }): Promise<{ ok: boolean }> {
   const t0 = Date.now();
   try {
@@ -99,17 +101,18 @@ export async function logRecommendationDecisions(opts: {
       if (legacyKey) priorByType.set(legacyKey, row);
     }
 
-    const inputSnapshot = sanitizeSnapshotForLog(opts.snapshot);
+    const inputSnapshot = {
+      ...sanitizeSnapshotForLog(opts.snapshot),
+      ...(opts.snapshotVersion != null ? { snapshot_version: opts.snapshotVersion } : {}),
+      ...(opts.inputFingerprint ? { input_fingerprint: opts.inputFingerprint } : {}),
+    };
     const keepTypes = new Set<string>();
 
     for (const d of opts.decisions) {
       const decisionType = canonicalTypeForDecision(d);
       keepTypes.add(decisionType);
       // Also match prior snake rows for outcome preservation
-      const prior =
-        priorByType.get(decisionType) ??
-        priorByType.get(d.decisionType) ??
-        null;
+      const prior = priorByType.get(decisionType) ?? priorByType.get(d.decisionType) ?? null;
       const evidence = buildEvidence(d, opts.snapshot);
 
       const row = {
@@ -179,6 +182,13 @@ export async function logRecommendationDecisions(opts: {
       }
     }
 
+    try {
+      const { stampExpectedActions } = await import("@/lib/engine/attribution.server");
+      await stampExpectedActions(opts.userId, opts.date);
+    } catch {
+      /* attribution table may not exist yet */
+    }
+
     return { ok: true };
   } catch (e) {
     console.warn("logRecommendationDecisions skipped", e);
@@ -195,86 +205,59 @@ export async function markDecisionOutcomes(opts: {
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: boolean }> {
   try {
-    const db = await adminDbLoose();
-    if (!db || !opts.userId) return { ok: false };
-
-    const patch: Record<string, unknown> = { outcome: opts.outcome };
-    if (opts.outcomeMetrics != null) {
-      patch["outcome_metrics"] = opts.outcomeMetrics;
+    if (!opts.userId) return { ok: false };
+    const { actionKindFromLegacyOutcome } = await import("@/lib/engine/attribution");
+    const mapped = actionKindFromLegacyOutcome(opts.outcome);
+    if (!mapped) {
+      logEngineDecision({
+        userId: opts.userId,
+        date: opts.date,
+        engine: "attribution_v1",
+        decisionType: opts.outcome,
+        success: true,
+        reason: "unmapped_no_fanout",
+      });
+      return { ok: true };
     }
-
-    let q = db
-      .from("recommendation_decisions")
-      .update(patch)
-      .eq("user_id", opts.userId)
-      .eq("date", opts.date);
-
-    if (opts.onlyUnset !== false) {
-      q = q.is("outcome", null);
-    }
-
-    const { error } = await q;
-    if (error) {
-      console.warn("markDecisionOutcomes failed", error);
-      return { ok: false };
-    }
-
-    try {
-      const { data: rows } = await db
-        .from("recommendation_decisions")
-        .select("id")
-        .eq("user_id", opts.userId)
-        .eq("date", opts.date);
-      if (rows?.length) {
-        const dayStart = `${opts.date}T00:00:00.000Z`;
-        const inserts = (rows as Array<{ id: string }>).map((r) => ({
-          decision_id: r.id,
-          user_id: opts.userId,
-          outcome_type: opts.outcome,
-          value: opts.outcomeMetrics ?? null,
-          observed_at: new Date().toISOString(),
-          metadata: {
-            source: "mark_decision_outcomes",
-            date: opts.date,
-            ...(opts.metadata ?? {}),
-          },
-        }));
-        // Light dedupe: skip if same decision_id + outcome_type already today
-        for (const ins of inserts) {
-          const { data: existing } = await db
-            .from("decision_outcomes")
-            .select("id")
-            .eq("decision_id", ins.decision_id)
-            .eq("outcome_type", ins.outcome_type)
-            .gte("observed_at", dayStart)
-            .limit(1);
-          if (existing?.length) continue;
-          const { error: oErr } = await db.from("decision_outcomes").insert(ins);
-          if (oErr && !String(oErr.message ?? "").includes("does not exist")) {
-            console.warn("decision_outcomes insert failed", oErr.message);
-          }
-        }
-      }
-    } catch {
-      /* table may not exist until migration applied */
-    }
-
-    return { ok: true };
+    const extras: import("@/lib/engine/attribution").AttributionExtras = {};
+    const metrics = opts.outcomeMetrics;
+    if (metrics?.workoutCompleted != null) extras.workoutCompleted = metrics.workoutCompleted;
+    if (metrics?.rpe !== undefined) extras.rpe = metrics.rpe ?? null;
+    if (metrics?.sessionDurationMin != null) extras.sessionDurationMin = metrics.sessionDurationMin;
+    if (metrics?.volumeFactor != null && metrics.volumeFactor < 1) extras.volumeReduced = true;
+    const { recordAttributedEvent } = await import("@/lib/engine/attribution.server");
+    const event: Parameters<typeof recordAttributedEvent>[0] = {
+      userId: opts.userId,
+      date: opts.date,
+      actionKind: mapped.actionKind,
+      status: mapped.status,
+      window: mapped.window,
+      extras,
+      metrics: metrics ?? null,
+      legacyOutcome: opts.outcome,
+    };
+    if (opts.onlyUnset !== undefined) event.onlyUnsetLegacy = opts.onlyUnset;
+    const res = await recordAttributedEvent(event);
+    return { ok: res.ok };
   } catch (e) {
     console.warn("markDecisionOutcomes skipped", e);
     return { ok: false };
   }
 }
 
-/** Merge metrics onto yesterday's decisions (D+1 check-in) + dual-write decision_outcomes. */
+/** D+1 check-in metrics on attributed decisions only (no day fan-out). */
 export async function appendOutcomeMetrics(opts: {
   userId: string;
   date: string;
   metrics: OutcomeMetrics;
-}): Promise<{ ok: boolean; volumeReduced: boolean }> {
+}): Promise<{
+  ok: boolean;
+  volumeReduced: boolean;
+  hits: import("@/lib/engine/attribution").AttributionHit[];
+}> {
   try {
     const db = await adminDbLoose();
-    if (!db || !opts.userId) return { ok: false, volumeReduced: false };
+    if (!db || !opts.userId) return { ok: false, volumeReduced: false, hits: [] };
 
     const { data: rows, error } = await db
       .from("recommendation_decisions")
@@ -282,15 +265,19 @@ export async function appendOutcomeMetrics(opts: {
       .eq("user_id", opts.userId)
       .eq("date", opts.date);
 
-    if (error || !rows?.length) return { ok: false, volumeReduced: false };
+    if (error || !rows?.length) return { ok: false, volumeReduced: false, hits: [] };
+
+    const typedRows = rows as Array<{
+      id: string;
+      decision_type: string;
+      decision_value?: { value?: unknown };
+      outcome_metrics?: Record<string, unknown> | null;
+    }>;
 
     let volumeReduced = false;
-    const dayStart = `${opts.date}T00:00:00.000Z`;
-
-    for (const row of rows) {
-      const dv = (row as { decision_value?: { value?: unknown } }).decision_value;
-      const val = dv?.value;
-      const dtype = String((row as { decision_type?: string }).decision_type ?? "");
+    for (const row of typedRows) {
+      const val = row.decision_value?.value;
+      const dtype = String(row.decision_type ?? "");
       if (
         (dtype === "training_volume" || dtype === "TRAINING_VOLUME") &&
         typeof val === "number" &&
@@ -298,56 +285,40 @@ export async function appendOutcomeMetrics(opts: {
       ) {
         volumeReduced = true;
       }
-      const prev =
-        ((row as { outcome_metrics?: Record<string, unknown> | null }).outcome_metrics as Record<
-          string,
-          unknown
-        > | null) ?? {};
-      const merged = { ...prev, ...opts.metrics };
-      if (
-        (dtype === "training_volume" || dtype === "TRAINING_VOLUME") &&
-        typeof val === "number"
-      ) {
-        merged["volumeFactor"] = prev["volumeFactor"] ?? val;
-      }
-      const id = (row as { id: string }).id;
-      await db.from("recommendation_decisions").update({ outcome_metrics: merged }).eq("id", id);
-
-      // Dual-write D+1 into decision_outcomes
-      try {
-        const { data: existing } = await db
-          .from("decision_outcomes")
-          .select("id")
-          .eq("decision_id", id)
-          .eq("outcome_type", "next_day_checkin")
-          .gte("observed_at", dayStart)
-          .limit(1);
-        if (!existing?.length) {
-          await db.from("decision_outcomes").insert({
-            decision_id: id,
-            user_id: opts.userId,
-            outcome_type: "next_day_checkin",
-            value: opts.metrics,
-            observed_at: new Date().toISOString(),
-            metadata: { source: "next_day_checkin", date: opts.date },
-          });
-        }
-      } catch {
-        /* optional */
-      }
     }
 
-    return { ok: true, volumeReduced };
+    const extras: import("@/lib/engine/attribution").AttributionExtras = { volumeReduced };
+    if (opts.metrics.workoutCompleted != null) extras.workoutCompleted = opts.metrics.workoutCompleted;
+    if (opts.metrics.rpe !== undefined) extras.rpe = opts.metrics.rpe ?? null;
+
+    const { recordAttributedEvent } = await import("@/lib/engine/attribution.server");
+    const res = await recordAttributedEvent({
+      userId: opts.userId,
+      date: opts.date,
+      actionKind: "checkin_next_day",
+      status: "completed",
+      window: "d1",
+      extras,
+      metrics: opts.metrics,
+    });
+
+    for (const h of res.hits) {
+      const prev = typedRows.find((r) => r.id === h.decisionId)?.outcome_metrics ?? {};
+      await db
+        .from("recommendation_decisions")
+        .update({ outcome_metrics: { ...prev, ...opts.metrics } })
+        .eq("id", h.decisionId)
+        .eq("user_id", opts.userId);
+    }
+
+    return { ok: res.ok, volumeReduced, hits: res.hits };
   } catch (e) {
     console.warn("appendOutcomeMetrics skipped", e);
-    return { ok: false, volumeReduced: false };
+    return { ok: false, volumeReduced: false, hits: [] };
   }
 }
 
-export async function loadDecisionsForDate(opts: {
-  userId: string;
-  date: string;
-}): Promise<
+export async function loadDecisionsForDate(opts: { userId: string; date: string }): Promise<
   Array<{
     id?: string;
     decision_type: string;
@@ -384,10 +355,7 @@ export async function loadDecisionsForDate(opts: {
   }
 }
 
-export async function loadRecentOutcomes(opts: {
-  userId: string;
-  limit?: number;
-}): Promise<
+export async function loadRecentOutcomes(opts: { userId: string; limit?: number }): Promise<
   Array<{
     decision_id: string;
     outcome_type: string;

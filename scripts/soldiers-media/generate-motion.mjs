@@ -1,22 +1,31 @@
 #!/usr/bin/env node
 /**
- * Build WebM/MP4 for published needsMotion packages from Soldiers stills only.
+ * Build WebM/MP4 for needsMotion packages from Soldiers stills only.
  *
- * Preferred: FAL_KEY / RUNWAY_API_KEY / KLING_API_KEY (logged; wire provider when present).
  * Fallback: two Soldiers keyframes (poster + pose-end) xfade loop — not a Ken Burns zoom.
- * Isometric hold (prancha): encode the Soldiers still as a 4s loop.
+ * Isometric hold: encode the Soldiers still as a 4s loop.
  *
- * Usage: node scripts/soldiers-media/generate-motion.mjs
+ * Usage:
+ *   node scripts/soldiers-media/generate-motion.mjs
+ *   node scripts/soldiers-media/generate-motion.mjs --batch 1
+ *   node scripts/soldiers-media/generate-motion.mjs --id remada-elastico
+ *   node scripts/soldiers-media/generate-motion.mjs --pilot
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  root,
+  loadQueue,
+  itemsForBatch,
+  parseArg,
+  PILOT_EXERCISE_IDS,
+} from "./media-queue-lib.mjs";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 loadEnv(join(root, ".env"));
 
-const PACKAGES = [
+const PILOT_PACKAGES = [
   { kind: "exercise", id: "supino-reto", duration: 4, hold: false },
   { kind: "exercise", id: "flexao", duration: 4, hold: false },
   { kind: "exercise", id: "remada-curvada", duration: 4, hold: false },
@@ -42,7 +51,10 @@ function loadEnv(path) {
     if (eq < 1) continue;
     const name = trimmed.slice(0, eq).trim();
     let value = trimmed.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (!process.env[name]) process.env[name] = value;
@@ -169,12 +181,72 @@ function encodeXfade(start, end, dir, duration) {
   for (const tmp of [startClip, endClip, srcMp4]) unlinkSync(tmp);
 }
 
-if (process.env.FAL_KEY || process.env.FAL_API_KEY || process.env.RUNWAY_API_KEY || process.env.KLING_API_KEY) {
-  console.log("image-to-video env is set; keyframe fallback still used unless pose-end is replaced by provider output");
+function resolvePackages() {
+  const batchArg = parseArg("--batch");
+  const idArg = parseArg("--id");
+  const pilot = process.argv.includes("--pilot");
+
+  if (idArg) {
+    const queue = loadQueue();
+    const fromQueue = queue?.items?.find((i) => i.id === idArg);
+    if (fromQueue) {
+      return [
+        {
+          kind: fromQueue.kind || "exercise",
+          id: fromQueue.id,
+          duration: fromQueue.duration || 4,
+          hold: Boolean(fromQueue.hold),
+        },
+      ];
+    }
+    if (PILOT_EXERCISE_IDS.includes(idArg)) {
+      return PILOT_PACKAGES.filter((p) => p.id === idArg);
+    }
+    return [{ kind: "exercise", id: idArg, duration: 4, hold: false }];
+  }
+
+  if (batchArg != null) {
+    const queue = loadQueue();
+    if (!queue) {
+      console.error("Missing motion backlog. Run: npm run media:queue");
+      process.exit(1);
+    }
+    return itemsForBatch(queue, batchArg).map((item) => ({
+      kind: item.kind || "exercise",
+      id: item.id,
+      duration: item.duration || 4,
+      hold: Boolean(item.hold),
+    }));
+  }
+
+  if (pilot) return PILOT_PACKAGES;
+
+  // Default: pilot packages (brand/howto) + full backlog that has stills ready
+  const queue = loadQueue();
+  const backlog = (queue?.items ?? []).map((item) => ({
+    kind: item.kind || "exercise",
+    id: item.id,
+    duration: item.duration || 4,
+    hold: Boolean(item.hold),
+  }));
+  return [...PILOT_PACKAGES, ...backlog];
 }
 
+if (
+  process.env.FAL_KEY ||
+  process.env.FAL_API_KEY ||
+  process.env.RUNWAY_API_KEY ||
+  process.env.KLING_API_KEY
+) {
+  console.log(
+    "image-to-video env is set; keyframe fallback still used unless pose-end is replaced by provider output",
+  );
+}
+
+const PACKAGES = resolvePackages();
 let done = 0;
 const skipped = [];
+
 for (const pkg of PACKAGES) {
   const dir = join(root, "public/soldiers-media/v1", pkg.kind, pkg.id);
   mkdirSync(dir, { recursive: true });
@@ -206,5 +278,8 @@ for (const pkg of PACKAGES) {
 console.log(`motion packages ${done}/${PACKAGES.length}`);
 if (skipped.length) {
   for (const line of skipped) console.error("skip", line);
-  process.exit(1);
+  // Batch mode: skip incomplete stills without failing the whole run
+  const batchMode = parseArg("--batch") != null || parseArg("--id") != null;
+  if (!batchMode && done === 0) process.exit(1);
+  if (!batchMode && skipped.length === PACKAGES.length) process.exit(1);
 }

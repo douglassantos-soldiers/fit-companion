@@ -1,13 +1,29 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { allQuestsComplete, bumpManualQuest, ensureDailyQuests } from "@/data/daily-quests";
 import { runBehaviorLoop } from "@/lib/engine/behavior";
 import { presetById } from "@/data/meal-presets";
 import { performanceDimensions } from "@/lib/engine/dimensions";
-import { buildLivingPlan } from "@/lib/engine/living-plan";
+import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
+import { applyDecisionContextToState } from "@/lib/engine/decision-context-snapshot";
 import { scalePreset } from "@/lib/engine/nutrition";
 import { grantPendingAchievements } from "@/lib/engine/achievements";
 import { prsAchievedInSession } from "@/lib/engine/period-review";
-import { applyXpAward, dailyXpGoalMet, supplementsComplete, waterGoalReached, XP } from "@/lib/engine/xp";
+import {
+  applyXpAward,
+  dailyXpGoalMet,
+  supplementsComplete,
+  waterGoalReached,
+  XP,
+} from "@/lib/engine/xp";
 import {
   bumpFriendQuestOnSession,
   challengeProgress,
@@ -37,21 +53,18 @@ import { productById } from "@/data/products";
 import { emitAppEventCompat } from "@/lib/events/emit";
 import { enqueueEntity, ensureOutboxListeners, flushOutbox } from "@/lib/sync/outbox";
 import {
-  persistDecisionsBestEffort,
+  refreshDecisionContextBestEffort,
   recordNextDayCheckInBestEffort,
   recordSessionOutcomeBestEffort,
+  recordDecisionActionBestEffort,
 } from "@/lib/decision-client";
 import { clearLocalReminders, scheduleLocalReminders } from "@/lib/notifications";
-import { applyCmsState } from "@/lib/cms";
+import { applyCmsState, emptyCmsState } from "@/lib/cms";
 import { applyPublicCatalog, type PublicCatalog } from "@/lib/catalog-runtime";
 import { getPublicCms, getPublicCatalog } from "@/lib/admin.functions";
 import { hydrateSoldiersMedia } from "@/lib/soldiers-media";
 import { getPublishedSoldiersMedia } from "@/lib/soldiers-media.functions";
-import {
-  migrateLegacyPrefs,
-  prefsToLegacyArrays,
-  setPreference,
-} from "@/lib/training/preferences";
+import { migrateLegacyPrefs, prefsToLegacyArrays, setPreference } from "@/lib/training/preferences";
 import type {
   ActivityLogEntry,
   ActivityLogKind,
@@ -110,17 +123,16 @@ function rollupSupplementLogsFromDoses(
   return out;
 }
 
-function refreshRestock(s: AppState, base?: AppState["restockEstimates"]): AppState["restockEstimates"] {
+function refreshRestock(
+  s: AppState,
+  base?: AppState["restockEstimates"],
+): AppState["restockEstimates"] {
   const estimates = base ?? s.restockEstimates ?? {};
   const withConf = enrichRestockConfidence(estimates, s.supplementLogs, {
     doseLogs: s.supplementDoseLogs ?? [],
     frequencies: s.supplementFrequencies,
   });
-  return mergeRestockWithConsumption(
-    withConf,
-    s.supplementDoseLogs ?? [],
-    s.supplementFrequencies,
-  );
+  return mergeRestockWithConsumption(withConf, s.supplementDoseLogs ?? [], s.supplementFrequencies);
 }
 import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
@@ -162,7 +174,9 @@ interface Store {
   removeProgressPhoto: (id: string) => void;
   setProgressPhotoVisibility: (id: string, visibility: PhotoVisibility) => void;
   addWater: (ml: number) => void;
-  addMealEntry: (entry: Omit<MealEntry, "id" | "date"> & { date?: string; servings?: number }) => void;
+  addMealEntry: (
+    entry: Omit<MealEntry, "id" | "date"> & { date?: string; servings?: number },
+  ) => void;
   removeMealEntry: (id: string) => void;
   updateMealEntry: (
     id: string,
@@ -211,7 +225,11 @@ interface Store {
   dismissCoachNudge: () => void;
   markCoachNudgeShown: () => void;
   toggleHub: (hubId: string) => void;
-  logActivity: (kind: ActivityLogKind, value: number, date?: string) => {
+  logActivity: (
+    kind: ActivityLogKind,
+    value: number,
+    date?: string,
+  ) => {
     ok: boolean;
     message?: string;
     warning?: string;
@@ -301,18 +319,23 @@ function withSnapshot(s: AppState): AppState {
     ...s,
     dayCheckIns: s.dayCheckIns ?? {},
     livingPlans: s.livingPlans ?? {},
+    decisionContextByDate: s.decisionContextByDate ?? {},
     challengeBaselines: s.challengeBaselines ?? {},
     challengePersonalTargets: s.challengePersonalTargets ?? {},
     activityLogs: s.activityLogs ?? [],
     joinedHubIds: s.joinedHubIds ?? [],
     dimensionSnapshots: [...rest, { date, scores }].sort((a, b) => (a.date < b.date ? -1 : 1)),
   };
-  const plan = buildLivingPlan(withDims, date);
-  if (!plan) return withDims;
-  return {
-    ...withDims,
-    livingPlans: { ...withDims.livingPlans, [date]: plan },
-  };
+  const cached = withDims.decisionContextByDate?.[date];
+  if (cached?.source === "server") {
+    return {
+      ...withDims,
+      livingPlans: { ...withDims.livingPlans, [date]: cached.livingPlan },
+    };
+  }
+  const assembled = assembleDecisionContext(withDims, { date, source: "offline_legacy" });
+  if (!assembled) return withDims;
+  return applyDecisionContextToState(withDims, assembled);
 }
 
 function syncMealCount(s: AppState, date: string): AppState {
@@ -368,10 +391,16 @@ function afterXpSideEffects(
     const bonus = applyXpAward(out, XP.questsCompleteBonus, date);
     out = bonus.state;
   }
-  if (dailyXpGoalMet(out, date) && !dailyXpGoalMet(prev, date) && out.profile && out.shareProgress && deviceId) {
-    void publishRetentionEvent(deviceId, out.profile.name, "xp_goal", { xp: out.xpByDate[date] ?? 0 }).catch(
-      (err) => console.warn("publishRetentionEvent failed", err),
-    );
+  if (
+    dailyXpGoalMet(out, date) &&
+    !dailyXpGoalMet(prev, date) &&
+    out.profile &&
+    out.shareProgress &&
+    deviceId
+  ) {
+    void publishRetentionEvent(deviceId, out.profile.name, "xp_goal", {
+      xp: out.xpByDate[date] ?? 0,
+    }).catch((err) => console.warn("publishRetentionEvent failed", err));
     const reward = rollCosmeticReward();
     if (reward && !(out.cosmeticBadges ?? []).includes(reward.id)) {
       out = { ...out, cosmeticBadges: [...(out.cosmeticBadges ?? []), reward.id] };
@@ -427,7 +456,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
       .catch((e) => {
         console.warn("CMS hydrate failed", e);
-        applyCmsState({ exerciseMedia: {}, mealImages: {}, workoutNotes: {} });
+        applyCmsState(emptyCmsState());
         setCmsRevision((n) => n + 1);
       });
 
@@ -473,44 +502,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
         if (remote) {
           skipPush.current = true;
-          const logsForConfidence =
-            Object.keys(local.supplementLogs ?? {}).length
-              ? local.supplementLogs
-              : remote.supplementLogs ?? {};
+          const logsForConfidence = Object.keys(local.supplementLogs ?? {}).length
+            ? local.supplementLogs
+            : (remote.supplementLogs ?? {});
           const restockBase = Object.keys(local.restockEstimates ?? {}).length
             ? local.restockEstimates
-            : remote.restockEstimates ?? {};
+            : (remote.restockEstimates ?? {});
           const merged = withQuests(
             {
               ...emptyState,
               ...remote,
-              meals: remote.meals?.length ? remote.meals : local.meals ?? [],
-              measurements: mergeMeasurementsByDate(remote.measurements ?? [], local.measurements ?? []),
-              progressPhotos: mergeProgressPhotos(remote.progressPhotos ?? [], local.progressPhotos ?? []),
+              meals: remote.meals?.length ? remote.meals : (local.meals ?? []),
+              measurements: mergeMeasurementsByDate(
+                remote.measurements ?? [],
+                local.measurements ?? [],
+              ),
+              progressPhotos: mergeProgressPhotos(
+                remote.progressPhotos ?? [],
+                local.progressPhotos ?? [],
+              ),
               theme: local.theme ?? remote.theme ?? "dark",
-              earnedBadges: [...new Set([...(remote.earnedBadges ?? []), ...(local.earnedBadges ?? [])])],
+              earnedBadges: [
+                ...new Set([...(remote.earnedBadges ?? []), ...(local.earnedBadges ?? [])]),
+              ],
               livingPlanFeedback: {
                 ...(remote.livingPlanFeedback ?? {}),
                 ...(local.livingPlanFeedback ?? {}),
               },
               dimensionSnapshots: local.dimensionSnapshots?.length
                 ? local.dimensionSnapshots
-                : remote.dimensionSnapshots ?? [],
+                : (remote.dimensionSnapshots ?? []),
               shareProgress: local.shareProgress ?? remote.shareProgress ?? true,
               socialPrivacy: normalizeSocialPrivacy(
                 local.socialPrivacy ?? remote.socialPrivacy,
                 local.shareProgress ?? remote.shareProgress ?? true,
               ),
               sessionFx: local.sessionFx ?? remote.sessionFx ?? true,
-              favoriteMealPresetIds: local.favoriteMealPresetIds ?? remote.favoriteMealPresetIds ?? [],
+              favoriteMealPresetIds:
+                local.favoriteMealPresetIds ?? remote.favoriteMealPresetIds ?? [],
               savedMeals: mergeSavedMeals(local.savedMeals, remote.savedMeals),
-              wearableConnections: mergeWearableConnections(local.wearableConnections, remote.wearableConnections),
+              wearableConnections: mergeWearableConnections(
+                local.wearableConnections,
+                remote.wearableConnections,
+              ),
               lastFraudWarning: local.lastFraudWarning ?? remote.lastFraudWarning ?? null,
               likedExerciseIds: [
-                ...new Set([
-                  ...(remote.likedExerciseIds ?? []),
-                  ...(local.likedExerciseIds ?? []),
-                ]),
+                ...new Set([...(remote.likedExerciseIds ?? []), ...(local.likedExerciseIds ?? [])]),
               ],
               dislikedExerciseIds: [
                 ...new Set([
@@ -542,10 +579,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               xpGoalMetDates: [
                 ...new Set([...(remote.xpGoalMetDates ?? []), ...(local.xpGoalMetDates ?? [])]),
               ],
-              dailyQuestIds: local.dailyQuestDate === todayKey() ? local.dailyQuestIds : remote.dailyQuestIds,
-              dailyQuestDate: local.dailyQuestDate === todayKey() ? local.dailyQuestDate : remote.dailyQuestDate,
+              dailyQuestIds:
+                local.dailyQuestDate === todayKey() ? local.dailyQuestIds : remote.dailyQuestIds,
+              dailyQuestDate:
+                local.dailyQuestDate === todayKey() ? local.dailyQuestDate : remote.dailyQuestDate,
               dailyQuestProgress:
-                local.dailyQuestDate === todayKey() ? local.dailyQuestProgress : remote.dailyQuestProgress,
+                local.dailyQuestDate === todayKey()
+                  ? local.dailyQuestProgress
+                  : remote.dailyQuestProgress,
               cosmeticBadges: [
                 ...new Set([...(remote.cosmeticBadges ?? []), ...(local.cosmeticBadges ?? [])]),
               ],
@@ -562,7 +603,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               accessTier: local.accessTier ?? remote.accessTier ?? "base",
               purchaseProductIds: local.purchaseProductIds?.length
                 ? local.purchaseProductIds
-                : remote.purchaseProductIds ?? [],
+                : (remote.purchaseProductIds ?? []),
               restockEstimates: enrichRestockConfidence(restockBase ?? {}, logsForConfidence),
               supplementLogs: logsForConfidence,
               routineFromPurchase: local.routineFromPurchase || remote.routineFromPurchase || false,
@@ -574,6 +615,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           );
           setState(merged);
           applyTheme(merged.theme ?? "dark");
+          void refreshDecisionContextBestEffort(id).then((snap) => {
+            if (!snap) return;
+            setState((s) => applyDecisionContextToState(s, snap));
+          });
 
           if (resolvedUserId) {
             void persistUserPatterns({
@@ -586,10 +631,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } else {
           if (resolvedUserId) {
             setState((s) => ({ ...s, userId: resolvedUserId }));
-            const bootState = withQuests(
-              { ...emptyState, ...local, userId: resolvedUserId },
-              id,
-            );
+            const bootState = withQuests({ ...emptyState, ...local, userId: resolvedUserId }, id);
             void persistUserPatterns({
               data: {
                 deviceId: id,
@@ -724,17 +766,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const prev = withQuests(s, deviceId.current);
           let next = withSnapshot({ ...prev, sessions: [session, ...prev.sessions] });
           const awarded = applyXpAward(next, xpGain);
-          next = afterXpSideEffects(prev, awarded.state, deviceId.current, { fromSession: session });
+          next = afterXpSideEffects(prev, awarded.state, deviceId.current, {
+            fromSession: session,
+          });
           const granted = grantPendingAchievements(next);
           next = granted.state;
-          if (granted.unlocked.length && deviceId.current && next.profile && shouldPublishEvent(next.socialPrivacy, "badge", {})) {
+          if (
+            granted.unlocked.length &&
+            deviceId.current &&
+            next.profile &&
+            shouldPublishEvent(next.socialPrivacy, "badge", {})
+          ) {
             for (const id of granted.unlocked) {
               void publishBadgeEvent(deviceId.current, next.profile.name, id).catch((err) =>
                 console.warn("publishBadgeEvent failed", err),
               );
             }
           }
-          if (deviceId.current && next.profile && shouldPublishEvent(next.socialPrivacy, "session", { volumeKg: session.volumeKg })) {
+          if (
+            deviceId.current &&
+            next.profile &&
+            shouldPublishEvent(next.socialPrivacy, "session", { volumeKg: session.volumeKg })
+          ) {
             const id = deviceId.current;
             const name = next.profile.name;
             void publishSessionEvent(id, name, session.title, session.volumeKg, {
@@ -762,16 +815,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((s) =>
           withSnapshot({
             ...s,
-            weights: [...s.weights.filter((w) => w.date !== todayKey()), { date: todayKey(), weightKg }].sort((a, b) =>
-              a.date < b.date ? -1 : 1,
-            ),
+            weights: [
+              ...s.weights.filter((w) => w.date !== todayKey()),
+              { date: todayKey(), weightKg },
+            ].sort((a, b) => (a.date < b.date ? -1 : 1)),
             profile: s.profile ? { ...s.profile, weightKg } : s.profile,
           }),
         );
-        emitAppEvent(deviceId.current, "weight_logged", { weightKg, date: todayKey() }, {
-          entityType: "weight",
-          entityId: todayKey(),
-        });
+        emitAppEvent(
+          deviceId.current,
+          "weight_logged",
+          { weightKg, date: todayKey() },
+          {
+            entityType: "weight",
+            entityId: todayKey(),
+          },
+        );
       },
       addMeasurements: (entry) => {
         const date = (entry.date ?? todayKey()).slice(0, 10);
@@ -812,7 +871,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProgressPhotoVisibility: (id, visibility) =>
         update((s) => ({
           ...s,
-          progressPhotos: (s.progressPhotos ?? []).map((p) => (p.id === id ? { ...p, visibility } : p)),
+          progressPhotos: (s.progressPhotos ?? []).map((p) =>
+            p.id === id ? { ...p, visibility } : p,
+          ),
         })),
       addWater: (ml) =>
         update((s) => {
@@ -841,7 +902,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...entry,
             date,
             servings,
-            sourceKind: entry.sourceKind ?? (entry.presetId ? "informed" : entry.aiMode ? "estimated" : "informed"),
+            sourceKind:
+              entry.sourceKind ??
+              (entry.presetId ? "informed" : entry.aiMode ? "estimated" : "informed"),
             confidence: entry.confidence ?? (entry.sourceKind === "estimated" ? 0.5 : 1),
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           };
@@ -855,12 +918,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
           return next;
         });
-        emitAppEvent(deviceId.current, "meal_logged", {
-          mealId,
-          date: entry.date ?? todayKey(),
-          proteinG: entry.proteinG,
-          sourceKind: entry.sourceKind ?? "informed",
-        }, { entityType: "meal", entityId: mealId });
+        emitAppEvent(
+          deviceId.current,
+          "meal_logged",
+          {
+            mealId,
+            date: entry.date ?? todayKey(),
+            proteinG: entry.proteinG,
+            sourceKind: entry.sourceKind ?? "informed",
+          },
+          { entityType: "meal", entityId: mealId },
+        );
+        if (deviceId.current) {
+          const mealAction: {
+            deviceId: string;
+            date: string;
+            actionKind: string;
+            status: string;
+            entityType: string;
+            entityId: string;
+            mealSlot?: string;
+          } = {
+            deviceId: deviceId.current,
+            date: (entry.date ?? todayKey()).slice(0, 10),
+            actionKind: "meal_logged",
+            status: "completed",
+            entityType: "meal",
+            entityId: mealId,
+          };
+          if (entry.slot) mealAction.mealSlot = entry.slot;
+          recordDecisionActionBestEffort(mealAction);
+        }
         if (entry.aiMode || entry.sourceKind === "estimated") {
           emitAppEvent(
             deviceId.current,
@@ -933,7 +1021,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toggleFavoriteMeal: (presetId) =>
         update((s) => {
           const ids = s.favoriteMealPresetIds ?? [];
-          const next = ids.includes(presetId) ? ids.filter((x) => x !== presetId) : [...ids, presetId];
+          const next = ids.includes(presetId)
+            ? ids.filter((x) => x !== presetId)
+            : [...ids, presetId];
           return { ...s, favoriteMealPresetIds: next };
         }),
       saveMealTemplate: (meal) =>
@@ -1260,7 +1350,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const progressOpts: import("@/lib/social").ChallengeProgressOpts = {
               activityLogs: current.activityLogs,
             };
-            if (current.challengeBaselines?.[id] != null) progressOpts.baseline = current.challengeBaselines[id];
+            if (current.challengeBaselines?.[id] != null)
+              progressOpts.baseline = current.challengeBaselines[id];
             if (current.challengePersonalTargets?.[id] != null) {
               progressOpts.personalTarget = current.challengePersonalTargets[id];
             }
@@ -1270,7 +1361,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               baseline: progress.baseline,
               metric: challenge.metric,
             };
-            if (progress.personalTarget != null) fraudInput.personalTarget = progress.personalTarget;
+            if (progress.personalTarget != null)
+              fraudInput.personalTarget = progress.personalTarget;
             const fraud = validateChallengeProgress(fraudInput);
             const policy = applyFraudPolicy(fraud);
             if (policy.action === "warn" && policy.userMessage) warning = policy.userMessage;
@@ -1327,7 +1419,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     current.activityLogs ?? [],
                     challenge.durationDays,
                   );
-                  await joinChallengeRemote(deviceId.current, cid, name, baseline).catch(() => undefined);
+                  await joinChallengeRemote(deviceId.current, cid, name, baseline).catch(
+                    () => undefined,
+                  );
                   const hubSync: {
                     baseline?: number;
                     pct?: number;
@@ -1342,10 +1436,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     proofStatus: proof.status,
                     proofSource: proof.source,
                   };
-                  if (progress.personalTarget != null) hubSync.personalTarget = progress.personalTarget;
-                  await syncChallengeProgress(deviceId.current, cid, progress.current, name, hubSync).catch(
-                    () => undefined,
-                  );
+                  if (progress.personalTarget != null)
+                    hubSync.personalTarget = progress.personalTarget;
+                  await syncChallengeProgress(
+                    deviceId.current,
+                    cid,
+                    progress.current,
+                    name,
+                    hubSync,
+                  ).catch(() => undefined);
                 }
               })
               .catch((e) => console.error("Falha ao entrar no hub remoto", e));
@@ -1365,7 +1464,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       pushChat: (role, text) =>
         update((s) => ({
           ...s,
-          chat: [...s.chat, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, text }],
+          chat: [
+            ...s.chat,
+            { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, role, text },
+          ],
         })),
       setTheme: (theme) => update((s) => ({ ...s, theme })),
       setShareProgress: (share) =>
@@ -1408,7 +1510,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       earnBadge: (id) => {
         if (state.earnedBadges.includes(id)) return false;
-        update((s) => (s.earnedBadges.includes(id) ? s : { ...s, earnedBadges: [...s.earnedBadges, id] }));
+        update((s) =>
+          s.earnedBadges.includes(id) ? s : { ...s, earnedBadges: [...s.earnedBadges, id] },
+        );
         if (deviceId.current && state.shareProgress && state.profile) {
           void publishBadgeEvent(deviceId.current, state.profile.name, id).catch((err) =>
             console.warn("publishBadgeEvent failed", err),
@@ -1430,22 +1534,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             freezeUsedDates: [...(prev.freezeUsedDates ?? []), date],
           };
           if (deviceId.current && next.shareProgress && next.profile) {
-            void publishRetentionEvent(deviceId.current, next.profile.name, "freeze_used", { date }).catch(
-              () => undefined,
-            );
+            void publishRetentionEvent(deviceId.current, next.profile.name, "freeze_used", {
+              date,
+            }).catch(() => undefined);
           }
           return next;
         });
         return true;
       },
-      markQuestCoachOpened: () => update((s) => bumpManualQuest(withQuests(s, deviceId.current), "coach")),
+      markQuestCoachOpened: () =>
+        update((s) => bumpManualQuest(withQuests(s, deviceId.current), "coach")),
       markQuestKudos: () => {
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           let next = bumpManualQuest(prev, "kudos");
           const awarded = applyXpAward(next, XP.kudos);
           // Cap kudos XP via checking progress — simple: only if quest exists and under cap using a counter in progress
-          const kudosCount = (prev.dailyQuestProgress?.["q-kudos"] ?? 0) + (prev.dailyQuestProgress?.["__kudos_xp"] ?? 0);
+          const kudosCount =
+            (prev.dailyQuestProgress?.["q-kudos"] ?? 0) +
+            (prev.dailyQuestProgress?.["__kudos_xp"] ?? 0);
           if (kudosCount < XP.kudosCap) {
             next = {
               ...awarded.state,
@@ -1558,16 +1665,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           version: prevVersion + 1,
           ...(checkIn.noEquipment ? { noEquipment: true } : {}),
           ...(checkIn.equipment ? { equipment: checkIn.equipment } : {}),
-          ...(checkIn.acceptedTrainingMode ? { acceptedTrainingMode: checkIn.acceptedTrainingMode } : {}),
+          ...(checkIn.acceptedTrainingMode
+            ? { acceptedTrainingMode: checkIn.acceptedTrainingMode }
+            : {}),
           ...(checkIn.soreness != null ? { soreness: checkIn.soreness } : {}),
           ...(checkIn.stress != null ? { stress: checkIn.stress } : {}),
           ...(checkIn.notes ? { notes: checkIn.notes.slice(0, 280) } : {}),
           ...(checkIn.lunchOutToday ? { lunchOutToday: true } : {}),
           ...(Array.isArray(checkIn.skippedSlots) ? { skippedSlots: checkIn.skippedSlots } : {}),
         };
+        const prevCtx = stateRef.current.decisionContextByDate ?? {};
+        const restCtx = { ...prevCtx };
+        delete restCtx[date];
         const nextState = withSnapshot({
           ...stateRef.current,
           dayCheckIns: { ...(stateRef.current.dayCheckIns ?? {}), [date]: full },
+          decisionContextByDate: restCtx,
         });
         update(() => nextState);
         if (nextState.livingPlans?.[date]?.workout.mode === "rest") {
@@ -1577,6 +1690,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             { date, reason: "rest_day" },
             { entityType: "workout", entityId: date },
           );
+          if (deviceId.current) {
+            recordDecisionActionBestEffort({
+              deviceId: deviceId.current,
+              date,
+              actionKind: "rest_taken",
+              status: "completed",
+              primaryKind: "rest",
+            });
+          }
         }
         emitAppEvent(
           deviceId.current,
@@ -1608,7 +1730,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             version: full.version ?? 1,
           });
           void flushOutbox().catch(() => undefined);
-          persistDecisionsBestEffort(deviceId.current, nextState, date);
+          void refreshDecisionContextBestEffort(deviceId.current, date).then((snap) => {
+            if (!snap) return;
+            update((s) => applyDecisionContextToState(s, snap));
+          });
           recordNextDayCheckInBestEffort(deviceId.current, {
             date,
             energy: full.energy,
@@ -1623,17 +1748,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       refreshLivingPlan: () => {
+        const date = todayKey();
+        let rebuilt = false;
         update((s) => {
-          const next = withSnapshot(s);
-          if (deviceId.current) persistDecisionsBestEffort(deviceId.current, next);
-          return next;
+          const cached = s.decisionContextByDate?.[date];
+          if (cached?.source === "server") return s;
+          rebuilt = true;
+          return withSnapshot(s);
         });
-        emitAppEvent(
-          deviceId.current,
-          "plan_modified",
-          { date: todayKey(), reason: "refresh" },
-          { entityType: "plan", entityId: todayKey() },
-        );
+        if (deviceId.current) {
+          void refreshDecisionContextBestEffort(deviceId.current, date).then((snap) => {
+            if (!snap) return;
+            update((cur) => applyDecisionContextToState(cur, snap));
+          });
+        }
+        if (rebuilt) {
+          emitAppEvent(
+            deviceId.current,
+            "plan_modified",
+            { date, reason: "refresh" },
+            { entityType: "plan", entityId: date },
+          );
+        }
       },
       reset: () => {
         skipPush.current = true;

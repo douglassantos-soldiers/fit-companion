@@ -1,9 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, History, Pin, Play, RefreshCw, Settings2, X } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronRight,
+  History,
+  Play,
+  RefreshCw,
+  Settings2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, EmptyState } from "@/components/app-shell";
-import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
+import { ExercisePlanRow } from "@/components/training/exercise-plan-row";
 import { MuscleHeatmap } from "@/components/session/muscle-heatmap";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,10 +19,22 @@ import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import { alternativesFor } from "@/data/exercises";
 import { buildWeeklyPlanDetailed } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
-import { WEEK_MODE_LABEL, PROGRESSION_CODE_LABEL, type ProgressionReasonCode } from "@/lib/engine/progression";
-import { muscleRecoveryMap, buildMuscleRecoverySnapshots } from "@/lib/engine/recovery";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import {
+  isTodayPlannedDay,
+  todaySessionShouldBeExpress,
+} from "@/lib/engine/decision-context-snapshot";
+import {
+  WEEK_MODE_LABEL,
+  PROGRESSION_CODE_LABEL,
+  type ProgressionReasonCode,
+} from "@/lib/engine/progression";
+import {
+  muscleRecoveryMap,
+  buildMuscleRecoverySnapshots,
+  consecutiveHardRpeStreak,
+} from "@/lib/engine/recovery";
 import { useStore } from "@/lib/store";
-import { resolveExerciseMedia } from "@/lib/soldiers-media";
 import { GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
 import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import {
@@ -33,10 +53,14 @@ export const Route = createFileRoute("/treino/")({
       { title: "Treino — Soldiers Training" },
       {
         name: "description",
-        content: "Plano semanal gerado pelo seu perfil, com séries, repetições e progressão de carga.",
+        content:
+          "Plano semanal gerado pelo seu perfil, com séries, repetições e progressão de carga.",
       },
       { property: "og:title", content: "Seu plano de treino" },
-      { property: "og:description", content: "Divisão semanal, cargas sugeridas e histórico de sessões." },
+      {
+        property: "og:description",
+        content: "Divisão semanal, cargas sugeridas e histórico de sessões.",
+      },
     ],
   }),
   component: TrainingPage,
@@ -47,9 +71,20 @@ const FOCUS_OPTIONS = Object.keys(FOCUS_MUSCLE_LABEL) as FocusMuscle[];
 function TrainingPage() {
   const { state, hydrated, patchProfile, setExercisePreference, saveDayCheckIn } = useStore();
   const todayCheck = state.dayCheckIns?.[todayKey()];
-  const [equipOverride, setEquipOverride] = useState<Equipment | null>(todayCheck?.equipment ?? null);
+  const [equipOverride, setEquipOverride] = useState<Equipment | null>(
+    todayCheck?.equipment ?? null,
+  );
   const [ajustesOpen, setAjustesOpen] = useState(false);
   const [swapFor, setSwapFor] = useState<{ dayId: string; exerciseId: string } | null>(null);
+
+  const recoveryCtx = useMemo(
+    () => ({
+      ...(todayCheck?.sleepHours != null ? { sleepHours: todayCheck.sleepHours } : {}),
+      ...(todayCheck?.energy ? { energy: todayCheck.energy } : {}),
+      sessionRpeHardStreak: consecutiveHardRpeStreak(state.sessions),
+    }),
+    [todayCheck?.sleepHours, todayCheck?.energy, state.sessions],
+  );
 
   const planResult = useMemo(() => {
     if (!state.profile) return null;
@@ -62,12 +97,19 @@ function TrainingPage() {
         likedExerciseIds: state.likedExerciseIds ?? [],
         dislikedExerciseIds: state.dislikedExerciseIds ?? [],
         exercisePreferences: state.exercisePreferences,
+        recoveryCtx,
       },
     );
-  }, [state, equipOverride, todayCheck?.equipment]);
+  }, [state, equipOverride, todayCheck?.equipment, recoveryCtx]);
 
-  const recovery = useMemo(() => muscleRecoveryMap(state.sessions), [state.sessions]);
-  const recoverySnaps = useMemo(() => buildMuscleRecoverySnapshots(state.sessions), [state.sessions]);
+  const recovery = useMemo(
+    () => muscleRecoveryMap(state.sessions, new Date(), recoveryCtx),
+    [state.sessions, recoveryCtx],
+  );
+  const recoverySnaps = useMemo(
+    () => buildMuscleRecoverySnapshots(state.sessions, recoveryCtx),
+    [state.sessions, recoveryCtx],
+  );
 
   if (!hydrated || !state.profile || !planResult) {
     return (
@@ -81,6 +123,15 @@ function TrainingPage() {
   const { days: plan, weekMode } = planResult;
   const todayWeekday = new Date().getDay();
   const todayDay = plan.find((d) => d.weekday === todayWeekday) ?? plan[0] ?? null;
+  const decisionCtx = decisionContextForUi(state);
+  const expressForDay = (dayId: string) => {
+    const accepted = todayCheck?.acceptedTrainingMode;
+    return todaySessionShouldBeExpress({
+      snapshot: decisionCtx,
+      isTodaySession: isTodayPlannedDay(dayId, decisionCtx) || dayId === todayDay?.id,
+      ...(accepted ? { acceptedTrainingMode: accepted } : {}),
+    });
+  };
   const activeEquip = equipOverride ?? todayCheck?.equipment ?? profile.equipment;
   const weekdays = profile.trainingWeekdays ?? plan.map((d) => d.weekday);
   const swapSource = swapFor
@@ -101,7 +152,9 @@ function TrainingPage() {
       ...(todayCheck?.soreness != null ? { soreness: todayCheck.soreness } : {}),
       ...(todayCheck?.stress != null ? { stress: todayCheck.stress } : {}),
       ...(todayCheck?.notes ? { notes: todayCheck.notes } : {}),
-      ...(todayCheck?.acceptedTrainingMode ? { acceptedTrainingMode: todayCheck.acceptedTrainingMode } : {}),
+      ...(todayCheck?.acceptedTrainingMode
+        ? { acceptedTrainingMode: todayCheck.acceptedTrainingMode }
+        : {}),
     });
     toast.success(`Plano de hoje: ${eq}`);
   };
@@ -115,7 +168,7 @@ function TrainingPage() {
         <Link
           to="/treino/sessao/$id"
           params={{ id: todayDay.id }}
-          search={{ express: false, from: "treino" }}
+          search={{ express: expressForDay(todayDay.id), from: "treino" }}
           className="mb-4 block"
         >
           <Button className="glow-primary h-14 w-full font-bold uppercase tracking-wide">
@@ -214,69 +267,39 @@ function TrainingPage() {
               </div>
               <ul className="mt-3 space-y-2">
                 {day.exercises.map((ex) => {
-                  const thumb = resolveExerciseMedia(ex.exerciseId);
                   const pinned = state.exercisePreferences?.[ex.exerciseId] === "preferred";
                   const chips = (ex.reasonCodes ?? [])
                     .slice(0, 2)
                     .map((c) => PROGRESSION_CODE_LABEL[c as ProgressionReasonCode] ?? c);
                   return (
-                    <li key={ex.exerciseId} className="rounded-xl border border-white/10 p-2">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <Link
-                          to="/treino/exercicio/$id"
-                          params={{ id: ex.exerciseId }}
-                          className="flex min-w-0 items-center gap-2 text-foreground"
-                        >
-                          <SoldiersMediaThumb media={thumb} alt={ex.name} className="size-8 rounded-md" />
-                          <span className="truncate">{ex.name}</span>
-                        </Link>
-                        <span className="shrink-0 text-muted-foreground">
-                          {ex.sets}x{ex.reps}
-                          {ex.suggestedLoad > 0 && ex.unit === "kg" ? ` · ${ex.suggestedLoad} kg` : ""}
-                        </span>
-                      </div>
-                      {chips.length ? (
-                        <p className="mt-1 text-[0.65rem] text-muted-foreground">{chips.join(" · ")}</p>
-                      ) : null}
-                      <div className="mt-2 flex gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-[0.65rem]"
-                          onClick={() =>
-                            setExercisePreference(ex.exerciseId, pinned ? "clear" : "preferred")
-                          }
-                        >
-                          <Pin className="size-3" /> {pinned ? "Fixado" : "Fixar"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-[0.65rem]"
-                          onClick={() => setSwapFor({ dayId: day.id, exerciseId: ex.exerciseId })}
-                        >
-                          <RefreshCw className="size-3" /> Trocar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-[0.65rem]"
-                          onClick={() => {
-                            setExercisePreference(ex.exerciseId, "avoided");
-                            toast.success("Exercício evitado no próximo plano");
-                          }}
-                        >
-                          <X className="size-3" /> Pular
-                        </Button>
-                      </div>
-                    </li>
+                    <ExercisePlanRow
+                      key={ex.exerciseId}
+                      exerciseId={ex.exerciseId}
+                      name={ex.name}
+                      sets={ex.sets}
+                      reps={ex.reps}
+                      suggestedLoad={ex.suggestedLoad}
+                      unit={ex.unit}
+                      chips={chips}
+                      pinned={pinned}
+                      onPin={() =>
+                        setExercisePreference(ex.exerciseId, pinned ? "clear" : "preferred")
+                      }
+                      onSwap={() => setSwapFor({ dayId: day.id, exerciseId: ex.exerciseId })}
+                      onSkip={() => {
+                        setExercisePreference(ex.exerciseId, "avoided");
+                        toast.success("Exercício evitado no próximo plano");
+                      }}
+                    />
                   );
                 })}
               </ul>
-              <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false, from: "treino" }} className="mt-4 block">
+              <Link
+                to="/treino/sessao/$id"
+                params={{ id: day.id }}
+                search={{ express: expressForDay(day.id), from: "treino" }}
+                className="mt-4 block"
+              >
                 <Button className="h-11 w-full font-bold uppercase tracking-wide">
                   <Play className="size-4" /> Treinar
                 </Button>
@@ -293,21 +316,33 @@ function TrainingPage() {
               description="Sua primeira sessão aparece aqui depois que você treinar."
               action={
                 plan[0] ? (
-                  <Link to="/treino/sessao/$id" params={{ id: plan[0].id }} search={{ express: false, from: "treino" }} className="block">
+                  <Link
+                    to="/treino/sessao/$id"
+                    params={{ id: plan[0].id }}
+                    search={{ express: expressForDay(plan[0].id), from: "treino" }}
+                    className="block"
+                  >
                     <Button className="h-11 w-full font-bold uppercase tracking-wide">
                       <Play className="size-4" /> Começar sessão
                     </Button>
                   </Link>
                 ) : (
                   <Link to="/" className="block">
-                    <Button className="h-11 w-full font-bold uppercase tracking-wide">Ver Hoje</Button>
+                    <Button className="h-11 w-full font-bold uppercase tracking-wide">
+                      Ver Hoje
+                    </Button>
                   </Link>
                 )
               }
             />
           ) : (
             state.sessions.map((s) => (
-              <Link key={s.id} to="/treino/historico/$sessionId" params={{ sessionId: s.id }} className="block">
+              <Link
+                key={s.id}
+                to="/treino/historico/$sessionId"
+                params={{ sessionId: s.id }}
+                className="block"
+              >
                 <article className="surface-card p-4 transition-colors hover:border-primary">
                   <div className="flex justify-between">
                     <h2 className="text-base">{s.title}</h2>
@@ -325,8 +360,14 @@ function TrainingPage() {
         </TabsContent>
       </Tabs>
 
-      <SoldiersOverlay open={ajustesOpen} onClose={() => setAjustesOpen(false)} title="Ajustes do plano">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dias da semana</p>
+      <SoldiersOverlay
+        open={ajustesOpen}
+        onClose={() => setAjustesOpen(false)}
+        title="Ajustes do plano"
+      >
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Dias da semana
+        </p>
         <div className="mb-4 grid grid-cols-7 gap-1.5">
           {WEEKDAY_LABELS.map((label, weekday) => {
             const on = weekdays.includes(weekday);
@@ -335,12 +376,17 @@ function TrainingPage() {
                 key={label}
                 type="button"
                 onClick={() => {
-                  const next = on ? weekdays.filter((d) => d !== weekday) : [...weekdays, weekday].sort((a, b) => a - b);
+                  const next = on
+                    ? weekdays.filter((d) => d !== weekday)
+                    : [...weekdays, weekday].sort((a, b) => a - b);
                   if (next.length < 2) {
                     toast.error("Escolha pelo menos 2 dias");
                     return;
                   }
-                  patchProfile({ trainingWeekdays: next.slice(0, 6), daysPerWeek: Math.min(6, next.length) });
+                  patchProfile({
+                    trainingWeekdays: next.slice(0, 6),
+                    daysPerWeek: Math.min(6, next.length),
+                  });
                 }}
                 className={`rounded-xl border py-3 text-[0.65rem] font-bold uppercase ${
                   on ? "border-primary bg-primary text-primary-foreground" : "border-white/10"
@@ -351,7 +397,9 @@ function TrainingPage() {
             );
           })}
         </div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Priorizar músculos</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Priorizar músculos
+        </p>
         <div className="mb-4 flex flex-wrap gap-2">
           {FOCUS_OPTIONS.map((m) => {
             const on = (profile.focusMuscles ?? []).includes(m);
@@ -374,7 +422,9 @@ function TrainingPage() {
             );
           })}
         </div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inventário</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Inventário
+        </p>
         <div className="flex flex-wrap gap-2">
           {GYM_GEAR_OPTIONS.map((g: GymGear) => {
             const on = (profile.equipmentInventory ?? []).includes(g);
@@ -387,7 +437,8 @@ function TrainingPage() {
                   const next = on ? cur.filter((x) => x !== g) : [...cur, g];
                   patchProfile({
                     equipmentInventory: next,
-                    equipment: next.includes("barra") || next.includes("maquinas") ? "academia" : "casa",
+                    equipment:
+                      next.includes("barra") || next.includes("maquinas") ? "academia" : "casa",
                   });
                 }}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${

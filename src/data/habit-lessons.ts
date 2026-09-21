@@ -1,5 +1,7 @@
 import { todayKey } from "@/lib/types";
-import { pickEditorialLesson } from "@/lib/content-match";
+import { contentToLesson, listPublishedContent, pickEditorialLesson } from "@/lib/content-match";
+import { pickEditorialItems, type ContentRankInput } from "@/lib/content/recommend";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
 import type { BehaviorSelectContext, BehaviorTriggerKey } from "@/lib/engine/behavior/types";
 
 export type HabitLessonTag =
@@ -148,12 +150,20 @@ function fallbackLesson(date: Date): HabitLesson {
   return HABIT_LESSONS[idx]!;
 }
 
-/** Adaptive lesson: prefers tag matching active trigger/pattern; else date rotation. */
+/** Adaptive lesson: prefers content ranker when a snapshot exists; else CMS goal/level then trigger tags. */
 export function lessonForToday(
   date: Date = new Date(),
   behaviorCtx?: BehaviorSelectContext | null,
   targeting?: { goal?: string | null; level?: string | null } | null,
+  snapshot?: DecisionContextSnapshot | ContentRankInput | null,
 ): HabitLesson {
+  if (snapshot) {
+    const opts: Parameters<typeof pickEditorialItems>[1] = { date, snapshot };
+    if (targeting?.goal !== undefined) opts.goal = targeting.goal;
+    if (targeting?.level !== undefined) opts.level = targeting.level;
+    const ranked = pickEditorialItems(listPublishedContent(), opts, 1);
+    if (ranked[0]) return contentToLesson(ranked[0]);
+  }
   const editorial = pickEditorialLesson(targeting, date);
   if (editorial) return editorial;
   if (behaviorCtx) {

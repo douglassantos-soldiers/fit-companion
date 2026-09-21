@@ -2,7 +2,7 @@
  * Admin Console server functions (PIN session required for mutations + admin reads).
  */
 import { createServerFn } from "@tanstack/react-start";
-import type { CmsState } from "@/lib/cms";
+import { publicCmsView, type CmsState } from "@/lib/cms";
 import type { AccessTier } from "@/data/shopify-product-map";
 
 function parseCmsState(input: unknown): CmsState {
@@ -12,6 +12,8 @@ function parseCmsState(input: unknown): CmsState {
     exerciseMedia: { ...(raw.exerciseMedia ?? {}) },
     mealImages: { ...(raw.mealImages ?? {}) },
     workoutNotes: { ...(raw.workoutNotes ?? {}) },
+    exerciseMediaAuthorized: { ...(raw.exerciseMediaAuthorized ?? {}) },
+    mealImagesAuthorized: { ...(raw.mealImagesAuthorized ?? {}) },
   };
 }
 
@@ -38,10 +40,10 @@ function parseEntitlementManual(input: unknown): {
   return { email, action, tier };
 }
 
-/** Public read — app hydrate (service_role via server). */
+/** Public read — app hydrate (service_role via server). Production media only. */
 export const getPublicCms = createServerFn({ method: "GET" }).handler(async () => {
   const { readCmsOverrides } = await import("@/lib/admin.server");
-  return await readCmsOverrides();
+  return publicCmsView(await readCmsOverrides());
 });
 
 export const loadCmsRemote = createServerFn({ method: "GET" }).handler(async () => {
@@ -53,9 +55,8 @@ export const loadCmsRemote = createServerFn({ method: "GET" }).handler(async () 
 export const saveCmsRemote = createServerFn({ method: "POST" })
   .inputValidator(parseCmsState)
   .handler(async ({ data }) => {
-    const { assertAdmin, readCmsOverrides, upsertCmsOverrides } = await import(
-      "@/lib/admin.server"
-    );
+    const { assertAdmin, readCmsOverrides, upsertCmsOverrides } =
+      await import("@/lib/admin.server");
     assertAdmin();
     const result = await upsertCmsOverrides(data);
     if (!result.ok) return { ok: false as const, reason: result.reason };
@@ -102,9 +103,8 @@ export const importShopifyCustomersBatch = createServerFn({ method: "POST" })
     reset: (input as { reset?: boolean } | null)?.reset === true,
   }))
   .handler(async ({ data }) => {
-    const { assertAdmin, importShopifyCustomersBatch: runBatch } = await import(
-      "@/lib/admin.server"
-    );
+    const { assertAdmin, importShopifyCustomersBatch: runBatch } =
+      await import("@/lib/admin.server");
     assertAdmin();
     return await runBatch({ reset: data.reset });
   });
@@ -180,11 +180,11 @@ function parseExerciseSave(input: unknown) {
       ? raw["equipment"]
       : "ambos") as import("@/data/exercises").Exercise["equipment"],
     swapGroup: String(raw?.["swapGroup"] ?? ""),
-    joints: (Array.isArray(raw?.["joints"]) ? raw!["joints"] : []) as import("@/data/exercises").Joint[],
+    joints: (Array.isArray(raw?.["joints"])
+      ? raw!["joints"]
+      : []) as import("@/data/exercises").Joint[],
     unit: (raw?.["unit"] === "corpo" || raw?.["unit"] === "min" ? raw["unit"] : "kg") as
-      | "kg"
-      | "corpo"
-      | "min",
+      "kg" | "corpo" | "min",
     baseLoad: Number(raw?.["baseLoad"] ?? 20),
     priority: Number(raw?.["priority"] ?? 2),
     primaryMuscles: (Array.isArray(raw?.["primaryMuscles"])
@@ -200,13 +200,34 @@ function parseExerciseSave(input: unknown) {
       : [],
     videoUrl: raw?.["videoUrl"] != null ? String(raw["videoUrl"]) : null,
     mediaUrl: raw?.["mediaUrl"] != null ? String(raw["mediaUrl"]) : null,
-    cues: raw?.["cues"] != null ? String(raw["cues"]) : null,
     alternativeIds: Array.isArray(raw?.["alternativeIds"])
       ? (raw!["alternativeIds"] as unknown[]).map(String)
       : [],
   };
+  if (Array.isArray(raw?.["cues"])) parsed.cues = (raw!["cues"] as unknown[]).map(String);
+  else if (raw?.["cues"] != null) parsed.cues = String(raw["cues"]);
   if (raw?.["movementPattern"] != null) parsed.movementPattern = String(raw["movementPattern"]);
   if (raw?.["difficulty"] != null) parsed.difficulty = String(raw["difficulty"]);
+  if (raw?.["canonicalName"] != null) parsed.canonicalName = String(raw["canonicalName"]);
+  if (raw?.["displayNameEn"] != null) parsed.displayNameEn = String(raw["displayNameEn"]);
+  if (raw?.["version"] != null && Number.isFinite(Number(raw["version"])))
+    parsed.version = Number(raw["version"]);
+  if (Array.isArray(raw?.["aliases"])) parsed.aliases = (raw!["aliases"] as unknown[]).map(String);
+  if (Array.isArray(raw?.["searchTerms"]))
+    parsed.searchTerms = (raw!["searchTerms"] as unknown[]).map(String);
+  if (Array.isArray(raw?.["equipmentInventory"])) {
+    parsed.equipmentInventory = (raw!["equipmentInventory"] as unknown[]).map(String);
+  }
+  if (raw?.["exerciseFamily"] != null) parsed.exerciseFamily = String(raw["exerciseFamily"]);
+  if (raw?.["movementFamily"] != null) parsed.movementFamily = String(raw["movementFamily"]);
+  if (raw?.["progressionFamily"] != null)
+    parsed.progressionFamily = String(raw["progressionFamily"]);
+  if (raw?.["regressionFamily"] != null) parsed.regressionFamily = String(raw["regressionFamily"]);
+  if (Array.isArray(raw?.["contraindicationTags"])) {
+    parsed.contraindicationTags = (raw!["contraindicationTags"] as unknown[]).map(String);
+  }
+  if (raw?.["mediaId"] != null) parsed.mediaId = String(raw["mediaId"]);
+  if (raw?.["mediaStatus"] != null) parsed.mediaStatus = String(raw["mediaStatus"]);
   return parsed;
 }
 
@@ -273,7 +294,9 @@ export const loadAdminTrainingRules = createServerFn({ method: "GET" }).handler(
 });
 
 export const saveAdminTrainingRules = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => input as import("@/lib/training/training-rules").TrainingRules)
+  .inputValidator(
+    (input: unknown) => input as import("@/lib/training/training-rules").TrainingRules,
+  )
   .handler(async ({ data }) => {
     const { assertAdmin } = await import("@/lib/admin.server");
     assertAdmin();
@@ -292,7 +315,16 @@ function parseContentSave(input: unknown) {
   const raw = input as Record<string, unknown> | null;
   const title = String(raw?.["title"] ?? "").trim();
   if (!title) throw new Error("Título obrigatório");
-  const kinds = ["article", "tip", "technique", "nutrition", "recovery", "motivation"] as const;
+  const kinds = [
+    "article",
+    "tip",
+    "technique",
+    "nutrition",
+    "recovery",
+    "motivation",
+    "video",
+    "education",
+  ] as const;
   const kind = kinds.includes(raw?.["kind"] as (typeof kinds)[number])
     ? (raw!["kind"] as (typeof kinds)[number])
     : "tip";
@@ -306,6 +338,12 @@ function parseContentSave(input: unknown) {
     levels: string[];
     published: boolean;
     sortOrder: number;
+    visible?: boolean;
+    expertId?: string;
+    collectionId?: string;
+    mediaId?: string;
+    publishAt?: string;
+    unpublishAt?: string;
   } = {
     kind,
     title,
@@ -315,8 +353,14 @@ function parseContentSave(input: unknown) {
     levels: Array.isArray(raw?.["levels"]) ? (raw!["levels"] as unknown[]).map(String) : [],
     published: Boolean(raw?.["published"]),
     sortOrder: Number(raw?.["sortOrder"] ?? 0),
+    visible: raw?.["visible"] !== false,
   };
   if (raw?.["id"]) parsed.id = String(raw["id"]);
+  if (raw?.["expertId"]) parsed.expertId = String(raw["expertId"]);
+  if (raw?.["collectionId"]) parsed.collectionId = String(raw["collectionId"]);
+  if (raw?.["mediaId"]) parsed.mediaId = String(raw["mediaId"]);
+  if (raw?.["publishAt"]) parsed.publishAt = String(raw["publishAt"]);
+  if (raw?.["unpublishAt"]) parsed.unpublishAt = String(raw["unpublishAt"]);
   return parsed;
 }
 
@@ -393,4 +437,52 @@ export const hideAdminComment = createServerFn({ method: "POST" })
     assertAdmin();
     const { hideComment } = await import("@/lib/moderation.server");
     return await hideComment(data.commentId);
+  });
+
+export const listAdminExperts = createServerFn({ method: "GET" }).handler(async () => {
+  const { assertAdmin } = await import("@/lib/admin.server");
+  assertAdmin();
+  const { listExpertsAdmin } = await import("@/lib/catalog.server");
+  return await listExpertsAdmin();
+});
+
+export const saveAdminExpert = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => input as import("@/lib/content/types").Expert)
+  .handler(async ({ data }) => {
+    const { assertAdmin } = await import("@/lib/admin.server");
+    assertAdmin();
+    const { upsertExpert } = await import("@/lib/catalog.server");
+    return await upsertExpert(data);
+  });
+
+export const listAdminTrails = createServerFn({ method: "GET" }).handler(async () => {
+  const { assertAdmin } = await import("@/lib/admin.server");
+  assertAdmin();
+  const { listProgramsAdmin } = await import("@/lib/catalog.server");
+  return await listProgramsAdmin();
+});
+
+export const saveAdminTrail = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => input as import("@/lib/content/types").ContentProgram)
+  .handler(async ({ data }) => {
+    const { assertAdmin } = await import("@/lib/admin.server");
+    assertAdmin();
+    const { upsertProgram } = await import("@/lib/catalog.server");
+    return await upsertProgram(data);
+  });
+
+export const listAdminCollections = createServerFn({ method: "GET" }).handler(async () => {
+  const { assertAdmin } = await import("@/lib/admin.server");
+  assertAdmin();
+  const { listCollectionsAdmin } = await import("@/lib/catalog.server");
+  return await listCollectionsAdmin();
+});
+
+export const saveAdminCollection = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => input as import("@/lib/content/types").ContentCollection)
+  .handler(async ({ data }) => {
+    const { assertAdmin } = await import("@/lib/admin.server");
+    assertAdmin();
+    const { upsertCollection } = await import("@/lib/catalog.server");
+    return await upsertCollection(data);
   });

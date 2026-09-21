@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EXERCISE_LIBRARY, PLANNER_EXERCISE_IDS, libraryById } from "@/data/exercise-library";
 import { EXERCISES, alternativesFor } from "@/data/exercises";
-import { coverageReport, PILOT_EXERCISE_IDS, SOLDIERS_MEDIA_MANIFEST } from "@/data/soldiers-media-manifest";
+import {
+  coverageReport,
+  PILOT_EXERCISE_IDS,
+  SOLDIERS_MEDIA_MANIFEST,
+} from "@/data/soldiers-media-manifest";
 import { resolveExerciseMedia, resolveMealMedia, resolveProductMedia } from "@/lib/soldiers-media";
 import { MEAL_PRESETS } from "@/data/meal-presets";
 import { PRODUCTS } from "@/data/products";
@@ -17,7 +21,8 @@ describe("exercise library lote 1", () => {
     const planner = [...PLANNER_EXERCISE_IDS].sort();
     const current = EXERCISES.map((e) => e.id).sort();
     expect(planner).toEqual(current);
-    expect(planner.length).toBe(EXERCISE_LIBRARY.length);
+    expect(planner.length).toBeGreaterThanOrEqual(100);
+    expect(planner.length).toBeLessThan(EXERCISE_LIBRARY.length);
   });
 
   it("exposes former library-only ids as swaps", () => {

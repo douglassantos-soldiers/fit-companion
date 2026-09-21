@@ -4,7 +4,10 @@
  */
 import { emitUserEvent } from "@/lib/events/emit";
 import { trackAppEvent } from "@/lib/shopify.functions";
-import { markDecisionOutcomeBestEffort } from "@/lib/decision-client";
+import {
+  markDecisionOutcomeBestEffort,
+  recordDecisionActionBestEffort,
+} from "@/lib/decision-client";
 import { todayKey } from "@/lib/types";
 import { recordBehaviorOutcomeBestEffort } from "@/lib/engine/outcome-learning";
 
@@ -52,6 +55,21 @@ export async function trackOutcome(
       });
       if (kind === "living_plan_followed" || kind === "living_plan_skipped") {
         markDecisionOutcomeBestEffort(deviceId, kind, todayKey());
+      }
+      if (kind === "workout_started") {
+        const entityId = typeof payload["entityId"] === "string" ? payload["entityId"] : "";
+        const action: {
+          deviceId: string;
+          actionKind: string;
+          status: string;
+          entityId?: string;
+        } = {
+          deviceId,
+          actionKind: "workout_started",
+          status: "started",
+        };
+        if (entityId) action.entityId = entityId;
+        recordDecisionActionBestEffort(action);
       }
       return;
     }

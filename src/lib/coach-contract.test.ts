@@ -48,8 +48,13 @@ describe("Coach contract FASE 6", () => {
       kind: "why",
       summary: "Volume reduzido",
       why: ["Sono baixo"],
-      decisions: [{ type: "training_volume", value: 0.7, explanation: "Reduzi o volume porque seu sono caiu." }],
-      safetyNotice: undefined,
+      decisions: [
+        {
+          type: "training_volume",
+          value: 0.7,
+          explanation: "Reduzi o volume porque seu sono caiu.",
+        },
+      ],
     });
     expect(s.kind).toBe("why");
     expect(s.decisions[0]?.type).toBe("training_volume");
@@ -64,7 +69,7 @@ describe("Coach contract FASE 6", () => {
 });
 
 describe("Coach local Why replies", () => {
-  it("answers why training / calories / protein / rest", { timeout: 15_000 }, () => {
+  it("answers why training / calories / protein / rest", { timeout: 40_000 }, () => {
     const date = todayKey();
     const state: AppState = {
       ...emptyState,

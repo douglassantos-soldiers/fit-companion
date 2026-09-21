@@ -5,15 +5,9 @@
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import type { UserPatterns } from "@/lib/engine/learning";
-import {
-  parsePatternsBlob,
-  type PatternsBlobV2,
-} from "@/lib/engine/learned-patterns";
+import { parsePatternsBlob, type PatternsBlobV2 } from "@/lib/engine/learned-patterns";
 
-export async function savePatternsBlob(
-  userId: string,
-  blob: PatternsBlobV2,
-): Promise<boolean> {
+export async function savePatternsBlob(userId: string, blob: PatternsBlobV2): Promise<boolean> {
   if (!userId) return false;
   const db = await adminDbLoose();
   if (!db) return false;
@@ -40,8 +34,11 @@ export async function saveUserPatterns(
   patterns: UserPatterns | PatternsBlobV2,
 ): Promise<boolean> {
   if (!userId) return false;
-  if (patterns && typeof patterns === "object" && "version" in patterns && (patterns as PatternsBlobV2).version === 2) {
-    return savePatternsBlob(userId, patterns as PatternsBlobV2);
+  if (patterns && typeof patterns === "object" && "version" in patterns) {
+    const ver = (patterns as PatternsBlobV2).version;
+    if (ver === 2 || ver === 3) {
+      return savePatternsBlob(userId, patterns as PatternsBlobV2);
+    }
   }
   const legacy = patterns as UserPatterns;
   const blob: PatternsBlobV2 = {

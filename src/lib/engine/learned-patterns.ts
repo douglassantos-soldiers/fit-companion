@@ -7,6 +7,7 @@ import {
   isAllowedPatternKind,
   sanitizeEvidenceNote,
 } from "@/lib/engine/learning-guardrails";
+import type { InterventionResponse } from "@/lib/engine/learning/types";
 import { extractUserPatterns, type UserPatterns } from "@/lib/engine/user-patterns";
 import { todayKey, type AppState } from "@/lib/types";
 
@@ -39,9 +40,10 @@ export type LearnedPattern = {
 };
 
 export type PatternsBlobV2 = {
-  version: 2;
+  version: 2 | 3;
   legacy: UserPatterns;
   patterns: LearnedPattern[];
+  interventionResponses?: InterventionResponse[];
 };
 
 export const PATTERN_MIN_OBS: Record<PatternKind, number> = {
@@ -145,7 +147,10 @@ export function extractLearnedPatterns(
       const obs = Math.min(state.sessions.length, 12);
       let p = map.get("weekday_skip") ?? emptyPattern("weekday_skip", date);
       // Sync evidence count toward session-based observations without double-counting wildly
-      while (p.evidenceCount < Math.min(obs, PATTERN_MIN_OBS.weekday_skip + 2) && weak < avg * 0.55) {
+      while (
+        p.evidenceCount < Math.min(obs, PATTERN_MIN_OBS.weekday_skip + 2) &&
+        weak < avg * 0.55
+      ) {
         p = pushEvidence(
           p,
           date,
@@ -156,14 +161,10 @@ export function extractLearnedPatterns(
         if ((prior?.length ?? 0) > 0) break;
       }
       // Fresh extract without prior: seed enough evidence from history
-      if (!(prior?.length) && state.sessions.length >= 8) {
+      if (!prior?.length && state.sessions.length >= 8) {
         p = emptyPattern("weekday_skip", date);
         for (let i = 0; i < Math.min(state.sessions.length, 10); i++) {
-          p = pushEvidence(
-            p,
-            date,
-            `Histórico: dia fraco ${names[legacy.weakestWeekday!]}.`,
-          );
+          p = pushEvidence(p, date, `Histórico: dia fraco ${names[legacy.weakestWeekday!]}.`);
         }
       }
       map.set("weekday_skip", p);
@@ -172,15 +173,23 @@ export function extractLearnedPatterns(
 
   // Long workout avoidance / prefers short
   const longSessions = state.sessions.filter((s) => s.durationMin >= 75).length;
-  const shortSessions = state.sessions.filter((s) => s.durationMin > 0 && s.durationMin < 45).length;
-  const midSessions = state.sessions.filter((s) => s.durationMin >= 45 && s.durationMin < 75).length;
+  const shortSessions = state.sessions.filter(
+    (s) => s.durationMin > 0 && s.durationMin < 45,
+  ).length;
+  const midSessions = state.sessions.filter(
+    (s) => s.durationMin >= 45 && s.durationMin < 75,
+  ).length;
 
   if (state.sessions.length >= 6 && longSessions < shortSessions * 0.3) {
     let p = map.get("avoids_long_workouts") ?? emptyPattern("avoids_long_workouts", date);
-    if (!(prior?.length)) {
+    if (!prior?.length) {
       p = emptyPattern("avoids_long_workouts", date);
       for (let i = 0; i < Math.min(state.sessions.length, 8); i++) {
-        p = pushEvidence(p, date, `Sessões longas raras (${longSessions}) vs curtas (${shortSessions}).`);
+        p = pushEvidence(
+          p,
+          date,
+          `Sessões longas raras (${longSessions}) vs curtas (${shortSessions}).`,
+        );
       }
     } else {
       p = pushEvidence(p, date, `Continua evitando treinos longos.`);
@@ -190,7 +199,7 @@ export function extractLearnedPatterns(
 
   if (state.sessions.length >= 6 && shortSessions >= midSessions && shortSessions >= 3) {
     let p = map.get("prefers_short_sessions") ?? emptyPattern("prefers_short_sessions", date);
-    if (!(prior?.length)) {
+    if (!prior?.length) {
       p = emptyPattern("prefers_short_sessions", date);
       for (let i = 0; i < Math.min(shortSessions, 8); i++) {
         p = pushEvidence(p, date, `Conclui bem sessões <45 min (${shortSessions} no histórico).`);
@@ -210,10 +219,14 @@ export function extractLearnedPatterns(
   const weekdayMeals = meals.length - weekendMeals.length;
   if (weekdayMeals > 4 && weekendMeals.length < weekdayMeals * 0.35) {
     let p = map.get("weekend_protein_drop") ?? emptyPattern("weekend_protein_drop", date);
-    if (!(prior?.length)) {
+    if (!prior?.length) {
       p = emptyPattern("weekend_protein_drop", date);
       for (let i = 0; i < 4; i++) {
-        p = pushEvidence(p, date, `Menos refeições no fim de semana (${weekendMeals.length} vs ${weekdayMeals} em dias úteis).`);
+        p = pushEvidence(
+          p,
+          date,
+          `Menos refeições no fim de semana (${weekendMeals.length} vs ${weekdayMeals} em dias úteis).`,
+        );
       }
     } else {
       p = pushEvidence(p, date, `Gap de refeições no fim de semana.`);
@@ -225,7 +238,7 @@ export function extractLearnedPatterns(
   const otherAvg = meals.length / 7;
   if (meals.length >= 10 && sundayMeals < otherAvg * 0.5) {
     let p = map.get("sunday_meal_gap") ?? emptyPattern("sunday_meal_gap", date);
-    if (!(prior?.length)) {
+    if (!prior?.length) {
       p = emptyPattern("sunday_meal_gap", date);
       for (let i = 0; i < 4; i++) {
         p = pushEvidence(p, date, `Domingo com poucas refeições registradas (${sundayMeals}).`);
@@ -249,8 +262,9 @@ export function extractLearnedPatterns(
     if (next && next.sleepHours < 6) latePairs += 1;
   }
   if (latePairs >= 1) {
-    let p = map.get("poor_sleep_after_late_train") ?? emptyPattern("poor_sleep_after_late_train", date);
-    if (!(prior?.length) && latePairs >= 4) {
+    let p =
+      map.get("poor_sleep_after_late_train") ?? emptyPattern("poor_sleep_after_late_train", date);
+    if (!prior?.length && latePairs >= 4) {
       p = emptyPattern("poor_sleep_after_late_train", date);
       for (let i = 0; i < latePairs; i++) {
         p = pushEvidence(p, date, `Sono <6h no dia seguinte a treino longo.`);
@@ -280,8 +294,9 @@ export function buildPatternsBlobV2(
   let priorPatterns: LearnedPattern[] | null = null;
   if (prior && typeof prior === "object") {
     if (Array.isArray(prior)) priorPatterns = prior;
-    else if ("version" in prior && (prior as PatternsBlobV2).version === 2) {
-      priorPatterns = (prior as PatternsBlobV2).patterns;
+    else if ("version" in prior) {
+      const ver = (prior as PatternsBlobV2).version;
+      if (ver === 2 || ver === 3) priorPatterns = (prior as PatternsBlobV2).patterns;
     }
   }
   return {
@@ -294,9 +309,9 @@ export function buildPatternsBlobV2(
 export function parsePatternsBlob(raw: unknown): PatternsBlobV2 | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  if (r["version"] === 2 && Array.isArray(r["patterns"])) {
-    return {
-      version: 2,
+  if ((r["version"] === 2 || r["version"] === 3) && Array.isArray(r["patterns"])) {
+    const blob: PatternsBlobV2 = {
+      version: r["version"] === 3 ? 3 : 2,
       legacy: (r["legacy"] as UserPatterns) ?? {
         weekdaySessionCounts: {},
         weakestWeekday: null,
@@ -306,6 +321,10 @@ export function parsePatternsBlob(raw: unknown): PatternsBlobV2 | null {
       },
       patterns: r["patterns"] as LearnedPattern[],
     };
+    if (Array.isArray(r["interventionResponses"])) {
+      blob.interventionResponses = r["interventionResponses"] as InterventionResponse[];
+    }
+    return blob;
   }
   // Legacy flat UserPatterns
   if ("weekdaySessionCounts" in r || "updatedAt" in r) {
@@ -335,4 +354,58 @@ export function applyOutcomeToPattern(
   if (idx >= 0) list[idx] = p;
   else list.push(p);
   return list;
+}
+
+const STATUS_RANK: Record<PatternStatus, number> = {
+  blocked: 3,
+  active: 2,
+  candidate: 1,
+  decayed: 0,
+};
+
+export function mergeLearnedPatternOutcomes(
+  prior: LearnedPattern[] | undefined,
+  incoming: LearnedPattern[],
+): LearnedPattern[] {
+  const map = new Map<PatternKind, LearnedPattern>();
+  for (const p of incoming) map.set(p.kind, p);
+  for (const p of prior ?? []) {
+    const cur = map.get(p.kind);
+    if (!cur) {
+      map.set(p.kind, p);
+      continue;
+    }
+    map.set(p.kind, {
+      ...cur,
+      successfulOutcomes: Math.max(cur.successfulOutcomes, p.successfulOutcomes),
+      failedOutcomes: Math.max(cur.failedOutcomes, p.failedOutcomes),
+      evidenceCount: Math.max(cur.evidenceCount, p.evidenceCount),
+      evidence: cur.evidence.length >= p.evidence.length ? cur.evidence : p.evidence,
+      confidence: Math.max(cur.confidence, p.confidence),
+      status: STATUS_RANK[p.status] > STATUS_RANK[cur.status] ? p.status : cur.status,
+      lastObservedAt:
+        cur.lastObservedAt >= p.lastObservedAt ? cur.lastObservedAt : p.lastObservedAt,
+    });
+  }
+  return [...map.values()];
+}
+
+export function buildPatternsBlob(
+  state: AppState,
+  prior?: PatternsBlobV2 | LearnedPattern[] | UserPatterns | null,
+  interventionResponses?: InterventionResponse[],
+): PatternsBlobV2 {
+  const v2 = buildPatternsBlobV2(state, prior);
+  const priorResponses =
+    prior && typeof prior === "object" && "interventionResponses" in prior
+      ? (prior as PatternsBlobV2).interventionResponses
+      : undefined;
+  const blob: PatternsBlobV2 = {
+    version: 3,
+    legacy: v2.legacy,
+    patterns: v2.patterns,
+  };
+  const responses = interventionResponses ?? priorResponses;
+  if (responses?.length) blob.interventionResponses = responses;
+  return blob;
 }

@@ -29,6 +29,7 @@ export function AppShell({
   headerBadge,
   headerAccessDays,
   hideTitle,
+  dock,
   children,
 }: {
   title: string;
@@ -36,6 +37,7 @@ export function AppShell({
   headerBadge?: ReactNode;
   headerAccessDays?: number | null;
   hideTitle?: boolean;
+  dock?: ReactNode;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -44,10 +46,17 @@ export function AppShell({
   const showAccess = headerAccessDays != null && headerAccessDays <= 7;
 
   return (
-    <div className="relative min-h-screen bg-background pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+    <div
+      className={cn(
+        "relative min-h-screen bg-background",
+        dock
+          ? "pb-[calc(11.5rem+env(safe-area-inset-bottom))]"
+          : "pb-[calc(6.5rem+env(safe-area-inset-bottom))]",
+      )}
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
 
-      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/75 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-md items-center gap-2 px-4 py-3">
           <SoldiersLogo />
           <div className="ml-auto flex items-center gap-1.5">
@@ -63,7 +72,7 @@ export function AppShell({
             ) : null}
             <Link
               to="/perfil"
-              className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              className="flex size-10 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-gradient-to-br from-primary/30 to-white/5 text-primary transition-colors hover:border-primary/40"
               aria-label="Perfil"
             >
               <User className="size-4" />
@@ -82,8 +91,14 @@ export function AppShell({
         {children}
       </main>
 
+      {dock ? (
+        <div className="fixed inset-x-0 bottom-[calc(5.35rem+env(safe-area-inset-bottom))] z-20 px-3">
+          <div className="mx-auto w-full max-w-md">{dock}</div>
+        </div>
+      ) : null}
+
       <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
-        <div className="surface-glass glow-primary mx-auto w-full max-w-md rounded-full border border-white/10 px-1.5 py-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
+        <div className="surface-glass mx-auto w-full max-w-md rounded-full border border-white/10 px-1.5 py-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.45)]">
           <Tabs
             selectedKey={selected}
             onSelectionChange={(key) => {

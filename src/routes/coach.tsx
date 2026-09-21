@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Bot, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { buildDailyMealPlan } from "@/lib/engine/nutrition";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import type { AppState, ChatMessage } from "@/lib/types";
+import { todayKey } from "@/lib/types";
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/coach")({
@@ -237,8 +238,28 @@ function CoachPage() {
     });
   };
 
+  const hasUserMessage = state.chat.some((m) => m.role === "user");
+
   return (
-    <AppShell title="Coach" subtitle={busy ? "Pensando…" : "Treino, comida e suplementos com base nos seus dados"}>
+    <AppShell
+      title="Coach"
+      subtitle={busy ? "Pensando…" : "Treino, comida e suplementos com base nos seus dados"}
+      dock={
+        <div className="surface-glass flex gap-2 p-2">
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="Pergunte algo ao coach"
+            className="h-12 rounded-full border-white/10 bg-card/40 backdrop-blur"
+            disabled={busy}
+          />
+          <Button size="icon" className="size-12 glow-primary" onClick={send} aria-label="Enviar" disabled={busy}>
+            <Send className="size-4" />
+          </Button>
+        </div>
+      }
+    >
       {coachNudgeFromState({
         ...state,
         coachNudgeDismissedAt: null,
@@ -246,11 +267,41 @@ function CoachPage() {
       }).show ? (
         <Link
           to="/progresso/resumo"
+          search={{ period: "week" }}
           className="mb-3 inline-flex rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
         >
           Volume subiu — ver análise
         </Link>
       ) : null}
+
+      {!hasUserMessage ? (
+        <section className="mb-6 text-center">
+          <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Bot className="size-10" />
+          </div>
+          <h2 className="mt-4 text-2xl">Bem-vindo ao Coach</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Pergunte qualquer coisa — treino, comida, recuperação ou suplementos com base nos seus dados.
+          </p>
+          <p className="eyebrow mt-6 mb-2 text-left">Sugestões rápidas</p>
+          <div className="grid grid-cols-2 gap-2 text-left">
+            {COACH_PROMPTS.slice(0, 4).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                disabled={busy}
+                onClick={() => askPrompt(p.id, p.label)}
+                className="surface-glass p-3 text-left transition-colors hover:border-primary/40 disabled:opacity-50"
+              >
+                <Sparkles className="mb-2 size-4 text-primary" />
+                <p className="text-xs font-semibold leading-snug">{p.label}</p>
+                <p className="mt-1 text-[0.65rem] text-primary">Gerar</p>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="space-y-3">
         {state.chat.map((m) => (
           <div
@@ -331,32 +382,20 @@ function CoachPage() {
         </div>
       ) : null}
 
-      <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
-        {COACH_PROMPTS.map((p) => (
-          <button
-            key={p.id}
-            disabled={busy}
-            onClick={() => askPrompt(p.id, p.label)}
-            className="whitespace-nowrap rounded-full border border-primary/40 bg-card/40 px-3 py-2 text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary disabled:opacity-50"
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-3 flex gap-2">
-        <Input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Pergunte algo ao coach"
-          className="h-12 rounded-full border-white/10 bg-card/40 backdrop-blur"
-          disabled={busy}
-        />
-        <Button size="icon" className="size-12 glow-primary" onClick={send} aria-label="Enviar" disabled={busy}>
-          <Send className="size-4" />
-        </Button>
-      </div>
+      {hasUserMessage ? (
+        <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+          {COACH_PROMPTS.map((p) => (
+            <button
+              key={p.id}
+              disabled={busy}
+              onClick={() => askPrompt(p.id, p.label)}
+              className="whitespace-nowrap rounded-full border border-primary/40 bg-card/40 px-3 py-2 text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </AppShell>
   );
 }

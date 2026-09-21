@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NumberInput, Modal } from "@mantine/core";
 import { Chip } from "@heroui/react";
 import {
@@ -10,6 +10,7 @@ import {
   Pill,
   Plus,
   Scale,
+  Sparkles,
   TrendingUp,
   Users,
   Utensils,
@@ -27,11 +28,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActivityFeed } from "@/components/social/activity-feed";
 import { DailyQuestsCard, XpBar } from "@/components/today/engagement-cards";
-import { LivingPlanHero, type LivingPlanEatAction, type LivingPlanPrimaryAction } from "@/components/today/living-plan-hero";
+import {
+  LivingPlanHero,
+  type LivingPlanEatAction,
+  type LivingPlanPrimaryAction,
+} from "@/components/today/living-plan-hero";
+import { CompleteProfileSheet } from "@/components/today/complete-profile-sheet";
+import { CoachNudgeOverlay } from "@/components/coach-nudge-overlay";
 import { AccessWindowBanner } from "@/components/today/access-window-banner";
 import { WeekPath } from "@/components/today/week-path";
+import { HomeProgressCard } from "@/components/today/home-progress-card";
 import { PRODUCTS } from "@/data/products";
-import { resolveProductMedia } from "@/lib/soldiers-media";
+import { resolveExerciseMedia, resolveProductMedia } from "@/lib/soldiers-media";
 import {
   getStorefrontBaseUrl,
   primaryReorderProductId,
@@ -41,13 +49,24 @@ import {
 import { trackAppEvent } from "@/lib/shopify.functions";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import type { MealPreset } from "@/data/meal-presets";
-import { performanceDimensions, performanceScore, adherenceScore, streak } from "@/lib/engine/dimensions";
-import { computeLearningInsights, topLearningInsight, learningWeekHint } from "@/lib/engine/learning";
+import {
+  performanceDimensions,
+  performanceScore,
+  adherenceScore,
+  streak,
+} from "@/lib/engine/dimensions";
+import {
+  computeLearningInsights,
+  topLearningInsight,
+  learningWeekHint,
+} from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
-import { evaluateSafety } from "@/lib/engine/safety";
-import { rankRecommendations } from "@/lib/engine/recommendation";
-import { runBehaviorLoop } from "@/lib/engine/behavior";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import {
+  selectNutritionOpts,
+  selectTrainingMode,
+  shouldRefreshDecisionContextForToday,
+} from "@/lib/engine/decision-context-snapshot";
 import { trackOutcome } from "@/lib/outcome";
 import {
   buildDailyMealPlan,
@@ -57,10 +76,20 @@ import {
   addMealFromPreset,
   suggestSlot,
 } from "@/lib/engine/nutrition";
-import { clampServings, copyMealToSlot, lastMealForSlot, nutritionProofLine, proteinGapLine } from "@/lib/nutrition/log-loop";
-import { mealPlanOptsFromState } from "@/lib/nutrition/plan-opts";
-import { buildExpressSession, buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
-import { daySummary, nextOnboardingTip, streakAtRisk, weekPathStates } from "@/lib/engine/retention";
+import {
+  clampServings,
+  copyMealToSlot,
+  lastMealForSlot,
+  nutritionProofLine,
+  proteinGapLine,
+} from "@/lib/nutrition/log-loop";
+import { buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
+import {
+  daySummary,
+  nextOnboardingTip,
+  streakAtRisk,
+  weekPathStates,
+} from "@/lib/engine/retention";
 import { dailyXp } from "@/lib/engine/xp";
 import { suggestSupplementNow } from "@/lib/engine/supplements";
 import {
@@ -96,7 +125,10 @@ export const Route = createFileRoute("/")({
         content: "Uma ação óbvia: iniciar o treino ou registrar a refeição.",
       },
       { property: "og:title", content: "Soldiers Training" },
-      { property: "og:description", content: "Treino personalizado, progresso e desafios sem burocracia." },
+      {
+        property: "og:description",
+        content: "Treino personalizado, progresso e desafios sem burocracia.",
+      },
     ],
   }),
   component: Today,
@@ -144,6 +176,7 @@ function Today() {
   const [maisAberto, setMaisAberto] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
+  const requestedServerContextFor = useRef<string | null>(null);
   const days = useMemo(() => weekDays(), []);
   const deviceId = getDeviceId();
   const {
@@ -165,8 +198,20 @@ function Today() {
 
   useEffect(() => {
     if (!hydrated || !state.profile) return;
-    if (!state.livingPlans?.[todayKey()]) refreshLivingPlan();
-  }, [hydrated, state.profile, state.livingPlans, refreshLivingPlan]);
+    const today = todayKey();
+    const ctx = state.decisionContextByDate?.[today];
+    if (
+      !shouldRefreshDecisionContextForToday({
+        snapshot: ctx,
+        hasLivingPlan: Boolean(state.livingPlans?.[today]),
+        alreadyRequested: requestedServerContextFor.current === today,
+      })
+    ) {
+      return;
+    }
+    requestedServerContextFor.current = today;
+    refreshLivingPlan();
+  }, [hydrated, state.profile, state.livingPlans, state.decisionContextByDate, refreshLivingPlan]);
 
   useEffect(() => {
     if (!hydrated || !state.profile) return;
@@ -235,6 +280,13 @@ function Today() {
     };
   }, [club, deviceId, state.profile?.name, state.sessions.length]);
 
+  const nudge = coachNudgeFromState(state);
+  useEffect(() => {
+    if (!hydrated || !nudge.show) return;
+    setNudgeOpen(true);
+    markCoachNudgeShown();
+  }, [hydrated, nudge.show, markCoachNudgeShown]);
+
   if (!hydrated || !state.profile) {
     return (
       <AppShell title="Carregando" subtitle="Preparando seu dia">
@@ -258,7 +310,8 @@ function Today() {
     dislikedExerciseIds: state.dislikedExerciseIds ?? [],
   });
   const day = planDayForToday(plan);
-  const expressDay = day ? buildExpressSession(day) : null;
+  const decisionCtx = decisionContextForUi(state, todayKey());
+  const expressToday = decisionCtx ? selectTrainingMode(decisionCtx) === "express" : false;
   const doneToday = state.sessions.some((s) => s.date.slice(0, 10) === todayKey());
   const metrics = todayMetrics(state);
   const taken = todaySupplements(state);
@@ -268,15 +321,23 @@ function Today() {
   const st = streak(state.sessions, { freezeUsedDates: state.freezeUsedDates });
   const persona = homePersona(state);
   const brand = brandLevel(state);
-  const weekReview = persona === "consistente" || persona === "avancado" ? periodReview(state, "week") : null;
+  const weekReview =
+    persona === "consistente" || persona === "avancado" ? periodReview(state, "week") : null;
   const wow = persona === "avancado" ? weekOverWeek(state.sessions) : null;
-  const weekPrs = persona === "consistente" || persona === "avancado" ? prsInCurrentWeek(state.sessions) : [];
+  const weekPrs =
+    persona === "consistente" || persona === "avancado" ? prsInCurrentWeek(state.sessions) : [];
   const showLeague = persona !== "novo" && persona !== "inativo";
   const needsRecovery = !profile.typicalSleepHours || !profile.primaryBlocker;
   const bodyIncomplete = !(profile.age >= 16 && profile.heightCm >= 130 && profile.weightKg >= 35);
   const profileIncomplete = bodyIncomplete || needsRecovery || profile.onboardingComplete === false;
-  const livingBundle = buildLivingPlanWithDecisions(state, todayKey());
-  const engine = mealPlanOptsFromState(state, todayKey(), livingBundle?.decisions);
+  const livingBundle = decisionCtx
+    ? {
+        plan: decisionCtx.livingPlan,
+        decisions: decisionCtx.decisions,
+        behavior: decisionCtx.behavior,
+      }
+    : null;
+  const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
   const goals = nutritionGoals(profile, insights, engine);
   const nutrition = dayNutritionTotalsFromState(state);
   const mealPlan = buildDailyMealPlan(profile, state, todayKey(), insights, engine);
@@ -292,7 +353,11 @@ function Today() {
     ? PRODUCTS.filter((p) => state.supplementRoutine.includes(p.id))
     : goalProducts.slice(0, 3);
 
-  const nowSuggestion = suggestSupplementNow(state.supplementRoutine, goalProducts.slice(0, 3), taken);
+  const nowSuggestion = suggestSupplementNow(
+    state.supplementRoutine,
+    goalProducts.slice(0, 3),
+    taken,
+  );
   const pathStates = weekPathStates(state, days);
 
   const onPickMeal = (preset: MealPreset, servings = 1) => {
@@ -360,7 +425,8 @@ function Today() {
     }
   };
 
-  const atRisk = streakAtRisk(state.sessions, new Date(), state.freezeUsedDates ?? []) && !doneToday;
+  const atRisk =
+    streakAtRisk(state.sessions, new Date(), state.freezeUsedDates ?? []) && !doneToday;
   const summary = daySummary(state);
   const tip = nextOnboardingTip(profile, state);
   const questsDone = (state.dailyQuestIds ?? []).filter((id) => {
@@ -370,27 +436,30 @@ function Today() {
 
   const living = livingBundle?.plan ?? state.livingPlans?.[todayKey()] ?? null;
   const todayCheckIn = state.dayCheckIns?.[todayKey()];
-  const safety = evaluateSafety(state);
-  const behaviorLoop = livingBundle?.behavior ?? runBehaviorLoop(state);
-  const topRec = living
-    ? rankRecommendations({
-        livingPlan: living,
-        safety,
-        context: userCtx,
-        decisions: livingBundle?.decisions ?? null,
-        goal: profile.goal,
-        purchaseProductIds: state.purchaseProductIds ?? [],
-        behavior: behaviorLoop,
-        weekday: new Date().getDay(),
-      })[0]
-    : null;
+  const behaviorLoop = livingBundle?.behavior ?? {
+    profile: {
+      consistency: 0.5,
+      mealAdherence: 0.5,
+      trainingAdherence: 0.5,
+      sleepBehavior: 0.5,
+      weekendPattern: 0.5,
+      timeConstraintBehavior: 0.5,
+      interventionResponse: {},
+      confidence: 0.4,
+    },
+    patterns: [],
+    triggers: [],
+    interventions: [],
+    experiments: [],
+    lapses: [],
+  };
+  const topRec = decisionCtx?.recommendations[0] ?? null;
 
   const homeBlocks = orderHomeBlocks(state, behaviorLoop.profile, {
     hasClub: Boolean(club),
     followingCount: 0,
     level: profile.level,
   });
-  const nudge = coachNudgeFromState(state);
   const daysLeft = accessDaysRemaining(state.accessExpiresAt);
   const urgency = accessUrgencyLevel(daysLeft);
   const windowReorderUrl = primaryReorderUrl(state.purchaseProductIds) ?? getStorefrontBaseUrl();
@@ -415,12 +484,6 @@ function Today() {
     return { soon, product, url };
   })();
 
-  useEffect(() => {
-    if (!hydrated || !nudge.show) return;
-    setNudgeOpen(true);
-    markCoachNudgeShown();
-  }, [hydrated, nudge.show, markCoachNudgeShown]);
-
   return (
     <AppShell
       title={`Bom treino, ${profile.name.split(" ")[0]}`}
@@ -429,21 +492,34 @@ function Today() {
       headerAccessDays={urgency ? daysLeft : null}
       hideTitle
     >
-      <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
             Olá, <span className="font-semibold text-foreground">{profile.name.split(" ")[0]}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {brand.label} · Nv. {brand.level} · streak {st}d
+            {brand.label} · Nv. {brand.level}
             {showLeague && leagueMe ? ` · Liga #${leagueMe.rank}` : ""}
             {daysLeft != null && daysLeft <= 7 ? ` · acesso ${daysLeft}d` : ""}
           </p>
         </div>
-        <Link to="/progresso" className="flex items-center gap-1 text-xs font-semibold text-primary">
+        <Link
+          to="/progresso"
+          className="flex items-center gap-1 text-xs font-semibold text-primary"
+        >
           <TrendingUp className="size-3.5" /> Progresso
         </Link>
       </div>
+
+      <WeekPath days={days} states={pathStates} />
+
+      <HomeProgressCard
+        score={score}
+        exerciseMin={living?.workout.estimatedMin ?? day?.estimatedMin ?? 0}
+        questsDone={questsDone}
+        questsTarget={3}
+        streakDays={st}
+      />
 
       {urgency && daysLeft != null && windowReorderUrl ? (
         <AccessWindowBanner
@@ -456,22 +532,22 @@ function Today() {
 
       {persona !== "novo" &&
         (() => {
-        const proof = trainingProofLine(state);
-        if (!proof) return null;
-        return proof.exerciseId ? (
-          <Link
-            to="/treino/exercicio/$id"
-            params={{ id: proof.exerciseId }}
-            className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
-          >
-            {proof.text}
-          </Link>
-        ) : (
-          <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-            {proof.text}
-          </p>
-        );
-      })()}
+          const proof = trainingProofLine(state);
+          if (!proof) return null;
+          return proof.exerciseId ? (
+            <Link
+              to="/treino/exercicio/$id"
+              params={{ id: proof.exerciseId }}
+              className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+            >
+              {proof.text}
+            </Link>
+          ) : (
+            <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+              {proof.text}
+            </p>
+          );
+        })()}
 
       {profileIncomplete ? (
         <button
@@ -479,7 +555,9 @@ function Today() {
           className="mb-3 w-full rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-left"
           onClick={() => setProfileOpen(true)}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Completar perfil</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Completar perfil
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {bodyIncomplete
               ? "Idade, altura e peso calibram proteína e cargas — 30 segundos."
@@ -497,8 +575,14 @@ function Today() {
       {persona === "inativo" && day && !doneToday ? (
         <div className="surface-glass mb-4 border-primary/30 p-4">
           <p className="eyebrow">Retomar</p>
-          <p className="mt-1 text-sm font-semibold">Volte com pouca fricção — Express protege o hábito.</p>
-          <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: true, from: "hoje" }}>
+          <p className="mt-1 text-sm font-semibold">
+            Volte com pouca fricção — Express protege o hábito.
+          </p>
+          <Link
+            to="/treino/sessao/$id"
+            params={{ id: day.id }}
+            search={{ express: expressToday, from: "hoje" }}
+          >
             <Button className="mt-3 h-11 w-full font-bold uppercase">Retomar treino</Button>
           </Link>
         </div>
@@ -508,14 +592,19 @@ function Today() {
         <LivingPlanHero
           plan={living}
           doneToday={doneToday}
+          cover={day?.exercises[0] ? resolveExerciseMedia(day.exercises[0].exerciseId) : null}
           checkIn={todayCheckIn}
           defaultAvailableMin={resolvedAvailableMin(todayCheckIn, profile)}
           feedback={state.livingPlanFeedback?.[todayKey()] ?? null}
           onFeedback={(vote, reason) => {
             saveLivingPlanFeedback(todayKey(), vote, reason);
-            void trackOutcome(getDeviceId(), vote === "up" ? "living_plan_followed" : "living_plan_skipped", {
-              reason: reason ?? null,
-            });
+            void trackOutcome(
+              getDeviceId(),
+              vote === "up" ? "living_plan_followed" : "living_plan_skipped",
+              {
+                reason: reason ?? null,
+              },
+            );
             toast.success(vote === "up" ? "Obrigado — o plano segue" : "Anotado — vamos ajustar");
           }}
           onSaveCheckIn={(c) => {
@@ -542,7 +631,11 @@ function Today() {
           eatAction={(() => {
             const eat: LivingPlanEatAction = {
               title: nextMeal?.preset?.label ?? "Registrar refeição",
-              hint: gap ?? (nextMeal?.preset ? `${nextMeal.preset.proteinG} g proteína` : "Slots do dia preenchidos"),
+              hint:
+                gap ??
+                (nextMeal?.preset
+                  ? `${nextMeal.preset.proteinG} g proteína`
+                  : "Slots do dia preenchidos"),
               servings: servingsNow,
               onServings: (n) => setEatServings(clampServings(n)),
               onApply: () => {
@@ -563,6 +656,23 @@ function Today() {
         />
       ) : null}
 
+      <Link
+        to="/coach"
+        className="surface-glass mb-4 flex items-start gap-3 p-4 transition-colors hover:border-primary/40"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <Sparkles className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="eyebrow">Coach IA</p>
+          <p className="mt-1 text-sm font-semibold leading-snug">
+            {living?.narrative
+              ? living.narrative.slice(0, 110) + (living.narrative.length > 110 ? "…" : "")
+              : "Pergunte qualquer coisa — treino, comida ou recuperação."}
+          </p>
+        </div>
+      </Link>
+
       {persona !== "inativo" ? (
         <div className="mb-4 space-y-3">
           <XpBar xp={xp} />
@@ -576,12 +686,18 @@ function Today() {
             <Flame className="size-5 shrink-0 text-primary text-glow" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">Não perca o streak de {st}d</p>
-              <p className="text-xs text-muted-foreground">Treine, faça Express ou use um freeze.</p>
+              <p className="text-xs text-muted-foreground">
+                Treine, faça Express ou use um freeze.
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {day ? (
-              <Link to="/treino/sessao/$id" params={{ id: day.id }} search={{ express: false, from: "hoje" }}>
+              <Link
+                to="/treino/sessao/$id"
+                params={{ id: day.id }}
+                search={{ express: expressToday, from: "hoje" }}
+              >
                 <Button size="sm">Treinar</Button>
               </Link>
             ) : null}
@@ -603,7 +719,9 @@ function Today() {
 
       {restockSoon ? (
         <div className="surface-glass mb-4 border-primary/25 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Estoque estimado</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Estoque estimado
+          </p>
           <div className="mt-2 flex items-center gap-3">
             <SoldiersMediaThumb
               media={resolveProductMedia(restockSoon.product.id)}
@@ -613,8 +731,8 @@ function Today() {
             <div className="min-w-0">
               <p className="text-sm font-semibold">Pedir de novo {restockSoon.product.name}</p>
               <p className="text-xs text-muted-foreground">
-                ~{Math.max(0, restockSoon.soon.days)} dia{restockSoon.soon.days === 1 ? "" : "s"} restantes
-                (estimativa)
+                ~{Math.max(0, restockSoon.soon.days)} dia{restockSoon.soon.days === 1 ? "" : "s"}{" "}
+                restantes (estimativa)
               </p>
             </div>
           </div>
@@ -648,12 +766,16 @@ function Today() {
             <div key="wow" className="mb-4 grid grid-cols-3 gap-2">
               <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
                 <p className="text-display text-lg text-primary">
-                  {wow.volumeDeltaPct != null ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%` : "—"}
+                  {wow.volumeDeltaPct != null
+                    ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%`
+                    : "—"}
                 </p>
                 <p className="text-[0.65rem] uppercase text-muted-foreground">Volume</p>
               </div>
               <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                <p className="text-display text-lg text-primary">{living?.traffic.recovery ?? "—"}</p>
+                <p className="text-display text-lg text-primary">
+                  {living?.traffic.recovery ?? "—"}
+                </p>
                 <p className="text-[0.65rem] uppercase text-muted-foreground">Recuperação</p>
               </div>
               <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
@@ -694,7 +816,11 @@ function Today() {
                   {gap}
                 </p>
               ) : null}
-              <Button variant="secondary" className="h-11 w-full" onClick={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}>
+              <Button
+                variant="secondary"
+                className="h-11 w-full"
+                onClick={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}
+              >
                 <Utensils className="size-4" /> Registrar refeição
               </Button>
             </div>
@@ -784,8 +910,12 @@ function Today() {
             >
               <Users className="size-4 text-primary" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Para você"}</p>
-                <p className="text-[0.65rem] text-muted-foreground">Feed, desafios e pressão saudável</p>
+                <p className="text-sm font-semibold">
+                  {club ? `Clube · ${club.name}` : "Para você"}
+                </p>
+                <p className="text-[0.65rem] text-muted-foreground">
+                  Feed, desafios e pressão saudável
+                </p>
               </div>
             </Link>
           );
@@ -810,8 +940,6 @@ function Today() {
 
         {maisAberto ? (
           <div className="space-y-4">
-            <WeekPath days={days} states={pathStates} />
-
             {showLeague && friendQuest ? (
               <section className="surface-glass p-4">
                 <p className="eyebrow">Missão em dupla</p>
@@ -819,13 +947,18 @@ function Today() {
                   {friendQuest.nameA} + {friendQuest.nameB}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {friendQuest.progressA + friendQuest.progressB}/{friendQuest.target} treinos esta semana
+                  {friendQuest.progressA + friendQuest.progressB}/{friendQuest.target} treinos esta
+                  semana
                 </p>
               </section>
             ) : null}
 
             {showLeague && stories.length ? (
-              <Link to="/social" search={{ tab: "clubes" }} className="mb-0 flex gap-2 overflow-x-auto pb-1">
+              <Link
+                to="/social"
+                search={{ tab: "clubes" }}
+                className="mb-0 flex gap-2 overflow-x-auto pb-1"
+              >
                 {stories.map((s) => (
                   <div key={s.id} className="shrink-0 text-center">
                     <img
@@ -833,44 +966,50 @@ function Today() {
                       alt={s.displayName}
                       className="size-14 rounded-full border-2 border-primary object-cover"
                     />
-                    <p className="mt-1 max-w-14 truncate text-[0.6rem] text-muted-foreground">{s.displayName}</p>
+                    <p className="mt-1 max-w-14 truncate text-[0.6rem] text-muted-foreground">
+                      {s.displayName}
+                    </p>
                   </div>
                 ))}
               </Link>
             ) : null}
 
             {showLeague ? (
-            <section>
-              <div className="mb-2 flex items-center justify-between px-1">
-                <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Clube"}</p>
-                <Link to="/social" search={{ tab: "feed" }} className="text-xs text-primary">
-                  Ver mais
-                </Link>
-              </div>
-              {club ? (
-                <ActivityFeed
-                  events={clubFeed}
-                  deviceId={deviceId}
-                  kudosGiven={kudosGiven}
-                  compact
-                  onKudos={(id) => {
-                    setClubFeed((prev) =>
-                      prev.map((x) => (x.id === id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
-                    );
-                    setKudosGiven((g) => ({ ...g, [id]: true }));
-                  }}
-                  onKudosQuest={markQuestKudos}
-                />
-              ) : (
-                <Link to="/social" search={{ tab: "clubes" }} className="surface-glass flex items-center gap-3 p-4">
-                  <Users className="size-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-bold">Entre num clube</p>
-                    <p className="text-xs text-muted-foreground">Feed, liga e pressão saudável</p>
-                  </div>
-                </Link>
-              )}
-            </section>
+              <section>
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Clube"}</p>
+                  <Link to="/social" search={{ tab: "feed" }} className="text-xs text-primary">
+                    Ver mais
+                  </Link>
+                </div>
+                {club ? (
+                  <ActivityFeed
+                    events={clubFeed}
+                    deviceId={deviceId}
+                    kudosGiven={kudosGiven}
+                    compact
+                    onKudos={(id) => {
+                      setClubFeed((prev) =>
+                        prev.map((x) => (x.id === id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
+                      );
+                      setKudosGiven((g) => ({ ...g, [id]: true }));
+                    }}
+                    onKudosQuest={markQuestKudos}
+                  />
+                ) : (
+                  <Link
+                    to="/social"
+                    search={{ tab: "clubes" }}
+                    className="surface-glass flex items-center gap-3 p-4"
+                  >
+                    <Users className="size-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-bold">Entre num clube</p>
+                      <p className="text-xs text-muted-foreground">Feed, liga e pressão saudável</p>
+                    </div>
+                  </Link>
+                )}
+              </section>
             ) : null}
 
             {persona !== "novo" && tip ? (
@@ -918,20 +1057,30 @@ function Today() {
                   <p className="eyebrow">Resumo do dia</p>
                   <div className="mt-3 grid grid-cols-4 gap-2 text-center">
                     <div>
-                      <p className="text-display text-lg text-primary text-glow">{summary.trained ? "OK" : "—"}</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Treino</p>
+                      <p className="text-display text-lg text-primary text-glow">
+                        {summary.trained ? "OK" : "—"}
+                      </p>
+                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                        Treino
+                      </p>
                     </div>
                     <div>
                       <p className="text-display text-lg text-primary">{summary.proteinPct}%</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Proteína</p>
+                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                        Proteína
+                      </p>
                     </div>
                     <div>
                       <p className="text-display text-lg text-primary">{summary.waterPct}%</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Água</p>
+                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                        Água
+                      </p>
                     </div>
                     <div>
                       <p className="text-display text-lg text-primary">{questsDone}/3</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">Missões</p>
+                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
+                        Missões
+                      </p>
                     </div>
                   </div>
                 </section>
@@ -946,8 +1095,17 @@ function Today() {
 
                 <section className="surface-glass grid grid-cols-4 gap-1 p-4">
                   <MetricRing value={metrics.waterMl} max={goals.waterMl} label="Água" unit="ml" />
-                  <MetricRing value={nutrition.proteinG} max={goals.proteinG} label="Proteína" unit="g" />
-                  <MetricRing value={taken.length} max={Math.max(1, routine.length)} label="Suplementos" />
+                  <MetricRing
+                    value={nutrition.proteinG}
+                    max={goals.proteinG}
+                    label="Proteína"
+                    unit="g"
+                  />
+                  <MetricRing
+                    value={taken.length}
+                    max={Math.max(1, routine.length)}
+                    label="Suplementos"
+                  />
                   <MetricRing value={doneToday ? 1 : 0} max={1} label="Treino" />
                 </section>
 
@@ -962,7 +1120,11 @@ function Today() {
                   >
                     <Droplets className="size-4" /> Água
                   </Button>
-                  <Button variant="outline" className="h-11" onClick={() => setMealSlot(suggestSlot())}>
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => setMealSlot(suggestSlot())}
+                  >
                     <Utensils className="size-4" /> Refeição
                   </Button>
                   <Button variant="outline" className="h-11" onClick={openWeight}>
@@ -989,21 +1151,30 @@ function Today() {
                             alt={p.name}
                             className="size-10 rounded-lg"
                           />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold">{p.name}</p>
-                            {highlight ? (
-                              <Chip color="accent" size="sm" variant="soft" className="text-primary">
-                                <Chip.Label>Agora</Chip.Label>
-                              </Chip>
-                            ) : null}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold">{p.name}</p>
+                              {highlight ? (
+                                <Chip
+                                  color="accent"
+                                  size="sm"
+                                  variant="soft"
+                                  className="text-primary"
+                                >
+                                  <Chip.Label>Agora</Chip.Label>
+                                </Chip>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {p.timing} · {p.serving}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {p.timing} · {p.serving}
-                          </p>
                         </div>
-                        </div>
-                        <Button size="sm" variant={done ? "default" : "secondary"} onClick={() => toggleSupplement(p.id)}>
+                        <Button
+                          size="sm"
+                          variant={done ? "default" : "secondary"}
+                          onClick={() => toggleSupplement(p.id)}
+                        >
                           {done ? "Tomado" : "Marcar"}
                         </Button>
                       </li>
@@ -1069,4 +1240,3 @@ function Today() {
     </AppShell>
   );
 }
-

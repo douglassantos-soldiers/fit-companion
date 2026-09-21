@@ -174,22 +174,38 @@ export async function upsertBehaviorExperiments(
   if (!userId || !experiments.length) return false;
   const db = await adminDbLoose();
   if (!db) return false;
-  const rows = experiments.map((e) => ({
-    user_id: userId,
-    client_id: e.id,
-    target: e.target,
-    start_date: e.start,
-    end_date: e.end,
-    baseline: e.baseline,
-    result: e.result,
-    confidence: e.confidence,
-    status: e.status,
-    updated_at: new Date().toISOString(),
-  }));
-  const { error } = await db.from("behavior_experiments").insert(rows);
-  if (error) {
-    console.warn("upsertBehaviorExperiments failed", error);
-    return false;
+  for (const e of experiments) {
+    const row = {
+      user_id: userId,
+      client_id: e.id,
+      target: e.target,
+      start_date: e.start,
+      end_date: e.end,
+      baseline: e.baseline,
+      result: e.result,
+      confidence: e.confidence,
+      status: e.status,
+      updated_at: new Date().toISOString(),
+    };
+    const { data: existing } = await db
+      .from("behavior_experiments")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("client_id", e.id)
+      .maybeSingle();
+    if (existing?.id) {
+      const { error } = await db.from("behavior_experiments").update(row).eq("id", existing.id);
+      if (error) {
+        console.warn("upsertBehaviorExperiments update failed", error);
+        return false;
+      }
+    } else {
+      const { error } = await db.from("behavior_experiments").insert(row);
+      if (error) {
+        console.warn("upsertBehaviorExperiments insert failed", error);
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -228,42 +244,56 @@ export async function loadBehaviorExperiments(userId: string): Promise<BehaviorE
   }));
 }
 
-export async function loadInterventionSuccessRates(
+export async function loadInterventionResponses(
   userId: string,
-): Promise<Partial<Record<InterventionType, number>>> {
-  if (!userId) return {};
+): Promise<import("@/lib/engine/learning/types").InterventionResponse[]> {
+  if (!userId) return [];
   const db = await adminDbLoose();
-  if (!db) return {};
+  if (!db) return [];
   const { data: interventions } = await db
     .from("behavior_interventions")
     .select("id, type")
     .eq("user_id", userId)
     .limit(100);
-  if (!interventions?.length) return {};
+  if (!interventions?.length) return [];
   const { data: outcomes } = await db
     .from("behavior_outcomes")
-    .select("intervention_id, success")
+    .select("intervention_id, success, metrics, observed_at")
     .eq("user_id", userId)
     .limit(200);
-  if (!outcomes?.length) return {};
+  if (!outcomes?.length) return [];
 
   const typedInterventions = interventions as Array<{ id: string; type: string }>;
-  const typedOutcomes = outcomes as Array<{ intervention_id: string | null; success: boolean }>;
+  const typedOutcomes = outcomes as Array<{
+    intervention_id: string | null;
+    success: boolean;
+    metrics: Record<string, unknown> | null;
+    observed_at: string | null;
+  }>;
   const typeById = new Map(
     typedInterventions.map((i) => [String(i.id), i.type as InterventionType]),
   );
-  const stats: Record<string, { ok: number; n: number }> = {};
+  const { applyInterventionOutcome } = await import("@/lib/engine/learning/responses");
+  let list: import("@/lib/engine/learning/types").InterventionResponse[] = [];
   for (const o of typedOutcomes) {
     const t = o.intervention_id ? typeById.get(String(o.intervention_id)) : null;
     if (!t) continue;
-    const s = stats[t] ?? { ok: 0, n: 0 };
-    s.n += 1;
-    if (o.success) s.ok += 1;
-    stats[t] = s;
+    const raw =
+      o.metrics && typeof o.metrics["result"] === "string" ? String(o.metrics["result"]) : null;
+    const result =
+      raw === "neutral" || raw === "inconclusive"
+        ? "neutral"
+        : raw === "fail" || o.success === false
+          ? "fail"
+          : "success";
+    list = applyInterventionOutcome(list, t, result, o.observed_at ?? new Date().toISOString());
   }
-  const out: Partial<Record<InterventionType, number>> = {};
-  for (const [t, s] of Object.entries(stats)) {
-    if (s.n >= 1) out[t as InterventionType] = Math.round((s.ok / s.n) * 100) / 100;
-  }
-  return out;
+  return list;
+}
+
+export async function loadInterventionSuccessRates(
+  userId: string,
+): Promise<Partial<Record<InterventionType, number>>> {
+  const { scalarsFromResponses } = await import("@/lib/engine/learning/responses");
+  return scalarsFromResponses(await loadInterventionResponses(userId));
 }

@@ -19,7 +19,7 @@ export function ProgramsTab({
   onSave: () => void;
 }) {
   if (!rules) {
-    return <p className="text-sm text-muted-foreground">Carregue as regras de programa.</p>;
+    return <p className="text-sm text-muted-foreground">Carregue as regras de treino.</p>;
   }
 
   const patchScheme = (goal: Goal, patch: Partial<GoalScheme>) => {

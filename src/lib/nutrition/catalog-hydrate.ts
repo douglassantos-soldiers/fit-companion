@@ -1,7 +1,13 @@
 /**
  * Map CMS/DB food rows onto domain FoodItem (TACO hydrate). Pure — no I/O.
  */
-import type { FoodCategory, FoodItem, FoodServing, FoodSource, NutrientValue } from "@/lib/nutrition/types";
+import type {
+  FoodCategory,
+  FoodItem,
+  FoodServing,
+  FoodSource,
+  NutrientValue,
+} from "@/lib/nutrition/types";
 
 const CATEGORIES = new Set<FoodCategory>([
   "cereais",
@@ -22,7 +28,15 @@ const CATEGORIES = new Set<FoodCategory>([
   "outros",
 ]);
 
-const MACRO_KEYS = new Set(["energyKcal", "proteinG", "carbG", "fatG", "fiberG", "sugarG", "sodiumMg"]);
+const MACRO_KEYS = new Set([
+  "energyKcal",
+  "proteinG",
+  "carbG",
+  "fatG",
+  "fiberG",
+  "sugarG",
+  "sodiumMg",
+]);
 
 function asCategory(raw: unknown): FoodCategory {
   const s = String(raw ?? "outros");
@@ -30,7 +44,13 @@ function asCategory(raw: unknown): FoodCategory {
 }
 
 function asSource(raw: unknown): FoodSource {
-  if (raw === "taco" || raw === "user" || raw === "imported" || raw === "ai_estimate" || raw === "internal") {
+  if (
+    raw === "taco" ||
+    raw === "user" ||
+    raw === "imported" ||
+    raw === "ai_estimate" ||
+    raw === "internal"
+  ) {
     return raw;
   }
   return "imported";
@@ -42,7 +62,14 @@ function num(v: unknown): number | undefined {
 }
 
 export function extrasFromNutrientRows(
-  rows: Array<{ nutrient_key?: string; value?: number; unit?: string; source?: string; kind?: string; confidence?: number }>,
+  rows: Array<{
+    nutrient_key?: string;
+    value?: number;
+    unit?: string;
+    source?: string;
+    kind?: string;
+    confidence?: number;
+  }>,
   foodSource: FoodSource,
 ): Record<string, NutrientValue> | undefined {
   const extras: Record<string, NutrientValue> = {};
@@ -70,7 +97,10 @@ export function foodItemFromCatalogRow(
   const id = String(row["id"] ?? "").trim();
   const name = String(row["name"] ?? "").trim();
   if (!id || !name) return null;
-  const perRaw = row["per100g"] && typeof row["per100g"] === "object" ? (row["per100g"] as Record<string, unknown>) : {};
+  const perRaw =
+    row["per100g"] && typeof row["per100g"] === "object"
+      ? (row["per100g"] as Record<string, unknown>)
+      : {};
   const food: FoodItem = {
     id,
     name,
@@ -90,6 +120,8 @@ export function foodItemFromCatalogRow(
   if (brand) food.brand = brand;
   const ean = String(row["ean"] ?? "").trim();
   if (ean) food.ean = ean;
+  const sourceVersion = String(row["source_version"] ?? "").trim();
+  if (sourceVersion) food.sourceVersion = sourceVersion;
   if (Array.isArray(row["synonyms"])) food.synonyms = (row["synonyms"] as unknown[]).map(String);
   const fiber = num(perRaw["fiberG"]);
   if (fiber != null) food.per100g.fiberG = fiber;

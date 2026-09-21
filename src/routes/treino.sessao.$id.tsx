@@ -19,11 +19,25 @@ import { SessionCelebration } from "@/components/today/engagement-cards";
 import { alternativesFor, exerciseById } from "@/data/exercises";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
-import { buildExpressSession, buildWeeklyPlan, sessionVolume, type PlannedExercise } from "@/lib/engine/plan";
+import {
+  buildExpressSession,
+  buildWeeklyPlan,
+  sessionVolume,
+  type PlannedExercise,
+} from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import {
+  isTodayPlannedDay,
+  todaySessionShouldBeExpress,
+} from "@/lib/engine/decision-context-snapshot";
 import { enrichSessionExercises } from "@/lib/training/session";
 import { detectExercisePrs } from "@/lib/training/prs";
-import { applyLoadDrop, suggestLoadDrop, type LoadDropSuggestion } from "@/lib/training/intra-session";
+import {
+  applyLoadDrop,
+  suggestLoadDrop,
+  type LoadDropSuggestion,
+} from "@/lib/training/intra-session";
 import { logsFromPlanned, setsFromPlanned } from "@/lib/training/session-logs";
 import { parseRepTarget } from "@/lib/training/effort";
 import { progressionForExercise, weekModifier } from "@/lib/engine/progression";
@@ -42,7 +56,14 @@ import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
 import { suggestPostWorkoutUpsell } from "@/data/shopify-product-map";
 import { trackAppEvent } from "@/lib/shopify.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { todayKey, type ExerciseLog, type SessionLog, type SessionRpe, type SetLog } from "@/lib/types";
+import {
+  todayKey,
+  type ExerciseLog,
+  type SessionLog,
+  type SessionRpe,
+  type SetLog,
+} from "@/lib/types";
+import { useStore } from "@/lib/store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { registerPushWorker, subscribePush } from "@/lib/push";
 import { SESSION_LEAVE_BODY, SESSION_LEAVE_TITLE } from "@/lib/ui/platform-copy";
@@ -85,12 +106,34 @@ function readEffortScale(): SessionEffortScale {
 
 function SessionPage() {
   const { id } = useParams({ from: "/treino/sessao/$id" });
-  const { express, from } = Route.useSearch();
+  const { express: searchExpress, from } = Route.useSearch();
   const navigate = useNavigate();
-  const { state, hydrated, addSession, markUpsellShown, setExercisePreference, dismissCoachNudge, markCoachNudgeShown, setRemindersEnabled } =
-    useStore();
+  const {
+    state,
+    hydrated,
+    addSession,
+    markUpsellShown,
+    setExercisePreference,
+    dismissCoachNudge,
+    markCoachNudgeShown,
+    setRemindersEnabled,
+  } = useStore();
   const track = useServerFn(trackAppEvent);
   const fxOn = state.sessionFx !== false;
+  const decisionCtx = decisionContextForUi(state);
+  const expressLock = useRef<boolean | null>(null);
+  if (expressLock.current == null && state.profile) {
+    const todaySession = isTodayPlannedDay(id, decisionCtx);
+    const accepted = state.dayCheckIns?.[todayKey()]?.acceptedTrainingMode;
+    expressLock.current = todaySession
+      ? todaySessionShouldBeExpress({
+          snapshot: decisionCtx,
+          isTodaySession: true,
+          ...(accepted ? { acceptedTrainingMode: accepted } : {}),
+        })
+      : searchExpress === true;
+  }
+  const express = expressLock.current ?? searchExpress === true;
 
   useEffect(() => {
     if (!hydrated || !id) return;
@@ -228,7 +271,8 @@ function SessionPage() {
   const liveXp = (express ? XP.express : XP.session) + (livePrs.length ? XP.pr : 0);
   const previewRank = brandLevel({ ...state, sessions: [draftSession, ...state.sessions] });
   if (!summaryOpen) finishStatsRef.current = null;
-  else if (!finishStatsRef.current) finishStatsRef.current = { prCount: livePrs.length, xp: liveXp };
+  else if (!finishStatsRef.current)
+    finishStatsRef.current = { prCount: livePrs.length, xp: liveXp };
   const previewXp = finishStatsRef.current?.xp ?? liveXp;
   const previewPrCount = finishStatsRef.current?.prCount ?? livePrs.length;
   const dims = performanceDimensions(state, profile);
@@ -240,12 +284,14 @@ function SessionPage() {
   const activeLog = logs[safeExIdx];
   const activeExercise = activePlanned ? exerciseById(activePlanned.exerciseId) : undefined;
   const currentSetIdx = activeLog?.sets.findIndex((s) => !s.done) ?? -1;
-  const workingSetIdx = currentSetIdx >= 0 ? currentSetIdx : Math.max(0, (activeLog?.sets.length ?? 1) - 1);
+  const workingSetIdx =
+    currentSetIdx >= 0 ? currentSetIdx : Math.max(0, (activeLog?.sets.length ?? 1) - 1);
   const workingSet = activeLog?.sets[workingSetIdx];
 
   const partnerIdx = partnerIndex(planned, safeExIdx);
   const partner = partnerIdx >= 0 ? planned[partnerIdx] : undefined;
-  const partnerDone = partnerIdx >= 0 ? (logs[partnerIdx]?.sets.filter((s) => s.done).length ?? 0) : 0;
+  const partnerDone =
+    partnerIdx >= 0 ? (logs[partnerIdx]?.sets.filter((s) => s.done).length ?? 0) : 0;
   const myDoneCount = activeLog?.sets.filter((s) => s.done).length ?? 0;
   const partnerPending = partnerIdx >= 0 && (logs[partnerIdx]?.sets.some((s) => !s.done) ?? false);
   const restAfterThisSet = !(partnerPending && partnerDone < myDoneCount + 1);
@@ -284,7 +330,9 @@ function SessionPage() {
         ? l
         : {
             ...l,
-            sets: l.sets.map((s, j) => (j !== workingSetIdx ? s : { ...s, done: true, skipped: true })),
+            sets: l.sets.map((s, j) =>
+              j !== workingSetIdx ? s : { ...s, done: true, skipped: true },
+            ),
           },
     );
     setLogs(nextLogs);
@@ -353,7 +401,9 @@ function SessionPage() {
               lastPerformance: prog.lastPerformance,
               reasonCodes: prog.reasonCodes,
               plateau: prog.plateau,
-              ...(prog.evidence.estimated1rm != null ? { estimated1rm: prog.evidence.estimated1rm } : {}),
+              ...(prog.evidence.estimated1rm != null
+                ? { estimated1rm: prog.evidence.estimated1rm }
+                : {}),
               ...(prog.evidence.lastLoad != null ? { bestWeight: prog.evidence.lastLoad } : {}),
             },
       );
@@ -509,9 +559,7 @@ function SessionPage() {
         ? l
         : {
             ...l,
-            sets: l.sets.map((s, j) =>
-              j !== setIdx ? s : { ...s, done: true, restSec },
-            ),
+            sets: l.sets.map((s, j) => (j !== setIdx ? s : { ...s, done: true, restSec })),
           },
     );
     setLogs(nextLogs);
@@ -546,7 +594,7 @@ function SessionPage() {
     if (!loadDropDismissed.includes(exIdx)) {
       const currentGroup = exerciseById(activePlanned.exerciseId)?.group ?? null;
       const nextPlanned = planned[exIdx + 1];
-      const nextGroup = nextPlanned ? exerciseById(nextPlanned.exerciseId)?.group ?? null : null;
+      const nextGroup = nextPlanned ? (exerciseById(nextPlanned.exerciseId)?.group ?? null) : null;
       const suggestion = suggestLoadDrop({
         logs: nextLogs,
         exerciseIndex: exIdx,
@@ -558,20 +606,23 @@ function SessionPage() {
       if (suggestion) setLoadDrop(suggestion);
     }
 
-    window.setTimeout(() => {
-      if (step.allDone) {
-        setSummaryOpen(true);
-        setSummaryBurst(true);
-        return;
-      }
-      setActiveExIdx(step.nextExIdx);
-      if (step.openRest) {
-        setRest({
-          seconds: step.betweenExercises ? Math.min(restSec, 45) : restSec,
-          paused: false,
-        });
-      }
-    }, exerciseDone ? 850 : 650);
+    window.setTimeout(
+      () => {
+        if (step.allDone) {
+          setSummaryOpen(true);
+          setSummaryBurst(true);
+          return;
+        }
+        setActiveExIdx(step.nextExIdx);
+        if (step.openRest) {
+          setRest({
+            seconds: step.betweenExercises ? Math.min(restSec, 45) : restSec,
+            paused: false,
+          });
+        }
+      },
+      exerciseDone ? 850 : 650,
+    );
   };
 
   const openSummary = () => {
@@ -667,7 +718,10 @@ function SessionPage() {
         )}
 
         {doneSets > 0 && doneSets === totalSets ? (
-          <Button className="mt-4 h-12 w-full font-bold uppercase tracking-wide" onClick={openSummary}>
+          <Button
+            className="mt-4 h-12 w-full font-bold uppercase tracking-wide"
+            onClick={openSummary}
+          >
             Finalizar treino
           </Button>
         ) : null}
@@ -750,7 +804,8 @@ function SessionPage() {
         {loadDrop ? (
           <div className="space-y-3">
             <p className="text-sm">
-              Sugerido: {loadDrop.fromKg} kg → <span className="font-semibold text-primary">{loadDrop.toKg} kg</span>
+              Sugerido: {loadDrop.fromKg} kg →{" "}
+              <span className="font-semibold text-primary">{loadDrop.toKg} kg</span>
             </p>
             <Button
               className="h-11 w-full"
@@ -892,7 +947,11 @@ function SessionPage() {
               aria-label="RPE da sessão"
             >
               {RPE_OPTIONS.map((opt) => (
-                <ToggleButton key={opt.id} value={opt.id} className="flex flex-col gap-0.5 py-3 normal-case">
+                <ToggleButton
+                  key={opt.id}
+                  value={opt.id}
+                  className="flex flex-col gap-0.5 py-3 normal-case"
+                >
                   <span className="text-display text-sm">{opt.label}</span>
                   <span className="text-[0.65rem] opacity-70">{opt.hint}</span>
                 </ToggleButton>

@@ -1,10 +1,20 @@
 import { CHALLENGES } from "@/data/challenges";
 import { lessonForToday } from "@/data/habit-lessons";
 import { PRODUCTS } from "@/data/products";
-import { performanceDimensions, performanceScore, sessionsInLastDays, streak } from "@/lib/engine/dimensions";
+import {
+  performanceDimensions,
+  performanceScore,
+  sessionsInLastDays,
+  streak,
+} from "@/lib/engine/dimensions";
 import { computeLearningInsights, learningWeekHint } from "@/lib/engine/learning";
-import { buildLivingPlan, buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
-import { buildDailyMealPlan, dayNutritionTotals, nextSuggestedMeal, nutritionGoals } from "@/lib/engine/nutrition";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import {
+  buildDailyMealPlan,
+  dayNutritionTotals,
+  nextSuggestedMeal,
+  nutritionGoals,
+} from "@/lib/engine/nutrition";
 import { buildWeeklyPlanDetailed, planDayForToday } from "@/lib/engine/plan";
 import { WEEK_MODE_LABEL } from "@/lib/engine/progression";
 import { dosesTakenToday, monthlyDoseAdherence } from "@/lib/engine/supplements";
@@ -33,7 +43,7 @@ export const COACH_PROMPTS: CoachPrompt[] = [
 ];
 
 function whyFromChange(state: AppState, key: string): string | null {
-  const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+  const living = decisionContextForUi(state)?.livingPlan ?? state.livingPlans?.[todayKey()] ?? null;
   const hit = living?.whyByChange?.find((w) => w.key === key);
   return hit?.reason ?? null;
 }
@@ -75,7 +85,7 @@ export function coachReply(promptId: string, state: AppState): string {
   const dosesToday = dosesTakenToday(state.supplementLogs, routine);
   const monthAdh = monthlyDoseAdherence(state.supplementLogs, routine);
   const learnNote = insights?.reasons[0] ? ` Aprendizado: ${insights.reasons[0]}` : "";
-  const built = buildLivingPlanWithDecisions(state);
+  const built = decisionContextForUi(state);
 
   const modeNote =
     weekMode === "deload"
@@ -86,7 +96,7 @@ export function coachReply(promptId: string, state: AppState): string {
 
   switch (promptId) {
     case "hoje": {
-      const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
+      const living = built?.livingPlan ?? state.livingPlans?.[todayKey()] ?? null;
       if (living) {
         return `Hoje: ${living.workout.title} (${living.workout.mode}, ~${living.workout.estimatedMin} min, volume ${Math.round(living.workout.volumeFactor * 100)}%). Hábito: ${living.habits.title}. ${living.narrative}`;
       }
@@ -95,13 +105,16 @@ export function coachReply(promptId: string, state: AppState): string {
         : `Hoje é dia de descanso ativo: 20 a 30 minutos de caminhada e mobilidade já bastam.${modeNote}`;
     }
     case "por-que": {
-      const living = state.livingPlans?.[todayKey()] ?? buildLivingPlan(state);
-      if (!living?.why.length) return `Ainda sem sinais fortes de adaptação.${modeNote}${learnNote}`;
+      const living = built?.livingPlan ?? state.livingPlans?.[todayKey()] ?? null;
+      if (!living?.why.length)
+        return `Ainda sem sinais fortes de adaptação.${modeNote}${learnNote}`;
       const byChange = living.whyByChange?.length
         ? ` Detalhes: ${living.whyByChange.map((w) => `${w.label}: ${w.reason}`).join(" ")}`
         : "";
       return `Por que o plano de hoje: ${living.why.slice(0, 4).join(" ")}${byChange}${
-        living.diffFromYesterday.length ? ` Diff vs ontem: ${living.diffFromYesterday.join("; ")}.` : ""
+        living.diffFromYesterday.length
+          ? ` Diff vs ontem: ${living.diffFromYesterday.join("; ")}.`
+          : ""
       }`;
     }
     case "por-que-treino": {
@@ -165,7 +178,9 @@ export function coachReply(promptId: string, state: AppState): string {
       const recommended = PRODUCTS.filter((p) => p.goals.includes(profile.goal)).slice(0, 3);
       return `Para o seu objetivo: ${recommended
         .map((p) => `${p.name} (${p.timing.toLowerCase()})`)
-        .join(", ")}. Hoje ${dosesToday}/${routine.length || recommended.length} doses marcadas. Aderência do mês: ${monthAdh.pct}%.${learnNote}`;
+        .join(
+          ", ",
+        )}. Hoje ${dosesToday}/${routine.length || recommended.length} doses marcadas. Aderência do mês: ${monthAdh.pct}%.${learnNote}`;
     }
     case "sem-tempo":
       return today
@@ -215,8 +230,10 @@ export function coachFreeform(text: string, state: AppState) {
     (t.includes("mudou") || t.includes("plano") || t.includes("why"))
   )
     return coachReply("por-que", state);
-  if (t.includes("treino") && (t.includes("hoje") || t.includes("agora"))) return coachReply("hoje", state);
-  if (t.includes("suplement") || t.includes("whey") || t.includes("creatina")) return coachReply("suplemento", state);
+  if (t.includes("treino") && (t.includes("hoje") || t.includes("agora")))
+    return coachReply("hoje", state);
+  if (t.includes("suplement") || t.includes("whey") || t.includes("creatina"))
+    return coachReply("suplemento", state);
   if (
     t.includes("proteína") ||
     t.includes("proteina") ||
@@ -227,11 +244,14 @@ export function coachFreeform(text: string, state: AppState) {
     t.includes("plano alimentar")
   )
     return coachReply("nutricao", state);
-  if (t.includes("hábito") || t.includes("habito") || t.includes("lição") || t.includes("licao")) return coachReply("habito", state);
+  if (t.includes("hábito") || t.includes("habito") || t.includes("lição") || t.includes("licao"))
+    return coachReply("habito", state);
   if (t.includes("dor") || t.includes("cansad")) return coachReply("dor", state);
   if (t.includes("desafio")) return coachReply("desafio", state);
-  if (t.includes("peso") || t.includes("evolu") || t.includes("progress")) return coachReply("progresso", state);
+  if (t.includes("peso") || t.includes("evolu") || t.includes("progress"))
+    return coachReply("progresso", state);
   if (t.includes("tempo") || t.includes("minuto")) return coachReply("sem-tempo", state);
-  if (t.includes("deload") || t.includes("push") || t.includes("semana")) return coachReply("plano", state);
+  if (t.includes("deload") || t.includes("push") || t.includes("semana"))
+    return coachReply("plano", state);
   return coachReply("plano", state);
 }

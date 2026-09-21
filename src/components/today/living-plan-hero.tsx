@@ -2,7 +2,10 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, HelpCircle, Moon, Pill, Play, ThumbsDown, ThumbsUp, Utensils, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MetricRing } from "@/components/metric-ring";
+import { SoldiersMediaFrame } from "@/components/soldiers-media-frame";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
+import type { ResolvedMedia } from "@/lib/soldiers-media";
 import { isAppPath, parseSessionHref } from "@/lib/training/session-nav";
 import type {
   DayCheckIn,
@@ -56,6 +59,7 @@ export function LivingPlanHero({
   defaultAvailableMin = 60,
   feedback,
   onFeedback,
+  cover,
 }: {
   plan: LivingPlanSnapshot;
   doneToday: boolean;
@@ -67,6 +71,7 @@ export function LivingPlanHero({
   defaultAvailableMin?: number;
   feedback?: LivingPlanFeedback | null;
   onFeedback?: (vote: LivingPlanFeedbackVote, reason?: LivingPlanFeedbackReason) => void;
+  cover?: ResolvedMedia | null;
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
@@ -104,34 +109,51 @@ export function LivingPlanHero({
 
   return (
     <>
-      <section className="surface-glass relative mb-4 overflow-hidden p-5">
-        <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-primary/20 blur-3xl" />
-        <div className="relative">
+      <section className="surface-glass relative mb-4 overflow-hidden">
+        {cover && (cover.posterUrl || cover.thumbnailUrl || cover.webmUrl || cover.mp4Url) ? (
+          <div className="relative h-40">
+            <SoldiersMediaFrame media={cover} alt={plan.workout.title} className="h-full w-full" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-4">
+              <p className="eyebrow">Meta do dia</p>
+              <p className="text-display mt-1 text-2xl text-foreground">
+                {doneToday
+                  ? "Treino concluído"
+                  : plan.workout.mode === "rest"
+                    ? "Recuperação ativa"
+                    : plan.workout.title}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        <div className="relative p-5">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="eyebrow">
                 {plan.workout.mode === "rest"
                   ? "Hoje: proteína e rest"
                   : `Hoje: treinar ~${plan.workout.estimatedMin} min`}
               </p>
-              <p className="text-display text-glow mt-1 text-4xl text-primary">{plan.score}</p>
-              <p className="text-xs text-muted-foreground">Performance / 100</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["Treino", plan.traffic.training],
+                    ["Nutri", plan.traffic.nutrition],
+                    ["Recup.", plan.traffic.recovery],
+                    ["Hábito", plan.traffic.consistency],
+                  ] as const
+                ).map(([label, light]) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2 py-0.5 text-[0.65rem] text-muted-foreground"
+                  >
+                    <span className={cn("size-1.5 rounded-full", TRAFFIC[light])} />
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1.5 text-right text-xs">
-              {(
-                [
-                  ["Treinamento", plan.traffic.training],
-                  ["Nutrição", plan.traffic.nutrition],
-                  ["Recuperação", plan.traffic.recovery],
-                  ["Consistência", plan.traffic.consistency],
-                ] as const
-              ).map(([label, light]) => (
-                <div key={label} className="flex items-center justify-end gap-2">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className={cn("size-2.5 rounded-full", TRAFFIC[light])} />
-                </div>
-              ))}
-            </div>
+            <MetricRing value={plan.score} max={100} label="Hoje" />
           </div>
 
           {plan.blocker ? (
@@ -427,8 +449,11 @@ export function LivingPlanHero({
             ) : null}
           </div>
 
-          <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
-            <p className="eyebrow">O que fazer hoje</p>
+          <details className="mt-5 border-t border-white/10 pt-4">
+            <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Plano completo do dia
+            </summary>
+            <div className="mt-3 space-y-3">
 
             <div className="flex items-start gap-3">
               <Play className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -499,7 +524,8 @@ export function LivingPlanHero({
                 ) : null}
               </div>
             </div>
-          </div>
+            </div>
+          </details>
 
           {plan.diffFromYesterday.length ? (
             <p className="mt-4 text-[0.65rem] text-muted-foreground">

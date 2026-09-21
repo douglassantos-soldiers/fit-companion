@@ -4,18 +4,9 @@
  */
 
 export type CoachMemoryKind =
-  | "facts"
-  | "preferences"
-  | "patterns"
-  | "recent_decisions"
-  | "coach_notes";
+  "facts" | "preferences" | "patterns" | "recent_decisions" | "coach_notes";
 
-export type CoachTurnKind =
-  | "factual"
-  | "contextual"
-  | "explanatory"
-  | "actionable"
-  | "medical";
+export type CoachTurnKind = "factual" | "contextual" | "explanatory" | "actionable" | "medical";
 
 export type CoachActionId =
   | "adapt_workout"
@@ -110,6 +101,10 @@ export interface CoachContext {
     sleepHours: number | null;
     energy: string | null;
     hardRpeStreak: number;
+    readiness?: string | null;
+    sleepConfidence?: number;
+    checkInConfidence?: number;
+    wearableConfidence?: number;
   };
   nutrition: {
     proteinG: number;
@@ -140,7 +135,13 @@ export interface CoachContext {
     reasonCodes: string[];
     confidence: number;
     explanation: string;
-    source?: "decision_log" | "recomputed_live";
+    source?: "decision_log" | "recomputed_live" | "server_snapshot";
+    attribution?: {
+      expectedAction?: string;
+      actionStatus?: string;
+      attributionType?: string;
+      learningSignal?: string | null;
+    };
   }>;
   recentDecisions: Array<{
     date: string;

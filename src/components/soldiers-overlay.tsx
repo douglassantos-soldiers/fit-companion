@@ -51,13 +51,13 @@ export function SoldiersOverlay({
           >
             <DialogPanel
               className={cn(
-                "surface-card max-h-[70vh] w-full max-w-md overflow-y-auto p-5",
+                "surface-card max-h-[70vh] w-full max-w-md overflow-y-auto bg-card p-5 text-card-foreground",
                 panelClassName,
               )}
             >
               {title ? (
                 <div className="flex items-center justify-between gap-3">
-                  <DialogTitle className="text-xl">{title}</DialogTitle>
+                  <DialogTitle className="text-xl text-foreground">{title}</DialogTitle>
                   <button type="button" onClick={onClose} aria-label="Fechar">
                     <X className="size-5 text-muted-foreground" />
                   </button>

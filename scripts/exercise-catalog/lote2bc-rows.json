@@ -1,0 +1,3569 @@
+[
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps",
+      "ombros"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "cotovelos abertos",
+      "carga controlada"
+    ],
+    "id": "supino-guilhotina",
+    "lote": "2b",
+    "name": "Supino guilhotina",
+    "en": "Guillotine press",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 35,
+    "pattern": "press",
+    "start": "barra alta sobre o peito superior",
+    "end": "braços estendidos",
+    "steps": [
+      "Deite no banco com a barra alinhada ao peito superior.",
+      "Desça a barra em direção ao pescoço com controle.",
+      "Empurre sem perder as escápulas no banco.",
+      "Use carga moderada — amplitude maior no peito superior."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "cotovelos leves",
+      "peito alonga"
+    ],
+    "id": "crucifixo-chao",
+    "lote": "2b",
+    "name": "Crucifixo no chão",
+    "en": "Floor fly",
+    "group": "peito",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "peito-fly",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "raise",
+    "start": "halteres acima do peito",
+    "end": "cotovelos no chão, peito aberto",
+    "steps": [
+      "Deite no chão com halteres acima do peito.",
+      "Abra os braços até os cotovelos tocarem o chão.",
+      "Feche o arco sem bater os pesos.",
+      "O chão limita a amplitude."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "cues": [
+      "peito alto",
+      "sem encolher trapézio"
+    ],
+    "id": "supino-cabo-sentado",
+    "lote": "2b",
+    "name": "Supino no cabo sentado",
+    "en": "Seated cable chest press",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "cabos",
+      "maquinas"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 25,
+    "pattern": "press",
+    "start": "alças na altura do peito",
+    "end": "braços estendidos à frente",
+    "steps": [
+      "Sente no banco com cabos na altura do peito.",
+      "Empurre as alças à frente até quase estender.",
+      "Volte com controle mantendo o peito aberto.",
+      "Mantenha os ombros baixos."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps",
+      "core"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "cues": [
+      "cotovelos junto ao tronco",
+      "quadril estável"
+    ],
+    "id": "flexao-diamond-elevada",
+    "lote": "2b",
+    "name": "Flexão diamante pés elevados",
+    "en": "Feet-elevated diamond push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "mãos em diamante, pés no apoio",
+    "end": "peito baixo perto das mãos",
+    "steps": [
+      "Mãos juntas formando um diamante; pés elevados num banco.",
+      "Desça o peito em direção às mãos.",
+      "Empurre até estender os braços.",
+      "Core firme o tempo todo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "peito colado",
+      "sem impulso"
+    ],
+    "id": "remada-peito-suportada",
+    "lote": "2b",
+    "name": "Remada inclinada com peito apoiado",
+    "en": "Chest-supported row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "halteres",
+      "barra"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 35,
+    "pattern": "pull",
+    "start": "peito no banco inclinado, braços pendurados",
+    "end": "cotovelos atrás do tronco",
+    "steps": [
+      "Deite de bruços num banco inclinado com peito apoiado.",
+      "Puxe os pesos até o banco, cotovelos para trás.",
+      "Aperte as escápulas no topo.",
+      "Desça sem balançar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "peito alto",
+      "cotovelos para baixo"
+    ],
+    "id": "puxada-pegada-aberta",
+    "lote": "2b",
+    "name": "Puxada pegada aberta",
+    "en": "Wide-grip lat pulldown",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "cabos",
+      "maquinas"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "pull",
+    "start": "barra larga acima da cabeça",
+    "end": "barra no peito superior",
+    "steps": [
+      "Segure a barra com pegada mais larga que os ombros.",
+      "Puxe até o peito superior sem inclinar demais.",
+      "Controle a subida.",
+      "Evite puxar atrás da nuca."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "ombro longe da orelha",
+      "tronco firme"
+    ],
+    "id": "remada-elastico",
+    "lote": "2b",
+    "name": "Remada com elástico",
+    "en": "Band row",
+    "group": "costas",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "costas-pull",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "pull",
+    "start": "elástico ancorado à frente, braços estendidos",
+    "end": "cotovelos atrás do tronco",
+    "steps": [
+      "Ancore o elástico na altura do peito.",
+      "Puxe as alças até o tronco.",
+      "Aperte as escápulas.",
+      "Retorne com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "peito",
+      "core"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "costelas baixas",
+      "amplitude controlada"
+    ],
+    "id": "pullover-halter",
+    "lote": "2b",
+    "name": "Pullover com halter",
+    "en": "Dumbbell pullover",
+    "group": "costas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "pull",
+    "start": "halter acima do peito",
+    "end": "halter atrás da cabeça alongado",
+    "steps": [
+      "Deite no banco segurando um halter acima do peito.",
+      "Leve o peso atrás da cabeça com cotovelos leves.",
+      "Puxe de volta sobre o peito.",
+      "Quadril estável."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "cues": [
+      "toque leve",
+      "joelhos alinhados"
+    ],
+    "id": "agachamento-caixa",
+    "lote": "2b",
+    "name": "Agachamento na caixa",
+    "en": "Box squat",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 50,
+    "pattern": "squat",
+    "start": "barra nas costas, em pé à frente da caixa",
+    "end": "sentado na caixa com controle",
+    "steps": [
+      "Posicione uma caixa atrás na altura desejada.",
+      "Sente com controle tocando a caixa.",
+      "Pause breve e levante empurrando o chão.",
+      "Tronco firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "cues": [
+      "tronco ereto",
+      "joelho da frente estável"
+    ],
+    "id": "afundo-reverso",
+    "lote": "2b",
+    "name": "Afundo reverso",
+    "en": "Reverse lunge",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "peso_corporal"
+    ],
+    "swap": "pernas-lunge",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "lunge",
+    "start": "em pé com carga nas mãos",
+    "end": "joelho traseiro próximo ao chão",
+    "steps": [
+      "Dê um passo longo para trás.",
+      "Desça até o joelho quase tocar o chão.",
+      "Empurre o pé da frente para voltar.",
+      "Alterne as pernas."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "cues": [
+      "quadril nivelado",
+      "coluna neutra"
+    ],
+    "id": "stiff-unilateral",
+    "lote": "2b",
+    "name": "Stiff unilateral",
+    "en": "Single-leg RDL",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "kettlebell"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "hinge",
+    "start": "em uma perna, carga na mão oposta",
+    "end": "tronco inclinado, perna livre estendida",
+    "steps": [
+      "Equilibre-se numa perna com carga na mão oposta.",
+      "Incline o tronco empurrando o quadril para trás.",
+      "Mantenha o quadril nivelado.",
+      "Volte estendendo o quadril."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "tornozelo"
+    ],
+    "cues": [
+      "sem balanço",
+      "amplitude completa"
+    ],
+    "id": "elevacao-gemeos-maquina",
+    "lote": "2b",
+    "name": "Elevação de gêmeos em máquina",
+    "en": "Standing calf raise machine",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "pernas-calf",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "raise",
+    "start": "ombros sob as almofadas, calcanhares baixos",
+    "end": "calcanhares elevados no topo",
+    "steps": [
+      "Coloque os ombros sob as almofadas e a ponta dos pés no degrau.",
+      "Desça o calcanhar até alongar.",
+      "Suba na ponta dos pés.",
+      "Pause no topo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "cues": [
+      "sem impulsionar com a perna de trás",
+      "tronco ereto"
+    ],
+    "id": "step-up",
+    "lote": "2b",
+    "name": "Step-up",
+    "en": "Step-up",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "peso_corporal"
+    ],
+    "swap": "pernas-lunge",
+    "unit": "kg",
+    "load": 10,
+    "pattern": "lunge",
+    "start": "pé no banco, carga nas mãos",
+    "end": "em pé sobre o banco",
+    "steps": [
+      "Coloque um pé firme no banco.",
+      "Empurre pelo calcanhar da frente até subir.",
+      "Desça com controle.",
+      "Complete as reps e troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "sem arquear a lombar",
+      "cotovelos sob os pesos"
+    ],
+    "id": "desenvolvimento-neutro",
+    "lote": "2b",
+    "name": "Desenvolvimento pegada neutra",
+    "en": "Neutral-grip shoulder press",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "ombros-press",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "press",
+    "start": "halteres na altura dos ombros, pegada neutra",
+    "end": "braços estendidos acima",
+    "steps": [
+      "Segure os halteres com palmas voltadas uma para a outra.",
+      "Empurre acima da cabeça.",
+      "Desça até a linha dos ombros.",
+      "Core firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "ombros baixos",
+      "sem shrug"
+    ],
+    "id": "elevacao-y-cabo",
+    "lote": "2b",
+    "name": "Elevação em Y no cabo",
+    "en": "Cable Y raise",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "raise",
+    "start": "alças baixas, braços à frente",
+    "end": "braços em Y acima da linha dos ombros",
+    "steps": [
+      "Pegue as alças baixas dos cabos cruzados.",
+      "Eleve os braços em diagonal formando um Y.",
+      "Controle a descida.",
+      "Use carga leve."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "costas"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "cotovelos altos",
+      "escápulas juntas"
+    ],
+    "id": "face-pull-elastico",
+    "lote": "2b",
+    "name": "Face pull com elástico",
+    "en": "Band face pull",
+    "group": "ombros",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "ombros-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "pull",
+    "start": "elástico na altura do rosto, braços à frente",
+    "end": "mãos ao lado da face, cotovelos altos",
+    "steps": [
+      "Ancore o elástico na altura dos olhos.",
+      "Puxe em direção ao rosto com cotovelos altos.",
+      "Rotacione externamente no final.",
+      "Retorne com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "cues": [
+      "cotovelos fixos",
+      "alongamento no fundo"
+    ],
+    "id": "rosca-inclinada-martelo",
+    "lote": "2b",
+    "name": "Rosca inclinada martelo",
+    "en": "Incline hammer curl",
+    "group": "biceps",
+    "equipment": "academia",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "curl",
+    "start": "sentado inclinado, braços pendurados",
+    "end": "halteres junto aos ombros",
+    "steps": [
+      "Sente no banco inclinado com braços pendurados.",
+      "Faça curl com pegada neutra.",
+      "Desça até alongar o bíceps.",
+      "Sem balançar o tronco."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "cues": [
+      "cotovelo colado",
+      "sem swing"
+    ],
+    "id": "rosca-cabo-unica",
+    "lote": "2b",
+    "name": "Rosca no cabo unilateral",
+    "en": "Single-arm cable curl",
+    "group": "biceps",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "curl",
+    "start": "alça baixa, braço estendido",
+    "end": "mão junto ao ombro",
+    "steps": [
+      "Segure a alça baixa com uma mão.",
+      "Curl até o ombro mantendo o cotovelo fixo.",
+      "Desça com controle.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo",
+      "ombro"
+    ],
+    "cues": [
+      "cotovelos fixos",
+      "costelas baixas"
+    ],
+    "id": "triceps-overhead-cabo",
+    "lote": "2b",
+    "name": "Tríceps overhead no cabo",
+    "en": "Cable overhead extension",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 15,
+    "pattern": "extension",
+    "start": "corda atrás da cabeça",
+    "end": "braços estendidos acima",
+    "steps": [
+      "De costas para a polia, corda atrás da cabeça.",
+      "Estenda os cotovelos até o topo.",
+      "Desça alongando o tríceps.",
+      "Cotovelos apontando para cima."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "peito"
+    ],
+    "joints": [
+      "cotovelo",
+      "ombro",
+      "punho"
+    ],
+    "cues": [
+      "cotovelos junto",
+      "punhos neutros"
+    ],
+    "id": "supino-fechado",
+    "lote": "2b",
+    "name": "Supino pegada fechada",
+    "en": "Close-grip bench press",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "press",
+    "start": "barra sobre o peito, mãos próximas",
+    "end": "braços estendidos",
+    "steps": [
+      "Pegada um pouco mais estreita que os ombros.",
+      "Desça a barra ao peito médio.",
+      "Empurre focando o tríceps.",
+      "Cotovelos mais próximos do tronco."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "cues": [
+      "sem girar o tronco",
+      "olhar para o chão"
+    ],
+    "id": "bird-dog",
+    "lote": "2b",
+    "name": "Bird dog",
+    "en": "Bird dog",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-iso",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "anti_rotation",
+    "start": "quatro apoios",
+    "end": "braço e perna opostos estendidos",
+    "steps": [
+      "Em quatro apoios, coluna neutra.",
+      "Estenda braço e perna opostos.",
+      "Mantenha o quadril estável.",
+      "Volte e alterne."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "ombros engajados",
+      "sem impulso"
+    ],
+    "id": "hanging-leg-raise",
+    "lote": "2b",
+    "name": "Elevação de pernas na barra",
+    "en": "Hanging leg raise",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "raise",
+    "start": "pendurado na barra, pernas estendidas",
+    "end": "pernas elevadas à frente",
+    "steps": [
+      "Pendure-se na barra com ombros ativos.",
+      "Eleve as pernas com controle.",
+      "Evite balançar.",
+      "Desça sem soltar o core."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "cues": [
+      "quadril travado",
+      "sem girar"
+    ],
+    "id": "pallof-elastico",
+    "lote": "2b",
+    "name": "Pallof com elástico",
+    "en": "Band Pallof press",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "core-iso",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "anti_rotation",
+    "start": "elástico lateral, mãos no peito",
+    "end": "braços estendidos à frente",
+    "steps": [
+      "Ancore o elástico ao lado na altura do peito.",
+      "Pressione as mãos à frente resistindo à rotação.",
+      "Segure e volte.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "cues": [
+      "peito alto",
+      "passos curtos"
+    ],
+    "id": "farmers-carry-halter",
+    "lote": "2b",
+    "name": "Farmers carry com halteres",
+    "en": "Dumbbell farmers carry",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "core-carry",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "carry",
+    "start": "halteres ao lado do corpo",
+    "end": "caminhada ereta com carga",
+    "steps": [
+      "Pegue os halteres ao lado do corpo.",
+      "Ande com passos curtos e tronco ereto.",
+      "Ombros baixos.",
+      "Pare e desça com controle."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "cues": [
+      "peito alto",
+      "joelhos alinhados"
+    ],
+    "id": "air-squat",
+    "lote": "2b",
+    "name": "Agachamento livre sem carga",
+    "en": "Air squat",
+    "group": "pernas",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-squat",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "squat",
+    "start": "em pé, pés na largura dos ombros",
+    "end": "quadris abaixo da linha dos joelhos",
+    "steps": [
+      "Pés na largura dos ombros.",
+      "Desça empurrando o quadril para trás.",
+      "Suba empurrando o chão.",
+      "Calcanhares no chão."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps",
+      "core"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "cues": [
+      "cotovelos colados",
+      "quadril estável"
+    ],
+    "id": "flexao-militar",
+    "lote": "2b",
+    "name": "Flexão militar",
+    "en": "Military push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "mãos sob os ombros",
+    "end": "peito próximo ao chão, cotovelos juntos",
+    "steps": [
+      "Mãos sob os ombros, corpo alinhado.",
+      "Desça com cotovelos próximos ao tronco.",
+      "Empurre até estender.",
+      "Core firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "cues": [
+      "coluna neutra",
+      "sem puxar com a lombar"
+    ],
+    "id": "remada-t-barra",
+    "lote": "2b",
+    "name": "Remada T-bar",
+    "en": "T-bar row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "pull",
+    "start": "tronco inclinado, braços estendidos",
+    "end": "placa junto ao peito",
+    "steps": [
+      "Prenda a barra no landmine ou use T-bar.",
+      "Incline o tronco e puxe a carga ao peito.",
+      "Aperte as escápulas.",
+      "Desça com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "cues": [
+      "ponte estável",
+      "sem deixar cair"
+    ],
+    "id": "leg-curl-bola",
+    "lote": "2b",
+    "name": "Flexão de pernas na bola",
+    "en": "Swiss ball leg curl",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "hinge",
+    "start": "costas no chão, calcanhares na bola",
+    "end": "joelhos flexionados, quadril elevado",
+    "steps": [
+      "Deite com calcanhares na bola e quadril elevado.",
+      "Puxe a bola flexionando os joelhos.",
+      "Estenda de volta com controle.",
+      "Mantenha o quadril alto."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "cotovelos leves",
+      "sem shrug"
+    ],
+    "id": "elevacao-lateral-halter-sentado",
+    "lote": "2b",
+    "name": "Elevação lateral sentada",
+    "en": "Seated lateral raise",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "raise",
+    "start": "sentado, braços ao lado",
+    "end": "braços na linha dos ombros",
+    "steps": [
+      "Sente ereto com halteres ao lado.",
+      "Eleve os braços até a linha dos ombros.",
+      "Desça com controle.",
+      "Sem balançar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "cues": [
+      "movimento no tronco",
+      "quadril estável"
+    ],
+    "id": "crunch-cabo",
+    "lote": "2b",
+    "name": "Crunch no cabo",
+    "en": "Cable crunch",
+    "group": "core",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "core-raise",
+    "unit": "kg",
+    "load": 25,
+    "pattern": "raise",
+    "start": "ajoelhado, corda atrás da cabeça",
+    "end": "cotovelos em direção aos joelhos",
+    "steps": [
+      "Ajoelhe de frente para a polia alta com a corda.",
+      "Flexione o tronco levando os cotovelos aos joelhos.",
+      "Volte alongando o abdômen.",
+      "Evite puxar só com os braços."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "pernas"
+    ],
+    "joints": [],
+    "cues": [
+      "cadência constante",
+      "tronco estável"
+    ],
+    "id": "bike-erg",
+    "lote": "2b",
+    "name": "Bike ergômetro",
+    "en": "BikeErg",
+    "group": "cardio",
+    "equipment": "academia",
+    "inv": [
+      "cardio"
+    ],
+    "swap": "cardio-machine",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "sentado na bike, pedais prontos",
+    "end": "cadência contínua",
+    "steps": [
+      "Ajuste o banco e comece a pedalar.",
+      "Mantenha cadência estável.",
+      "Use os braços se a máquina tiver alças.",
+      "Respire de forma ritmada."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "mãos altas",
+      "pés leves"
+    ],
+    "id": "shadow-boxing",
+    "lote": "2b",
+    "name": "Shadow boxing",
+    "en": "Shadow boxing",
+    "group": "cardio",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "cardio-locomotion",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "guarda alta, base de luta",
+    "end": "jab e deslocamentos contínuos",
+    "steps": [
+      "Adote base com guarda alta.",
+      "Alterne jabs e deslocamentos.",
+      "Mantenha o core ativo.",
+      "Respiração contínua."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "cues": [
+      "peito alto",
+      "joelho alinhado"
+    ],
+    "id": "kettlebell-goblet-lunge",
+    "lote": "2b",
+    "name": "Afundo goblet com kettlebell",
+    "en": "Goblet kettlebell lunge",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "pernas-lunge",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "lunge",
+    "start": "kettlebell no peito",
+    "end": "afundo com joelho traseiro baixo",
+    "steps": [
+      "Segure o kettlebell no peito (goblet).",
+      "Dê um passo à frente e desça.",
+      "Empurre para voltar.",
+      "Alterne as pernas."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core",
+      "costas"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "cues": [
+      "coluna neutra",
+      "carga próxima às canelas"
+    ],
+    "id": "kettlebell-deadlift",
+    "lote": "2b",
+    "name": "Levantamento terra com kettlebell",
+    "en": "Kettlebell deadlift",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 24,
+    "pattern": "hinge",
+    "start": "kettlebell entre os pés",
+    "end": "em pé, quadril estendido",
+    "steps": [
+      "Fique com o kettlebell entre os pés.",
+      "Empurre o quadril para trás e pegue a alça.",
+      "Estenda o quadril até ficar ereto.",
+      "Desça com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "peito",
+      "core"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "cues": [
+      "sem dobrar cotovelo",
+      "ombros longe das orelhas"
+    ],
+    "id": "push-up-plus",
+    "lote": "2b",
+    "name": "Flexão plus",
+    "en": "Push-up plus",
+    "group": "ombros",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "ombros-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "flexão, braços estendidos",
+    "end": "escápulas protradas no topo",
+    "steps": [
+      "Em flexão com braços estendidos.",
+      "Empurre o chão afastando ainda mais as escápulas.",
+      "Volte à posição neutra sem dobrar os cotovelos.",
+      "Serrátil ativo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "lote": "2c",
+    "id": "supino-smith",
+    "name": "Supino no Smith",
+    "en": "Smith machine bench press",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "barra"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 45,
+    "pattern": "press",
+    "start": "barra sobre o peito no Smith",
+    "end": "braços estendidos",
+    "steps": [
+      "Deite no banco centralizado no Smith.",
+      "Desça a barra ao peito com trilho guiado.",
+      "Empurre até estender.",
+      "Trave a barra ao terminar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps",
+      "ombros"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "supino-inclinado-barra",
+    "name": "Supino inclinado com barra",
+    "en": "Incline barbell bench press",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "press",
+    "start": "barra acima do peito superior",
+    "end": "braços estendidos inclinados",
+    "steps": [
+      "Banco inclinado ~30°.",
+      "Desça a barra ao peito superior.",
+      "Empurre na diagonal.",
+      "Pés firmes no chão."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "crucifixo-maquina",
+    "name": "Crucifixo na máquina",
+    "en": "Pec deck fly",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "peito-fly",
+    "unit": "kg",
+    "load": 25,
+    "pattern": "raise",
+    "start": "cotovelos no apoio, peito aberto",
+    "end": "alças quase juntas à frente",
+    "steps": [
+      "Ajuste o assento e apoie os cotovelos.",
+      "Feche o arco à frente do peito.",
+      "Abra com controle até alongar.",
+      "Sem shrug."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "crossover-alto",
+    "name": "Crossover alto",
+    "en": "High cable crossover",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "peito-fly",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "raise",
+    "start": "alças altas, braços abertos",
+    "end": "mãos cruzadas abaixo",
+    "steps": [
+      "Polias na posição alta.",
+      "Desça os cabos em arco até cruzar.",
+      "Controle a volta.",
+      "Peito alto."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "lote": "2c",
+    "id": "flexao-larga",
+    "name": "Flexão larga",
+    "en": "Wide push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "mãos mais largas que os ombros",
+    "end": "peito próximo ao chão",
+    "steps": [
+      "Mãos afastadas além da linha dos ombros.",
+      "Desça o peito com cotovelos abertos.",
+      "Empurre de volta.",
+      "Core alinhado."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "flexao-joelhos",
+    "name": "Flexão apoiando os joelhos",
+    "en": "Knee push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "joelhos no chão, mãos sob ombros",
+    "end": "peito baixo com tronco alinhado",
+    "steps": [
+      "Apoie os joelhos e cruze os tornozelos se preferir.",
+      "Desça o peito mantendo linha reta tronco-coxa.",
+      "Empurre até estender.",
+      "Progressão para flexão completa."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core",
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "supino-unilateral-halter",
+    "name": "Supino unilateral com halter",
+    "en": "Single-arm dumbbell bench press",
+    "group": "peito",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "press",
+    "start": "halter acima do peito, braço livre",
+    "end": "braço estendido acima do peito",
+    "steps": [
+      "Deite com um halter; outro braço pode ficar estendido ao lado.",
+      "Empurre o halter acima do peito.",
+      "Desça com controle.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "squeeze-press",
+    "name": "Squeeze press",
+    "en": "Squeeze press",
+    "group": "peito",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 14,
+    "pattern": "press",
+    "start": "halteres juntos acima do peito",
+    "end": "halteres juntos estendidos",
+    "steps": [
+      "Segure dois halteres espremidos um no outro.",
+      "Empurre mantendo a pressão interna.",
+      "Desça devagar sem separar os pesos.",
+      "Foco no peito interno."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "remada-smith",
+    "name": "Remada no Smith",
+    "en": "Smith machine row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "barra"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "pull",
+    "start": "barra pendurada, tronco inclinado",
+    "end": "barra ao abdômen",
+    "steps": [
+      "Incline o tronco e segure a barra do Smith.",
+      "Puxe ao abdômen.",
+      "Aperte as escápulas.",
+      "Desça guiado pelo trilho."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "puxada-supinada-maquina",
+    "name": "Puxada supinada na máquina",
+    "en": "Underhand lat pulldown",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "cabos",
+      "maquinas"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 35,
+    "pattern": "pull",
+    "start": "barra supinada acima",
+    "end": "barra no peito",
+    "steps": [
+      "Pegada supinada na largura dos ombros.",
+      "Puxe até o peito.",
+      "Controle a subida.",
+      "Peito alto."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "remada-sentada-neutra",
+    "name": "Remada sentada pegada neutra",
+    "en": "Neutral-grip seated row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "cabos",
+      "maquinas"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "pull",
+    "start": "alça neutra, braços estendidos",
+    "end": "cotovelos atrás do tronco",
+    "steps": [
+      "Sente na remada com pegada neutra.",
+      "Puxe ao abdômen.",
+      "Pause no final.",
+      "Retorne alongando."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps",
+      "core"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "australian-row-elevada",
+    "name": "Remada australiana pés elevados",
+    "en": "Feet-elevated inverted row",
+    "group": "costas",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "costas-pull",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "pull",
+    "start": "corpo inclinado, pés no banco",
+    "end": "peito na barra",
+    "steps": [
+      "Barra baixa; pés elevados num banco.",
+      "Puxe o peito à barra.",
+      "Desça com controle.",
+      "Corpo rígido."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "pulldown-unilateral",
+    "name": "Pulldown unilateral",
+    "en": "Single-arm lat pulldown",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "pull",
+    "start": "alça alta, braço estendido",
+    "end": "mão ao ombro",
+    "steps": [
+      "Use uma alça na polia alta.",
+      "Puxe o cotovelo até a costela.",
+      "Controle a subida.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "remada-kettlebell",
+    "name": "Remada com kettlebell",
+    "en": "Kettlebell row",
+    "group": "costas",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "pull",
+    "start": "quadril em dobradiça, kettlebell pendurado",
+    "end": "kettlebell ao quadril",
+    "steps": [
+      "Incline o tronco apoiando a mão livre se necessário.",
+      "Puxe o kettlebell ao quadril.",
+      "Aperte a escápula.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "shrug-halter",
+    "name": "Encolhimento com halteres",
+    "en": "Dumbbell shrug",
+    "group": "costas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "raise",
+    "start": "halteres ao lado, ombros baixos",
+    "end": "ombros elevados perto das orelhas",
+    "steps": [
+      "Em pé com halteres ao lado.",
+      "Eleve os ombros em linha reta.",
+      "Pause no topo.",
+      "Desça sem rolar os ombros."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "agachamento-smith",
+    "name": "Agachamento no Smith",
+    "en": "Smith machine squat",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "barra"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 50,
+    "pattern": "squat",
+    "start": "barra nas costas no trilho",
+    "end": "quadris abaixo dos joelhos",
+    "steps": [
+      "Posicione os pés à frente se necessário.",
+      "Desça com trilho guiado.",
+      "Empurre para subir.",
+      "Trave ao terminar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "agachamento-sumo-halter",
+    "name": "Agachamento sumô com halter",
+    "en": "Sumo dumbbell squat",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "squat",
+    "start": "pés largos, halter entre as pernas",
+    "end": "quadril abaixo dos joelhos",
+    "steps": [
+      "Pés largos, pontas levemente abertas.",
+      "Segure um halter entre as pernas.",
+      "Desça mantendo joelhos alinhados.",
+      "Suba empurrando o chão."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "leg-press-unilateral",
+    "name": "Leg press unilateral",
+    "en": "Single-leg leg press",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 40,
+    "pattern": "squat",
+    "start": "um pé na plataforma",
+    "end": "perna estendida sem travar joelho",
+    "steps": [
+      "Use uma perna na plataforma.",
+      "Desça com controle.",
+      "Empurre até quase estender.",
+      "Troque a perna."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "cadeira-flexora-em-pe",
+    "name": "Cadeira flexora em pé",
+    "en": "Standing leg curl",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "curl",
+    "start": "perna apoiada, joelho estendido",
+    "end": "calcanhar ao glúteo",
+    "steps": [
+      "Apoie o quadril na máquina.",
+      "Flexione o joelho trazendo o calcanhar ao glúteo.",
+      "Desça com controle.",
+      "Troque a perna."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "quadril"
+    ],
+    "lote": "2c",
+    "id": "abducao-elastico",
+    "name": "Abdução com elástico",
+    "en": "Band hip abduction",
+    "group": "pernas",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "raise",
+    "start": "elástico nos tornozelos, pés juntos",
+    "end": "perna aberta lateralmente",
+    "steps": [
+      "Elástico leve nos tornozelos.",
+      "Abra a perna lateralmente contra resistência.",
+      "Volte com controle.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "ponte-gluteo-unilateral",
+    "name": "Ponte de glúteo unilateral",
+    "en": "Single-leg glute bridge",
+    "group": "pernas",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "hinge",
+    "start": "costas no chão, um pé apoiado",
+    "end": "quadril elevado, perna livre estendida",
+    "steps": [
+      "Deite com um pé no chão.",
+      "Eleve o quadril até alinhar tronco e coxa.",
+      "Desça sem tocar bruscamente.",
+      "Troque a perna."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "good-morning-halter",
+    "name": "Good morning com halter",
+    "en": "Dumbbell good morning",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "hinge",
+    "start": "halter no peito, em pé",
+    "end": "tronco paralelo ao chão",
+    "steps": [
+      "Halter no peito ou atrás do pescoço com carga leve.",
+      "Empurre o quadril para trás inclinando o tronco.",
+      "Volte estendendo o quadril.",
+      "Coluna neutra."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "tornozelo"
+    ],
+    "lote": "2c",
+    "id": "panturrilha-unilateral",
+    "name": "Panturrilha unilateral",
+    "en": "Single-leg calf raise",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "peso_corporal"
+    ],
+    "swap": "pernas-calf",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "raise",
+    "start": "um pé no degrau",
+    "end": "calcanhar elevado",
+    "steps": [
+      "Apoie um pé no degrau.",
+      "Suba na ponta do pé.",
+      "Desça alongando.",
+      "Troque a perna."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "afundo-lateral",
+    "name": "Afundo lateral com carga",
+    "en": "Loaded lateral lunge",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "kettlebell"
+    ],
+    "swap": "pernas-lunge",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "lunge",
+    "start": "em pé com carga",
+    "end": "passo lateral, quadril baixo",
+    "steps": [
+      "Segure a carga à frente ou ao lado.",
+      "Dê um passo lateral amplo e desça.",
+      "Empurre de volta ao centro.",
+      "Alterne os lados."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "desenvolvimento-smith",
+    "name": "Desenvolvimento no Smith",
+    "en": "Smith machine shoulder press",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "barra"
+    ],
+    "swap": "ombros-press",
+    "unit": "kg",
+    "load": 30,
+    "pattern": "press",
+    "start": "barra na altura do queixo",
+    "end": "braços estendidos acima",
+    "steps": [
+      "Banco com encosto; barra na frente.",
+      "Empurre acima da cabeça.",
+      "Desça até o queixo.",
+      "Trave ao terminar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "elevacao-frontal-cabo",
+    "name": "Elevação frontal no cabo",
+    "en": "Cable front raise",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 10,
+    "pattern": "raise",
+    "start": "alça baixa, braço à frente",
+    "end": "braço na altura dos olhos",
+    "steps": [
+      "Polia baixa com uma alça.",
+      "Eleve o braço à frente até a linha dos olhos.",
+      "Desça com controle.",
+      "Troque o lado se unilateral."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "costas"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "crucifixo-inverso-cabo",
+    "name": "Crucifixo inverso no cabo",
+    "en": "Cable reverse fly",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "raise",
+    "start": "cabos cruzados, braços à frente",
+    "end": "braços abertos atrás",
+    "steps": [
+      "Polias na altura dos ombros.",
+      "Abra os braços para trás.",
+      "Aperte as escápulas.",
+      "Retorne com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "arnold-press-em-pe",
+    "name": "Arnold press em pé",
+    "en": "Standing Arnold press",
+    "group": "ombros",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "ombros-press",
+    "unit": "kg",
+    "load": 14,
+    "pattern": "press",
+    "start": "halteres na frente do rosto",
+    "end": "braços estendidos, palmas à frente",
+    "steps": [
+      "Comece com halteres frente ao rosto, palmas para você.",
+      "Gire e empurre acima.",
+      "Desça invertendo a rotação.",
+      "Core firme em pé."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "elevacao-lateral-elastico",
+    "name": "Elevação lateral com elástico",
+    "en": "Band lateral raise",
+    "group": "ombros",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "ombros-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "raise",
+    "start": "elástico sob os pés, braços ao lado",
+    "end": "braços na linha dos ombros",
+    "steps": [
+      "Pise no elástico com ambos os pés.",
+      "Eleve os braços lateralmente.",
+      "Desça devagar.",
+      "Cotovelos levemente flexionados."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "rosca-21",
+    "name": "Rosca 21",
+    "en": "21s curl",
+    "group": "biceps",
+    "equipment": "ambos",
+    "inv": [
+      "barra",
+      "halteres"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 15,
+    "pattern": "curl",
+    "start": "barra pendurada",
+    "end": "série parcial completa",
+    "steps": [
+      "7 reps metade inferior.",
+      "7 reps metade superior.",
+      "7 reps amplitude completa.",
+      "Descanse e repita se programado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "rosca-concentrada-cabo",
+    "name": "Rosca concentrada no cabo",
+    "en": "Cable concentration curl",
+    "group": "biceps",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "curl",
+    "start": "cotovelo no joelho, alça baixa",
+    "end": "mão próxima ao ombro",
+    "steps": [
+      "Sente e apoie o cotovelo no joelho.",
+      "Curl com cabo baixo.",
+      "Desça controlando.",
+      "Troque o braço."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "rosca-martelo-cabo",
+    "name": "Rosca martelo no cabo",
+    "en": "Cable hammer curl",
+    "group": "biceps",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 14,
+    "pattern": "curl",
+    "start": "corda ou alça neutra, braços ao lado",
+    "end": "mãos junto aos ombros",
+    "steps": [
+      "Use corda na polia baixa.",
+      "Curl com pegada neutra.",
+      "Desça até alongar.",
+      "Cotovelos fixos."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "rosca-elastico",
+    "name": "Rosca com elástico",
+    "en": "Band biceps curl",
+    "group": "biceps",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "biceps-curl",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "curl",
+    "start": "elástico sob os pés, braços estendidos",
+    "end": "mãos junto aos ombros",
+    "steps": [
+      "Pise no elástico.",
+      "Flexione os cotovelos contra a resistência.",
+      "Desça com controle.",
+      "Evite balançar."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "peito"
+    ],
+    "joints": [
+      "cotovelo",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "triceps-banco-pesos",
+    "name": "Tríceps no banco com pesos",
+    "en": "Weighted bench dip",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "peso_corporal",
+      "halteres"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 10,
+    "pattern": "extension",
+    "start": "mãos no banco, peso no colo",
+    "end": "cotovelos estendidos",
+    "steps": [
+      "Apoie as mãos no banco atrás de você.",
+      "Coloque peso no colo se usar carga.",
+      "Desça flexionando cotovelos.",
+      "Empurre até estender."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "triceps-testa-halter",
+    "name": "Tríceps testa com halteres",
+    "en": "Dumbbell skull crusher",
+    "group": "triceps",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 14,
+    "pattern": "extension",
+    "start": "halteres acima do peito",
+    "end": "cotovelos estendidos",
+    "steps": [
+      "Deite com halteres acima do peito.",
+      "Flexione os cotovelos levando pesos à testa.",
+      "Estenda de volta.",
+      "Cotovelos apontando para cima."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "triceps-corda-alta",
+    "name": "Tríceps corda polia alta",
+    "en": "High pulley rope pushdown",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "extension",
+    "start": "corda na polia alta, cotovelos flexionados",
+    "end": "braços estendidos, corda separada",
+    "steps": [
+      "Polia alta com corda.",
+      "Estenda os cotovelos separando a corda.",
+      "Controle a subida.",
+      "Cotovelos colados ao tronco."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "triceps-elastico",
+    "name": "Tríceps com elástico",
+    "en": "Band triceps pushdown",
+    "group": "triceps",
+    "equipment": "casa",
+    "inv": [
+      "elasticos"
+    ],
+    "swap": "triceps-extension",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "extension",
+    "start": "elástico ancorado alto",
+    "end": "cotovelos estendidos",
+    "steps": [
+      "Ancore o elástico acima.",
+      "Estenda os cotovelos para baixo.",
+      "Retorne com controle.",
+      "Tronco ereto."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "kickback-halter",
+    "name": "Tríceps coice com halter",
+    "en": "Dumbbell kickback",
+    "group": "triceps",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "triceps-extension",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "extension",
+    "start": "tronco inclinado, cotovelo alto",
+    "end": "braço estendido atrás",
+    "steps": [
+      "Incline o tronco apoiando a mão livre.",
+      "Estenda o cotovelo para trás.",
+      "Aperte o tríceps no topo.",
+      "Troque o braço."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "dead-bug-halter",
+    "name": "Dead bug com halter",
+    "en": "Weighted dead bug",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "core-iso",
+    "unit": "kg",
+    "load": 4,
+    "pattern": "anti_rotation",
+    "start": "de costas, halter acima do peito",
+    "end": "braço e perna opostos estendidos",
+    "steps": [
+      "Deite com halter acima do peito.",
+      "Estenda braço e perna opostos.",
+      "Mantenha a lombar colada ao chão.",
+      "Alterne lados."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "prancha-ombro-toque",
+    "name": "Prancha com toque no ombro",
+    "en": "Plank shoulder tap",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-iso",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "anti_rotation",
+    "start": "prancha alta",
+    "end": "mão toca o ombro oposto",
+    "steps": [
+      "Em prancha alta, pés afastados.",
+      "Toque o ombro oposto alternando.",
+      "Evite balançar o quadril.",
+      "Core firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "russian-twist-carga",
+    "name": "Russian twist com carga",
+    "en": "Weighted Russian twist",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "halteres",
+      "kettlebell"
+    ],
+    "swap": "core-raise",
+    "unit": "kg",
+    "load": 8,
+    "pattern": "rotation",
+    "start": "sentado inclinado, peso nas mãos",
+    "end": "peso tocando cada lado",
+    "steps": [
+      "Sente com tronco inclinado e pés no chão ou elevados.",
+      "Gire o peso de um lado ao outro.",
+      "Mantenha o peito aberto.",
+      "Controle a rotação."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "hollow-rock",
+    "name": "Hollow rock",
+    "en": "Hollow body rock",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "raise",
+    "start": "posição hollow",
+    "end": "balanço controlado",
+    "steps": [
+      "Deite em hollow com lombar pressionada.",
+      "Balance suavemente para frente e trás.",
+      "Mantenha braços e pernas estendidos.",
+      "Pare se perder a forma."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [],
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "ab-wheel-joelho",
+    "name": "Roda abdominal nos joelhos",
+    "en": "Kneeling ab wheel rollout",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-raise",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "raise",
+    "start": "ajoelhado, roda à frente",
+    "end": "braços estendidos à frente",
+    "steps": [
+      "Ajoelhe e segure a roda.",
+      "Role para frente mantendo core firme.",
+      "Puxe de volta.",
+      "Amplitude conforme controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "suitcase-carry-kettlebell",
+    "name": "Suitcase carry com kettlebell",
+    "en": "Kettlebell suitcase carry",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "core-carry",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "carry",
+    "start": "kettlebell numa mão",
+    "end": "caminhada ereta sem inclinar",
+    "steps": [
+      "Segure o kettlebell numa mão ao lado.",
+      "Ande resistindo à inclinação lateral.",
+      "Troque de mão.",
+      "Passos curtos."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "corrida-estacionaria",
+    "name": "Corrida estacionária",
+    "en": "Stationary running",
+    "group": "cardio",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "cardio-locomotion",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "em pé, joelhos prontos",
+    "end": "corrida no lugar contínua",
+    "steps": [
+      "Corra no lugar elevando joelhos.",
+      "Mantenha ritmo constante.",
+      "Use os braços.",
+      "Ajuste intensidade."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "polichinelo-passo",
+    "name": "Polichinelo com passo lateral",
+    "en": "Side-step jumping jack",
+    "group": "cardio",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "cardio-locomotion",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "pés juntos",
+    "end": "passo lateral com braços abertos",
+    "steps": [
+      "Dê um passo lateral abrindo os braços.",
+      "Volte ao centro.",
+      "Alterne direções.",
+      "Ritmo contínuo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "pernas",
+      "peito"
+    ],
+    "joints": [
+      "joelho",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "burpee-step",
+    "name": "Burpee com step",
+    "en": "Step burpee",
+    "group": "cardio",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "cardio-locomotion",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "em pé diante do step",
+    "end": "salto ou passo no step após flexão",
+    "steps": [
+      "Desça ao chão ou step com mãos.",
+      "Recue os pés e faça flexão opcional.",
+      "Volte e suba no step.",
+      "Repita com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "costas",
+      "pernas"
+    ],
+    "joints": [],
+    "lote": "2c",
+    "id": "remada-ergometro-intervalo",
+    "name": "Remo ergômetro intervalado",
+    "en": "Rowing erg intervals",
+    "group": "cardio",
+    "equipment": "academia",
+    "inv": [
+      "cardio"
+    ],
+    "swap": "cardio-machine",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "sentado no ergômetro",
+    "end": "sprints alternados com pausa",
+    "steps": [
+      "Ajuste o damper e pegada.",
+      "Reme forte nos intervalos.",
+      "Recupere nas pausas.",
+      "Mantenha postura."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "pernas"
+    ],
+    "joints": [],
+    "lote": "2c",
+    "id": "eliptico-inclinado",
+    "name": "Elíptico inclinado",
+    "en": "Incline elliptical",
+    "group": "cardio",
+    "equipment": "academia",
+    "inv": [
+      "cardio"
+    ],
+    "swap": "cardio-machine",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "máquina com inclinação moderada",
+    "end": "cadência constante",
+    "steps": [
+      "Aumente inclinação ou resistência.",
+      "Mantenha cadência estável.",
+      "Use corrimãos levemente se necessário.",
+      "Respire ritmado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros",
+      "core"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "kettlebell-clean",
+    "name": "Kettlebell clean",
+    "en": "Kettlebell clean",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 16,
+    "pattern": "hinge",
+    "start": "kettlebell entre os pés",
+    "end": "kettlebell rack no ombro",
+    "steps": [
+      "Exploda o quadril e puxe o sino.",
+      "Receba suave no rack.",
+      "Cotovelo colado ao corpo.",
+      "Troque de lado ou repita."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps",
+      "core"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "kettlebell-press",
+    "name": "Desenvolvimento com kettlebell",
+    "en": "Kettlebell press",
+    "group": "ombros",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "ombros-press",
+    "unit": "kg",
+    "load": 14,
+    "pattern": "press",
+    "start": "kettlebell no rack",
+    "end": "braço estendido acima",
+    "steps": [
+      "Kettlebell no rack na altura do ombro.",
+      "Empurre acima da cabeça.",
+      "Desça ao rack.",
+      "Troque o braço se unilateral."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros",
+      "pernas"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "turkish-getup-parcial",
+    "name": "Turkish get-up parcial",
+    "en": "Partial Turkish get-up",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "core-iso",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "carry",
+    "start": "deitado, kettlebell estendido",
+    "end": "sentado ou prancha alta parcial",
+    "steps": [
+      "Deite com kettlebell no braço estendido.",
+      "Suba até sentado ou prancha conforme progressão.",
+      "Desça na mesma sequência.",
+      "Olhar no kettlebell."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "landmine-row",
+    "name": "Remada landmine",
+    "en": "Landmine row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 30,
+    "pattern": "pull",
+    "start": "barra landmine, tronco inclinado",
+    "end": "placa ao peito",
+    "steps": [
+      "Segure a ponta da barra landmine.",
+      "Puxe ao peito.",
+      "Desça alongando.",
+      "Coluna neutra."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "landmine-squat",
+    "name": "Agachamento landmine",
+    "en": "Landmine squat",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 30,
+    "pattern": "squat",
+    "start": "barra landmine no peito",
+    "end": "agachamento profundo",
+    "steps": [
+      "Segure a ponta da barra no peito.",
+      "Agache mantendo tronco vertical.",
+      "Suba empurrando o chão.",
+      "Cotovelos juntos no topo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "cable-pull-through",
+    "name": "Pull-through no cabo",
+    "en": "Cable pull-through",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 25,
+    "pattern": "hinge",
+    "start": "costas à polia baixa, corda entre as pernas",
+    "end": "quadril estendido, tronco ereto",
+    "steps": [
+      "De costas para polia baixa, corda entre pernas.",
+      "Empurre o quadril para frente estendendo.",
+      "Volte flexionando quadril.",
+      "Foco nos glúteos."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "hip-thrust-barra",
+    "name": "Hip thrust com barra",
+    "en": "Barbell hip thrust",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 60,
+    "pattern": "hinge",
+    "start": "ombros no banco, barra no quadril",
+    "end": "quadril estendido alinhado",
+    "steps": [
+      "Apoie as escápulas no banco.",
+      "Barra com pad no quadril.",
+      "Estenda o quadril no topo.",
+      "Desça sem tocar bruscamente."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "costas"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "pec-deck-reverso",
+    "name": "Peck deck reverso",
+    "en": "Reverse pec deck",
+    "group": "ombros",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "raise",
+    "start": "peito no encosto, braços à frente",
+    "end": "braços abertos atrás",
+    "steps": [
+      "Sente de frente para o encosto.",
+      "Abra os braços contra a resistência.",
+      "Aperte escápulas.",
+      "Retorne com controle."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "chin-up-assistido",
+    "name": "Chin-up assistido",
+    "en": "Assisted chin-up",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "peso_corporal"
+    ],
+    "swap": "costas-pull",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "pull",
+    "start": "barra supinada, assistência ativa",
+    "end": "queixo acima da barra",
+    "steps": [
+      "Use máquina assistida ou elástico.",
+      "Puxe com queixo acima da barra.",
+      "Desça com controle.",
+      "Pegada supinada."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "peito"
+    ],
+    "joints": [
+      "cotovelo",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "dip-assistido",
+    "name": "Mergulho assistido",
+    "en": "Assisted dip",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "maquinas",
+      "peso_corporal"
+    ],
+    "swap": "triceps-extension",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "extension",
+    "start": "paralelas com assistência",
+    "end": "cotovelos estendidos",
+    "steps": [
+      "Apoie joelhos na assistência ou use elástico.",
+      "Desça flexionando cotovelos.",
+      "Empurre até estender.",
+      "Tronco levemente inclinado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "wall-sit",
+    "name": "Agachamento na parede",
+    "en": "Wall sit",
+    "group": "pernas",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-squat",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "isometric",
+    "start": "costas na parede, joelhos 90°",
+    "end": "isometria mantida",
+    "steps": [
+      "Encoste as costas na parede.",
+      "Desça até joelhos ~90°.",
+      "Mantenha a posição pelo tempo prescrito.",
+      "Respire normalmente."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "scapular-pullup",
+    "name": "Pull-up escapular",
+    "en": "Scapular pull-up",
+    "group": "costas",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "costas-pull",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "pull",
+    "start": "pendurado, braços estendidos",
+    "end": "escápulas retraídas sem flexionar cotovelos",
+    "steps": [
+      "Pendure na barra com braços estendidos.",
+      "Deprima e retraia escápulas.",
+      "Volte à posição alongada.",
+      "Sem dobrar cotovelos."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "glute-bridge-march",
+    "name": "Ponte de glúteo com marcha",
+    "en": "Glute bridge march",
+    "group": "pernas",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "hinge",
+    "start": "ponte, quadril elevado",
+    "end": "marcha alternando joelhos",
+    "steps": [
+      "Eleve o quadril em ponte.",
+      "Alterne flexão de joelhos mantendo quadril alto.",
+      "Não deixe o quadril cair.",
+      "Core firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "side-plank-hip",
+    "name": "Prancha lateral com elevação de quadril",
+    "en": "Side plank hip lift",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-iso",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "isometric",
+    "start": "prancha lateral",
+    "end": "quadril elevado no topo",
+    "steps": [
+      "Em prancha lateral sobre o antebraço.",
+      "Abaixe e eleve o quadril.",
+      "Mantenha alinhamento.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "cable-woodchop",
+    "name": "Woodchop no cabo",
+    "en": "Cable woodchop",
+    "group": "core",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "core-raise",
+    "unit": "kg",
+    "load": 15,
+    "pattern": "rotation",
+    "start": "alça alta lateral, braços estendidos",
+    "end": "movimento diagonal até o quadril oposto",
+    "steps": [
+      "Polia alta ao lado.",
+      "Puxe em diagonal atravessando o corpo.",
+      "Controle a volta.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "advanced",
+    "secondary": [],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "sissy-squat",
+    "name": "Sissy squat",
+    "en": "Sissy squat",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "pernas-squat",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "squat",
+    "start": "em pé, calcanhares elevados ou apoio",
+    "end": "corpo inclinado, joelhos flexionados",
+    "steps": [
+      "Incline o tronco para trás flexionando joelhos.",
+      "Mantenha quadril estendido.",
+      "Suba usando quadríceps.",
+      "Use apoio leve se necessário."
+    ]
+  },
+  {
+    "difficulty": "advanced",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "jefferson-curl",
+    "name": "Jefferson curl",
+    "en": "Jefferson curl",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "barra"
+    ],
+    "swap": "pernas-hinge",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "hinge",
+    "start": "em pé em degrau, barra nas mãos",
+    "end": "rolagem vertebral controlada",
+    "steps": [
+      "Em degrau, desça a barra flexionando coluna segmento a segmento.",
+      "Suba revertendo o movimento.",
+      "Use carga muito leve.",
+      "Apenas se tolerado pelo profissional."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "supino-inclinado-maquina",
+    "name": "Supino inclinado na máquina",
+    "en": "Incline chest press machine",
+    "group": "peito",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "peito-press",
+    "unit": "kg",
+    "load": 35,
+    "pattern": "press",
+    "start": "alças na altura do peito superior",
+    "end": "braços estendidos inclinados",
+    "steps": [
+      "Ajuste o assento inclinado.",
+      "Empurre as alças.",
+      "Desça com controle.",
+      "Pés firmes."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "flexao-pike-joelhos",
+    "name": "Flexão pike nos joelhos",
+    "en": "Kneeling pike push-up",
+    "group": "ombros",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "ombros-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "quadril alto, joelhos no chão",
+    "end": "topo da cabeça próximo ao chão",
+    "steps": [
+      "Forme um V com joelhos apoiados.",
+      "Desça a cabeça entre as mãos.",
+      "Empurre de volta.",
+      "Progressão para pike completo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "prancha-alcance-alternado",
+    "name": "Prancha com alcance alternado",
+    "en": "Plank reach",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-iso",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "anti_rotation",
+    "start": "prancha baixa",
+    "end": "braço estendido à frente",
+    "steps": [
+      "Em prancha sobre antebraços.",
+      "Estenda um braço à frente.",
+      "Volte e alterne.",
+      "Quadril estável."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core"
+    ],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "agachamento-talonetes",
+    "name": "Agachamento com calcanhares elevados",
+    "en": "Heel-elevated squat",
+    "group": "pernas",
+    "equipment": "ambos",
+    "inv": [
+      "peso_corporal",
+      "halteres"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 0,
+    "pattern": "squat",
+    "start": "calcanhares em talonete",
+    "end": "agachamento profundo",
+    "steps": [
+      "Calcanhares elevados numa placa.",
+      "Agache mantendo tronco ereto.",
+      "Suba empurrando o chão.",
+      "Foco em quadríceps."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "cadeira-extensora-unilateral",
+    "name": "Cadeira extensora unilateral",
+    "en": "Single-leg leg extension",
+    "group": "pernas",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "pernas-squat",
+    "unit": "kg",
+    "load": 15,
+    "pattern": "extension",
+    "start": "uma perna no apoio",
+    "end": "joelho estendido",
+    "steps": [
+      "Ajuste a máquina para uma perna.",
+      "Estenda o joelho.",
+      "Desça com controle.",
+      "Troque a perna."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "biceps"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "remada-polia-baixa-unilateral",
+    "name": "Remada polia baixa unilateral",
+    "en": "Single-arm low cable row",
+    "group": "costas",
+    "equipment": "academia",
+    "inv": [
+      "cabos"
+    ],
+    "swap": "costas-pull",
+    "unit": "kg",
+    "load": 25,
+    "pattern": "pull",
+    "start": "alça baixa, braço estendido",
+    "end": "cotovelo atrás do tronco",
+    "steps": [
+      "Sentado ou inclinado na polia baixa.",
+      "Puxe com um braço.",
+      "Aperte a escápula.",
+      "Troque o lado."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [],
+    "joints": [
+      "cotovelo"
+    ],
+    "lote": "2c",
+    "id": "rosca-scott-maquina",
+    "name": "Rosca Scott na máquina",
+    "en": "Machine preacher curl",
+    "group": "biceps",
+    "equipment": "academia",
+    "inv": [
+      "maquinas"
+    ],
+    "swap": "biceps-curl",
+    "unit": "kg",
+    "load": 20,
+    "pattern": "curl",
+    "start": "braços no apoio, cotovelos fixos",
+    "end": "flexão completa",
+    "steps": [
+      "Apoie os braços no banco Scott da máquina.",
+      "Flexione até o topo.",
+      "Desça até alongar.",
+      "Sem tirar cotovelos do apoio."
+    ]
+  },
+  {
+    "difficulty": "advanced",
+    "secondary": [
+      "triceps"
+    ],
+    "joints": [
+      "ombro",
+      "punho"
+    ],
+    "lote": "2c",
+    "id": "flexao-rapida",
+    "name": "Flexão rápida",
+    "en": "Explosive push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "flexão baixa",
+    "end": "mãos saem levemente do chão",
+    "steps": [
+      "Desça a flexão com controle.",
+      "Empurre explosivo (mãos podem sair do chão).",
+      "Amortecça a queda.",
+      "Core firme."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros"
+    ],
+    "joints": [
+      "ombro",
+      "lombar"
+    ],
+    "lote": "2c",
+    "id": "caminhada-urso",
+    "name": "Caminhada do urso",
+    "en": "Bear crawl",
+    "group": "core",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "core-carry",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "carry",
+    "start": "quatro apoios, joelhos elevados",
+    "end": "deslocamento à frente ou lateral",
+    "steps": [
+      "Joelhos levemente fora do chão.",
+      "Movimente mão e pé opostos.",
+      "Mantenha quadril baixo.",
+      "Respire contínuo."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "ombros"
+    ],
+    "joints": [
+      "lombar",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "kettlebell-windmill",
+    "name": "Windmill com kettlebell",
+    "en": "Kettlebell windmill",
+    "group": "core",
+    "equipment": "ambos",
+    "inv": [
+      "kettlebell"
+    ],
+    "swap": "core-raise",
+    "unit": "kg",
+    "load": 12,
+    "pattern": "hinge",
+    "start": "kettlebell overhead, pés abertos",
+    "end": "mão livre desce em direção ao pé",
+    "steps": [
+      "Kettlebell estendido acima.",
+      "Empurre o quadril para o lado oposto.",
+      "Desça a mão livre em direção ao pé.",
+      "Suba e troque se programado."
+    ]
+  },
+  {
+    "difficulty": "beginner",
+    "secondary": [
+      "pernas"
+    ],
+    "joints": [],
+    "lote": "2c",
+    "id": "bike-horizontal",
+    "name": "Bike horizontal",
+    "en": "Recumbent bike",
+    "group": "cardio",
+    "equipment": "academia",
+    "inv": [
+      "cardio"
+    ],
+    "swap": "cardio-machine",
+    "unit": "min",
+    "load": 0,
+    "pattern": "cardio",
+    "start": "sentado na bike horizontal",
+    "end": "cadência estável",
+    "steps": [
+      "Ajuste o banco e pedais.",
+      "Pedale em ritmo constante.",
+      "Mantenha postura no encosto.",
+      "Ajuste resistência conforme plano."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "costas"
+    ],
+    "joints": [
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "elevacao-posterior-banco",
+    "name": "Elevação posterior no banco",
+    "en": "Bench reverse fly",
+    "group": "ombros",
+    "equipment": "ambos",
+    "inv": [
+      "halteres"
+    ],
+    "swap": "ombros-raise",
+    "unit": "kg",
+    "load": 6,
+    "pattern": "raise",
+    "start": "tronco apoiado no banco inclinado",
+    "end": "braços abertos na linha dos ombros",
+    "steps": [
+      "Deite de bruços ou incline o tronco.",
+      "Abra os halteres lateralmente.",
+      "Aperte escápulas.",
+      "Desça com controle."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "peito"
+    ],
+    "joints": [
+      "cotovelo",
+      "ombro"
+    ],
+    "lote": "2c",
+    "id": "triceps-banco-inclinado",
+    "name": "Tríceps banco inclinado",
+    "en": "Incline bench dip",
+    "group": "triceps",
+    "equipment": "academia",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "triceps-extension",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "extension",
+    "start": "mãos no banco inclinado atrás",
+    "end": "cotovelos estendidos",
+    "steps": [
+      "Apoie as mãos num banco inclinado.",
+      "Desça flexionando cotovelos.",
+      "Empurre até estender.",
+      "Pés no chão ou elevados."
+    ]
+  },
+  {
+    "difficulty": "intermediate",
+    "secondary": [
+      "core",
+      "triceps"
+    ],
+    "joints": [
+      "ombro",
+      "joelho"
+    ],
+    "lote": "2c",
+    "id": "flexao-parafuso",
+    "name": "Flexão parafuso",
+    "en": "Spiderman push-up",
+    "group": "peito",
+    "equipment": "casa",
+    "inv": [
+      "peso_corporal"
+    ],
+    "swap": "peito-press",
+    "unit": "corpo",
+    "load": 0,
+    "pattern": "press",
+    "start": "flexão, corpo alinhado",
+    "end": "joelho ao cotovelo na descida",
+    "steps": [
+      "Desça a flexão.",
+      "Traga o joelho ao cotovelo do mesmo lado.",
+      "Suba e alterne.",
+      "Core firme."
+    ]
+  }
+]

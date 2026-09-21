@@ -42,7 +42,15 @@ export interface MealItemEntry {
 export type PrimaryBlocker = "sono" | "alimentacao" | "consistencia" | "tempo" | "equipamento";
 export type DayEnergy = "baixa" | "ok" | "alta";
 export type FocusMuscle = "peito" | "costas" | "pernas" | "ombros" | "biceps" | "triceps" | "core";
-export type GymGear = "barra" | "halteres" | "maquinas" | "elasticos" | "peso_corporal";
+export type GymGear =
+  | "barra"
+  | "halteres"
+  | "maquinas"
+  | "elasticos"
+  | "peso_corporal"
+  | "cabos"
+  | "kettlebell"
+  | "cardio";
 export type TrainingMode = "full" | "express" | "deload" | "rest";
 export type TrafficLight = "green" | "yellow" | "red";
 export type DoseUnit = "g" | "ml" | "caps" | "scoop" | "serving";
@@ -346,7 +354,8 @@ export interface ActivityLogEntry {
 }
 
 export type WearableProviderId = "strava" | "garmin" | "apple_health" | "health_connect";
-export type WearableLinkStatus = "disconnected" | "pending" | "connected" | "not_configured" | "needs_native";
+export type WearableLinkStatus =
+  "disconnected" | "pending" | "connected" | "not_configured" | "needs_native";
 
 export interface WearableConnection {
   provider: WearableProviderId;
@@ -451,11 +460,19 @@ export interface AppState {
   dayCheckIns: Record<string, DayCheckIn>;
   /** Living plan snapshots keyed by date */
   livingPlans: Record<string, LivingPlanSnapshot>;
+  /**
+   * Cached DecisionContextSnapshot keyed by date.
+   * Cache / UI / offline only — never the business authority when a server snapshot exists.
+   */
+  decisionContextByDate: Record<
+    string,
+    import("@/lib/engine/decision-context-snapshot").DecisionContextSnapshot
+  >;
   /** Baseline metric at challenge join (for relative % evolution) */
   challengeBaselines: Record<string, number>;
   /** Personalized absolute targets keyed by challenge id */
   challengePersonalTargets: Record<string, number>;
-  /** Self-reported + ingested activity logs (steps, football, run_km) */
+  /** Projection/cache of physical activities (SoT is `activities`). Challenge-compatible kinds only. */
   activityLogs: ActivityLogEntry[];
   /** Wearable link state only — tokens never live here */
   wearableConnections: WearableConnection[];
@@ -541,6 +558,7 @@ export const emptyState: AppState = {
   upsellShownDate: null,
   dayCheckIns: {},
   livingPlans: {},
+  decisionContextByDate: {},
   challengeBaselines: {},
   challengePersonalTargets: {},
   activityLogs: [],
@@ -587,6 +605,9 @@ export const GYM_GEAR_LABEL: Record<GymGear, string> = {
   maquinas: "Máquinas",
   elasticos: "Elásticos",
   peso_corporal: "Peso do corpo",
+  cabos: "Cabos",
+  kettlebell: "Kettlebell",
+  cardio: "Cardio",
 };
 
 export const BLOCKER_LABEL: Record<PrimaryBlocker, string> = {
@@ -608,4 +629,3 @@ import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
 
 /** Calendar day key — uses America/Sao_Paulo by default (not raw UTC). */
 export const todayKey = (d: Date = new Date()) => getUserTodayKey(DEFAULT_USER_TIMEZONE, d);
-

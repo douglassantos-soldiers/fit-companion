@@ -1,43 +1,30 @@
 /**
  * Merge code catalog seeds with DB overlays. Pure — no I/O.
+ * Authority: CanonicalExercise via resolveExerciseCatalog(seed, overlays).
  */
 import type { Exercise, Joint, MuscleGroup } from "@/data/exercises";
 import type { LibraryExercise } from "@/data/exercise-library";
-import type { Difficulty, MovementPattern } from "@/lib/training/exercise-catalog";
-import type {
-  Challenge,
-  ChallengeCategory,
-  ChallengeMetric,
-} from "@/data/challenges";
+import type { Challenge, ChallengeCategory, ChallengeMetric } from "@/data/challenges";
+import {
+  DEFAULT_ANIMATION_SPEC,
+  DIFFICULTIES,
+  EQUIPMENT_VALUES,
+  GYM_GEAR_VALUES,
+  MEDIA_STATUSES,
+  MUSCLE_GROUPS,
+  normalizeMovementPattern,
+  toCanonicalExercise,
+  type CanonicalExercise,
+  type CanonicalMovementPattern,
+  type Difficulty,
+  type MediaStatus,
+} from "@/lib/training/canonical-exercise";
+import type { GymGear } from "@/lib/types";
 
-const GROUPS: MuscleGroup[] = [
-  "peito",
-  "costas",
-  "pernas",
-  "ombros",
-  "biceps",
-  "triceps",
-  "core",
-  "cardio",
-];
+const GROUPS = MUSCLE_GROUPS;
 const JOINTS: Joint[] = ["joelho", "ombro", "lombar", "punho"];
-const EQUIPMENT: Exercise["equipment"][] = ["casa", "academia", "ambos"];
+const EQUIPMENT = EQUIPMENT_VALUES;
 const UNITS: Exercise["unit"][] = ["kg", "corpo", "min"];
-const PATTERNS: MovementPattern[] = [
-  "press",
-  "pull",
-  "squat",
-  "hinge",
-  "lunge",
-  "fly",
-  "raise",
-  "curl",
-  "extension",
-  "carry_iso",
-  "cardio",
-  "other",
-];
-const DIFFICULTIES: Difficulty[] = ["beginner", "intermediate", "advanced"];
 
 export type ExerciseOverlay = {
   id: string;
@@ -51,32 +38,33 @@ export type ExerciseOverlay = {
   priority?: number;
   primaryMuscles?: MuscleGroup[];
   secondaryMuscles?: MuscleGroup[];
-  movementPattern?: MovementPattern;
+  movementPattern?: CanonicalMovementPattern | string;
   difficulty?: Difficulty;
   plannerEligible?: boolean;
   active?: boolean;
   instructions?: string[];
   videoUrl?: string | null;
   mediaUrl?: string | null;
-  cues?: string | null;
+  cues?: string | string[] | null;
   alternativeIds?: string[];
+  canonicalName?: string;
+  displayNameEn?: string;
+  version?: number;
+  aliases?: string[];
+  searchTerms?: string[];
+  equipmentInventory?: GymGear[];
+  exerciseFamily?: string;
+  movementFamily?: string;
+  progressionFamily?: string;
+  regressionFamily?: string;
+  contraindicationTags?: string[];
+  mediaId?: string;
+  mediaStatus?: MediaStatus;
 };
 
-export type ResolvedLibraryExercise = LibraryExercise & {
-  alternativeIds: string[];
-  videoUrl?: string;
-  mediaUrl?: string;
-  cues?: string;
-};
+export type ResolvedLibraryExercise = CanonicalExercise;
 
-const DEFAULT_ANIMATION: LibraryExercise["animationSpec"] = {
-  tempo: "controlled",
-  durationSec: 4,
-  loop: true,
-  camera: "three-quarter",
-  start: "posição inicial",
-  end: "posição final",
-};
+const DEFAULT_ANIMATION = DEFAULT_ANIMATION_SPEC;
 
 function asGroup(v: unknown, fallback: MuscleGroup): MuscleGroup {
   return typeof v === "string" && (GROUPS as string[]).includes(v) ? (v as MuscleGroup) : fallback;
@@ -84,7 +72,9 @@ function asGroup(v: unknown, fallback: MuscleGroup): MuscleGroup {
 
 function asGroups(v: unknown, fallback: MuscleGroup[]): MuscleGroup[] {
   if (!Array.isArray(v)) return fallback;
-  const next = v.filter((x): x is MuscleGroup => typeof x === "string" && (GROUPS as string[]).includes(x));
+  const next = v.filter(
+    (x): x is MuscleGroup => typeof x === "string" && (GROUPS as string[]).includes(x),
+  );
   return next.length ? next : fallback;
 }
 
@@ -100,19 +90,33 @@ function asEquipment(v: unknown, fallback: Exercise["equipment"]): Exercise["equ
 }
 
 function asUnit(v: unknown, fallback: Exercise["unit"]): Exercise["unit"] {
-  return typeof v === "string" && (UNITS as string[]).includes(v) ? (v as Exercise["unit"]) : fallback;
+  return typeof v === "string" && (UNITS as string[]).includes(v)
+    ? (v as Exercise["unit"])
+    : fallback;
 }
 
-function asPattern(v: unknown, fallback: MovementPattern): MovementPattern {
-  return typeof v === "string" && (PATTERNS as string[]).includes(v)
-    ? (v as MovementPattern)
-    : fallback;
+function asPattern(v: unknown, fallback: CanonicalMovementPattern): CanonicalMovementPattern {
+  return typeof v === "string" ? normalizeMovementPattern(v, fallback) : fallback;
 }
 
 function asDifficulty(v: unknown, fallback: Difficulty): Difficulty {
-  return typeof v === "string" && (DIFFICULTIES as string[]).includes(v)
+  return typeof v === "string" && (DIFFICULTIES as readonly string[]).includes(v)
     ? (v as Difficulty)
     : fallback;
+}
+
+function asMediaStatus(v: unknown, fallback: MediaStatus): MediaStatus {
+  return typeof v === "string" && (MEDIA_STATUSES as readonly string[]).includes(v)
+    ? (v as MediaStatus)
+    : fallback;
+}
+
+function asGear(v: unknown, fallback?: GymGear[]): GymGear[] | undefined {
+  if (!Array.isArray(v)) return fallback;
+  const next = v.filter(
+    (x): x is GymGear => typeof x === "string" && GYM_GEAR_VALUES.includes(x as GymGear),
+  );
+  return next.length ? next : fallback;
 }
 
 function optionalText(v: string | null | undefined): string | undefined {
@@ -120,11 +124,27 @@ function optionalText(v: string | null | undefined): string | undefined {
   return t ? t : undefined;
 }
 
+function overlayCues(v: ExerciseOverlay["cues"]): string[] | undefined {
+  if (v == null) return undefined;
+  if (Array.isArray(v)) {
+    const next = v
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return next.length ? next : undefined;
+  }
+  const parts = String(v)
+    .split(/\n|\|/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : undefined;
+}
+
 function newFromOverlay(o: ExerciseOverlay): ResolvedLibraryExercise | null {
   const name = (o.name ?? "").trim();
   if (!name) return null;
   const group = asGroup(o.group, "peito");
-  const resolved: ResolvedLibraryExercise = {
+  return toCanonicalExercise({
     id: o.id,
     name,
     group,
@@ -136,33 +156,41 @@ function newFromOverlay(o: ExerciseOverlay): ResolvedLibraryExercise | null {
     priority: typeof o.priority === "number" ? o.priority : 2,
     primaryMuscles: asGroups(o.primaryMuscles, [group]),
     secondaryMuscles: asGroups(o.secondaryMuscles, []),
-    movementPattern: asPattern(o.movementPattern, "other"),
+    movementPattern: asPattern(o.movementPattern, "mobility"),
     difficulty: asDifficulty(o.difficulty, "intermediate"),
     plannerEligible: o.plannerEligible !== false,
     active: o.active !== false,
     instructions: Array.isArray(o.instructions) ? o.instructions.map(String) : [],
     animationSpec: { ...DEFAULT_ANIMATION },
     alternativeIds: Array.isArray(o.alternativeIds) ? o.alternativeIds.map(String) : [],
-  };
-  const videoUrl = optionalText(o.videoUrl);
-  const mediaUrl = optionalText(o.mediaUrl);
-  const cues = optionalText(o.cues);
-  return {
-    ...resolved,
-    ...(videoUrl ? { videoUrl } : {}),
-    ...(mediaUrl ? { mediaUrl } : {}),
-    ...(cues ? { cues } : {}),
-  };
+    canonicalName: o.canonicalName,
+    displayNameEn: o.displayNameEn,
+    version: o.version,
+    aliases: o.aliases,
+    searchTerms: o.searchTerms,
+    equipmentInventory: asGear(o.equipmentInventory),
+    exerciseFamily: o.exerciseFamily,
+    movementFamily: o.movementFamily,
+    progressionFamily: o.progressionFamily,
+    regressionFamily: o.regressionFamily,
+    contraindicationTags: o.contraindicationTags,
+    mediaId: o.mediaId,
+    mediaStatus: o.mediaStatus,
+    videoUrl: optionalText(o.videoUrl),
+    mediaUrl: optionalText(o.mediaUrl),
+    cues: overlayCues(o.cues),
+  });
 }
 
 function applyOverlay(base: ResolvedLibraryExercise, o: ExerciseOverlay): ResolvedLibraryExercise {
   const group = o.group != null ? asGroup(o.group, base.group) : base.group;
   const videoUrl = o.videoUrl !== undefined ? optionalText(o.videoUrl) : base.videoUrl;
   const mediaUrl = o.mediaUrl !== undefined ? optionalText(o.mediaUrl) : base.mediaUrl;
-  const cues = o.cues !== undefined ? optionalText(o.cues) : base.cues;
-  const next: ResolvedLibraryExercise = {
+  const cues = o.cues !== undefined ? overlayCues(o.cues) : base.cues;
+  const next = toCanonicalExercise({
     ...base,
     name: o.name != null && o.name.trim() ? o.name.trim() : base.name,
+    displayNamePt: o.name != null && o.name.trim() ? o.name.trim() : base.displayNamePt,
     group,
     equipment: o.equipment != null ? asEquipment(o.equipment, base.equipment) : base.equipment,
     swapGroup: o.swapGroup != null ? o.swapGroup.trim() || base.swapGroup : base.swapGroup,
@@ -171,23 +199,43 @@ function applyOverlay(base: ResolvedLibraryExercise, o: ExerciseOverlay): Resolv
     baseLoad:
       typeof o.baseLoad === "number" && Number.isFinite(o.baseLoad) ? o.baseLoad : base.baseLoad,
     priority: typeof o.priority === "number" ? o.priority : base.priority,
-    primaryMuscles: o.primaryMuscles != null ? asGroups(o.primaryMuscles, [group]) : base.primaryMuscles,
+    primaryMuscles:
+      o.primaryMuscles != null ? asGroups(o.primaryMuscles, [group]) : base.primaryMuscles,
     secondaryMuscles:
       o.secondaryMuscles != null ? asGroups(o.secondaryMuscles, []) : base.secondaryMuscles,
     movementPattern:
-      o.movementPattern != null ? asPattern(o.movementPattern, base.movementPattern) : base.movementPattern,
-    difficulty: o.difficulty != null ? asDifficulty(o.difficulty, base.difficulty) : base.difficulty,
+      o.movementPattern != null
+        ? asPattern(o.movementPattern, base.movementPattern)
+        : base.movementPattern,
+    difficulty:
+      o.difficulty != null ? asDifficulty(o.difficulty, base.difficulty) : base.difficulty,
     plannerEligible: o.plannerEligible != null ? o.plannerEligible : base.plannerEligible,
     active: o.active != null ? o.active : base.active,
     instructions: o.instructions != null ? o.instructions.map(String) : base.instructions,
     alternativeIds: o.alternativeIds != null ? o.alternativeIds.map(String) : base.alternativeIds,
-  };
-  if (videoUrl) next.videoUrl = videoUrl;
-  else delete next.videoUrl;
-  if (mediaUrl) next.mediaUrl = mediaUrl;
-  else delete next.mediaUrl;
-  if (cues) next.cues = cues;
-  else delete next.cues;
+    canonicalName: o.canonicalName != null ? o.canonicalName : base.canonicalName,
+    displayNameEn: o.displayNameEn !== undefined ? o.displayNameEn : base.displayNameEn,
+    version: typeof o.version === "number" ? o.version : base.version,
+    aliases: o.aliases != null ? o.aliases : base.aliases,
+    searchTerms: o.searchTerms != null ? o.searchTerms : base.searchTerms,
+    equipmentInventory:
+      o.equipmentInventory != null
+        ? asGear(o.equipmentInventory, base.equipmentInventory)
+        : base.equipmentInventory,
+    exerciseFamily: o.exerciseFamily !== undefined ? o.exerciseFamily : base.exerciseFamily,
+    movementFamily: o.movementFamily !== undefined ? o.movementFamily : base.movementFamily,
+    progressionFamily:
+      o.progressionFamily !== undefined ? o.progressionFamily : base.progressionFamily,
+    regressionFamily: o.regressionFamily !== undefined ? o.regressionFamily : base.regressionFamily,
+    contraindicationTags:
+      o.contraindicationTags != null ? o.contraindicationTags : base.contraindicationTags,
+    mediaId: o.mediaId != null && o.mediaId.trim() ? o.mediaId.trim() : base.mediaId,
+    mediaStatus:
+      o.mediaStatus != null ? asMediaStatus(o.mediaStatus, base.mediaStatus) : base.mediaStatus,
+    videoUrl,
+    mediaUrl,
+    cues,
+  });
   return next;
 }
 
@@ -197,7 +245,7 @@ export function mergeExercises(
 ): ResolvedLibraryExercise[] {
   const map = new Map<string, ResolvedLibraryExercise>();
   for (const s of seed) {
-    map.set(s.id, { ...s, instructions: [...s.instructions], alternativeIds: [] });
+    map.set(s.id, toCanonicalExercise({ ...s, alternativeIds: s.alternativeIds ?? [] }));
   }
   for (const o of overlays) {
     const id = String(o.id ?? "").trim();
@@ -210,6 +258,14 @@ export function mergeExercises(
     }
   }
   return [...map.values()];
+}
+
+/** Single catalog authority: seed + overlay → CanonicalExercise[]. */
+export function resolveExerciseCatalog(
+  seed: LibraryExercise[],
+  overlays: ExerciseOverlay[],
+): CanonicalExercise[] {
+  return mergeExercises(seed, overlays);
 }
 
 export function toPlannerExercises(resolved: ResolvedLibraryExercise[]): Exercise[] {
@@ -296,12 +352,17 @@ const METRICS: ChallengeMetric[] = [
 const MODES: NonNullable<Challenge["rankingMode"]>[] = ["absolute", "relative", "personalized"];
 
 function asCategory(v: unknown, fb: ChallengeCategory): ChallengeCategory {
-  return typeof v === "string" && (CATEGORIES as string[]).includes(v) ? (v as ChallengeCategory) : fb;
+  return typeof v === "string" && (CATEGORIES as string[]).includes(v)
+    ? (v as ChallengeCategory)
+    : fb;
 }
 function asMetric(v: unknown, fb: ChallengeMetric): ChallengeMetric {
   return typeof v === "string" && (METRICS as string[]).includes(v) ? (v as ChallengeMetric) : fb;
 }
-function asMode(v: unknown, fb: NonNullable<Challenge["rankingMode"]>): NonNullable<Challenge["rankingMode"]> {
+function asMode(
+  v: unknown,
+  fb: NonNullable<Challenge["rankingMode"]>,
+): NonNullable<Challenge["rankingMode"]> {
   return typeof v === "string" && (MODES as string[]).includes(v)
     ? (v as NonNullable<Challenge["rankingMode"]>)
     : fb;
@@ -359,7 +420,8 @@ function applyChallenge(base: ResolvedChallenge, o: ChallengeOverlay): ResolvedC
   }
   if (typeof o.participants === "number") next.participants = o.participants;
   if (o.active != null) next.active = o.active;
-  if (o.rankingMode != null) next.rankingMode = asMode(o.rankingMode, next.rankingMode ?? "absolute");
+  if (o.rankingMode != null)
+    next.rankingMode = asMode(o.rankingMode, next.rankingMode ?? "absolute");
   if (o.requiresPerformance != null) {
     if (o.requiresPerformance) next.requiresPerformance = true;
     else delete next.requiresPerformance;
@@ -382,8 +444,10 @@ function applyChallenge(base: ResolvedChallenge, o: ChallengeOverlay): ResolvedC
   if (typeof o.targetPct === "number") next.targetPct = o.targetPct;
   if (typeof o.personalTargetMin === "number") next.personalTargetMin = o.personalTargetMin;
   if (typeof o.personalTargetMax === "number") next.personalTargetMax = o.personalTargetMax;
-  if (typeof o.personalTargetFactor === "number") next.personalTargetFactor = o.personalTargetFactor;
-  if (typeof o.personalTargetOffset === "number") next.personalTargetOffset = o.personalTargetOffset;
+  if (typeof o.personalTargetFactor === "number")
+    next.personalTargetFactor = o.personalTargetFactor;
+  if (typeof o.personalTargetOffset === "number")
+    next.personalTargetOffset = o.personalTargetOffset;
   return next;
 }
 
@@ -417,9 +481,11 @@ export function mergeChallenges(
 }
 
 export function activeChallenges(resolved: ResolvedChallenge[]): Challenge[] {
-  return resolved.filter((c) => c.active).map((c) => {
-    const { active: _a, ...rest } = c;
-    void _a;
-    return rest;
-  });
+  return resolved
+    .filter((c) => c.active)
+    .map((c) => {
+      const { active: _a, ...rest } = c;
+      void _a;
+      return rest;
+    });
 }

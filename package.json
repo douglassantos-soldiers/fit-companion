@@ -14,12 +14,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "media:validate": "node scripts/soldiers-media/validate-manifest.mjs",
+    "media:queue": "node scripts/soldiers-media/build-motion-queue.mjs",
     "media:prompts": "node scripts/soldiers-media/render-prompts.mjs",
     "media:coverage": "node scripts/soldiers-media/coverage-report.mjs",
     "media:compress": "node scripts/soldiers-media/compress-stills.mjs",
     "media:motion": "node scripts/soldiers-media/generate-motion.mjs",
+    "media:promote": "node scripts/soldiers-media/promote-media.mjs",
     "media:deploy": "node scripts/soldiers-media/deploy-remote.mjs",
-    "catalog:coverage": "node scripts/exercise-catalog/coverage-diff.mjs"
+    "catalog:coverage": "node scripts/exercise-catalog/coverage-diff.mjs",
+    "catalog:generate-seed": "node scripts/exercise-catalog/generate-seed.mjs",
+    "catalog:validate": "node scripts/exercise-catalog/validate.mjs",
+    "food:validate": "node scripts/nutrition/validate-catalog.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

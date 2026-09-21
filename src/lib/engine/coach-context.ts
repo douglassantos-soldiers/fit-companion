@@ -1,12 +1,31 @@
-import { performanceDimensions, performanceScore, adherenceScore, sessionsInLastDays, streak } from "@/lib/engine/dimensions";
-import { computeLearningInsights, learningWeekHint, extractUserPatterns, patternInsights } from "@/lib/engine/learning";
+import {
+  performanceDimensions,
+  performanceScore,
+  adherenceScore,
+  sessionsInLastDays,
+  streak,
+} from "@/lib/engine/dimensions";
+import {
+  computeLearningInsights,
+  learningWeekHint,
+  extractUserPatterns,
+  patternInsights,
+} from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
+import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
 import { buildDailyMealPlan, dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
-import { evaluateSafety } from "@/lib/engine/safety";
+import { evaluateSafetyForDate } from "@/lib/engine/safety";
 import { activeHubForState } from "@/data/hubs";
-import { BLOCKER_LABEL, GOAL_LABEL, LEVEL_LABEL, MEAL_SLOT_LABEL, todayKey, type AppState } from "@/lib/types";
+import {
+  BLOCKER_LABEL,
+  GOAL_LABEL,
+  LEVEL_LABEL,
+  MEAL_SLOT_LABEL,
+  todayKey,
+  type AppState,
+} from "@/lib/types";
 
 export type CoachContextBundle = {
   contextText: string;
@@ -17,12 +36,14 @@ export type CoachContextBundle = {
 };
 
 /** Build coach context from AppState (server-trusted when hydrated from DB). */
-export function buildCoachContextFromState(state: AppState): CoachContextBundle {
+export function buildCoachContextFromState(
+  state: AppState,
+  opts?: { decisionSnapshot?: DecisionContextSnapshot | null },
+): CoachContextBundle {
   const p = state.profile;
   if (!p) {
     return {
-      contextText:
-        "O usuário ainda não preencheu o perfil. Incentive-o a completar o perfil.",
+      contextText: "O usuário ainda não preencheu o perfil. Incentive-o a completar o perfil.",
       why: [],
       decisions: [],
       livingSummary: "indisponível",
@@ -41,14 +62,19 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
   const recent = sessionsInLastDays(state.sessions, 7);
   const metrics = state.days[todayKey()];
   const totals = dayNutritionTotals(state.meals ?? []);
-  const built = buildLivingPlanWithDecisions(state);
-  const living = state.livingPlans?.[todayKey()] ?? built?.plan ?? null;
-  const checkIn = state.dayCheckIns?.[todayKey()];
+  const date = todayKey();
+  const decisionSnapshot =
+    opts?.decisionSnapshot ??
+    state.decisionContextByDate?.[date] ??
+    assembleDecisionContext(state, { date, source: "offline_legacy" });
+  const living = decisionSnapshot?.livingPlan ?? state.livingPlans?.[date] ?? null;
+  const builtDecisions = decisionSnapshot?.decisions ?? null;
+  const checkIn = state.dayCheckIns?.[date];
   const activeHub = activeHubForState(state.joinedHubIds);
   const ctx = buildUserContext(state, state.userId);
   const patterns = extractUserPatterns(state);
   const patternLines = patternInsights(patterns);
-  const safety = evaluateSafety(state);
+  const safety = decisionSnapshot?.safety ?? evaluateSafetyForDate(state, date);
 
   const mealLines = mealPlan.slots
     .map((s) => {
@@ -75,12 +101,10 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
     ? [`Contexto de hoje (Context Engine):`, ...ctx.why.map((r) => `- ${r}`)]
     : ["Contexto de hoje: estável."];
 
-  const reasonBlock = ctx.reasonCodes.length
-    ? [`Reason codes: ${ctx.reasonCodes.join(", ")}`]
-    : [];
+  const reasonBlock = ctx.reasonCodes.length ? [`Reason codes: ${ctx.reasonCodes.join(", ")}`] : [];
 
   const decisions =
-    built?.decisions.decisions.map((d) => ({
+    builtDecisions?.decisions.map((d) => ({
       type: d.decisionType,
       value: d.decisionValue,
       explanation: d.explanation,
@@ -89,7 +113,7 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
   const decisionBlock = decisions.length
     ? [
         "Decisões de hoje (Decision Engine — NÃO recalcule volume/kcal/mode; apenas explique):",
-        ...built!.decisions.decisions.map(
+        ...builtDecisions!.decisions.map(
           (d) =>
             `- ${d.decisionType}=${String(d.decisionValue)} | codes=[${d.reasonCodes.join(",")}] | conf=${d.confidence} | ${d.explanation}`,
         ),
@@ -117,8 +141,12 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
     `Nome: ${p.name}`,
     `Objetivo: ${GOAL_LABEL[p.goal]} | Nível: ${LEVEL_LABEL[p.level]} | Local: ${p.equipment}`,
     `Idade ${p.age} | Altura ${p.heightCm} cm | Peso ${p.weightKg} kg | ${p.daysPerWeek} treinos/semana`,
-    p.restrictions.length ? `Restrições: ${p.restrictions.join(", ")}` : "Sem restrições registradas",
-    p.primaryBlocker ? `Bloqueio declarado: ${BLOCKER_LABEL[p.primaryBlocker]}` : "Sem bloqueio declarado",
+    p.restrictions.length
+      ? `Restrições: ${p.restrictions.join(", ")}`
+      : "Sem restrições registradas",
+    p.primaryBlocker
+      ? `Bloqueio declarado: ${BLOCKER_LABEL[p.primaryBlocker]}`
+      : "Sem bloqueio declarado",
     `Sono típico: ${p.typicalSleepHours ?? "—"} h | Pula café: ${p.skipBreakfast ? "sim" : "não"}`,
     checkIn
       ? `Check-in hoje: sono ${checkIn.sleepHours}h | energia ${checkIn.energy} | ${checkIn.availableMin} min${checkIn.soreness != null ? ` | dor ${checkIn.soreness}` : ""}${checkIn.stress != null ? ` | stress ${checkIn.stress}` : ""}`
@@ -156,11 +184,17 @@ export function buildCoachContextFromState(state: AppState): CoachContextBundle 
   ].join("\n");
 
   const safetyNotice = safety.escalateCare
-    ? safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
-      "Há um sinal no check-in que merece atenção profissional — não trate como adaptação de treino."
+    ? (safety.reasons.find((r) => r.includes("profissional") || r.includes("atenção")) ??
+      "Há um sinal no check-in que merece atenção profissional — não trate como adaptação de treino.")
     : undefined;
 
-  return { contextText, safetyNotice, why, decisions, livingSummary };
+  return {
+    contextText,
+    why,
+    decisions,
+    livingSummary,
+    ...(safetyNotice ? { safetyNotice } : {}),
+  };
 }
 
 /** Local/offline helper — same body as server context text. */

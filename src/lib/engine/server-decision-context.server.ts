@@ -1,13 +1,14 @@
 /**
- * Server-side decision context — single assembly point for intelligence engines.
- * DOMAIN → Customer360 → Context → Safety inputs (deterministic & traceable).
+ * Server-side decision context — compatibility wrapper around getOrBuildDecisionContext.
+ * DOMAIN → Customer360 → Context → Safety → Decision → Living Plan
  */
 import type { Customer360 } from "@/lib/customer360/types";
-import { buildContextSnapshot, type ContextSnapshot } from "@/lib/engine/context-snapshot";
-import { evaluateSafetyForDate, type SafetyVerdict } from "@/lib/engine/safety";
-import { computeDecisions, type DecisionBundle } from "@/lib/engine/decision";
+import type { ContextSnapshot } from "@/lib/engine/context-snapshot";
+import type { DecisionBundle } from "@/lib/engine/decision";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
+import type { SafetyVerdict } from "@/lib/engine/safety";
 import type { AppState } from "@/lib/types";
-import { DEFAULT_USER_TIMEZONE, getUserTodayKey, normalizeUserTimezone } from "@/lib/timezone";
+import { evaluateSafetyForDate } from "@/lib/engine/safety";
 
 export type ServerDecisionContext = {
   userId: string;
@@ -19,6 +20,7 @@ export type ServerDecisionContext = {
   safety: SafetyVerdict;
   decisions: DecisionBundle | null;
   stale360: boolean;
+  decisionContext?: DecisionContextSnapshot | null;
 };
 
 /**
@@ -30,40 +32,26 @@ export async function buildServerDecisionContext(
 ): Promise<ServerDecisionContext | null> {
   if (!userId) return null;
 
-  const { hydrateAppStateFromDb } = await import("@/lib/customer360/hydrate.server");
-  const { loadCustomerProfile, isCustomer360Stale, recomputeCustomer360 } = await import(
-    "@/lib/customer360/recompute.server"
-  );
+  const { getOrBuildDecisionContext } = await import("@/lib/engine/decision-context.server");
+  const built = await getOrBuildDecisionContext(userId, date);
+  if (!built) return null;
 
-  let state = await hydrateAppStateFromDb(userId);
-  state = { ...state, userId };
+  const dc = built.snapshot;
+  const timezone = dc?.timezone ?? built.state.profile?.timezone ?? "America/Sao_Paulo";
+  const targetDate = dc?.date ?? date ?? "";
+  const safety = dc?.safety ?? evaluateSafetyForDate(built.state, targetDate);
 
-  const timezone = normalizeUserTimezone(state.profile?.timezone ?? DEFAULT_USER_TIMEZONE);
-  const targetDate = date ?? getUserTodayKey(timezone);
-
-  let customer360 = await loadCustomerProfile(userId);
-  const stale360 = isCustomer360Stale(customer360);
-  if (stale360) {
-    customer360 = await recomputeCustomer360(userId);
-  }
-
-  if (customer360?.commerce?.productIds?.length && !state.purchaseProductIds?.length) {
-    state = { ...state, purchaseProductIds: customer360.commerce.productIds };
-  }
-
-  const snapshot = state.profile ? buildContextSnapshot(state, targetDate) : null;
-  const safety = evaluateSafetyForDate(state, targetDate);
-  const decisions = snapshot ? computeDecisions(snapshot, safety) : null;
-
-  return {
+  const result: ServerDecisionContext = {
     userId,
     date: targetDate,
     timezone,
-    state,
-    customer360,
-    snapshot,
+    state: built.state,
+    customer360: built.customer360,
+    snapshot: dc?.context ?? null,
     safety,
-    decisions,
-    stale360,
+    decisions: dc?.decisions ?? null,
+    stale360: built.stale360,
   };
+  if (dc) result.decisionContext = dc;
+  return result;
 }

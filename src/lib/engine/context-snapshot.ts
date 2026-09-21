@@ -13,15 +13,23 @@ import {
   computeLearningInsights,
   extractUserPatterns,
   type UserPatterns,
+  type LearningSnapshot,
 } from "@/lib/engine/learning";
-import { activePatterns, extractLearnedPatterns, type LearnedPattern } from "@/lib/engine/learned-patterns";
-import { computeRecoveryV2, type RecoveryLevel } from "@/lib/engine/recovery-v2";
+import {
+  activePatterns,
+  extractLearnedPatterns,
+  type LearnedPattern,
+} from "@/lib/engine/learned-patterns";
+import { computeRecoverySnapshot, consecutiveHardRpeStreak } from "@/lib/engine/recovery";
+import type {
+  ReadinessLevel,
+  RecoveryLevel,
+  RecoverySnapshot,
+  RecoverySourceSummary,
+} from "@/lib/engine/recovery";
 import { plateauExerciseIds, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { computeMuscleLoad } from "@/lib/training/muscle-load";
-import {
-  detectTravelFromNotes,
-  type ReasonCode,
-} from "@/lib/engine/reason-codes";
+import { detectTravelFromNotes, type ReasonCode } from "@/lib/engine/reason-codes";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
 import { resolvedAvailableMin } from "@/lib/engine/session-time";
 import {
@@ -50,10 +58,16 @@ export type ContextSnapshot = {
   recovery: {
     score: number | null;
     level: RecoveryLevel | null;
+    readiness?: ReadinessLevel;
     fatigueSignal: boolean;
     sorenessAvg: number | null;
     stressAvg: number | null;
     explanation: string | null;
+    confidence?: number;
+    sleepConfidence?: number;
+    checkInConfidence?: number;
+    wearableConfidence?: number;
+    sourceSummary?: RecoverySourceSummary;
   };
   sleep: {
     hours: number | null;
@@ -101,37 +115,37 @@ function dateNDaysAgo(n: number, from = todayKey()) {
   return todayKey(d);
 }
 
-function hardRpeStreak(sessions: AppState["sessions"]): number {
-  const sorted = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
-  let streak = 0;
-  for (const s of sorted) {
-    if (s.rpe === "dificil") streak += 1;
-    else break;
-  }
-  return streak;
-}
-
 export function buildContextSnapshot(
   state: AppState,
   date = todayKey(),
   userId?: string | null,
+  recovery?: RecoverySnapshot,
+  learning?: LearningSnapshot,
 ): ContextSnapshot | null {
   const profile = state.profile;
   if (!profile) return null;
 
   const uid = userId ?? state.userId ?? null;
-  const c360 = buildCustomer360FromState(state, uid != null ? { userId: uid } : undefined);
-  const insights = computeLearningInsights(state);
+  const recoverySnap = recovery ?? computeRecoverySnapshot(state, date);
+  const c360 = buildCustomer360FromState(
+    state,
+    uid != null
+      ? { userId: uid, date, recoverySnapshot: recoverySnap }
+      : { date, recoverySnapshot: recoverySnap },
+  );
+  const insights = learning?.insights ?? computeLearningInsights(state, date);
   const patterns = extractUserPatterns(state);
-  const learned = extractLearnedPatterns(state);
+  const learned = learning?.learnedPatterns ?? extractLearnedPatterns(state, null, date);
   const active = activePatterns(learned);
-  const recoveryV2 = computeRecoveryV2(state, date);
   const checkIn = state.dayCheckIns?.[date];
   const hasCheckInToday = Boolean(checkIn);
 
   let sleepHours: number | null = null;
   let sleepSource: ContextSnapshot["sleep"]["source"] = "unknown";
-  if (checkIn?.sleepHours != null) {
+  if (recoverySnap.sourceSummary.sleep === "checkin" && recoverySnap.sleep != null) {
+    sleepHours = recoverySnap.sleep;
+    sleepSource = "checkin";
+  } else if (checkIn?.sleepHours != null) {
     sleepHours = checkIn.sleepHours;
     sleepSource = "checkin";
   } else if (profile.typicalSleepHours != null) {
@@ -148,24 +162,17 @@ export function buildContextSnapshot(
   const perfDims = dims.filter((d) =>
     ["forca", "resistencia", "consistencia", "recuperacao", "sono"].includes(d.key),
   );
-  const adhereDims = dims.filter((d) =>
-    ["nutricao", "suplementacao", "habitos"].includes(d.key),
-  );
-  const recoveryDim = dims.find((d) => d.key === "recuperacao");
+  const adhereDims = dims.filter((d) => ["nutricao", "suplementacao", "habitos"].includes(d.key));
 
   const sessions7d = sessionsInLastDays(state.sessions, 7);
   const cutoff3 = dateNDaysAgo(3, date);
   const sessions3d = state.sessions.filter((s) => s.date.slice(0, 10) >= cutoff3);
   const hardCount = sessions3d.filter((s) => s.rpe === "dificil").length;
-  const hardStreak = insights?.hardRpeStreak ?? hardRpeStreak(state.sessions);
+  const hardStreak = insights?.hardRpeStreak ?? consecutiveHardRpeStreak(state.sessions);
   const weekHint = insights?.adaptations.weekHint ?? null;
 
   const volumeLoad: ContextSnapshot["training"]["volumeLoad"] =
-    hardStreak >= 2 || weekHint === "deload"
-      ? "high"
-      : sessions7d.length <= 1
-        ? "low"
-        : "normal";
+    hardStreak >= 2 || weekHint === "deload" ? "high" : sessions7d.length <= 1 ? "low" : "normal";
 
   const limitedToday = checkIn?.noEquipment === true;
   const travel = detectTravelFromNotes(checkIn?.notes) || detectTravelFromNotes(state.bio);
@@ -185,21 +192,19 @@ export function buildContextSnapshot(
   const adhereScore = adherenceScore(dims);
   const reasonSeeds: ReasonCode[] = [];
 
-  if (sleepHours != null && sleepHours < 6) reasonSeeds.push("sleep_low");
-  else if (sleepHours != null && sleepHours >= 7) reasonSeeds.push("sleep_good");
+  if (sleepSource === "checkin" && sleepHours != null && sleepHours < 6)
+    reasonSeeds.push("sleep_low");
+  else if (sleepSource === "checkin" && sleepHours != null && sleepHours >= 7)
+    reasonSeeds.push("sleep_good");
 
   if (checkIn?.energy === "baixa") reasonSeeds.push("energy_low");
   else if (checkIn?.energy === "alta") reasonSeeds.push("energy_high");
 
   if (hardStreak >= 2) reasonSeeds.push("rpe_high");
-  if (
-    recoveryV2.level === "low" ||
-    c360.recovery.fatigueSignal ||
-    (recoveryDim && recoveryDim.score < 50)
-  ) {
+  if (recoverySnap.readiness === "low" || recoverySnap.fatigueSignal) {
     reasonSeeds.push("recovery_low");
   }
-  for (const code of recoveryV2.reasonCodes) {
+  for (const code of recoverySnap.reasonCodes) {
     if (!reasonSeeds.includes(code)) reasonSeeds.push(code);
   }
   if (insights && insights.proteinAdherence7d < 0.7) reasonSeeds.push("protein_low");
@@ -208,7 +213,10 @@ export function buildContextSnapshot(
     reasonSeeds.push("weight_trend_down");
   }
   if (checkIn && checkIn.availableMin < 40) reasonSeeds.push("time_limited");
-  if (active.some((p) => p.kind === "prefers_short_sessions") && resolvedAvailableMin(checkIn, profile) <= 50) {
+  if (
+    active.some((p) => p.kind === "prefers_short_sessions") &&
+    resolvedAvailableMin(checkIn, profile) <= 50
+  ) {
     reasonSeeds.push("time_limited");
   }
   if (active.some((p) => p.kind === "prefers_short_sessions" && p.successfulOutcomes >= 2)) {
@@ -240,16 +248,32 @@ export function buildContextSnapshot(
     }
     const hist = listExercisesWithHistory(state.sessions, 12);
     if (hist.some((h) => h.trend === "up" && !h.plateau)) reasonSeeds.push("progression_ready");
-    if (hist.some((h) => h.hits.length >= 2 && h.trend === "up")) reasonSeeds.push("pr_opportunity");
+    if (hist.some((h) => h.hits.length >= 2 && h.trend === "up"))
+      reasonSeeds.push("pr_opportunity");
   }
 
-  let confidenceBase = recoveryV2.confidence;
+  let confidenceBase = recoverySnap.confidence;
   if (hasCheckInToday) confidenceBase = Math.max(confidenceBase, 0.6);
   if (sessions7d.length >= 3) confidenceBase += 0.05;
   if (recentChecks.length >= 3) confidenceBase += 0.05;
   if (!hasCheckInToday) confidenceBase -= 0.08;
   if (state.sessions.length < 3) confidenceBase -= 0.08;
-  confidenceBase = Math.max(0.35, Math.min(0.9, confidenceBase));
+  confidenceBase = Math.max(0.2, Math.min(0.9, confidenceBase));
+
+  const recoverySlice: ContextSnapshot["recovery"] = {
+    score: recoverySnap.score,
+    level: recoverySnap.level,
+    readiness: recoverySnap.readiness,
+    fatigueSignal: recoverySnap.fatigueSignal,
+    sorenessAvg: recoverySnap.soreness,
+    stressAvg: recoverySnap.stress,
+    explanation: recoverySnap.explanation,
+    confidence: recoverySnap.confidence,
+    sleepConfidence: recoverySnap.sleepConfidence,
+    checkInConfidence: recoverySnap.checkInConfidence,
+    wearableConfidence: recoverySnap.wearableConfidence,
+    sourceSummary: recoverySnap.sourceSummary,
+  };
 
   return {
     date,
@@ -265,14 +289,7 @@ export function buildContextSnapshot(
       kcalTrend: insights?.adaptations.kcalDelta ?? null,
       weightTrendKg7d: c360.nutrition.weightTrendKg7d,
     },
-    recovery: {
-      score: recoveryV2.score,
-      level: recoveryV2.level,
-      fatigueSignal: recoveryV2.level === "low" || c360.recovery.fatigueSignal,
-      sorenessAvg: recoveryV2.signals.manual.soreness,
-      stressAvg: recoveryV2.signals.manual.stress,
-      explanation: recoveryV2.explanation,
-    },
+    recovery: recoverySlice,
     sleep: {
       hours: sleepHours,
       avg7d: sleepAvg7d != null ? Math.round(sleepAvg7d * 10) / 10 : c360.recovery.sleepAvg7d,

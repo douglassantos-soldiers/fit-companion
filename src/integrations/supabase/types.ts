@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -12,38 +12,116 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          calories: number | null
+          created_at: string
+          device: string | null
+          distance_m: number | null
+          duration_sec: number | null
+          external_id: string | null
+          id: string
+          metrics: Json
+          proof_status: string
+          source: string
+          started_at: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          calories?: number | null
+          created_at?: string
+          device?: string | null
+          distance_m?: number | null
+          duration_sec?: number | null
+          external_id?: string | null
+          id: string
+          metrics?: Json
+          proof_status?: string
+          source: string
+          started_at: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          calories?: number | null
+          created_at?: string
+          device?: string | null
+          distance_m?: number | null
+          duration_sec?: number | null
+          external_id?: string | null
+          id?: string
+          metrics?: Json
+          proof_status?: string
+          source?: string
+          started_at?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_comments: {
+        Row: {
+          body: string
+          created_at: string
+          event_id: string
+          hidden_at: string | null
+          hidden_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          event_id: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          event_id?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_events: {
         Row: {
           created_at: string
           device_id: string
           display_name: string
+          hidden_at: string | null
+          hidden_by: string | null
           id: string
           kind: string
           kudos_count: number
@@ -54,6 +132,8 @@ export type Database = {
           created_at?: string
           device_id: string
           display_name?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           kind: string
           kudos_count?: number
@@ -64,6 +144,8 @@ export type Database = {
           created_at?: string
           device_id?: string
           display_name?: string
+          hidden_at?: string | null
+          hidden_by?: string | null
           id?: string
           kind?: string
           kudos_count?: number
@@ -102,6 +184,42 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_reactions: {
+        Row: {
+          created_at: string
+          event_id: string
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          kind: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_reactions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -461,6 +579,263 @@ export type Database = {
           },
         ]
       }
+      body_measurements: {
+        Row: {
+          arm_cm: number | null
+          chest_cm: number | null
+          created_at: string
+          date: string
+          device_id: string | null
+          hip_cm: number | null
+          id: string
+          thigh_cm: number | null
+          updated_at: string
+          user_id: string
+          waist_cm: number | null
+        }
+        Insert: {
+          arm_cm?: number | null
+          chest_cm?: number | null
+          created_at?: string
+          date: string
+          device_id?: string | null
+          hip_cm?: number | null
+          id?: string
+          thigh_cm?: number | null
+          updated_at?: string
+          user_id: string
+          waist_cm?: number | null
+        }
+        Update: {
+          arm_cm?: number | null
+          chest_cm?: number | null
+          created_at?: string
+          date?: string
+          device_id?: string | null
+          hip_cm?: number | null
+          id?: string
+          thigh_cm?: number | null
+          updated_at?: string
+          user_id?: string
+          waist_cm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_measurements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_challenges: {
+        Row: {
+          active: boolean
+          category: string
+          description: string
+          duration_days: number
+          ends_at: string | null
+          id: string
+          metric: string
+          personal_target_factor: number | null
+          personal_target_max: number | null
+          personal_target_min: number | null
+          personal_target_offset: number | null
+          ranking_mode: string
+          requires_performance: boolean
+          reward: string | null
+          starts_at: string | null
+          target: number
+          target_pct: number | null
+          title: string
+          unit: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string
+          description?: string
+          duration_days?: number
+          ends_at?: string | null
+          id: string
+          metric?: string
+          personal_target_factor?: number | null
+          personal_target_max?: number | null
+          personal_target_min?: number | null
+          personal_target_offset?: number | null
+          ranking_mode?: string
+          requires_performance?: boolean
+          reward?: string | null
+          starts_at?: string | null
+          target?: number
+          target_pct?: number | null
+          title: string
+          unit?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          description?: string
+          duration_days?: number
+          ends_at?: string | null
+          id?: string
+          metric?: string
+          personal_target_factor?: number | null
+          personal_target_max?: number | null
+          personal_target_min?: number | null
+          personal_target_offset?: number | null
+          ranking_mode?: string
+          requires_performance?: boolean
+          reward?: string | null
+          starts_at?: string | null
+          target?: number
+          target_pct?: number | null
+          title?: string
+          unit?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
+      catalog_exercises: {
+        Row: {
+          active: boolean
+          aliases: string[]
+          alternative_ids: string[]
+          animation_spec: Json | null
+          base_load: number
+          canonical_name: string | null
+          contraindication_tags: string[]
+          cues: string | null
+          difficulty: string | null
+          display_name_en: string | null
+          equipment: string
+          equipment_inventory: string[]
+          exercise_family: string | null
+          id: string
+          instructions: string[]
+          joints: string[]
+          media_id: string | null
+          media_status: string | null
+          media_url: string | null
+          movement_family: string | null
+          movement_pattern: string | null
+          muscle_group: string
+          name: string
+          planner_eligible: boolean
+          primary_muscles: string[]
+          priority: number
+          progression_family: string | null
+          regression_family: string | null
+          search_terms: string[]
+          secondary_muscles: string[]
+          swap_group: string
+          unit: string
+          updated_at: string
+          updated_by: string
+          version: number
+          video_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          aliases?: string[]
+          alternative_ids?: string[]
+          animation_spec?: Json | null
+          base_load?: number
+          canonical_name?: string | null
+          contraindication_tags?: string[]
+          cues?: string | null
+          difficulty?: string | null
+          display_name_en?: string | null
+          equipment: string
+          equipment_inventory?: string[]
+          exercise_family?: string | null
+          id: string
+          instructions?: string[]
+          joints?: string[]
+          media_id?: string | null
+          media_status?: string | null
+          media_url?: string | null
+          movement_family?: string | null
+          movement_pattern?: string | null
+          muscle_group: string
+          name: string
+          planner_eligible?: boolean
+          primary_muscles?: string[]
+          priority?: number
+          progression_family?: string | null
+          regression_family?: string | null
+          search_terms?: string[]
+          secondary_muscles?: string[]
+          swap_group?: string
+          unit?: string
+          updated_at?: string
+          updated_by?: string
+          version?: number
+          video_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          aliases?: string[]
+          alternative_ids?: string[]
+          animation_spec?: Json | null
+          base_load?: number
+          canonical_name?: string | null
+          contraindication_tags?: string[]
+          cues?: string | null
+          difficulty?: string | null
+          display_name_en?: string | null
+          equipment?: string
+          equipment_inventory?: string[]
+          exercise_family?: string | null
+          id?: string
+          instructions?: string[]
+          joints?: string[]
+          media_id?: string | null
+          media_status?: string | null
+          media_url?: string | null
+          movement_family?: string | null
+          movement_pattern?: string | null
+          muscle_group?: string
+          name?: string
+          planner_eligible?: boolean
+          primary_muscles?: string[]
+          priority?: number
+          progression_family?: string | null
+          regression_family?: string | null
+          search_terms?: string[]
+          secondary_muscles?: string[]
+          swap_group?: string
+          unit?: string
+          updated_at?: string
+          updated_by?: string
+          version?: number
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      catalog_settings: {
+        Row: {
+          id: string
+          taco_license_verified: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          taco_license_verified?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          taco_license_verified?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       challenge_entries: {
         Row: {
           challenge_id: string
@@ -484,6 +859,48 @@ export type Database = {
           {
             foreignKeyName: "challenge_entries_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenge_invites: {
+        Row: {
+          challenge_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          status: string
+          to_user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          status?: string
+          to_user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          status?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_invites_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_invites_to_user_id_fkey"
+            columns: ["to_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -666,6 +1083,9 @@ export type Database = {
       }
       cms_overrides: {
         Row: {
+          authorized: boolean
+          authorized_at: string | null
+          authorized_by: string | null
           entity_id: string
           entity_type: string
           id: string
@@ -675,6 +1095,9 @@ export type Database = {
           updated_by: string
         }
         Insert: {
+          authorized?: boolean
+          authorized_at?: string | null
+          authorized_by?: string | null
           entity_id: string
           entity_type: string
           id?: string
@@ -684,6 +1107,9 @@ export type Database = {
           updated_by?: string
         }
         Update: {
+          authorized?: boolean
+          authorized_at?: string | null
+          authorized_by?: string | null
           entity_id?: string
           entity_type?: string
           id?: string
@@ -817,6 +1243,253 @@ export type Database = {
           {
             foreignKeyName: "coach_sessions_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_collections: {
+        Row: {
+          cover_media_id: string | null
+          created_at: string
+          expert_id: string | null
+          id: string
+          kind: string
+          published: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cover_media_id?: string | null
+          created_at?: string
+          expert_id?: string | null
+          id: string
+          kind?: string
+          published?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          cover_media_id?: string | null
+          created_at?: string
+          expert_id?: string | null
+          id?: string
+          kind?: string
+          published?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_collections_expert_id_fkey"
+            columns: ["expert_id"]
+            isOneToOne: false
+            referencedRelation: "experts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_dismissals: {
+        Row: {
+          content_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_impressions: {
+        Row: {
+          content_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_items: {
+        Row: {
+          body: string
+          collection_id: string | null
+          created_at: string
+          expert_id: string | null
+          goals: string[]
+          id: string
+          kind: string
+          levels: string[]
+          media_id: string | null
+          media_url: string | null
+          publish_at: string | null
+          published: boolean
+          sort_order: number
+          title: string
+          unpublish_at: string | null
+          updated_at: string
+          updated_by: string
+          visible: boolean
+        }
+        Insert: {
+          body?: string
+          collection_id?: string | null
+          created_at?: string
+          expert_id?: string | null
+          goals?: string[]
+          id?: string
+          kind: string
+          levels?: string[]
+          media_id?: string | null
+          media_url?: string | null
+          publish_at?: string | null
+          published?: boolean
+          sort_order?: number
+          title: string
+          unpublish_at?: string | null
+          updated_at?: string
+          updated_by?: string
+          visible?: boolean
+        }
+        Update: {
+          body?: string
+          collection_id?: string | null
+          created_at?: string
+          expert_id?: string | null
+          goals?: string[]
+          id?: string
+          kind?: string
+          levels?: string[]
+          media_id?: string | null
+          media_url?: string | null
+          publish_at?: string | null
+          published?: boolean
+          sort_order?: number
+          title?: string
+          unpublish_at?: string | null
+          updated_at?: string
+          updated_by?: string
+          visible?: boolean
+        }
+        Relationships: []
+      }
+      content_progress: {
+        Row: {
+          completed_at: string | null
+          completion_percent: number
+          content_id: string
+          dismissed: boolean
+          saved: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_percent?: number
+          content_id: string
+          dismissed?: boolean
+          saved?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completion_percent?: number
+          content_id?: string
+          dismissed?: boolean
+          saved?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_reports: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string
+          reporter_user_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          target_id: string
+          target_kind: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string
+          reporter_user_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_id: string
+          target_kind?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string
+          reporter_user_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          target_id?: string
+          target_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_reporter_user_id_fkey"
+            columns: ["reporter_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -1047,38 +1720,182 @@ export type Database = {
           },
         ]
       }
+      decision_actions: {
+        Row: {
+          actual_action: string | null
+          completed_at: string | null
+          created_at: string
+          date: string
+          decision_id: string
+          entity_id: string | null
+          entity_type: string | null
+          expected_action: string
+          id: string
+          metadata: Json
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_action?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date: string
+          decision_id: string
+          entity_id?: string | null
+          entity_type?: string | null
+          expected_action: string
+          id?: string
+          metadata?: Json
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_action?: string | null
+          completed_at?: string | null
+          created_at?: string
+          date?: string
+          decision_id?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          expected_action?: string
+          id?: string
+          metadata?: Json
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_actions_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: true
+            referencedRelation: "recommendation_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_actions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_context_snapshots: {
+        Row: {
+          created_at: string
+          customer360_version: number | null
+          date: string
+          engine: string
+          id: string
+          input_fingerprint: string
+          payload: Json
+          snapshot_version: number
+          stale360: boolean
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer360_version?: number | null
+          date: string
+          engine?: string
+          id?: string
+          input_fingerprint: string
+          payload?: Json
+          snapshot_version?: number
+          stale360?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer360_version?: number | null
+          date?: string
+          engine?: string
+          id?: string
+          input_fingerprint?: string
+          payload?: Json
+          snapshot_version?: number
+          stale360?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_context_snapshots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decision_outcomes: {
         Row: {
+          action_id: string | null
+          attribution_confidence: number | null
+          attribution_type: string
           created_at: string
           decision_id: string
           id: string
+          learning_signal: string | null
           metadata: Json
           observed_at: string
+          outcome_quality: string
           outcome_type: string
+          outcome_window: string
           user_id: string
           value: Json | null
         }
         Insert: {
+          action_id?: string | null
+          attribution_confidence?: number | null
+          attribution_type?: string
           created_at?: string
           decision_id: string
           id?: string
+          learning_signal?: string | null
           metadata?: Json
           observed_at?: string
+          outcome_quality?: string
           outcome_type: string
+          outcome_window?: string
           user_id: string
           value?: Json | null
         }
         Update: {
+          action_id?: string | null
+          attribution_confidence?: number | null
+          attribution_type?: string
           created_at?: string
           decision_id?: string
           id?: string
+          learning_signal?: string | null
           metadata?: Json
           observed_at?: string
+          outcome_quality?: string
           outcome_type?: string
+          outcome_window?: string
           user_id?: string
           value?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "decision_outcomes_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "decision_actions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "decision_outcomes_decision_id_fkey"
             columns: ["decision_id"]
@@ -1259,6 +2076,113 @@ export type Database = {
           },
         ]
       }
+      experts: {
+        Row: {
+          active: boolean
+          bio: string
+          created_at: string
+          id: string
+          name: string
+          photo_media_id: string | null
+          social: Json
+          specialty: string
+          updated_at: string
+          updated_by: string
+          verified: boolean
+        }
+        Insert: {
+          active?: boolean
+          bio?: string
+          created_at?: string
+          id: string
+          name: string
+          photo_media_id?: string | null
+          social?: Json
+          specialty?: string
+          updated_at?: string
+          updated_by?: string
+          verified?: boolean
+        }
+        Update: {
+          active?: boolean
+          bio?: string
+          created_at?: string
+          id?: string
+          name?: string
+          photo_media_id?: string | null
+          social?: Json
+          specialty?: string
+          updated_at?: string
+          updated_by?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
+      feed_dismissals: {
+        Row: {
+          author_user_id: string
+          created_at: string
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          author_user_id: string
+          created_at?: string
+          kind: string
+          user_id: string
+        }
+        Update: {
+          author_user_id?: string
+          created_at?: string
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_dismissals_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_dismissals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_impressions: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_items: {
         Row: {
           active: boolean
@@ -1266,11 +2190,13 @@ export type Database = {
           category: string
           confidence: number
           created_at: string
+          ean: string | null
           id: string
           name: string
           per100g: Json
           serving_reference: string
           source: string
+          source_version: string | null
           synonyms: string[]
           updated_at: string
         }
@@ -1280,11 +2206,13 @@ export type Database = {
           category: string
           confidence?: number
           created_at?: string
+          ean?: string | null
           id: string
           name: string
           per100g?: Json
           serving_reference?: string
           source?: string
+          source_version?: string | null
           synonyms?: string[]
           updated_at?: string
         }
@@ -1294,11 +2222,13 @@ export type Database = {
           category?: string
           confidence?: number
           created_at?: string
+          ean?: string | null
           id?: string
           name?: string
           per100g?: Json
           serving_reference?: string
           source?: string
+          source_version?: string | null
           synonyms?: string[]
           updated_at?: string
         }
@@ -1943,6 +2873,215 @@ export type Database = {
           },
         ]
       }
+      program_sessions: {
+        Row: {
+          content_item_id: string | null
+          day: number
+          id: string
+          nutrition_json: Json
+          program_id: string
+          recovery_json: Json
+          training_json: Json
+          updated_at: string
+          week: number
+        }
+        Insert: {
+          content_item_id?: string | null
+          day?: number
+          id: string
+          nutrition_json?: Json
+          program_id: string
+          recovery_json?: Json
+          training_json?: Json
+          updated_at?: string
+          week?: number
+        }
+        Update: {
+          content_item_id?: string | null
+          day?: number
+          id?: string
+          nutrition_json?: Json
+          program_id?: string
+          recovery_json?: Json
+          training_json?: Json
+          updated_at?: string
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_sessions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programs: {
+        Row: {
+          cover_media_id: string | null
+          created_at: string
+          description: string
+          duration_weeks: number
+          expert_ids: string[]
+          goal: string | null
+          id: string
+          level: string | null
+          publish_at: string | null
+          published: boolean
+          sessions_per_week: number
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          cover_media_id?: string | null
+          created_at?: string
+          description?: string
+          duration_weeks?: number
+          expert_ids?: string[]
+          goal?: string | null
+          id: string
+          level?: string | null
+          publish_at?: string | null
+          published?: boolean
+          sessions_per_week?: number
+          title: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          cover_media_id?: string | null
+          created_at?: string
+          description?: string
+          duration_weeks?: number
+          expert_ids?: string[]
+          goal?: string | null
+          id?: string
+          level?: string | null
+          publish_at?: string | null
+          published?: boolean
+          sessions_per_week?: number
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
+      progress_photos: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          id: string
+          pose: string
+          storage_path: string
+          taken_on: string
+          updated_at: string
+          user_id: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          pose: string
+          storage_path: string
+          taken_on: string
+          updated_at?: string
+          user_id: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          pose?: string
+          storage_path?: string
+          taken_on?: string
+          updated_at?: string
+          user_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_photos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_sends: {
+        Row: {
+          category: string
+          id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          id?: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_sends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_items: {
         Row: {
           food_id: string
@@ -2187,6 +3326,105 @@ export type Database = {
         }
         Relationships: []
       }
+      social_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_follows_follower_id_fkey"
+            columns: ["follower_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_follows_following_id_fkey"
+            columns: ["following_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_mutes: {
+        Row: {
+          created_at: string
+          muted_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          muted_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          muted_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_mutes_muted_id_fkey"
+            columns: ["muted_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_mutes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_profiles: {
         Row: {
           app_user_id: string | null
@@ -2194,6 +3432,12 @@ export type Database = {
           bio: string | null
           device_id: string
           display_name: string
+          privacy_nutrition: string
+          privacy_photos: string
+          privacy_profile: string
+          privacy_prs: string
+          privacy_weight: string
+          privacy_workouts: string
           updated_at: string
           user_id: string | null
         }
@@ -2203,6 +3447,12 @@ export type Database = {
           bio?: string | null
           device_id: string
           display_name?: string
+          privacy_nutrition?: string
+          privacy_photos?: string
+          privacy_profile?: string
+          privacy_prs?: string
+          privacy_weight?: string
+          privacy_workouts?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -2212,6 +3462,12 @@ export type Database = {
           bio?: string | null
           device_id?: string
           display_name?: string
+          privacy_nutrition?: string
+          privacy_photos?: string
+          privacy_profile?: string
+          privacy_prs?: string
+          privacy_weight?: string
+          privacy_workouts?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -2227,6 +3483,8 @@ export type Database = {
       }
       soldiers_media: {
         Row: {
+          animation_spec: Json | null
+          checksums: Json | null
           created_at: string
           duration_sec: number | null
           entity_id: string
@@ -2237,16 +3495,21 @@ export type Database = {
           needs_motion: boolean
           ownership: string
           poster_url: string | null
+          prompt: string | null
           qa_notes: string | null
+          region: string
           source: string
           status: string
           style: string
           thumbnail_url: string | null
           updated_at: string
+          variant: string
           version: string
           webm_url: string | null
         }
         Insert: {
+          animation_spec?: Json | null
+          checksums?: Json | null
           created_at?: string
           duration_sec?: number | null
           entity_id: string
@@ -2257,16 +3520,21 @@ export type Database = {
           needs_motion?: boolean
           ownership?: string
           poster_url?: string | null
+          prompt?: string | null
           qa_notes?: string | null
+          region?: string
           source?: string
           status?: string
           style?: string
           thumbnail_url?: string | null
           updated_at?: string
+          variant?: string
           version?: string
           webm_url?: string | null
         }
         Update: {
+          animation_spec?: Json | null
+          checksums?: Json | null
           created_at?: string
           duration_sec?: number | null
           entity_id?: string
@@ -2277,12 +3545,15 @@ export type Database = {
           needs_motion?: boolean
           ownership?: string
           poster_url?: string | null
+          prompt?: string | null
           qa_notes?: string | null
+          region?: string
           source?: string
           status?: string
           style?: string
           thumbnail_url?: string | null
           updated_at?: string
+          variant?: string
           version?: string
           webm_url?: string | null
         }
@@ -2382,6 +3653,27 @@ export type Database = {
           },
         ]
       }
+      training_rules: {
+        Row: {
+          id: string
+          payload: Json
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          id?: string
+          payload?: Json
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       user_events: {
         Row: {
           created_at: string
@@ -2467,6 +3759,9 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          status: string
+          status_reason: string | null
+          status_until: string | null
           timezone: string | null
           updated_at: string
         }
@@ -2475,6 +3770,9 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          status?: string
+          status_reason?: string | null
+          status_until?: string | null
           timezone?: string | null
           updated_at?: string
         }
@@ -2483,8 +3781,38 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          status?: string
+          status_reason?: string | null
+          status_until?: string | null
           timezone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      wearable_connections: {
+        Row: {
+          access_token: string | null
+          expires_at: string | null
+          provider: string
+          refresh_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          expires_at?: string | null
+          provider: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          expires_at?: string | null
+          provider?: string
+          refresh_token?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2660,11 +3988,7 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
-

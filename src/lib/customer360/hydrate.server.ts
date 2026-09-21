@@ -75,7 +75,8 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     accessGrantedAt: typeof r["accessGrantedAt"] === "string" ? r["accessGrantedAt"] : null,
     lastPurchaseAt: typeof r["lastPurchaseAt"] === "string" ? r["lastPurchaseAt"] : null,
     accessExpiresAt: typeof r["accessExpiresAt"] === "string" ? r["accessExpiresAt"] : null,
-    shopifyDisplayName: typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
+    shopifyDisplayName:
+      typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
     accessTier: r["accessTier"] === "performance" ? "performance" : "base",
     purchaseProductIds: Array.isArray(r["purchaseProductIds"])
       ? (r["purchaseProductIds"] as string[])
@@ -127,7 +128,8 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       : {}),
     termsAcceptedAt: typeof r["termsAcceptedAt"] === "string" ? r["termsAcceptedAt"] : null,
     privacyAcceptedAt: typeof r["privacyAcceptedAt"] === "string" ? r["privacyAcceptedAt"] : null,
-    healthPurposeAckAt: typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
+    healthPurposeAckAt:
+      typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
     favoriteMealPresetIds: Array.isArray(r["favoriteMealPresetIds"])
       ? (r["favoriteMealPresetIds"] as string[])
       : [],
@@ -193,17 +195,32 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
   const db = await adminDbLoose();
   if (!db) return base;
 
-  const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes, checkInsRes] =
-    await Promise.all([
-      db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-      db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
-      db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
-      db.from("daily_metrics").select("*").eq("user_id", userId),
-      db.from("supplement_logs").select("*").eq("user_id", userId),
-      db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
-      db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
-      db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
-    ]);
+  const [
+    profileRes,
+    sessionsRes,
+    weightsRes,
+    daysRes,
+    supplementsRes,
+    stateRes,
+    mealsRes,
+    checkInsRes,
+    snapshotsRes,
+  ] = await Promise.all([
+    db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+    db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    db.from("daily_metrics").select("*").eq("user_id", userId),
+    db.from("supplement_logs").select("*").eq("user_id", userId),
+    db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
+    db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db
+      .from("decision_context_snapshots")
+      .select("date, payload")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .limit(14),
+  ]);
 
   const stateRow = stateRes.data as Row | null;
   const retention = retentionFromRow(stateRow?.["retention"]);
@@ -257,7 +274,9 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
           ? { primaryBlocker: prefs["primaryBlocker"] as import("@/lib/types").PrimaryBlocker }
           : {}),
         ...(prefs["nutritionProfile"] && typeof prefs["nutritionProfile"] === "object"
-          ? { nutritionProfile: prefs["nutritionProfile"] as import("@/lib/types").NutritionProfile }
+          ? {
+              nutritionProfile: prefs["nutritionProfile"] as import("@/lib/types").NutritionProfile,
+            }
           : {}),
         ...(Array.isArray(prefs["equipmentInventory"])
           ? { equipmentInventory: prefs["equipmentInventory"] as import("@/lib/types").GymGear[] }
@@ -275,6 +294,10 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     ...m,
     id: m.id || crypto.randomUUID(),
   }));
+
+  const decisionContextByDate = mapDecisionContextCache(
+    snapshotsRes.error ? [] : ((snapshotsRes.data ?? []) as Row[]),
+  );
 
   return {
     ...base,
@@ -296,9 +319,14 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     theme: ((stateRow?.["theme"] as AppState["theme"]) ?? "dark") as AppState["theme"],
     dimensionSnapshots: (stateRow?.["dimension_snapshots"] as AppState["dimensionSnapshots"]) ?? [],
     earnedBadges:
-      (retention.earnedBadges?.length ? retention.earnedBadges : (stateRow?.["earned_badges"] as string[])) ?? [],
+      (retention.earnedBadges?.length
+        ? retention.earnedBadges
+        : (stateRow?.["earned_badges"] as string[])) ?? [],
     shareProgress: stateRow?.["share_progress"] !== false,
-    socialPrivacy: normalizeSocialPrivacy(retention.socialPrivacy, stateRow?.["share_progress"] !== false),
+    socialPrivacy: normalizeSocialPrivacy(
+      retention.socialPrivacy,
+      stateRow?.["share_progress"] !== false,
+    ),
     sessionFx: stateRow?.["session_fx"] !== false,
     favoriteMealPresetIds:
       (retention.favoriteMealPresetIds?.length
@@ -308,6 +336,24 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     remindersEnabled: stateRow?.["reminders_enabled"] === true,
     reminderHour: Number(stateRow?.["reminder_hour"] ?? 18),
     seenOnboardingTips: (stateRow?.["seen_onboarding_tips"] as string[]) ?? [],
-    livingPlans: (stateRow?.["living_plans"] as AppState["livingPlans"]) ?? {},
+    livingPlans: {
+      ...((stateRow?.["living_plans"] as AppState["livingPlans"]) ?? {}),
+      ...Object.fromEntries(
+        Object.entries(decisionContextByDate).map(([d, snap]) => [d, snap.livingPlan]),
+      ),
+    },
+    decisionContextByDate,
   };
+}
+
+function mapDecisionContextCache(rows: Row[]): AppState["decisionContextByDate"] {
+  const out: AppState["decisionContextByDate"] = {};
+  for (const row of rows) {
+    const date = String(row["date"] ?? "");
+    const payload = row["payload"];
+    if (!date || !payload || typeof payload !== "object") continue;
+    const snap = payload as AppState["decisionContextByDate"][string];
+    out[date] = { ...snap, source: "server" };
+  }
+  return out;
 }

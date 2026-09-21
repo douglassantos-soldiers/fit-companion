@@ -2,10 +2,7 @@
  * Recovery from lapse — avoid "all or nothing" messaging.
  */
 import { interventionForTrigger } from "@/lib/engine/behavior/interventions";
-import type {
-  BehaviorProfile,
-  RecoveryFromLapse,
-} from "@/lib/engine/behavior/types";
+import type { BehaviorProfile, RecoveryFromLapse } from "@/lib/engine/behavior/types";
 import { streak } from "@/lib/engine/dimensions";
 import type { AppState } from "@/lib/types";
 import { todayKey } from "@/lib/types";
@@ -13,13 +10,14 @@ import { todayKey } from "@/lib/types";
 export function detectLapses(
   state: AppState,
   profile: BehaviorProfile,
+  date = todayKey(),
 ): RecoveryFromLapse[] {
   const out: RecoveryFromLapse[] = [];
   const s = streak(state.sessions ?? [], { freezeUsedDates: state.freezeUsedDates });
-  const today = todayKey();
+  const today = date;
   const trainedToday = (state.sessions ?? []).some((x) => x.date.slice(0, 10) === today);
   const yesterday = (() => {
-    const d = new Date();
+    const d = new Date(`${date}T12:00:00`);
     d.setDate(d.getDate() - 1);
     return todayKey(d);
   })();

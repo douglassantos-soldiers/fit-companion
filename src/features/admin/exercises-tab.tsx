@@ -2,12 +2,13 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toCanonicalExercise } from "@/lib/training/canonical-exercise";
 import type { ResolvedLibraryExercise } from "@/lib/training/resolve-catalog";
 
 const GROUPS = ["peito", "costas", "pernas", "ombros", "biceps", "triceps", "core", "cardio"];
 
 function emptyDraft(): ResolvedLibraryExercise {
-  return {
+  return toCanonicalExercise({
     id: "",
     name: "",
     group: "peito",
@@ -19,21 +20,13 @@ function emptyDraft(): ResolvedLibraryExercise {
     priority: 2,
     primaryMuscles: ["peito"],
     secondaryMuscles: [],
-    movementPattern: "other",
+    movementPattern: "mobility",
     difficulty: "intermediate",
     plannerEligible: true,
     active: true,
     instructions: [],
-    animationSpec: {
-      start: "posição inicial",
-      end: "posição final",
-      tempo: "controlled",
-      durationSec: 4,
-      loop: true,
-      camera: "three-quarter",
-    },
     alternativeIds: [],
-  };
+  });
 }
 
 export function ExercisesTab({
@@ -53,7 +46,8 @@ export function ExercisesTab({
     const t = q.trim().toLowerCase();
     if (!t) return rows;
     return rows.filter(
-      (e) => e.name.toLowerCase().includes(t) || e.id.toLowerCase().includes(t) || e.group.includes(t),
+      (e) =>
+        e.name.toLowerCase().includes(t) || e.id.toLowerCase().includes(t) || e.group.includes(t),
     );
   }, [rows, q]);
 
@@ -71,12 +65,17 @@ export function ExercisesTab({
           <Label className="text-xs">id</Label>
           <Input value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
           <Label className="text-xs">nome</Label>
-          <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Input
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
           <Label className="text-xs">grupo</Label>
           <select
             className="h-10 w-full rounded-md border border-white/10 bg-background px-3 text-sm"
             value={draft.group}
-            onChange={(e) => setDraft({ ...draft, group: e.target.value as ResolvedLibraryExercise["group"] })}
+            onChange={(e) =>
+              setDraft({ ...draft, group: e.target.value as ResolvedLibraryExercise["group"] })
+            }
           >
             {GROUPS.map((g) => (
               <option key={g} value={g}>
@@ -95,7 +94,10 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                primaryMuscles: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) as never,
+                primaryMuscles: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean) as never,
               })
             }
           />
@@ -105,12 +107,57 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                alternativeIds: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                alternativeIds: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
               })
             }
           />
           <Label className="text-xs">cues</Label>
-          <Input value={draft.cues ?? ""} onChange={(e) => setDraft({ ...draft, cues: e.target.value })} />
+          <Input
+            value={(draft.cues ?? []).join(" | ")}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                cues: e.target.value
+                  .split("|")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+          />
+          <Label className="text-xs">aliases (vírgula)</Label>
+          <Input
+            value={(draft.aliases ?? []).join(",")}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                aliases: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+          />
+          <Label className="text-xs">search terms (vírgula)</Label>
+          <Input
+            value={(draft.searchTerms ?? []).join(",")}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                searchTerms: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+          />
+          <Label className="text-xs">media id</Label>
+          <Input
+            value={draft.mediaId}
+            onChange={(e) => setDraft({ ...draft, mediaId: e.target.value.trim() || draft.id })}
+          />
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"

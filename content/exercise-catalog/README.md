@@ -13,7 +13,8 @@ Proibido:
 
 Arquivos:
 - `soldiers-lote1.json` — snapshot da library Soldiers (lote 1)
-- `taxonomy-gaps-v1.json` — backlog autoral de famílias para lotes 2+
+- `taxonomy-gaps-v1.json` — backlog autoral de famílias para lotes 2–3
+- `taxonomy-gaps-v2.json` — backlog lote 2b (planner) + 2c (library-only), alvo ~250 exercícios
 - `import/` — dump local opcional (gitignored). Use `--from` no script.
 
 ```

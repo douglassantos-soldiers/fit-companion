@@ -33,7 +33,6 @@ import { plateauAnalysisWorkflow } from "@/lib/coach/workflows/plateau-analysis"
 import { postWorkoutWorkflow } from "@/lib/coach/workflows/post-workout";
 import { recoveryAdjustmentWorkflow } from "@/lib/coach/workflows/recovery-adjustment";
 import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
-import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { evaluateSafetyForDate } from "@/lib/engine/safety";
 import { EVENT_TAXONOMY } from "@/lib/events/taxonomy";
 import type { WorkflowResult } from "@/lib/coach/types";
@@ -88,8 +87,12 @@ function pickWorkflow(
   if (hint === "weekly-review" || /revis[aã]o\s+semanal|resumo\s+da\s+semana/i.test(lastUser)) {
     return weeklyReviewWorkflow(ctx.typed);
   }
-  if (hint === "post-workout" || /p[oó]s.?treino|depois\s+do\s+treino|acabei\s+de\s+treinar/i.test(lastUser)) {
-    const last = [...(state.sessions ?? [])].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  if (
+    hint === "post-workout" ||
+    /p[oó]s.?treino|depois\s+do\s+treino|acabei\s+de\s+treinar/i.test(lastUser)
+  ) {
+    const last =
+      [...(state.sessions ?? [])].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
     return postWorkoutWorkflow(ctx.typed, last, state.sessions ?? []);
   }
   if (hint === "recovery-adjustment" || /recupera|cansad|sono\s+ruim|fatigue/i.test(lastUser)) {
@@ -168,19 +171,22 @@ export const askAiCoach = createServerFn({ method: "POST" })
     }
 
     const evidence = workflow?.evidence ?? evidenceFromContext(ctx.typed);
-    const built = buildLivingPlanWithDecisions(ctx.state, day);
-    const safety = evaluateSafetyForDate(ctx.state, day);
+    const snap = ctx.state.decisionContextByDate?.[day] ?? null;
+    const builtDecisions = snap?.decisions ?? null;
+    const safety = snap?.safety ?? evaluateSafetyForDate(ctx.state, day);
 
     let proposal =
       workflow?.proposal ??
-      (built ? proposalFromDecisions(built.decisions, safety, evidence as Record<string, string | number | boolean | null>) : null);
+      (builtDecisions
+        ? proposalFromDecisions(
+            builtDecisions,
+            safety,
+            evidence as Record<string, string | number | boolean | null>,
+          )
+        : null);
 
     if (proposal) {
-      const validated = validateProposalAgainstDecisionEngine(
-        proposal,
-        built?.decisions ?? null,
-        safety,
-      );
+      const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
       proposal = validated.proposal;
       if (proposal) {
         void persistCoachProposal({
@@ -196,9 +202,7 @@ export const askAiCoach = createServerFn({ method: "POST" })
       }
     }
 
-    const actions = workflow?.actions?.length
-      ? workflow.actions
-      : actionsForProposal(proposal);
+    const actions = workflow?.actions?.length ? workflow.actions : actionsForProposal(proposal);
 
     const toolBlock =
       Object.keys(toolPack).length > 0
@@ -220,7 +224,8 @@ export const askAiCoach = createServerFn({ method: "POST" })
         (intent === "today"
           ? `Hoje: ${ctx.livingSummary}`
           : intent === "why"
-            ? ctx.why[0] ?? "O plano reflete as decisões do Decision Engine para o seu contexto de hoje."
+            ? (ctx.why[0] ??
+              "O plano reflete as decisões do Decision Engine para o seu contexto de hoje.")
             : ctx.livingSummary),
       why: workflow?.analysis?.length ? workflow.analysis : ctx.why,
       decisions: ctx.decisions,

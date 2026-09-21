@@ -7,13 +7,7 @@ export type FoodSource = "taco" | "user" | "imported" | "ai_estimate" | "interna
 export type NutrientKind = "observed" | "derived" | "estimated";
 
 export type MacroKey =
-  | "energyKcal"
-  | "proteinG"
-  | "carbG"
-  | "fatG"
-  | "fiberG"
-  | "sugarG"
-  | "sodiumMg";
+  "energyKcal" | "proteinG" | "carbG" | "fatG" | "fiberG" | "sugarG" | "sodiumMg";
 
 export type MicroKey =
   | "ironMg"
@@ -80,6 +74,8 @@ export interface FoodItem {
   synonyms?: string[];
   /** GTIN/EAN when known (internal match before Open Food Facts) */
   ean?: string;
+  /** Internal catalog revision (e.g. soldiers-internal-v1). Omit on overlays without it. */
+  sourceVersion?: string;
   /** Nutrients per 100 g (canonical) */
   per100g: MacroSnapshot;
 }

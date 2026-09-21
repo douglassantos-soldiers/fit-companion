@@ -12,7 +12,11 @@ import type {
   BehaviorPatternKey,
 } from "@/lib/engine/behavior/types";
 import { extractUserPatterns } from "@/lib/engine/user-patterns";
-import { extractLearnedPatterns, activePatterns } from "@/lib/engine/learned-patterns";
+import {
+  extractLearnedPatterns,
+  activePatterns,
+  type LearnedPattern,
+} from "@/lib/engine/learned-patterns";
 import { todayKey, type AppState } from "@/lib/types";
 
 const WEEKDAY_NAMES = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -38,15 +42,18 @@ function pattern(
   };
 }
 
-export function detectBehaviorPatterns(state: AppState, now = todayKey()): BehaviorPattern[] {
+export function detectBehaviorPatterns(
+  state: AppState,
+  now = todayKey(),
+  learnedPrior?: LearnedPattern[] | null,
+): BehaviorPattern[] {
   const legacy = extractUserPatterns(state);
   const out: BehaviorPattern[] = [];
 
   if (legacy.weakestWeekday != null && state.sessions.length >= 8) {
     const wd = legacy.weakestWeekday;
     const count = legacy.weekdaySessionCounts[wd] ?? 0;
-    const avg =
-      Object.values(legacy.weekdaySessionCounts).reduce((a, b) => a + b, 0) / 7;
+    const avg = Object.values(legacy.weekdaySessionCounts).reduce((a, b) => a + b, 0) / 7;
     const support = Math.max(2, Math.round(avg - count + 2));
     const conf = Math.min(0.9, 0.4 + (avg - count) * 0.15);
     out.push(
@@ -150,7 +157,7 @@ export function detectBehaviorPatterns(state: AppState, now = todayKey()): Behav
 
   // Bridge learned patterns
   try {
-    const learned = activePatterns(extractLearnedPatterns(state));
+    const learned = activePatterns(extractLearnedPatterns(state, learnedPrior ?? null, now));
     for (const lp of learned) {
       const key = mapLearnedKind(lp.kind);
       if (!key || out.some((p) => p.key === key)) continue;

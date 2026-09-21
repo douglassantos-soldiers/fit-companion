@@ -94,9 +94,12 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     accessGrantedAt: typeof r["accessGrantedAt"] === "string" ? r["accessGrantedAt"] : null,
     lastPurchaseAt: typeof r["lastPurchaseAt"] === "string" ? r["lastPurchaseAt"] : null,
     accessExpiresAt: typeof r["accessExpiresAt"] === "string" ? r["accessExpiresAt"] : null,
-    shopifyDisplayName: typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
+    shopifyDisplayName:
+      typeof r["shopifyDisplayName"] === "string" ? r["shopifyDisplayName"] : null,
     accessTier: r["accessTier"] === "performance" ? "performance" : "base",
-    purchaseProductIds: Array.isArray(r["purchaseProductIds"]) ? (r["purchaseProductIds"] as string[]) : [],
+    purchaseProductIds: Array.isArray(r["purchaseProductIds"])
+      ? (r["purchaseProductIds"] as string[])
+      : [],
     restockEstimates:
       r["restockEstimates"] && typeof r["restockEstimates"] === "object"
         ? (r["restockEstimates"] as AppState["restockEstimates"])
@@ -127,7 +130,9 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       r["supplementFrequencies"] && typeof r["supplementFrequencies"] === "object"
         ? (r["supplementFrequencies"] as Record<string, DoseFrequency>)
         : {},
-    likedExerciseIds: Array.isArray(r["likedExerciseIds"]) ? (r["likedExerciseIds"] as string[]) : [],
+    likedExerciseIds: Array.isArray(r["likedExerciseIds"])
+      ? (r["likedExerciseIds"] as string[])
+      : [],
     dislikedExerciseIds: Array.isArray(r["dislikedExerciseIds"])
       ? (r["dislikedExerciseIds"] as string[])
       : [],
@@ -141,7 +146,8 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       : {}),
     termsAcceptedAt: typeof r["termsAcceptedAt"] === "string" ? r["termsAcceptedAt"] : null,
     privacyAcceptedAt: typeof r["privacyAcceptedAt"] === "string" ? r["privacyAcceptedAt"] : null,
-    healthPurposeAckAt: typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
+    healthPurposeAckAt:
+      typeof r["healthPurposeAckAt"] === "string" ? r["healthPurposeAckAt"] : null,
     remindersEnabled: r["remindersEnabled"] === true,
     earnedBadges: Array.isArray(r["earnedBadges"]) ? (r["earnedBadges"] as string[]) : [],
     socialPrivacy: normalizeSocialPrivacy(r["socialPrivacy"], true),
@@ -239,7 +245,9 @@ function mapDoseLogs(rows: Row[]): SupplementDoseLog[] {
   }));
 }
 
-function profilePrefsFromRow(prefs: unknown): Partial<
+function profilePrefsFromRow(
+  prefs: unknown,
+): Partial<
   Pick<
     Profile,
     | "skipBreakfast"
@@ -260,11 +268,13 @@ function profilePrefsFromRow(prefs: unknown): Partial<
   if (p["skipBreakfast"] === true) out.skipBreakfast = true;
   if (p["lunchOutOften"] === true) out.lunchOutOften = true;
   if (typeof p["typicalSleepHours"] === "number") out.typicalSleepHours = p["typicalSleepHours"];
-  if (typeof p["primaryBlocker"] === "string") out.primaryBlocker = p["primaryBlocker"] as PrimaryBlocker;
+  if (typeof p["primaryBlocker"] === "string")
+    out.primaryBlocker = p["primaryBlocker"] as PrimaryBlocker;
   if (p["nutritionProfile"] && typeof p["nutritionProfile"] === "object") {
     out.nutritionProfile = p["nutritionProfile"] as NutritionProfile;
   }
-  if (Array.isArray(p["trainingWeekdays"])) out.trainingWeekdays = p["trainingWeekdays"] as number[];
+  if (Array.isArray(p["trainingWeekdays"]))
+    out.trainingWeekdays = p["trainingWeekdays"] as number[];
   if (Array.isArray(p["focusMuscles"])) {
     out.focusMuscles = p["focusMuscles"] as FocusMuscle[];
   }
@@ -302,7 +312,10 @@ function mapSessions(rows: Row[]) {
   });
 }
 
-async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promise<AppState | null> {
+async function pullForUserId(
+  userId: string,
+  fallbackDeviceIds: string[],
+): Promise<AppState | null> {
   const db = await adminDbLoose();
   if (!db || !userId) return null;
 
@@ -327,9 +340,21 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
     db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
     db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
     db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
-    db.from("supplement_dose_logs").select("*").eq("user_id", userId).order("taken_at", { ascending: true }),
-    db.from("body_measurements").select("*").eq("user_id", userId).order("date", { ascending: true }),
-    db.from("progress_photos").select("*").eq("user_id", userId).order("taken_on", { ascending: true }),
+    db
+      .from("supplement_dose_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("taken_at", { ascending: true }),
+    db
+      .from("body_measurements")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: true }),
+    db
+      .from("progress_photos")
+      .select("*")
+      .eq("user_id", userId)
+      .order("taken_on", { ascending: true }),
   ]);
 
   // day_checkins / dose logs may be missing before migration — ignore table errors
@@ -344,7 +369,9 @@ async function pullForUserId(userId: string, fallbackDeviceIds: string[]): Promi
       ? ((measurementsRes.data ?? []) as Row[])
       : [];
   const photoRows =
-    photosRes && !("error" in photosRes && photosRes.error) ? ((photosRes.data ?? []) as Row[]) : [];
+    photosRes && !("error" in photosRes && photosRes.error)
+      ? ((photosRes.data ?? []) as Row[])
+      : [];
 
   const hasUserRows =
     profileRes.data ||
@@ -407,8 +434,7 @@ function assembleStateFromRows(opts: {
     doseLogs = [],
     measurements = [],
     progressPhotos = [],
-  } =
-    opts;
+  } = opts;
   const hasAnything =
     profiles.length > 0 ||
     sessions.length > 0 ||
@@ -490,7 +516,10 @@ function assembleStateFromRows(opts: {
       ]),
     ),
     supplementLogs: Object.fromEntries(
-      [...suppByDate.values()].map((s) => [String(s["date"]), (s["supplement_ids"] as string[]) ?? []]),
+      [...suppByDate.values()].map((s) => [
+        String(s["date"]),
+        (s["supplement_ids"] as string[]) ?? [],
+      ]),
     ),
     supplementRoutine: (stateRow?.["supplement_routine"] as string[]) ?? [],
     challenges: (stateRow?.["challenges"] as string[]) ?? [],
@@ -520,13 +549,26 @@ async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
 
   const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
     await Promise.all([
-      db.from("profiles").select("*").in("device_id", deviceIds).order("updated_at", { ascending: false }).limit(1),
-      db.from("sessions").select("*").in("device_id", deviceIds).order("date", { ascending: false }),
+      db
+        .from("profiles")
+        .select("*")
+        .in("device_id", deviceIds)
+        .order("updated_at", { ascending: false })
+        .limit(1),
+      db
+        .from("sessions")
+        .select("*")
+        .in("device_id", deviceIds)
+        .order("date", { ascending: false }),
       db.from("weights").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
       db.from("daily_metrics").select("*").in("device_id", deviceIds),
       db.from("supplement_logs").select("*").in("device_id", deviceIds),
       db.from("app_state").select("*").in("device_id", deviceIds),
-      db.from("meal_entries").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
+      db
+        .from("meal_entries")
+        .select("*")
+        .in("device_id", deviceIds)
+        .order("date", { ascending: true }),
     ]);
 
   return assembleStateFromRows({
@@ -683,10 +725,13 @@ export async function pushStateServer(
     );
     const accepted = state.sessions.filter((s) => {
       const remote = remoteById.get(s.id);
-      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
-        version: Number((s as { version?: number }).version ?? 1),
-        clientUpdatedAt: new Date().toISOString(),
-      });
+      const ok = shouldAcceptWrite(
+        remote as { version?: number; updated_at?: string } | undefined,
+        {
+          version: Number((s as { version?: number }).version ?? 1),
+          clientUpdatedAt: new Date().toISOString(),
+        },
+      );
       if (!ok) conflicts.push(`session:${s.id}`);
       return ok;
     });
@@ -730,7 +775,11 @@ export async function pushStateServer(
   }
 
   if ((state.measurements ?? []).length) {
-    const measProbe = await db.from("body_measurements").select("date").eq("user_id", userId).limit(1);
+    const measProbe = await db
+      .from("body_measurements")
+      .select("date")
+      .eq("user_id", userId)
+      .limit(1);
     if (!measProbe.error) {
       tasks.push(
         db.from("body_measurements").upsert(
@@ -804,10 +853,13 @@ export async function pushStateServer(
     );
     const accepted = state.meals.filter((m) => {
       const remote = remoteById.get(m.id);
-      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
-        version: Number((m as { version?: number }).version ?? 1),
-        clientUpdatedAt: new Date().toISOString(),
-      });
+      const ok = shouldAcceptWrite(
+        remote as { version?: number; updated_at?: string } | undefined,
+        {
+          version: Number((m as { version?: number }).version ?? 1),
+          clientUpdatedAt: new Date().toISOString(),
+        },
+      );
       if (!ok) conflicts.push(`meal:${m.id}`);
       return ok;
     });
@@ -855,10 +907,13 @@ export async function pushStateServer(
       );
       const accepted = doses.filter((d) => {
         const remote = remoteById.get(d.id);
-        const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
-          version: Number(d.version ?? 1),
-          clientUpdatedAt: new Date().toISOString(),
-        });
+        const ok = shouldAcceptWrite(
+          remote as { version?: number; updated_at?: string } | undefined,
+          {
+            version: Number(d.version ?? 1),
+            clientUpdatedAt: new Date().toISOString(),
+          },
+        );
         if (!ok) conflicts.push(`dose:${d.id}`);
         return ok;
       });
@@ -899,10 +954,13 @@ export async function pushStateServer(
     );
     const accepted = checkIns.filter((c) => {
       const remote = remoteByDate.get(c.date.slice(0, 10));
-      const ok = shouldAcceptWrite(remote as { version?: number; updated_at?: string } | undefined, {
-        version: Number(c.version ?? 1),
-        clientUpdatedAt: new Date().toISOString(),
-      });
+      const ok = shouldAcceptWrite(
+        remote as { version?: number; updated_at?: string } | undefined,
+        {
+          version: Number(c.version ?? 1),
+          clientUpdatedAt: new Date().toISOString(),
+        },
+      );
       if (!ok) conflicts.push(`day_checkin:${c.date}`);
       return ok;
     });
@@ -1080,8 +1138,9 @@ const CLEAR_USER_CORE_TABLES = [
   "meal_entries",
   "day_checkins",
   "customer_profiles",
-  "recommendation_decisions",
   "decision_outcomes",
+  "decision_actions",
+  "recommendation_decisions",
   "user_patterns",
   "user_events",
   "push_subscriptions",
@@ -1164,27 +1223,31 @@ export async function exportUserDataServer(deviceId: string): Promise<{
   const db = await adminDbLoose();
   if (!db) return { ok: false, json: "" };
 
-  const [profile, sessions, weights, meals, events, stateRow, measurements, photos] = await Promise.all([
-    db.from("profiles").select("*").eq("user_id", identity.userId).maybeSingle(),
-    db.from("sessions").select("client_id, date, title, duration_min, volume_kg, rpe").eq("user_id", identity.userId),
-    db.from("weights").select("date, weight_kg").eq("user_id", identity.userId),
-    db.from("meal_entries").select("client_id, date, slot, items").eq("user_id", identity.userId),
-    db
-      .from("user_events")
-      .select("event_type, occurred_at, entity_type, entity_id, metadata")
-      .eq("user_id", identity.userId)
-      .order("occurred_at", { ascending: false })
-      .limit(500),
-    db.from("app_state").select("retention").eq("user_id", identity.userId).maybeSingle(),
-    db
-      .from("body_measurements")
-      .select("date, waist_cm, arm_cm, chest_cm, hip_cm, thigh_cm")
-      .eq("user_id", identity.userId),
-    db
-      .from("progress_photos")
-      .select("taken_on, pose, visibility, storage_path")
-      .eq("user_id", identity.userId),
-  ]);
+  const [profile, sessions, weights, meals, events, stateRow, measurements, photos] =
+    await Promise.all([
+      db.from("profiles").select("*").eq("user_id", identity.userId).maybeSingle(),
+      db
+        .from("sessions")
+        .select("client_id, date, title, duration_min, volume_kg, rpe")
+        .eq("user_id", identity.userId),
+      db.from("weights").select("date, weight_kg").eq("user_id", identity.userId),
+      db.from("meal_entries").select("client_id, date, slot, items").eq("user_id", identity.userId),
+      db
+        .from("user_events")
+        .select("event_type, occurred_at, entity_type, entity_id, metadata")
+        .eq("user_id", identity.userId)
+        .order("occurred_at", { ascending: false })
+        .limit(500),
+      db.from("app_state").select("retention").eq("user_id", identity.userId).maybeSingle(),
+      db
+        .from("body_measurements")
+        .select("date, waist_cm, arm_cm, chest_cm, hip_cm, thigh_cm")
+        .eq("user_id", identity.userId),
+      db
+        .from("progress_photos")
+        .select("taken_on, pose, visibility, storage_path")
+        .eq("user_id", identity.userId),
+    ]);
 
   const retention = (stateRow.data?.retention as Record<string, unknown> | null) ?? {};
   return {
@@ -1217,4 +1280,3 @@ export async function exportUserDataServer(deviceId: string): Promise<{
     }),
   };
 }
-

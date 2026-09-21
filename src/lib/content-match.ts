@@ -1,15 +1,25 @@
 /**
- * Editorial content targeting by goal/level. No behavior recommender.
+ * Editorial content targeting by goal/level. Content ranker lives in content/recommend.ts.
  */
 import type { HabitLesson } from "@/data/habit-lessons";
 
 export type ContentKind =
-  | "article"
-  | "tip"
-  | "technique"
-  | "nutrition"
-  | "recovery"
-  | "motivation";
+  "article" | "tip" | "technique" | "nutrition" | "recovery" | "motivation" | "video" | "education";
+
+export const CONTENT_KINDS: ContentKind[] = [
+  "article",
+  "tip",
+  "technique",
+  "nutrition",
+  "recovery",
+  "motivation",
+  "video",
+  "education",
+];
+
+export function isContentKind(value: unknown): value is ContentKind {
+  return CONTENT_KINDS.includes(value as ContentKind);
+}
 
 export type PublicContentItem = {
   id: string;
@@ -21,15 +31,23 @@ export type PublicContentItem = {
   levels: string[];
   published: boolean;
   sortOrder: number;
+  expertId?: string;
+  collectionId?: string;
+  mediaId?: string;
+  publishAt?: string;
+  unpublishAt?: string;
+  visible?: boolean;
 };
 
 const KIND_RANK: Record<ContentKind, number> = {
   tip: 0,
-  technique: 1,
-  motivation: 2,
-  nutrition: 3,
-  recovery: 4,
-  article: 5,
+  education: 1,
+  technique: 2,
+  motivation: 3,
+  nutrition: 4,
+  recovery: 5,
+  article: 6,
+  video: 7,
 };
 
 export function matchesTarget(
@@ -38,6 +56,7 @@ export function matchesTarget(
   level?: string | null,
 ): boolean {
   if (!item.published) return false;
+  if (item.visible === false) return false;
   const goals = item.goals.filter(Boolean);
   const levels = item.levels.filter(Boolean);
   if (goals.length && goal && !goals.includes(goal)) return false;
@@ -89,7 +108,10 @@ export function pickEditorialItems(
   let pool = items.filter((i) => i.published);
   const base = opts.date ?? new Date();
   for (let i = 0; i < limit; i += 1) {
-    const picked = pickEditorialItem(pool, { ...opts, date: new Date(base.getTime() + i * 86_400_000) });
+    const picked = pickEditorialItem(pool, {
+      ...opts,
+      date: new Date(base.getTime() + i * 86_400_000),
+    });
     if (!picked) break;
     out.push(picked);
     pool = pool.filter((x) => x.id !== picked.id);

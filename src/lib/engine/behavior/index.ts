@@ -29,33 +29,44 @@ export {
   consistencyScore,
 } from "@/lib/engine/behavior/adherence";
 
-import { buildBehaviorProfile } from "@/lib/engine/behavior/profile";
-import { detectBehaviorPatterns } from "@/lib/engine/behavior/patterns";
-import { detectBehaviorTriggers } from "@/lib/engine/behavior/triggers";
-import { selectInterventions } from "@/lib/engine/behavior/interventions";
-import { proposeExperiments } from "@/lib/engine/behavior/experiments";
-import { detectLapses } from "@/lib/engine/behavior/relapse";
+import { computeLearningSnapshot } from "@/lib/engine/learning/snapshot";
+import { applyInterventionOutcome, scalarsFromResponses } from "@/lib/engine/learning/responses";
+import type { LearningOutcome } from "@/lib/engine/learning/types";
+import type { LearnedPattern } from "@/lib/engine/learned-patterns";
 import type {
   BehaviorLoopResult,
   BehaviorProfile,
   InterventionType,
 } from "@/lib/engine/behavior/types";
-import type { AppState } from "@/lib/types";
+import { todayKey, type AppState } from "@/lib/types";
+import { buildBehaviorProfile } from "@/lib/engine/behavior/profile";
+import { selectInterventions } from "@/lib/engine/behavior/interventions";
 
 export function runBehaviorLoop(
   state: AppState,
   opts?: {
+    date?: string;
     interventionResponse?: Partial<Record<InterventionType, number>>;
+    interventionResponses?: import("@/lib/engine/learning/types").InterventionResponse[];
     experiments?: BehaviorLoopResult["experiments"];
+    learnedPrior?: LearnedPattern[] | null;
   },
 ): BehaviorLoopResult {
-  const profile = buildBehaviorProfile(state, opts?.interventionResponse ?? {});
-  const patterns = detectBehaviorPatterns(state);
-  const triggers = detectBehaviorTriggers(patterns);
-  const interventions = selectInterventions(triggers, profile);
-  const experiments = proposeExperiments(triggers, opts?.experiments ?? []);
-  const lapses = detectLapses(state, profile);
-  return { profile, patterns, triggers, interventions, experiments, lapses };
+  const date = opts?.date ?? todayKey();
+  const snap = computeLearningSnapshot(state, date, {
+    ...(opts?.learnedPrior != null ? { patterns: opts.learnedPrior } : {}),
+    ...(opts?.interventionResponses ? { interventionResponses: opts.interventionResponses } : {}),
+    ...(opts?.experiments ? { experiments: opts.experiments } : {}),
+  });
+  if (opts?.interventionResponse && !opts.interventionResponses) {
+    const profile = buildBehaviorProfile(state, opts.interventionResponse);
+    return {
+      ...snap.behavior,
+      profile,
+      interventions: selectInterventions(snap.behavior.triggers, profile),
+    };
+  }
+  return snap.behavior;
 }
 
 export function applyBehaviorOutcome(
@@ -63,15 +74,29 @@ export function applyBehaviorOutcome(
   type: InterventionType,
   success: boolean,
 ): BehaviorProfile {
-  const prev = profile.interventionResponse[type] ?? 0.5;
-  const next = success
-    ? Math.min(0.95, prev + 0.08)
-    : Math.max(0.1, prev - 0.1);
+  return applyInterventionResult(profile, type, success ? "success" : "fail");
+}
+
+export function applyInterventionResult(
+  profile: BehaviorProfile,
+  type: InterventionType,
+  result: LearningOutcome,
+  at = todayKey(),
+): BehaviorProfile {
+  const fromScalar = Object.entries(profile.interventionResponse).map(([key, confidence]) => ({
+    type: key as InterventionType,
+    successCount: 0,
+    failureCount: 0,
+    neutralCount: 0,
+    confidence: confidence ?? 0.5,
+    lastUsedAt: null as string | null,
+  }));
+  const nextList = applyInterventionOutcome(fromScalar.length ? fromScalar : [], type, result, at);
   return {
     ...profile,
     interventionResponse: {
       ...profile.interventionResponse,
-      [type]: Math.round(next * 100) / 100,
+      ...scalarsFromResponses(nextList),
     },
   };
 }

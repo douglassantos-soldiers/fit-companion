@@ -13,6 +13,11 @@ import {
   type InterventionType,
 } from "@/lib/engine/behavior";
 import type { DayCheckIn, DayEnergy, SessionRpe } from "@/lib/types";
+import {
+  shouldLearnFromAttribution,
+  type AttributionType,
+  type OutcomeQuality,
+} from "@/lib/engine/attribution";
 
 export type OutcomeMetrics = {
   workoutCompleted?: boolean;
@@ -124,6 +129,28 @@ export function applyEvaluationsToPatterns(
     next = applyOutcomeToPattern(next, ev.kind, ev.result, date, ev.note);
   }
   return next;
+}
+
+export function applyAttributedEvaluationsToPatterns(
+  patterns: LearnedPattern[],
+  items: Array<{
+    evaluation: InterventionEvaluation;
+    attributionType: AttributionType;
+    attributionConfidence: number;
+    outcomeQuality: OutcomeQuality;
+  }>,
+  date: string,
+): LearnedPattern[] {
+  const evals = items
+    .filter((item) =>
+      shouldLearnFromAttribution({
+        attributionType: item.attributionType,
+        attributionConfidence: item.attributionConfidence,
+        outcomeQuality: item.outcomeQuality,
+      }),
+    )
+    .map((item) => item.evaluation);
+  return applyEvaluationsToPatterns(patterns, evals, date);
 }
 
 export function metricsFromSessionAndCheckIn(opts: {

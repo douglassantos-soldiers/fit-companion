@@ -4,7 +4,7 @@
  * Usage: node scripts/soldiers-media/compress-stills.mjs
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, readdirSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,16 +18,19 @@ function runQuiet(args) {
 }
 
 function writeWebp(src, dest, vf, maxBytes) {
+  const tmp = `${dest}.tmp.webp`;
   let lastSize = Infinity;
   for (const q of [72, 62, 52, 42, 32, 24, 18]) {
-    const res = runQuiet(["-y", "-i", src, "-vf", vf, "-q:v", String(q), dest]);
+    const res = runQuiet(["-y", "-i", src, "-vf", vf, "-q:v", String(q), tmp]);
     if (res.status !== 0) {
+      if (existsSync(tmp)) unlinkSync(tmp);
       console.error(res.stderr?.toString() || "ffmpeg failed");
       process.exit(res.status ?? 1);
     }
-    lastSize = statSync(dest).size;
-    if (lastSize <= maxBytes) return lastSize;
+    lastSize = statSync(tmp).size;
+    if (lastSize <= maxBytes) break;
   }
+  renameSync(tmp, dest);
   return lastSize;
 }
 

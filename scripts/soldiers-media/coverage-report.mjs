@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
- * Coverage: manifest kinds + files on disk + optional remote soldiers_media.
- * Run: node scripts/soldiers-media/coverage-report.mjs
+ * Coverage scorecard vs exercise library (not only dirs on disk).
+ * npm run media:coverage
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseSoldiersLibrary } from "../exercise-catalog/parse-library.mjs";
+import { isExternalMediaUrl, isSoldiersOwnedUrl, normalizeStatus } from "./governance-lib.mjs";
+import { loadPublishedIds, packageComplete } from "./media-queue-lib.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const mediaRoot = join(root, "public/soldiers-media/v1");
-const POSTER_BUDGET = 80 * 1024;
 
 function loadEnv(path) {
   if (!existsSync(path)) return;
@@ -20,7 +22,10 @@ function loadEnv(path) {
     if (eq < 1) continue;
     const name = trimmed.slice(0, eq).trim();
     let value = trimmed.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (!process.env[name]) process.env[name] = value;
@@ -29,11 +34,14 @@ function loadEnv(path) {
 
 loadEnv(join(root, ".env"));
 
-const style = JSON.parse(readFileSync(join(root, "content/soldiers-media-v1/style-lock.json"), "utf8"));
-const legal = JSON.parse(readFileSync(join(root, "content/soldiers-media-v1/legal-policy.json"), "utf8"));
-
-const MOTION_KINDS = new Set(["exercise", "brand", "howto"]);
-const kinds = ["exercise", "meal", "product", "hub", "challenge", "brand", "howto"];
+const style = JSON.parse(
+  readFileSync(join(root, "content/soldiers-media-v1/style-lock.json"), "utf8"),
+);
+const legal = JSON.parse(
+  readFileSync(join(root, "content/soldiers-media-v1/legal-policy.json"), "utf8"),
+);
+const library = parseSoldiersLibrary(root);
+const publishedSet = new Set(loadPublishedIds());
 
 function pickStill(dir) {
   const posterWebp = join(dir, "poster.webp");
@@ -48,70 +56,91 @@ function pickStill(dir) {
   };
 }
 
-const byKind = {};
-const motionWithoutVideo = [];
-const overBudget = [];
-let packages = 0;
-
-for (const kind of kinds) {
-  const kindDir = join(mediaRoot, kind);
-  const row = { total: 0, onDisk: 0, motion: 0, withVideo: 0, overBudget: 0 };
-  if (existsSync(kindDir)) {
-    for (const entityId of readdirSync(kindDir)) {
-      const dir = join(kindDir, entityId);
-      if (!statSync(dir).isDirectory()) continue;
-      row.total += 1;
-      packages += 1;
-      const files = pickStill(dir);
-      if (files.poster) row.onDisk += 1;
-      const needsMotion = MOTION_KINDS.has(kind);
-      if (needsMotion) {
-        row.motion += 1;
-        if (files.webm || files.mp4) row.withVideo += 1;
-        else motionWithoutVideo.push(`${kind}/${entityId}`);
-      }
-      if (files.poster) {
-        const size = statSync(files.poster).size;
-        if (size > POSTER_BUDGET) {
-          row.overBudget += 1;
-          overBudget.push(`${kind}/${entityId} ${size}`);
-        }
-      }
-    }
+const disk = new Map();
+if (existsSync(join(mediaRoot, "exercise"))) {
+  for (const entityId of readdirSync(join(mediaRoot, "exercise"))) {
+    const dir = join(mediaRoot, "exercise", entityId);
+    if (!statSync(dir).isDirectory()) continue;
+    disk.set(entityId, pickStill(dir));
   }
-  byKind[kind] = row;
 }
 
-console.log(`style=${style.id} license=${legal.license}`);
-console.log("forbidden inputs:", legal.forbidden.length);
-console.log("packages on disk:", packages);
-for (const kind of kinds) {
-  const r = byKind[kind];
-  console.log(
-    `${kind}\ttotal=${r.total} disk=${r.onDisk} motion=${r.motion} video=${r.withVideo} overBudget=${r.overBudget}`,
-  );
+let mediaComplete = 0;
+let posterMissing = 0;
+let thumbMissing = 0;
+let motionMissing = 0;
+let qaPending = 0;
+let published = 0;
+let rejected = 0;
+let legacy = 0;
+let externalUrls = 0;
+
+for (const row of library) {
+  const id = row.mediaId || row.id;
+  const files = disk.get(id);
+  const dir = join(mediaRoot, "exercise", id);
+  const isPublished = publishedSet.has(id) && packageComplete(dir);
+  const status = isPublished ? "published" : "draft";
+  if (status === "published") published += 1;
+  if (status === "qa") qaPending += 1;
+  if (status === "rejected") rejected += 1;
+
+  const hasPoster = Boolean(files?.poster);
+  const hasThumb = Boolean(files?.thumb || files?.poster);
+  const hasMotion = Boolean(files?.webm || files?.mp4);
+  if (isPublished && hasPoster && hasThumb && hasMotion) mediaComplete += 1;
+  if (!hasPoster) posterMissing += 1;
+  if (!hasThumb) thumbMissing += 1;
+  if (!hasMotion) motionMissing += 1;
+
+  for (const url of [row.mediaUrl, row.videoUrl]) {
+    if (!url) continue;
+    if (isSoldiersOwnedUrl(url)) continue;
+    legacy += 1;
+    if (isExternalMediaUrl(url)) externalUrls += 1;
+  }
 }
-console.log("motion without video:", motionWithoutVideo.length);
-for (const id of motionWithoutVideo) console.log("  -", id);
-if (overBudget.length) {
-  console.log("posters over 80KB:", overBudget.length);
-  for (const line of overBudget.slice(0, 12)) console.log("  -", line);
-}
+
+const report = {
+  style: style.id,
+  license: legal.license,
+  totalExercises: library.length,
+  mediaComplete,
+  posterMissing,
+  thumbMissing,
+  motionMissing,
+  qaPending,
+  published,
+  rejected,
+  legacy,
+  externalUrls,
+  publishedListed: publishedSet.size,
+};
+
+console.log(JSON.stringify(report, null, 2));
 
 const url = (process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
-const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+const key =
+  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 if (url && key) {
   const res = await fetch(
-    `${url}/rest/v1/soldiers_media?select=kind,entity_id,status,needs_motion,poster_url,webm_url,mp4_url`,
+    `${url}/rest/v1/soldiers_media?select=kind,entity_id,status,needs_motion,poster_url,thumbnail_url,webm_url,mp4_url,gif_url`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } },
   );
   if (!res.ok) {
     console.log("remote: read failed", res.status);
   } else {
     const rows = await res.json();
-    const published = rows.filter((r) => r.status === "published");
-    const remoteMotionGap = published.filter((r) => r.needs_motion && !r.webm_url && !r.mp4_url);
-    console.log(`remote published=${published.length} motionWithoutVideo=${remoteMotionGap.length}`);
+    const publishedRows = rows.filter((r) => normalizeStatus(r.status) === "published");
+    const qaRows = rows.filter((r) => normalizeStatus(r.status) === "qa");
+    const rejectedRows = rows.filter((r) => normalizeStatus(r.status) === "rejected");
+    console.log(
+      JSON.stringify({
+        remotePublished: publishedRows.length,
+        remoteQaPending: qaRows.length,
+        remoteRejected: rejectedRows.length,
+      }),
+    );
   }
 } else {
   console.log("remote: skipped (no SUPABASE_URL / publishable key)");

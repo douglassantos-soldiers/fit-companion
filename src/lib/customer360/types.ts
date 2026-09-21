@@ -112,6 +112,13 @@ export type Behavior360 = {
   behaviorConfidence?: number;
 };
 
+export type Athlete360 = {
+  sessionCountTotal: number;
+  preferredSports: string[];
+  activityCount28d: number;
+  verifiedShare: number;
+};
+
 export type Goals360 = {
   currentGoal: Goal | null;
   level: Level | null;
@@ -135,6 +142,8 @@ export type Customer360 = {
   supplements: Supplements360;
   behavior: Behavior360;
   goals: Goals360;
+  /** Optional derived athlete block — never nutrition/weight/photos */
+  athlete?: Athlete360;
   /** Data lineage for important metrics */
   lineage: Record<string, LineageEntry>;
   /** Explicit estimate wrappers (do not present as facts) */
