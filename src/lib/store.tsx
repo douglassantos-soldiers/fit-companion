@@ -141,6 +141,7 @@ import { rollCosmeticReward } from "@/lib/engine/rewards";
 import {
   emptyState,
   todayKey,
+  todayKeyForProfile,
   type AppState,
   type BodyMeasurementEntry,
   type DayCheckIn,
@@ -314,7 +315,7 @@ function applyTheme(theme: Theme) {
 
 function withSnapshot(s: AppState): AppState {
   if (!s.profile) return s;
-  const date = todayKey();
+  const date = todayKeyForProfile(s.profile);
   const dims = performanceDimensions(s, s.profile);
   const scores = Object.fromEntries(dims.map((d) => [d.key, d.score]));
   const rest = s.dimensionSnapshots.filter((x) => x.date !== date);
@@ -336,7 +337,11 @@ function withSnapshot(s: AppState): AppState {
       livingPlans: { ...withDims.livingPlans, [date]: cached.livingPlan },
     };
   }
-  const assembled = assembleDecisionContext(withDims, { date, source: "offline_legacy" });
+  const assembled = assembleDecisionContext(withDims, {
+    date,
+    timezone: s.profile.timezone,
+    source: "offline_legacy",
+  });
   if (!assembled) return withDims;
   return applyDecisionContextToState(withDims, assembled);
 }
@@ -374,7 +379,7 @@ function mergeSavedMeals(local?: SavedMeal[], remote?: SavedMeal[]): SavedMeal[]
 
 function withQuests(s: AppState, deviceId: string): AppState {
   const loop = runBehaviorLoop(s);
-  return ensureDailyQuests(s, deviceId, todayKey(), {
+  return ensureDailyQuests(s, deviceId, todayKeyForProfile(s.profile), {
     triggers: loop.triggers,
     patterns: loop.patterns,
     profile: loop.profile,
@@ -389,7 +394,7 @@ function afterXpSideEffects(
   opts?: { fromSession?: SessionLog },
 ): AppState {
   let out = next;
-  const date = todayKey();
+  const date = todayKeyForProfile(out.profile);
   if (allQuestsComplete(out, date) && !allQuestsComplete(prev, date)) {
     const bonus = applyXpAward(out, XP.questsCompleteBonus, date);
     out = bonus.state;
@@ -718,7 +723,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sessions: state.sessions,
       freezeUsedDates: state.freezeUsedDates ?? [],
       streakFreezes: state.streakFreezes ?? 0,
-      xpToday: state.xpByDate?.[todayKey()] ?? 0,
+      xpToday: state.xpByDate?.[todayKeyForProfile(state.profile)] ?? 0,
       ...(day?.title ? { dayTitle: day.title } : {}),
     });
     return () => clearLocalReminders();
@@ -735,7 +740,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
-  const day = (s: AppState) => s.days[todayKey()] ?? { date: todayKey(), waterMl: 0, meals: 0 };
+  const day = (s: AppState) => {
+    const date = todayKeyForProfile(s.profile);
+    return s.days[date] ?? { date, waterMl: 0, meals: 0 };
+  };
 
   const value = useMemo<Store>(
     () => ({

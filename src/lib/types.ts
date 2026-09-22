@@ -629,3 +629,11 @@ import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
 
 /** Calendar day key — uses America/Sao_Paulo by default (not raw UTC). */
 export const todayKey = (d: Date = new Date()) => getUserTodayKey(DEFAULT_USER_TIMEZONE, d);
+
+/** Calendar day for a profile's IANA timezone (falls back to Soldiers default). */
+export function todayKeyForProfile(
+  profile?: Pick<Profile, "timezone"> | null,
+  d: Date = new Date(),
+) {
+  return getUserTodayKey(profile?.timezone ?? DEFAULT_USER_TIMEZONE, d);
+}

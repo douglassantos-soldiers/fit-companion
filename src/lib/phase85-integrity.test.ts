@@ -18,7 +18,7 @@ import { aggregateNutrition } from "@/lib/customer360/aggregators/nutrition";
 import { previewCustomer360FromState } from "@/lib/customer360/recompute.server";
 import { getUserTodayKey, DEFAULT_USER_TIMEZONE, withProfileTimezone, normalizeUserTimezone } from "@/lib/timezone";
 import { buildQaScenario, isQaModeEnabled } from "@/lib/qa/scenarios";
-import { emptyState, todayKey } from "@/lib/types";
+import { emptyState, todayKey, todayKeyForProfile } from "@/lib/types";
 import { patternKeyFromEvaluation } from "@/lib/engine/outcome-learning";
 
 describe("PHASE 8.5 access session secrets", () => {
@@ -79,6 +79,12 @@ describe("PHASE 8.5 timezone", () => {
   it("todayKey defaults to America/Sao_Paulo calendar", () => {
     expect(DEFAULT_USER_TIMEZONE).toBe("America/Sao_Paulo");
     expect(todayKey()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("todayKeyForProfile respects profile timezone near UTC midnight", () => {
+    const nearMidnightUtc = new Date("2026-03-15T02:30:00.000Z");
+    expect(todayKeyForProfile({ timezone: "America/Sao_Paulo" }, nearMidnightUtc)).toBe("2026-03-14");
+    expect(todayKeyForProfile({ timezone: "UTC" }, nearMidnightUtc)).toBe("2026-03-15");
   });
 
   it("withProfileTimezone fills missing zone and normalizes invalid", () => {

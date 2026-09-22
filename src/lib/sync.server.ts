@@ -684,6 +684,15 @@ export async function pushStateServer(
           { onConflict: "user_id" },
         ),
       );
+      tasks.push(
+        db
+          .from("users")
+          .update({
+            timezone: state.profile.timezone ?? "America/Sao_Paulo",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId),
+      );
     } else {
       conflicts.push("profile");
     }
