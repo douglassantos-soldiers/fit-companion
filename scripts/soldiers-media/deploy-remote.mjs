@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadPublishedIds, packageComplete } from "./media-queue-lib.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 loadEnv(join(root, ".env"));
@@ -20,6 +21,7 @@ if (!url || !key) {
 
 const MOTION_KINDS = new Set(["exercise", "brand", "howto"]);
 const base = join(root, "public/soldiers-media/v1");
+const publishedExercises = new Set(loadPublishedIds());
 
 function loadEnv(path) {
   if (!existsSync(path)) return;
@@ -135,7 +137,16 @@ for (const pkg of packages) {
       uploaded[file] = publicUrl(objectPath);
     }
     const prev = await existingStatus(pkg.kind, pkg.entityId);
-    const status = prev === "published" ? "published" : "generated";
+    const localPublished =
+      pkg.kind === "exercise" &&
+      publishedExercises.has(pkg.entityId) &&
+      packageComplete(pkg.dir);
+    const finalStatus =
+      pkg.kind === "exercise"
+        ? prev === "published" || localPublished
+          ? "published"
+          : "generated"
+        : "published";
     await upsertRow({
       kind: pkg.kind,
       entity_id: pkg.entityId,
@@ -146,7 +157,7 @@ for (const pkg of packages) {
       source: "soldiers",
       ownership: "owned",
       license: "soldiers-owned",
-      status,
+      status: finalStatus,
       needs_motion: MOTION_KINDS.has(pkg.kind),
       poster_url: uploaded["poster.webp"] ?? uploaded["poster.png"] ?? null,
       thumbnail_url: uploaded["thumb.webp"] ?? uploaded["thumb.png"] ?? uploaded["poster.webp"] ?? uploaded["poster.png"] ?? null,
@@ -157,7 +168,7 @@ for (const pkg of packages) {
       updated_at: new Date().toISOString(),
     });
     ok += 1;
-    console.log(status, pkg.kind, pkg.entityId);
+    console.log(finalStatus, pkg.kind, pkg.entityId);
   } catch (err) {
     failures.push(`${pkg.kind}/${pkg.entityId}: ${err instanceof Error ? err.message : String(err)}`);
     console.error("failed", pkg.kind, pkg.entityId);

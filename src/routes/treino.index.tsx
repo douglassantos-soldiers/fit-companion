@@ -5,13 +5,13 @@ import {
   ChevronRight,
   History,
   Play,
-  RefreshCw,
   Settings2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, EmptyState } from "@/components/app-shell";
 import { ExercisePlanRow } from "@/components/training/exercise-plan-row";
+import { ExerciseSwapPicker } from "@/components/training/exercise-swap-picker";
 import { MuscleHeatmap } from "@/components/session/muscle-heatmap";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,7 +35,7 @@ import {
   consecutiveHardRpeStreak,
 } from "@/lib/engine/recovery";
 import { useStore } from "@/lib/store";
-import { GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
+import { GYM_GEAR_OPTIONS, matchesInventory } from "@/lib/training/inventory";
 import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import {
   FOCUS_MUSCLE_LABEL,
@@ -138,7 +138,10 @@ function TrainingPage() {
     ? plan.flatMap((d) => d.exercises).find((e) => e.exerciseId === swapFor.exerciseId)
     : null;
   const swapOptions = swapSource
-    ? alternativesFor(swapSource.exerciseId, activeEquip, profile.restrictions)
+    ? alternativesFor(swapSource.exerciseId, activeEquip, profile.restrictions, {
+        preferences: state.exercisePreferences,
+        preferPublishedMedia: true,
+      }).filter((e) => matchesInventory(e, activeEquip, profile.equipmentInventory))
     : [];
 
   const persistEquip = (eq: Equipment) => {
@@ -456,37 +459,18 @@ function TrainingPage() {
         open={Boolean(swapFor)}
         onClose={() => setSwapFor(null)}
         title="Trocar exercício"
-        description="O atual entra em evitar; o novo fica preferido."
+        description="O atual entra em evitar; o novo fica preferido. Prefira alternativas com demo publicada."
       >
-        {swapOptions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma alternativa agora.</p>
-        ) : (
-          <ul className="space-y-2">
-            {swapOptions.map((alt) => (
-              <li key={alt.id}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-between rounded-xl px-4 py-3 text-left font-normal"
-                  onClick={() => {
-                    if (swapFor) setExercisePreference(swapFor.exerciseId, "avoided");
-                    setExercisePreference(alt.id, "preferred");
-                    setSwapFor(null);
-                    toast.success(`Trocado para ${alt.name}`);
-                  }}
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">{alt.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {alt.group} · {alt.equipment}
-                    </span>
-                  </span>
-                  <RefreshCw className="size-4 text-primary" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ExerciseSwapPicker
+          options={swapOptions}
+          emptyLabel="Nenhuma alternativa agora."
+          onPick={(alt) => {
+            if (swapFor) setExercisePreference(swapFor.exerciseId, "avoided");
+            setExercisePreference(alt.id, "preferred");
+            setSwapFor(null);
+            toast.success(`Trocado para ${alt.name}`);
+          }}
+        />
       </SoldiersOverlay>
     </AppShell>
   );

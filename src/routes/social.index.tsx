@@ -60,12 +60,15 @@ export const Route = createFileRoute("/social/")({
 function progressFor(challengeId: string, state: AppState) {
   const challenge = challengeById(challengeId);
   if (!challenge) return null;
-  return challengeProgress(challenge, state.sessions, {
-    baseline: state.challengeBaselines?.[challengeId],
-    personalTarget: state.challengePersonalTargets?.[challengeId],
+  const opts: import("@/lib/social").ChallengeProgressOpts = {
     activityLogs: state.activityLogs,
     invitesSent: state.challengeInvitesSent ?? 0,
-  });
+  };
+  const baseline = state.challengeBaselines?.[challengeId];
+  if (baseline !== undefined) opts.baseline = baseline;
+  const personalTarget = state.challengePersonalTargets?.[challengeId];
+  if (personalTarget !== undefined) opts.personalTarget = personalTarget;
+  return challengeProgress(challenge, state.sessions, opts);
 }
 
 function modeLabel(c: (typeof CHALLENGES)[number]) {
@@ -93,8 +96,8 @@ function SocialHubPage() {
     globalFallback: true,
     refreshKey: state.sessions.length,
     mode: "foryou",
-    goal: state.profile?.goal,
-    level: state.profile?.level,
+    goal: state.profile?.goal ?? null,
+    level: state.profile?.level ?? null,
   });
 
   const [clubs, setClubs] = useState<ClubSummary[]>([]);
@@ -162,7 +165,7 @@ function SocialHubPage() {
 
   const catalogChallenges = CHALLENGES.filter((c) => !isProfileGeneratedChallenge(c.id));
   const profileChallenges = suggestProfileChallenges({
-    level: state.profile?.level,
+    level: state.profile?.level ?? null,
     sessionCount: state.sessions.length,
     hasClub: clubs.length > 0,
     followingCount,

@@ -4,6 +4,8 @@
  */
 import { EXERCISE_LIBRARY } from "@/data/exercise-library";
 import { resolveExerciseMedia } from "@/lib/soldiers-media";
+import { isPreferred } from "@/lib/training/preferences";
+import type { ExercisePreferenceValue } from "@/lib/types";
 
 export type MuscleGroup =
   | "peito"
@@ -29,6 +31,11 @@ export interface Exercise {
   priority?: number;
   /** Optional future demo image/GIF URL */
   mediaUrl?: string;
+}
+
+export interface AlternativesForOpts {
+  preferences?: Record<string, ExercisePreferenceValue>;
+  preferPublishedMedia?: boolean;
 }
 
 function plannerFromLibrary(): Exercise[] {
@@ -94,36 +101,96 @@ export function respectsJoints(ex: Exercise, avoided: Joint[]) {
   return !ex.joints.some((j) => avoided.includes(j));
 }
 
+function hasPublishedMedia(exerciseId: string): boolean {
+  return resolveExerciseMedia(exerciseId).source === "soldiers";
+}
+
 /** Alternativas para trocar na sessão: lista explícita do CMS, senão swapGroup/grupo. */
 export function alternativesFor(
   exerciseId: string,
   equipment: "casa" | "academia",
   restrictions: string[] = [],
+  opts: AlternativesForOpts = {},
 ): Exercise[] {
   const current = exerciseById(exerciseId);
   if (!current) return [];
   const avoided = normalizeRestrictions(restrictions);
   const explicit = getAlternativeIds(exerciseId);
+  const preferMedia = opts.preferPublishedMedia !== false;
 
+  const equipOk = (e: Exercise) => matchesEquipment(e, equipment);
+
+  let pool: Exercise[];
   if (explicit?.length) {
-    return explicit
+    pool = explicit
       .map((id) => exerciseById(id))
       .filter((e): e is Exercise => Boolean(e))
-      .filter((e) => e.id !== exerciseId && matchesEquipment(e, equipment) && respectsJoints(e, avoided));
+      .filter((e) => e.id !== exerciseId && equipOk(e) && respectsJoints(e, avoided));
+  } else {
+    pool = EXERCISES.filter(
+      (e) =>
+        e.id !== exerciseId &&
+        equipOk(e) &&
+        respectsJoints(e, avoided) &&
+        (e.swapGroup === current.swapGroup || e.group === current.group),
+    );
   }
-
-  const pool = EXERCISES.filter(
-    (e) =>
-      e.id !== exerciseId &&
-      matchesEquipment(e, equipment) &&
-      respectsJoints(e, avoided) &&
-      (e.swapGroup === current.swapGroup || e.group === current.group),
-  );
 
   return pool.sort((a, b) => {
     const sameSwapA = a.swapGroup === current.swapGroup ? 0 : 1;
     const sameSwapB = b.swapGroup === current.swapGroup ? 0 : 1;
     if (sameSwapA !== sameSwapB) return sameSwapA - sameSwapB;
+    if (preferMedia) {
+      const mediaA = hasPublishedMedia(a.id) ? 0 : 1;
+      const mediaB = hasPublishedMedia(b.id) ? 0 : 1;
+      if (mediaA !== mediaB) return mediaA - mediaB;
+    }
+    if (opts.preferences) {
+      const prefA = isPreferred(opts.preferences, a.id) ? 0 : 1;
+      const prefB = isPreferred(opts.preferences, b.id) ? 0 : 1;
+      if (prefA !== prefB) return prefA - prefB;
+    }
     return (a.priority ?? 99) - (b.priority ?? 99);
   });
 }
+
+/** Build explicit alternative_ids from dense swapGroups (machine/compound families). */
+export function buildSwapGroupAlternatives(pool: Exercise[] = EXERCISES): Record<string, string[]> {
+  const DENSE = new Set([
+    "peito-press",
+    "peito-fly",
+    "costas-pull",
+    "costas-row",
+    "perna-squat",
+    "perna-hinge",
+    "perna-lunge",
+    "ombro-press",
+    "ombro-raise",
+    "triceps-ext",
+    "biceps-curl",
+  ]);
+  const byGroup = new Map<string, string[]>();
+  for (const ex of pool) {
+    if (!DENSE.has(ex.swapGroup)) continue;
+    const list = byGroup.get(ex.swapGroup) ?? [];
+    list.push(ex.id);
+    byGroup.set(ex.swapGroup, list);
+  }
+  const map: Record<string, string[]> = {};
+  for (const [, ids] of byGroup) {
+    if (ids.length < 2) continue;
+    for (const id of ids) {
+      map[id] = ids.filter((x) => x !== id).slice(0, 8);
+    }
+  }
+  return map;
+}
+
+/** Seed runtime alternatives; CMS hydrate may merge/override later. */
+export function seedSwapGroupAlternatives(pool: Exercise[] = EXERCISES): Record<string, string[]> {
+  const map = buildSwapGroupAlternatives(pool);
+  setAlternativeIds(map);
+  return map;
+}
+
+seedSwapGroupAlternatives();

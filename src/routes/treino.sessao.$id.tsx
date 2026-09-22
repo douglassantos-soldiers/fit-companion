@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, Camera, Check, PartyPopper, RefreshCw, Share2 } from "lucide-react";
+import { ArrowLeft, Camera, Check, PartyPopper, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -13,10 +13,12 @@ import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import { ConfirmOverlay } from "@/components/confirm-overlay";
 import { ShareCardPicker } from "@/components/progress/share-card";
 import { ExerciseStage, type SessionEffortScale } from "@/components/session/exercise-stage";
+import { ExerciseSwapPicker } from "@/components/training/exercise-swap-picker";
 import { RestTimer } from "@/components/session/rest-timer";
 import { fxExerciseDone, fxRestEnd, fxSetDone } from "@/components/session/session-fx";
 import { SessionCelebration } from "@/components/today/engagement-cards";
 import { alternativesFor, exerciseById } from "@/data/exercises";
+import { matchesInventory } from "@/lib/training/inventory";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
 import {
@@ -172,6 +174,7 @@ function SessionPage() {
   const [sharePanel, setSharePanel] = useState(false);
   const [saving, setSaving] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [swapReason, setSwapReason] = useState<"swap" | "busy_machine">("swap");
   const [checkinFile, setCheckinFile] = useState<File | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
@@ -370,7 +373,7 @@ function SessionPage() {
     );
   };
 
-  const swapExercise = (exIdx: number, newId: string) => {
+  const swapExercise = (exIdx: number, newId: string, reason: "swap" | "busy_machine" = "swap") => {
     const alt = exerciseById(newId);
     if (!alt) return;
     const current = planned[exIdx];
@@ -414,10 +417,20 @@ function SessionPage() {
         data: {
           deviceId,
           kind: "workout_modified",
-          payload: { dayId: id, fromExerciseId: current?.exerciseId, toExerciseId: newId },
+          payload: {
+            dayId: id,
+            fromExerciseId: current?.exerciseId,
+            toExerciseId: newId,
+            reason,
+          },
           entityType: "workout",
           entityId: id,
         },
+      }).catch(() => undefined);
+      void trackOutcome(deviceId, "plan_modified", {
+        fromExerciseId: current?.exerciseId,
+        toExerciseId: newId,
+        reason,
       }).catch(() => undefined);
     }
     setLogs((prev) =>
@@ -631,8 +644,16 @@ function SessionPage() {
   };
 
   const swapOptions = activeLog
-    ? alternativesFor(activeLog.exerciseId, profile.equipment, profile.restrictions)
+    ? alternativesFor(activeLog.exerciseId, profile.equipment, profile.restrictions, {
+        preferences: state.exercisePreferences,
+        preferPublishedMedia: true,
+      }).filter((e) => matchesInventory(e, profile.equipment, profile.equipmentInventory))
     : [];
+
+  const openSwap = (reason: "swap" | "busy_machine") => {
+    setSwapReason(reason);
+    setSwapOpen(true);
+  };
 
   const goBack = () => {
     const hasProgress = logs.some((e) => e.sets.some((s) => s.done && !s.skipped));
@@ -699,7 +720,8 @@ function SessionPage() {
             onCompleteSet={completeSet}
             onSkipSet={skipSet}
             onAddSet={addSet}
-            onSwap={() => setSwapOpen(true)}
+            onSwap={() => openSwap("swap")}
+            onBusyMachine={() => openSwap("busy_machine")}
             onPrevExercise={() => setActiveExIdx((i) => Math.max(0, i - 1))}
             onNextExercise={() => setActiveExIdx((i) => Math.min(planned.length - 1, i + 1))}
             onPreference={(pref) => setExercisePreference(activePlanned.exerciseId, pref)}
@@ -763,33 +785,17 @@ function SessionPage() {
       <SoldiersOverlay
         open={swapOpen}
         onClose={() => setSwapOpen(false)}
-        title="Trocar exercício"
-        description="Alternativas compatíveis com seu equipamento e restrições"
+        title={swapReason === "busy_machine" ? "Máquina ocupada" : "Trocar exercício"}
+        description={
+          swapReason === "busy_machine"
+            ? "Escolha uma alternativa clara com o mesmo estímulo — preview da demo quando disponível"
+            : "Alternativas compatíveis com seu equipamento e restrições"
+        }
       >
-        {swapOptions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma alternativa disponível agora.</p>
-        ) : (
-          <ul className="space-y-2">
-            {swapOptions.map((alt) => (
-              <li key={alt.id}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-between rounded-xl px-4 py-3 text-left font-normal"
-                  onClick={() => swapExercise(safeExIdx, alt.id)}
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">{alt.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {alt.group} · {alt.equipment}
-                    </span>
-                  </span>
-                  <RefreshCw className="size-4 text-primary" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ExerciseSwapPicker
+          options={swapOptions}
+          onPick={(alt) => swapExercise(safeExIdx, alt.id, swapReason)}
+        />
       </SoldiersOverlay>
 
       <SoldiersOverlay

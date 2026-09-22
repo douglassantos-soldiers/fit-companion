@@ -104,6 +104,7 @@ import { useClubSocialFeed } from "@/hooks/use-club-social-feed";
 import { todayMetrics, todaySupplements, useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import { trainingProofLine } from "@/lib/training/proof";
+import { computeStrengthScore } from "@/lib/training/strength-score";
 import { DAILY_XP_GOAL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
 import { PeriodReviewCard } from "@/components/progress/period-review-card";
 import { brandLevel } from "@/lib/engine/brand-level";
@@ -322,10 +323,16 @@ function Today() {
   const persona = homePersona(state);
   const brand = brandLevel(state);
   const weekReview =
-    persona === "consistente" || persona === "avancado" ? periodReview(state, "week") : null;
+    persona === "consistente" || persona === "avancado" || new Date().getDay() === 0
+      ? periodReview(state, "week")
+      : null;
   const wow = persona === "avancado" ? weekOverWeek(state.sessions) : null;
   const weekPrs =
     persona === "consistente" || persona === "avancado" ? prsInCurrentWeek(state.sessions) : [];
+  const strengthScore =
+    persona === "consistente" || persona === "avancado"
+      ? computeStrengthScore(state.sessions, profile)
+      : null;
   const showLeague = persona !== "novo" && persona !== "inativo";
   const needsRecovery = !profile.typicalSleepHours || !profile.primaryBlocker;
   const bodyIncomplete = !(profile.age >= 16 && profile.heightCm >= 130 && profile.weightKg >= 35);
@@ -459,6 +466,7 @@ function Today() {
     hasClub: Boolean(club),
     followingCount: 0,
     level: profile.level,
+    isSunday: new Date().getDay() === 0,
   });
   const daysLeft = accessDaysRemaining(state.accessExpiresAt);
   const urgency = accessUrgencyLevel(daysLeft);
@@ -763,33 +771,62 @@ function Today() {
       {homeBlocks.map((blockId: HomeBlockId) => {
         if (blockId === "wow" && persona === "avancado" && wow) {
           return (
-            <div key="wow" className="mb-4 grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                <p className="text-display text-lg text-primary">
-                  {wow.volumeDeltaPct != null
-                    ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%`
-                    : "—"}
-                </p>
-                <p className="text-[0.65rem] uppercase text-muted-foreground">Volume</p>
+            <div key="wow" className="mb-4 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                  <p className="text-display text-lg text-primary">
+                    {wow.volumeDeltaPct != null
+                      ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%`
+                      : "—"}
+                  </p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">Volume</p>
+                </div>
+                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                  <p className="text-display text-lg text-primary">
+                    {living?.traffic.recovery ?? "—"}
+                  </p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">Recuperação</p>
+                </div>
+                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
+                  <p className="text-display text-lg text-primary">{weekPrs.length}</p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">PRs sem.</p>
+                </div>
               </div>
-              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                <p className="text-display text-lg text-primary">
-                  {living?.traffic.recovery ?? "—"}
-                </p>
-                <p className="text-[0.65rem] uppercase text-muted-foreground">Recuperação</p>
-              </div>
-              <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                <p className="text-display text-lg text-primary">{weekPrs.length}</p>
-                <p className="text-[0.65rem] uppercase text-muted-foreground">PRs sem.</p>
-              </div>
+              {strengthScore ? (
+                <Link
+                  to="/progresso"
+                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold">Strength Score</span>
+                    <span className="text-[0.65rem] uppercase text-muted-foreground">
+                      {strengthScore.coldStart ? "Estimativa" : `${strengthScore.evidenceCount} lifts`}
+                      {strengthScore.delta28d != null
+                        ? ` · ${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className="text-display text-xl text-primary">{strengthScore.score}</span>
+                </Link>
+              ) : null}
             </div>
           );
         }
         if (blockId === "weekPrs" && persona === "consistente" && weekPrs.length) {
           return (
-            <p key="weekPrs" className="mb-3 text-sm font-semibold text-primary">
-              {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
-            </p>
+            <div key="weekPrs" className="mb-3 space-y-1">
+              <p className="text-sm font-semibold text-primary">
+                {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
+              </p>
+              {strengthScore ? (
+                <Link to="/progresso" className="block text-xs text-muted-foreground">
+                  Strength Score {strengthScore.score}
+                  {strengthScore.delta28d != null
+                    ? ` (${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d)`
+                    : ""}
+                </Link>
+              ) : null}
+            </div>
           );
         }
         if (blockId === "periodReview" && weekReview && weekReview.sessions > 0) {

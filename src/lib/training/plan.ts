@@ -29,6 +29,7 @@ import { matchesInventory } from "@/lib/training/inventory";
 import { withWarmupPrescriptions } from "@/lib/training/warmup";
 import { resolveTrainingWeekdays } from "@/lib/training/weekdays";
 import { getTrainingRules } from "@/lib/training/training-rules";
+import { resolveExerciseMedia } from "@/lib/soldiers-media";
 import type {
   AppState,
   ExercisePreferenceValue,
@@ -120,8 +121,10 @@ function resolvePrefs(prefs: ExercisePrefs): Record<string, ExercisePreferenceVa
 
 function prefScore(ex: Exercise, prefMap: Record<string, ExercisePreferenceValue>): number {
   if (isAvoided(prefMap, ex.id)) return 1000;
-  if (isPreferred(prefMap, ex.id)) return -10;
-  return ex.priority ?? 99;
+  let score = ex.priority ?? 99;
+  if (isPreferred(prefMap, ex.id)) score -= 10;
+  if (resolveExerciseMedia(ex.id).source === "soldiers") score -= 2;
+  return score;
 }
 
 function pickExercises(
@@ -179,13 +182,15 @@ function maybeSwapForPlateau(
   if (!plateau.plateau || plateau.suggested_action !== "change_exercise") {
     return { exercise: ex };
   }
-  const alts = alternativesFor(ex.id, equipment, restrictions).filter(
+  const alts = alternativesFor(ex.id, equipment, restrictions, {
+    preferences: prefMap,
+    preferPublishedMedia: true,
+  }).filter(
     (a) =>
       !alreadyPicked.has(a.id) &&
       !isAvoided(prefMap, a.id) &&
       !analyzePlateau(hitsForExercise(a.id, sessions)).plateau,
   );
-  alts.sort((a, b) => prefScore(a, prefMap) - prefScore(b, prefMap));
   const swap = alts[0];
   if (!swap) return { exercise: ex };
   return { exercise: swap, swappedFromId: ex.id };

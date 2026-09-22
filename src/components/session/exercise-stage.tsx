@@ -1,5 +1,5 @@
 import { NumberInput } from "@mantine/core";
-import { ChevronLeft, ChevronRight, Minus, Plus, RefreshCw, SkipForward, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Plus, RefreshCw, SkipForward, ThumbsDown, ThumbsUp, Wrench } from "lucide-react";
 import type { Exercise } from "@/data/exercises";
 import type { PlannedExercise } from "@/lib/engine/plan";
 import type { SetLog } from "@/lib/types";
@@ -37,6 +37,7 @@ export function ExerciseStage({
   onSkipSet,
   onAddSet,
   onSwap,
+  onBusyMachine,
   onPrevExercise,
   onNextExercise,
   onPreference,
@@ -58,6 +59,7 @@ export function ExerciseStage({
   onSkipSet?: () => void;
   onAddSet?: () => void;
   onSwap: () => void;
+  onBusyMachine?: () => void;
   onPrevExercise: () => void;
   onNextExercise: () => void;
   onPreference?: (pref: "like" | "dislike" | "clear") => void;
@@ -100,9 +102,16 @@ export function ExerciseStage({
               · {planned.sets}x{planned.reps} · descanso {planned.restSec}s
             </p>
           </div>
-          <Button size="sm" variant="secondary" onClick={onSwap}>
-            <RefreshCw className="size-3.5" /> Trocar
-          </Button>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <Button size="sm" variant="secondary" onClick={onSwap}>
+              <RefreshCw className="size-3.5" /> Trocar
+            </Button>
+            {onBusyMachine ? (
+              <Button size="sm" variant="outline" className="border-primary/40" onClick={onBusyMachine}>
+                <Wrench className="size-3.5" /> Ocupada
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {planned.supersetGroupId && partnerName ? (

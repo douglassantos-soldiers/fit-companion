@@ -39,13 +39,19 @@ const HIGH = 0.7;
 export function orderHomeBlocks(
   _state: AppState,
   behavior: BehaviorProfile,
-  opts?: { hasClub?: boolean; followingCount?: number; level?: string | null },
+  opts?: { hasClub?: boolean; followingCount?: number; level?: string | null; isSunday?: boolean },
 ): HomeBlockId[] {
   const scores = new Map<HomeBlockId, number>(DEFAULT_ORDER.map((id, i) => [id, DEFAULT_ORDER.length - i]));
 
   const bump = (id: HomeBlockId, amount: number) => {
     scores.set(id, (scores.get(id) ?? 0) + amount);
   };
+
+  if (opts?.isSunday) {
+    bump("periodReview", 80);
+    bump("weekPrs", 40);
+    bump("wow", 35);
+  }
 
   if (behavior.mealAdherence < LOW) {
     bump("nutritionProof", 50);

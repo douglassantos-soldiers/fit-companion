@@ -43,6 +43,7 @@ import { best1RM } from "@/lib/training/one-rm";
 import { hitsForExercise } from "@/lib/engine/exercise-history";
 import { currentPersonalRecords } from "@/lib/training/prs";
 import { computeMuscleLoad } from "@/lib/training/muscle-load";
+import { computeStrengthScore } from "@/lib/training/strength-score";
 import { buildProofOfPerformance } from "@/lib/engine/proof-of-performance";
 import { nutritionGoals, weeklyNutritionSeries } from "@/lib/engine/nutrition";
 import { weeklySupplementAdherence } from "@/lib/engine/supplements";
@@ -109,6 +110,7 @@ export function ProgressPage() {
 
   const dims = performanceDimensions(state, state.profile);
   const score = performanceScore(dims);
+  const strength = computeStrengthScore(state.sessions, state.profile);
   const volume = weeklyVolumeSeries(state.sessions);
   const records = personalRecords(state.sessions);
   const wow = weekOverWeek(state.sessions);
@@ -168,7 +170,7 @@ export function ProgressPage() {
         <ProofCard className="mb-4" proof={proof} name={state.profile.name} empty />
         {lastWeight ? (
           <p className="mb-3 rounded-xl border border-white/10 px-3 py-2 text-sm">
-            Peso atual {lastWeight.kg} kg — registre de novo em Hoje; circunferências em Corpo.
+            Peso atual {lastWeight.weightKg} kg — registre de novo em Hoje; circunferências em Corpo.
           </p>
         ) : (
           <p className="mb-3 text-sm text-muted-foreground">
@@ -305,9 +307,47 @@ export function ProgressPage() {
 
       {/* Bloco 2 — Força */}
       <section className="surface-glass mt-4 space-y-6 p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">Força</p>
+            <h2 className="mt-1 text-display text-2xl">Strength Score</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {strength.coldStart
+                ? "Estimativa inicial — registre compounds para afiná-lo"
+                : `${strength.evidenceCount} lifts · 1RM / peso corporal`}
+            </p>
+          </div>
+          <div className="text-right">
+            <MetricRing value={strength.score} max={100} label="Força" size="md" />
+            {strength.delta28d != null ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {strength.delta28d > 0 ? "+" : ""}
+                {strength.delta28d} em 28d
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {strength.lifts.length > 0 ? (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {strength.lifts.map((lift) => (
+              <li
+                key={lift.exerciseId}
+                className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-sm"
+              >
+                <span>
+                  <span className="font-semibold">{lift.name}</span>
+                  <span className="mt-0.5 block text-[0.65rem] uppercase text-muted-foreground">
+                    {lift.pillar} · {lift.relativeBw}× BW
+                  </span>
+                </span>
+                <span className="text-display text-primary">{lift.score}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <div>
-          <p className="eyebrow">Força</p>
-          <h2 className="mt-1 text-display text-2xl">Volume e carga</h2>
+          <h3 className="text-sm font-semibold">Volume e carga</h3>
         </div>
 
         <div className="h-44">

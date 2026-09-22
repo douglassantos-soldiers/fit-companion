@@ -61,13 +61,48 @@ function PeriodResumoPage() {
         <Stat label="Treinos" value={String(review.sessions)} />
         <Stat label="Volume" value={`${review.volumeKg.toLocaleString("pt-BR")} kg`} />
         <Stat label="PRs" value={String(review.prCount)} />
+        <Stat label="Aderência" value={`${review.adherencePct}%`} />
+        <Stat
+          label="Strength Score"
+          value={review.strengthScore != null ? String(review.strengthScore) : "—"}
+        />
         <Stat label="Consistência" value={`${review.consistencyPct}%`} />
       </div>
+
+      {review.strengthDelta != null ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          Strength Score {review.strengthDelta > 0 ? "+" : ""}
+          {review.strengthDelta} em 28 dias
+        </p>
+      ) : null}
 
       {review.bestEvolution ? (
         <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold">
           Melhor evolução: {review.bestEvolution.name} +{review.bestEvolution.deltaKg} kg
         </p>
+      ) : null}
+
+      {review.nextBlock && review.nextBlock.days.length > 0 ? (
+        <section className="surface-glass mb-4 p-4">
+          <p className="eyebrow">Próximo bloco</p>
+          <h2 className="mt-1 text-display text-lg">{review.nextBlock.label}</h2>
+          <ul className="mt-3 space-y-2 text-sm">
+            {review.nextBlock.days.map((d) => (
+              <li key={d.title} className="flex justify-between gap-2 border-b border-white/5 pb-2 last:border-0">
+                <span>
+                  <span className="font-semibold">{d.title}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{d.focus}</span>
+                </span>
+                <span className="text-xs text-muted-foreground">{d.exerciseCount} ex.</span>
+              </li>
+            ))}
+          </ul>
+          <Link to="/treino" className="mt-3 block">
+            <Button variant="secondary" className="h-10 w-full">
+              Abrir plano
+            </Button>
+          </Link>
+        </section>
       ) : null}
 
       <p className="mb-4 text-sm text-muted-foreground">{review.coachLine}</p>

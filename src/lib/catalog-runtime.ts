@@ -3,7 +3,7 @@
  */
 import { EXERCISE_LIBRARY, setResolvedLibrary } from "@/data/exercise-library";
 import { CHALLENGES_SEED, replaceChallenges } from "@/data/challenges";
-import { replacePlannerExercises, setAlternativeIds } from "@/data/exercises";
+import { replacePlannerExercises, setAlternativeIds, buildSwapGroupAlternatives } from "@/data/exercises";
 import {
   activeChallenges,
   alternativeMapFromResolved,
@@ -70,7 +70,13 @@ export function applyPublicCatalog(catalog: PublicCatalog | null | undefined): v
   const resolvedEx = resolveExerciseCatalog(EXERCISE_LIBRARY, exercises);
   setResolvedLibrary(resolvedEx);
   replacePlannerExercises(toPlannerExercises(resolvedEx));
-  setAlternativeIds(alternativeMapFromResolved(resolvedEx));
+  const seededAlts = buildSwapGroupAlternatives(toPlannerExercises(resolvedEx));
+  const cmsAlts = alternativeMapFromResolved(resolvedEx);
+  const mergedAlts = { ...seededAlts };
+  for (const [id, ids] of Object.entries(cmsAlts)) {
+    if (ids.length) mergedAlts[id] = ids;
+  }
+  setAlternativeIds(mergedAlts);
 
   const resolvedCh = mergeChallenges(CHALLENGES_SEED, challenges, c.participantCounts ?? {});
   replaceChallenges(activeChallenges(resolvedCh));

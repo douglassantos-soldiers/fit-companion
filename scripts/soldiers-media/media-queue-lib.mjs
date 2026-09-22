@@ -79,9 +79,18 @@ export type PublishedExerciseId = (typeof PUBLISHED_EXERCISE_IDS)[number];
 export function buildMotionQueue() {
   const library = parseSoldiersLibrary(root);
   const pilot = new Set(PILOT_EXERCISE_IDS);
+  const published = new Set(loadPublishedIds());
   const backlog = library
     .filter((row) => !pilot.has(row.id))
-    .sort((a, b) => a.id.localeCompare(b.id))
+    .sort((a, b) => {
+      const aPlanner = a.plannerEligible === false ? 1 : 0;
+      const bPlanner = b.plannerEligible === false ? 1 : 0;
+      if (aPlanner !== bPlanner) return aPlanner - bPlanner;
+      const aPub = published.has(a.id) ? 1 : 0;
+      const bPub = published.has(b.id) ? 1 : 0;
+      if (aPub !== bPub) return aPub - bPub;
+      return a.id.localeCompare(b.id);
+    })
     .map((row, index) => ({
       kind: "exercise",
       id: row.id,
@@ -92,6 +101,8 @@ export function buildMotionQueue() {
       start: row.animationSpec?.start || "",
       end: row.animationSpec?.end || "",
       movementPattern: row.movementPattern || "",
+      plannerEligible: row.plannerEligible !== false,
+      published: published.has(row.id),
     }));
 
   const byBatch = {};
@@ -99,13 +110,22 @@ export function buildMotionQueue() {
     byBatch[b] = backlog.filter((r) => r.batch === b).length;
   }
 
+  const plannerPending = backlog.filter((r) => r.plannerEligible && !r.published).length;
+  const libraryPending = backlog.filter((r) => !r.plannerEligible && !r.published).length;
+
   return {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     total: backlog.length,
     batchCount: BATCH_COUNT,
     batchSize: BATCH_SIZE,
     byBatch,
+    priority: {
+      plannerEligibleFirst: true,
+      unpublishedFirst: true,
+      plannerPending,
+      libraryPending,
+    },
     pilotExcluded: PILOT_EXERCISE_IDS,
     items: backlog,
   };

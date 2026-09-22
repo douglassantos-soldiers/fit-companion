@@ -105,6 +105,8 @@ const report = {
   style: style.id,
   license: legal.license,
   totalExercises: library.length,
+  plannerEligible: library.filter((r) => r.plannerEligible !== false).length,
+  libraryOnly: library.filter((r) => r.plannerEligible === false).length,
   mediaComplete,
   posterMissing,
   thumbMissing,
@@ -116,6 +118,27 @@ const report = {
   externalUrls,
   publishedListed: publishedSet.size,
 };
+
+const plannerRows = library.filter((r) => r.plannerEligible !== false);
+const libraryOnlyRows = library.filter((r) => r.plannerEligible === false);
+let plannerPublished = 0;
+let libraryPublished = 0;
+for (const row of plannerRows) {
+  const id = row.mediaId || row.id;
+  if (publishedSet.has(id) && packageComplete(join(mediaRoot, "exercise", id))) plannerPublished += 1;
+}
+for (const row of libraryOnlyRows) {
+  const id = row.mediaId || row.id;
+  if (publishedSet.has(id) && packageComplete(join(mediaRoot, "exercise", id))) libraryPublished += 1;
+}
+report.plannerPublished = plannerPublished;
+report.plannerPublishedPct =
+  plannerRows.length > 0 ? Math.round((plannerPublished / plannerRows.length) * 1000) / 10 : 0;
+report.libraryPublished = libraryPublished;
+report.libraryPublishedPct =
+  libraryOnlyRows.length > 0
+    ? Math.round((libraryPublished / libraryOnlyRows.length) * 1000) / 10
+    : 0;
 
 console.log(JSON.stringify(report, null, 2));
 
@@ -131,14 +154,19 @@ if (url && key) {
     console.log("remote: read failed", res.status);
   } else {
     const rows = await res.json();
-    const publishedRows = rows.filter((r) => normalizeStatus(r.status) === "published");
-    const qaRows = rows.filter((r) => normalizeStatus(r.status) === "qa");
-    const rejectedRows = rows.filter((r) => normalizeStatus(r.status) === "rejected");
+    const exerciseRows = rows.filter((r) => r.kind === "exercise");
+    const publishedRows = exerciseRows.filter((r) => normalizeStatus(r.status) === "published");
+    const qaRows = exerciseRows.filter((r) => normalizeStatus(r.status) === "qa");
+    const rejectedRows = exerciseRows.filter((r) => normalizeStatus(r.status) === "rejected");
+    const otherPublished = rows.filter(
+      (r) => r.kind !== "exercise" && normalizeStatus(r.status) === "published",
+    ).length;
     console.log(
       JSON.stringify({
         remotePublished: publishedRows.length,
         remoteQaPending: qaRows.length,
         remoteRejected: rejectedRows.length,
+        remoteOtherPublished: otherPublished,
       }),
     );
   }

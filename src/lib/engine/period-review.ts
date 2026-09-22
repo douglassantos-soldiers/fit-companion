@@ -2,11 +2,28 @@ import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
 import type { CoachContext } from "@/lib/coach/types";
 import { exerciseById } from "@/data/exercises";
 import { sessionsInLastDays, streak, weekOverWeek } from "@/lib/engine/dimensions";
+import { trainingAdherence7d } from "@/lib/engine/behavior/adherence";
+import { learningWeekHint } from "@/lib/engine/learning";
+import { buildWeeklyPlan } from "@/lib/engine/plan";
 import { isoWeekDateKeys } from "@/lib/engine/xp";
+import { hitsForExercise, listExercisesWithHistory } from "@/lib/engine/exercise-history";
+import { best1RM } from "@/lib/training/one-rm";
 import { currentPersonalRecords, detectExercisePrs } from "@/lib/training/prs";
+import { computeStrengthScore } from "@/lib/training/strength-score";
 import { todayKey, type AppState, type SessionLog } from "@/lib/types";
 
 export type PeriodKind = "week" | "month";
+
+export interface NextBlockDay {
+  title: string;
+  focus: string;
+  exerciseCount: number;
+}
+
+export interface NextBlockPreview {
+  label: string;
+  days: NextBlockDay[];
+}
 
 export interface PeriodReview {
   kind: PeriodKind;
@@ -15,7 +32,12 @@ export interface PeriodReview {
   volumeKg: number;
   prCount: number;
   consistencyPct: number;
+  adherencePct: number;
   volumeDeltaPct: number | null;
+  strengthScore: number | null;
+  strengthDelta: number | null;
+  nextBlock: NextBlockPreview | null;
+  isSundayRitual: boolean;
   bestEvolution: { exerciseId: string; name: string; deltaKg: number } | null;
   coachLine: string;
   wins: string[];
@@ -31,11 +53,16 @@ function monthRange(now = new Date()): { start: string; end: string; label: stri
   return { start: todayKey(start), end: todayKey(end), label };
 }
 
+function isSunday(now: Date) {
+  return now.getDay() === 0;
+}
+
 function weekRange(now = new Date()): { start: string; end: string; label: string } {
   const keys = isoWeekDateKeys(now);
   const start = keys[0]!;
   const end = keys[6]!;
-  return { start, end, label: "SEU RESUMO" };
+  const label = isSunday(now) ? "RITUAL DA SEMANA" : "SEU RESUMO";
+  return { start, end, label };
 }
 
 function inRange(session: SessionLog, start: string, end: string) {
@@ -67,11 +94,45 @@ function bestEvolution(sessions: SessionLog[], start: string, end: string) {
   return best;
 }
 
+function nextWeekPlan(state: AppState, now: Date): NextBlockPreview | null {
+  const profile = state.profile;
+  if (!profile) return null;
+  const nextMonday = new Date(now);
+  const day = (nextMonday.getDay() + 6) % 7;
+  nextMonday.setDate(nextMonday.getDate() - day + 7);
+  nextMonday.setHours(12, 0, 0, 0);
+
+  const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state), {
+    likedExerciseIds: state.likedExerciseIds ?? [],
+    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+  });
+
+  const weekKeys = isoWeekDateKeys(nextMonday);
+  return {
+    label: `Próximo bloco · ${weekKeys[0]!.slice(5)} → ${weekKeys[6]!.slice(5)}`,
+    days: plan.map((d) => ({
+      title: d.title,
+      focus: d.focus,
+      exerciseCount: d.exercises.length,
+    })),
+  };
+}
+
 function stubCoachContext(state: AppState): CoachContext {
   const date = todayKey();
   const p = state.profile;
   const sessions7d = sessionsInLastDays(state.sessions, 7).length;
   const prs = currentPersonalRecords(state.sessions).slice(0, 5);
+  const top1rm = listExercisesWithHistory(state.sessions, 8)
+    .map((h) => {
+      const best = best1RM(hitsForExercise(h.exerciseId, state.sessions));
+      if (!best) return null;
+      return { exerciseId: h.exerciseId, estimated1rm: best.value };
+    })
+    .filter((x): x is { exerciseId: string; estimated1rm: number } => Boolean(x))
+    .sort((a, b) => b.estimated1rm - a.estimated1rm)
+    .slice(0, 5);
+
   return {
     userId: state.userId ?? "local",
     date,
@@ -99,7 +160,7 @@ function stubCoachContext(state: AppState): CoachContext {
     },
     exercisePerformance: {
       recentPrs: prs.map((pr) => ({ label: pr.label, value: pr.value, date: pr.achievedAt })),
-      top1rm: [],
+      top1rm,
     },
     recovery: {
       level: null,
@@ -156,10 +217,16 @@ export function periodReview(state: AppState, kind: PeriodKind, now = new Date()
   });
   const planned = Math.max(1, (state.profile?.daysPerWeek ?? 3) * (kind === "week" ? 1 : 4));
   const consistencyPct = Math.min(100, Math.round((inPeriod.length / planned) * 100));
+  const adherencePct =
+    kind === "week"
+      ? Math.round(trainingAdherence7d(state) * 100)
+      : consistencyPct;
   const wow = weekOverWeek(state.sessions);
   const volumeDeltaPct = kind === "week" ? wow.volumeDeltaPct : null;
   const coach = weeklyReviewWorkflow(stubCoachContext(state));
   const best = bestEvolution(state.sessions, range.start, range.end);
+  const strength = computeStrengthScore(state.sessions, state.profile, now);
+  const sundayRitual = kind === "week" && isSunday(now);
 
   return {
     kind,
@@ -168,7 +235,12 @@ export function periodReview(state: AppState, kind: PeriodKind, now = new Date()
     volumeKg,
     prCount: prs.length,
     consistencyPct,
+    adherencePct,
     volumeDeltaPct,
+    strengthScore: strength.score,
+    strengthDelta: strength.delta28d,
+    nextBlock: kind === "week" ? nextWeekPlan(state, now) : null,
+    isSundayRitual: sundayRitual,
     bestEvolution: best,
     coachLine: coach.nextFocus ?? coach.wins?.[0] ?? "Continue registrando.",
     wins: coach.wins ?? [],
