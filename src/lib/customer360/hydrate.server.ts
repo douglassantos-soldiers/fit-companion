@@ -133,7 +133,25 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     favoriteMealPresetIds: Array.isArray(r["favoriteMealPresetIds"])
       ? (r["favoriteMealPresetIds"] as string[])
       : [],
+    favoriteFoodIds: Array.isArray(r["favoriteFoodIds"])
+      ? (r["favoriteFoodIds"] as string[])
+      : [],
     savedMeals: Array.isArray(r["savedMeals"]) ? (r["savedMeals"] as AppState["savedMeals"]) : [],
+    customFoods: Array.isArray(r["customFoods"]) ? (r["customFoods"] as AppState["customFoods"]) : [],
+    savedTrainingPlans: Array.isArray(r["savedTrainingPlans"])
+      ? (r["savedTrainingPlans"] as AppState["savedTrainingPlans"])
+      : [],
+    activeTrainingPlanId:
+      typeof r["activeTrainingPlanId"] === "string" ? r["activeTrainingPlanId"] : null,
+    activeTrainingPlanWeekKey:
+      typeof r["activeTrainingPlanWeekKey"] === "string" ? r["activeTrainingPlanWeekKey"] : null,
+    activeTrainingBlock:
+      r["activeTrainingBlock"] && typeof r["activeTrainingBlock"] === "object"
+        ? (r["activeTrainingBlock"] as AppState["activeTrainingBlock"])
+        : null,
+    trainingBlockHistory: Array.isArray(r["trainingBlockHistory"])
+      ? (r["trainingBlockHistory"] as AppState["trainingBlockHistory"])
+      : [],
     wearableConnections: Array.isArray(r["wearableConnections"])
       ? (r["wearableConnections"] as AppState["wearableConnections"])
       : [],
@@ -342,7 +360,14 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
       (retention.favoriteMealPresetIds?.length
         ? retention.favoriteMealPresetIds
         : (stateRow?.["favorite_meal_preset_ids"] as string[])) ?? [],
+    favoriteFoodIds: retention.favoriteFoodIds ?? [],
     savedMeals: retention.savedMeals ?? [],
+    customFoods: retention.customFoods ?? [],
+    savedTrainingPlans: retention.savedTrainingPlans ?? [],
+    activeTrainingPlanId: retention.activeTrainingPlanId ?? null,
+    activeTrainingPlanWeekKey: retention.activeTrainingPlanWeekKey ?? null,
+    activeTrainingBlock: retention.activeTrainingBlock ?? null,
+    trainingBlockHistory: retention.trainingBlockHistory ?? [],
     remindersEnabled: stateRow?.["reminders_enabled"] === true,
     reminderHour: Number(stateRow?.["reminder_hour"] ?? 18),
     seenOnboardingTips: (stateRow?.["seen_onboarding_tips"] as string[]) ?? [],

@@ -14,8 +14,8 @@ A Fase 7 amplia o **conteúdo** do catálogo (exercícios lote 2–3, alimentos 
 | Lote 4 | deferred (Muscle up, Arranco, Arremesso, Puxada atrás da nuca) |
 | Meta atual | **~250** exercícios na library (~159 planner) |
 | Roadmap | **500** → **800** exercícios (fases futuras, sem inflar o planner) |
-| Alimentos | seed interno ~200, `source: "internal"` |
-| Receitas | biblioteca ~40–50, macros **derived** dos `foodId` |
+| Alimentos | seed interno ~280+ (incl. marcas/EAN), `source: "internal"` |
+| Receitas | biblioteca ~40–50, macros **derived** dos `foodId` — aba Receitas no meal picker |
 | Meal planner | continua em `MEAL_PRESETS` |
 
 ## Exercícios
@@ -39,7 +39,8 @@ Sem TACO no repositório. Overlay TACO continua atrás de `catalog_settings.taco
 - `FoodItem.sourceVersion` (ex. `soldiers-internal-v1`) nos alimentos novos
 - `food_items.ean` + `source_version` (migration `20261013120000_fase7_catalog_scale.sql`)
 - unique parcial em `ean` WHERE NOT NULL
-- EAN real **não** é inventado no seed
+- EAN real **não** é inventado no seed — lote `foods-brands-ean.ts` usa GTINs curados (rótulo / OFF BR)
+- **SoT de busca/barcode:** catálogo interno (+ TACO licenciado). **Open Food Facts = fallback de barcode apenas** (miss local → OFF BR, sem write em Postgres, sem indexar OFF na busca por nome)
 
 `rebuild()` monta um inverted index (name, brand, synonyms, category, ean). `searchFoods` usa o índice para candidatos e depois o score estável (`FoodSearchHit`). Se o índice estiver vazio, cai no scan linear. `meal-builder` / `nutrients` / `scaleMacros` intocados.
 
@@ -58,6 +59,17 @@ Zero alegações nutricionais. Sem mudança estrutural do meal planner.
 - Food search linear se o índice estiver vazio
 - Exercício sem mídia publicada → MuscleArt (Fase 6)
 - TACO ausente no seed TS; só DB + flag
+- Barcode: catálogo local → OFF BR (`br.openfoodfacts.org`) → world OFF
+
+## TACO unlock (ops)
+
+```
+node scripts/taco-xlsx-to-json.mjs path/to/Taco-4a-Edicao.xlsx --out ~/Downloads/taco-foods.json
+node scripts/import-taco.mjs ~/Downloads/taco-foods.json --out ~/Downloads/seed-taco-import.sql
+# Apply SQL with service role, then reload public catalog
+```
+
+Não commitar xlsx/JSON/SQL gerados.
 
 ## Gates
 

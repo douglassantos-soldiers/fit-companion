@@ -185,7 +185,7 @@ function CorpoPage() {
         <p className="text-sm font-semibold">Medidas de hoje</p>
         {state.weights[state.weights.length - 1] ? (
           <p className="text-xs text-muted-foreground">
-            Peso atual {state.weights[state.weights.length - 1]!.kg} kg (registrado em Hoje). Circunferências abaixo.
+            Peso atual {state.weights[state.weights.length - 1]!.weightKg} kg (registrado em Hoje). Circunferências abaixo.
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">

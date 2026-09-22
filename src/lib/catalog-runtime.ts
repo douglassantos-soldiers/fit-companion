@@ -30,8 +30,9 @@ import type {
   Expert,
   ProgramSession,
 } from "@/lib/content/types";
-import { applyTacoCatalog } from "@/lib/nutrition/food-catalog";
+import { applyTacoCatalog, applyUserCatalog } from "@/lib/nutrition/food-catalog";
 import type { FoodItem, FoodServing } from "@/lib/nutrition/types";
+import type { CustomFood } from "@/lib/types";
 
 export type PublicCatalog = {
   exercises: ExerciseOverlay[];
@@ -63,7 +64,10 @@ export const EMPTY_PUBLIC_CATALOG: PublicCatalog = {
   programSessions: [],
 };
 
-export function applyPublicCatalog(catalog: PublicCatalog | null | undefined): void {
+export function applyPublicCatalog(
+  catalog: PublicCatalog | null | undefined,
+  customFoods?: CustomFood[],
+): void {
   const c = catalog ?? EMPTY_PUBLIC_CATALOG;
   const exercises = (c.exercises ?? []) as ExerciseOverlay[];
   const challenges = (c.challenges ?? []) as ChallengeOverlay[];
@@ -102,4 +106,5 @@ export function applyPublicCatalog(catalog: PublicCatalog | null | undefined): v
     tacoFoods: c.tacoFoods ?? [],
     tacoServings: c.tacoServings ?? [],
   });
+  applyUserCatalog(customFoods ?? []);
 }

@@ -256,13 +256,24 @@ export function computeDecisions(
 
   let calorieDelta = snapshot.nutrition.kcalTrend ?? 0;
   const calorieCodes: ReasonCode[] = [];
-  if (snapshot.nutrition.weightTrendKg7d != null && snapshot.nutrition.weightTrendKg7d <= -0.5) {
-    if (snapshot.goal === "massa" && calorieDelta < 150) calorieDelta = 150;
-    calorieCodes.push("weight_trend_down");
+  const gatedLogging = snapshot.reasonSeeds.includes("incomplete_logging");
+  const gatedAdherence = snapshot.reasonSeeds.includes("adherence_gate");
+  if (gatedLogging) {
+    calorieCodes.push("incomplete_logging");
+    calorieDelta = 0;
+  } else if (gatedAdherence) {
+    calorieCodes.push("adherence_gate");
+    calorieDelta = 0;
+  } else {
+    if (snapshot.reasonSeeds.includes("weight_trend_down")) calorieCodes.push("weight_trend_down");
+    if (snapshot.reasonSeeds.includes("weight_trend_up")) calorieCodes.push("weight_trend_up");
+    if (sleepStress && snapshot.goal !== "gordura") {
+      calorieDelta = Math.max(calorieDelta, 50);
+      calorieCodes.push(...allSeeds.filter((c) => c === "sleep_low" || c === "energy_low"));
+    }
   }
-  if (sleepStress && snapshot.goal !== "gordura") {
-    calorieDelta = Math.max(calorieDelta, 50);
-    calorieCodes.push(...allSeeds.filter((c) => c === "sleep_low" || c === "energy_low"));
+  if (!calorieCodes.length && calorieDelta === 0) {
+    calorieCodes.push("sleep_good");
   }
 
   const proteinBias: "up" | "hold" =

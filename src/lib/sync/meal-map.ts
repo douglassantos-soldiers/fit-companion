@@ -42,6 +42,30 @@ function mapNutrientSnapshot(raw: unknown): MealNutrientSnapshot | undefined {
   if (s["fiberG"] != null) snap.fiberG = Number(s["fiberG"]);
   if (s["sugarG"] != null) snap.sugarG = Number(s["sugarG"]);
   if (s["sodiumMg"] != null) snap.sodiumMg = Number(s["sodiumMg"]);
+  const extrasRaw = s["extras"];
+  if (extrasRaw && typeof extrasRaw === "object" && !Array.isArray(extrasRaw)) {
+    const extras: NonNullable<MealNutrientSnapshot["extras"]> = {};
+    for (const [k, v] of Object.entries(extrasRaw as Record<string, unknown>)) {
+      if (!v || typeof v !== "object") continue;
+      const e = v as Record<string, unknown>;
+      const value = Number(e["value"]);
+      if (!Number.isFinite(value) || value <= 0) continue;
+      const src = asLineage(e["source"]) ?? source;
+      const ek =
+        e["kind"] === "observed" || e["kind"] === "derived" || e["kind"] === "estimated"
+          ? e["kind"]
+          : kind;
+      extras[k] = {
+        key: typeof e["key"] === "string" ? e["key"] : k,
+        value,
+        unit: typeof e["unit"] === "string" ? e["unit"] : "",
+        source: src,
+        kind: ek,
+        confidence: Number(e["confidence"] ?? snap.confidence),
+      };
+    }
+    if (Object.keys(extras).length) snap.extras = extras;
+  }
   return snap;
 }
 

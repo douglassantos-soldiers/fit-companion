@@ -275,6 +275,112 @@ export interface SavedMeal {
   createdAt: string;
 }
 
+/** User-authored food in retention blob (P2). Never invent EAN. */
+export interface CustomFood {
+  id: string;
+  name: string;
+  brand?: string;
+  category: import("@/lib/nutrition/types").FoodCategory;
+  /** per 100 g */
+  kcal: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  fiberG?: number;
+  sodiumMg?: number;
+  ironMg?: number;
+  vitaminDUcg?: number;
+  servingLabel: string;
+  servingGrams: number;
+  /** Validated GTIN/EAN only — omit if unknown */
+  ean?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Snapshot of a planned exercise for saved routines (no prescriptions/evidence). */
+export interface SavedTrainingPlanExercise {
+  exerciseId: string;
+  name: string;
+  sets: number;
+  reps: string;
+  restSec: number;
+  suggestedLoad: number;
+  unit: "kg" | "corpo" | "min";
+}
+
+export interface SavedTrainingPlanDay {
+  id: string;
+  title: string;
+  focus: string;
+  weekday?: number;
+  estimatedMin?: number;
+  exercises: SavedTrainingPlanExercise[];
+}
+
+/** User-owned fork of a week or day plan (Hevy / Boostcamp light). */
+export interface SavedTrainingPlan {
+  id: string;
+  name: string;
+  kind: "week" | "day";
+  createdAt: string;
+  updatedAt: string;
+  days: SavedTrainingPlanDay[];
+}
+
+/** Prescribed exercise inside an ActiveTrainingBlock day. */
+export interface BlockExercisePrescription {
+  exerciseId: string;
+  name: string;
+  sets: number;
+  reps: string;
+  restSec: number;
+  suggestedLoad?: number;
+  unit: "kg" | "corpo" | "min";
+}
+
+/** One training day inside a block week (day = 1..sessionsPerWeek). */
+export interface BlockDayPrescription {
+  id: string;
+  day: number;
+  title: string;
+  focus?: string;
+  estimatedMin?: number;
+  exercises: BlockExercisePrescription[];
+}
+
+export interface BlockWeek {
+  /** 1-based week number in the program */
+  week: number;
+  days: BlockDayPrescription[];
+}
+
+/**
+ * Hybrid periodization block (P2): structure from Content OS / manual;
+ * Living Plan still picks full|express|deload|rest + volume.
+ */
+export interface ActiveTrainingBlock {
+  id: string;
+  name: string;
+  source: "content_program" | "manual";
+  programId?: string;
+  /** YYYY-MM-DD */
+  startDate: string;
+  /** Clamped 4–8 */
+  durationWeeks: number;
+  sessionsPerWeek: number;
+  /** 0-based week index in the block */
+  currentWeekIndex: number;
+  weeks: BlockWeek[];
+  /** Prescription day ids completed (for week advance) */
+  completedDayIds: string[];
+}
+
+export interface ArchivedTrainingBlock extends ActiveTrainingBlock {
+  endedAt: string;
+  reason: "completed" | "left";
+}
+
 export interface MealEntry {
   id: string;
   date: string;
@@ -389,8 +495,21 @@ export interface AppState {
   /** Sons e vibração durante a sessão de treino */
   sessionFx: boolean;
   favoriteMealPresetIds: string[];
+  /** Catalog food ids the user starred (P1 diary loop). Cap ~60. */
+  favoriteFoodIds: string[];
   /** Composed meals the user saved for reuse (Fase 13 library). */
   savedMeals: SavedMeal[];
+  /** User-created foods with portion + optional EAN (P2). Cap ~60. */
+  customFoods: CustomFood[];
+  /** Forked week/day training plans (P1 logger tools). */
+  savedTrainingPlans: SavedTrainingPlan[];
+  /** Sticky routine for the current ISO week. */
+  activeTrainingPlanId: string | null;
+  activeTrainingPlanWeekKey: string | null;
+  /** Hybrid Content OS / manual training block (P2). */
+  activeTrainingBlock: ActiveTrainingBlock | null;
+  /** Recently finished/left blocks (capped). */
+  trainingBlockHistory: ArchivedTrainingBlock[];
   remindersEnabled: boolean;
   /** Local hour 0–23 for daily reminder */
   reminderHour: number;
@@ -524,7 +643,14 @@ export const emptyState: AppState = {
   },
   sessionFx: true,
   favoriteMealPresetIds: [],
+  favoriteFoodIds: [],
   savedMeals: [],
+  customFoods: [],
+  savedTrainingPlans: [],
+  activeTrainingPlanId: null,
+  activeTrainingPlanWeekKey: null,
+  activeTrainingBlock: null,
+  trainingBlockHistory: [],
   remindersEnabled: false,
   reminderHour: 18,
   pushPrefs: { workout: true, streak: true, challenge: true, kudos: true },

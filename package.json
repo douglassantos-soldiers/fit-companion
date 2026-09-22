@@ -24,7 +24,9 @@
     "catalog:coverage": "node scripts/exercise-catalog/coverage-diff.mjs",
     "catalog:generate-seed": "node scripts/exercise-catalog/generate-seed.mjs",
     "catalog:validate": "node scripts/exercise-catalog/validate.mjs",
-    "food:validate": "node scripts/nutrition/validate-catalog.mjs"
+    "food:validate": "node scripts/nutrition/validate-catalog.mjs",
+    "taco:xlsx-to-json": "node scripts/taco-xlsx-to-json.mjs",
+    "taco:import-sql": "node scripts/import-taco.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

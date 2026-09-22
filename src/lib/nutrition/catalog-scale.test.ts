@@ -39,7 +39,14 @@ describe("catalog scale foods", () => {
   it("stamps sourceVersion on lote 2 foods", () => {
     const versioned = FOOD_ITEMS.filter((f) => f.sourceVersion === INTERNAL_SOURCE_VERSION);
     expect(versioned.length).toBeGreaterThanOrEqual(90);
-    expect(FOOD_ITEMS.every((f) => !f.ean)).toBe(true);
+  });
+
+  it("includes curated branded SKUs with real EANs", () => {
+    const withEan = FOOD_ITEMS.filter((f) => f.ean);
+    expect(withEan.length).toBeGreaterThanOrEqual(70);
+    expect(withEan.every((f) => /^\d{8}$|^\d{13}$/.test(f.ean!))).toBe(true);
+    expect(withEan.every((f) => Boolean(f.brand))).toBe(true);
+    expect(foodById("br-coca-cola-coca-cola-original-lata")?.ean).toBe("7894900010015");
   });
 
   it("finds foods by synonym and brand via the inverted index", () => {
@@ -49,6 +56,8 @@ describe("catalog scale foods", () => {
     const byBrand = searchFoods("marca própria", { brand: "marca própria", limit: 8 });
     expect(byBrand.length).toBeGreaterThan(0);
     expect(byBrand.every((h) => h.food.brand === "marca própria")).toBe(true);
+    const byEan = searchFoods("7894900010015", { limit: 4 });
+    expect(byEan.some((h) => h.food.ean === "7894900010015")).toBe(true);
     const candidates = lookupFoodCandidateIds("peito de frango");
     expect(candidates?.has("frango-peito-grelhado")).toBe(true);
   });

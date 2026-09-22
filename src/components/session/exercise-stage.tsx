@@ -11,6 +11,7 @@ import { exerciseWorkoutNote } from "@/lib/cms";
 import { exerciseInstructions, resolveExerciseMedia } from "@/lib/soldiers-media";
 import { PROGRESSION_CODE_LABEL, type ProgressionReasonCode } from "@/lib/engine/progression";
 import { estimated1RM } from "@/lib/training/one-rm";
+import { plateBreakdown } from "@/lib/training/plates";
 import { cn } from "@/lib/utils";
 
 export type SessionEffortScale = "rpe" | "rir";
@@ -42,6 +43,7 @@ export function ExerciseStage({
   onNextExercise,
   onPreference,
   onEffortScale,
+  homeBar,
 }: {
   planned: PlannedExercise;
   exercise: Exercise | undefined;
@@ -64,6 +66,8 @@ export function ExerciseStage({
   onNextExercise: () => void;
   onPreference?: (pref: "like" | "dislike" | "clear") => void;
   onEffortScale: (scale: SessionEffortScale) => void;
+  /** Use 15 kg bar (casa / short bar) instead of 20 kg Olympic. */
+  homeBar?: boolean;
 }) {
   const group = exercise?.group ?? "peito";
   const cueNote = exercise ? exerciseWorkoutNote(exercise.id) : undefined;
@@ -78,6 +82,10 @@ export function ExerciseStage({
       ? estimated1RM(setLog.weightKg, setLog.reps)
       : 0;
   const chips = reasonChips(planned.reasonCodes);
+  const plates =
+    planned.unit === "kg" && setLog.weightKg > 0
+      ? plateBreakdown(setLog.weightKg, { homeBar: Boolean(homeBar) })
+      : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -287,6 +295,11 @@ export function ExerciseStage({
                 <Plus className="size-3.5" />
               </Button>
             </div>
+            {plates ? (
+              <p className="text-center text-[0.65rem] leading-tight text-muted-foreground" title="Anilhas por lado">
+                Por lado · {plates.label}
+              </p>
+            ) : null}
           </div>
           {effortScale === "rpe" ? (
             <NumberInput

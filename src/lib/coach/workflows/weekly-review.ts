@@ -31,6 +31,23 @@ export function weeklyReviewWorkflow(ctx: CoachContext): WorkflowResult {
   if (ctx.customer360.nutritionAdherence != null && ctx.customer360.nutritionAdherence < 0.6) {
     risks.push("Aderência proteica baixa (dias logados)");
   }
+  const kcalDecision = ctx.todayDecisions.find((d) => d.type === "nutrition_calorie_delta");
+  if (kcalDecision) {
+    const d = Number(kcalDecision.value);
+    if (Number.isFinite(d) && d !== 0) {
+      analysis.push(`Ajuste semanal de kcal: ${d > 0 ? "+" : ""}${d}`);
+      wins.push(
+        d > 0
+          ? `Meta de calorias aumentada em ${d} kcal nesta semana`
+          : `Meta de calorias reduzida em ${Math.abs(d)} kcal nesta semana`,
+      );
+    } else if (
+      kcalDecision.reasonCodes.includes("incomplete_logging") ||
+      kcalDecision.reasonCodes.includes("adherence_gate")
+    ) {
+      risks.push(kcalDecision.explanation);
+    }
+  }
   if (ctx.userPatterns.some((p) => /fim de semana|weekend/i.test(p))) {
     risks.push("Padrão de queda no fim de semana");
   }

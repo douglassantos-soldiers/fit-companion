@@ -12,10 +12,13 @@ export const REASON_CODES = [
   "recovery_low",
   "protein_low",
   "weight_trend_down",
+  "weight_trend_up",
   "time_limited",
   "travel",
   "equipment_limited",
   "adherence_drop",
+  "adherence_gate",
+  "incomplete_logging",
   "stim_restriction",
   "deload_week",
   "restock_risk",
@@ -79,6 +82,11 @@ export const REASON_CODE_META: Record<
     fragment: "o peso caiu na última semana",
     direction: "down",
   },
+  weight_trend_up: {
+    label: "Peso em alta",
+    fragment: "o peso subiu na última semana",
+    direction: "up",
+  },
   time_limited: {
     label: "Pouco tempo",
     fragment: "você tem pouco tempo disponível",
@@ -98,6 +106,16 @@ export const REASON_CODE_META: Record<
     label: "Aderência em queda",
     fragment: "a aderência caiu recentemente",
     direction: "down",
+  },
+  adherence_gate: {
+    label: "Aderência insuficiente",
+    fragment: "a aderência calórica ainda não sustenta um ajuste",
+    direction: "risk",
+  },
+  incomplete_logging: {
+    label: "Logging incompleto",
+    fragment: "o registro de refeições está incompleto",
+    direction: "risk",
   },
   stim_restriction: {
     label: "Stims bloqueados",

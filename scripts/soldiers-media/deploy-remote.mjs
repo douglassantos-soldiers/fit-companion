@@ -120,6 +120,7 @@ for (const kind of readdirSync(base)) {
 
 let ok = 0;
 const failures = [];
+const publishedExerciseIds = [];
 for (const pkg of packages) {
   try {
     const checksums = {};
@@ -167,6 +168,9 @@ for (const pkg of packages) {
       checksums,
       updated_at: new Date().toISOString(),
     });
+    if (pkg.kind === "exercise" && finalStatus === "published") {
+      publishedExerciseIds.push(pkg.entityId);
+    }
     ok += 1;
     console.log(finalStatus, pkg.kind, pkg.entityId);
   } catch (err) {
@@ -175,7 +179,38 @@ for (const pkg of packages) {
   }
 }
 
-console.log(`done ${ok}/${packages.length}`);
+async function syncCatalogMediaStatus(ids) {
+  if (!ids.length) return 0;
+  // PostgREST: patch in chunks by id list
+  const chunkSize = 50;
+  let updated = 0;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const filter = chunk.map((id) => `"${id}"`).join(",");
+    const res = await fetch(
+      `${url}/rest/v1/catalog_exercises?id=in.(${filter})`,
+      {
+        method: "PATCH",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({ media_status: "published" }),
+      },
+    );
+    if (!res.ok) {
+      console.error("catalog media_status sync failed", res.status, await res.text());
+      continue;
+    }
+    updated += chunk.length;
+  }
+  return updated;
+}
+
+const catalogSynced = await syncCatalogMediaStatus(publishedExerciseIds);
+console.log(`done ${ok}/${packages.length}; catalog media_status synced ~${catalogSynced}`);
 if (failures.length) {
   for (const line of failures) console.error(line);
   process.exit(1);

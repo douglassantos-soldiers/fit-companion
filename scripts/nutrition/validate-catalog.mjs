@@ -19,14 +19,19 @@ function duplicates(values) {
   return [...counts.entries()].filter(([, n]) => n > 1).map(([v]) => v);
 }
 
-const foodsSrc = `${read("src/data/foods.ts")}\n${read("src/data/foods-lote2.ts")}`;
+const foodsSrc = `${read("src/data/foods.ts")}\n${read("src/data/foods-lote2.ts")}\n${read("src/data/foods-delivery-br.ts")}\n${read("src/data/foods-brands-ean.ts")}`;
 const recipesSrc = read("src/data/recipes.ts");
 const lote2Src = read("src/data/foods-lote2.ts");
+const deliverySrc = read("src/data/foods-delivery-br.ts");
+const brandsSrc = read("src/data/foods-brands-ean.ts");
+const perfMicrosSrc = read("src/data/foods-performance-micros.ts");
 
-const foodIds = [...foodsSrc.matchAll(/\bid:\s*"([^"]+)"/g)]
+const foodIds = [
+  ...foodsSrc.matchAll(/\bid:\s*["']([^"']+)["']/g),
+]
   .map((m) => m[1])
-  .filter((id) => !id.startsWith("s-"));
-const foodNames = [...foodsSrc.matchAll(/\bname:\s*"([^"]+)"/g)].map((m) =>
+  .filter((id) => !id.startsWith("s-") && !id.startsWith("br-s-"));
+const foodNames = [...foodsSrc.matchAll(/\bname:\s*["']([^"']+)["']/g)].map((m) =>
   m[1].toLowerCase().trim(),
 );
 
@@ -53,8 +58,19 @@ const badGrams = [...foodsSrc.matchAll(/\bgrams:\s*(-?\d+(?:\.\d+)?)/g)]
 const lote2FoodCount = [...lote2Src.matchAll(/\bid:\s*"([^"]+)"/g)]
   .map((m) => m[1])
   .filter((id) => !id.startsWith("s-")).length;
+const deliveryFoodCount = [...deliverySrc.matchAll(/\bid:\s*"([^"]+)"/g)]
+  .map((m) => m[1])
+  .filter((id) => !id.startsWith("s-")).length;
+const performanceMicroFoods = [
+  ...perfMicrosSrc.matchAll(/^\s*"([^"]+)":\s*\{/gm),
+].map((m) => m[1]);
 const lote2MissingVersion = !/sourceVersion:\s*INTERNAL_SOURCE_VERSION/.test(lote2Src);
+const deliveryMissingVersion = !/sourceVersion:\s*INTERNAL_SOURCE_VERSION/.test(deliverySrc);
 const tacoInSeed = /source:\s*"taco"/.test(foodsSrc);
+
+const eans = [...foodsSrc.matchAll(/\bean:\s*["']([^"']+)["']/g)].map((m) => m[1].replace(/\D/g, ""));
+const badEanFormat = eans.filter((e) => e.length !== 8 && e.length !== 12 && e.length !== 13);
+const dupEans = duplicates(eans.filter(Boolean));
 
 const errors = [];
 const dupFoodIds = duplicates(foodIds);
@@ -70,20 +86,33 @@ if (missingRecipeFoods.length) errors.push("recipeFoodIdMissing");
 if (negativeMacros.length) errors.push("negativeMacros");
 if (badGrams.length) errors.push("gramsEquivalentInvalid");
 if (lote2MissingVersion) errors.push("lote2MissingSourceVersion");
+if (deliveryMissingVersion) errors.push("deliveryMissingSourceVersion");
+if (deliveryFoodCount < 50) errors.push("deliveryFoodsTooFew");
+if (performanceMicroFoods.length < 25) errors.push("performanceMicrosTooFew");
 if (tacoInSeed) errors.push("tacoPresentInSeed");
+if (badEanFormat.length) errors.push("eanFormatInvalid");
+if (dupEans.length) errors.push("duplicateEans");
 
 const report = {
   foods: foodIds.length,
   recipes: recipeIds.length,
   lote2Foods: lote2FoodCount,
+  deliveryFoods: deliveryFoodCount,
+  performanceMicroFoods: performanceMicroFoods.length,
+  brandedEanFoods: [...brandsSrc.matchAll(/\bid:\s*['"]([^'"]+)['"]/g)]
+    .map((m) => m[1])
+    .filter((id) => id.startsWith("br-")).length,
   duplicateFoodIds: dupFoodIds,
   duplicateFoodNames: dupFoodNames,
   duplicateRecipeIds: dupRecipeIds,
   duplicateRecipeNames: dupRecipeNames,
+  duplicateEans: dupEans,
+  badEanFormat,
   missingRecipeFoods,
   negativeMacros: negativeMacros.length,
   gramsEquivalentInvalid: badGrams.length,
   lote2HasSourceVersion: !lote2MissingVersion,
+  deliveryHasSourceVersion: !deliveryMissingVersion,
   tacoInSeed,
   errors,
 };

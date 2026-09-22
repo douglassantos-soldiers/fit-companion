@@ -126,13 +126,17 @@ export function coachReply(promptId: string, state: AppState): string {
         : `O treino de hoje segue o plano padrão da semana.${modeNote}`;
     }
     case "por-que-calorias": {
-      const reason =
-        whyFromChange(state, "calories") ??
-        built?.decisions.decisions.find((d) => d.decisionType === "nutrition_calorie_delta")
-          ?.explanation;
-      return reason
-        ? `Por que as calorias mudaram: ${reason}`
-        : "As calorias estão estáveis em relação à meta do perfil.";
+      const kcalDec = built?.decisions.decisions.find(
+        (d) => d.decisionType === "nutrition_calorie_delta",
+      );
+      const reason = whyFromChange(state, "calories") ?? kcalDec?.explanation;
+      const delta = kcalDec ? Number(kcalDec.decisionValue) : 0;
+      if (reason) {
+        return delta !== 0
+          ? `Ajuste semanal de calorias (${delta > 0 ? "+" : ""}${delta} kcal): ${reason}`
+          : `Por que as calorias não mudaram: ${reason}`;
+      }
+      return "As calorias estão estáveis em relação à meta do perfil nesta semana.";
     }
     case "por-que-descanso": {
       const reason =

@@ -1,5 +1,10 @@
 /**
  * Soldiers-authored Content OS seed. No third-party media or NTC dumps.
+ *
+ * program-base-4w training_json contract (authoritative):
+ *   { title?, focus?, estimatedMin?, exercises: [{ exerciseId, sets, reps, restSec?, loadHint?, unit? }] }
+ * Editorial bags like `{ theme: "técnica" }` are ignored by parseProgramTraining.
+ * Enrollment builds ActiveTrainingBlock client-side (AppState retention) — no server enroll table in P2.
  */
 import type { PublicContentItem } from "@/lib/content-match";
 import type {
@@ -7,6 +12,7 @@ import type {
   ContentProgram,
   Expert,
   ProgramSession,
+  ProgramTrainingDay,
 } from "@/lib/content/types";
 
 export const CONTENT_OS_EXPERTS: Expert[] = [
@@ -46,7 +52,8 @@ export const CONTENT_OS_PROGRAMS: ContentProgram[] = [
   {
     id: "program-base-4w",
     title: "Base 4 semanas",
-    description: "Trilha editorial curta: técnica, recuperação e hábito. Não substitui o planner.",
+    description:
+      "Trilha híbrida: 4 semanas × 3 dias com treinos prescritos. O Living Plan ainda ajusta express/deload/rest.",
     goal: "performance",
     level: "iniciante",
     durationWeeks: 4,
@@ -57,32 +64,80 @@ export const CONTENT_OS_PROGRAMS: ContentProgram[] = [
   },
 ];
 
-export const CONTENT_OS_PROGRAM_SESSIONS: ProgramSession[] = [
-  {
-    id: "program-base-4w-w1d1",
-    programId: "program-base-4w",
-    week: 1,
-    day: 1,
-    contentItemId: "soldiers-technique-bracing",
-    training: { theme: "técnica" },
-  },
-  {
-    id: "program-base-4w-w1d2",
-    programId: "program-base-4w",
-    week: 1,
-    day: 2,
-    contentItemId: "soldiers-recovery-rest",
-    recovery: { theme: "descanso" },
-  },
-  {
-    id: "program-base-4w-w1d3",
-    programId: "program-base-4w",
-    week: 1,
-    day: 3,
-    contentItemId: "soldiers-education-habit",
-    nutrition: { theme: "proteína" },
-  },
-];
+function dayA(week: number): ProgramTrainingDay {
+  const load = 40 + week * 2.5;
+  return {
+    title: "Empurrar",
+    focus: "peito · ombros · tríceps",
+    estimatedMin: 50,
+    exercises: [
+      { exerciseId: "supino-reto", sets: 3, reps: "8-10", restSec: 90, loadHint: load, unit: "kg" },
+      { exerciseId: "desenvolvimento", sets: 3, reps: "8-10", restSec: 75, loadHint: load * 0.55, unit: "kg" },
+      { exerciseId: "crucifixo", sets: 3, reps: "10-12", restSec: 60, loadHint: load * 0.35, unit: "kg" },
+      { exerciseId: "triceps-corda", sets: 3, reps: "10-12", restSec: 60, loadHint: load * 0.4, unit: "kg" },
+      { exerciseId: "prancha", sets: 3, reps: "30-45", restSec: 45, unit: "corpo" },
+    ],
+  };
+}
+
+function dayB(week: number): ProgramTrainingDay {
+  const load = 50 + week * 2.5;
+  return {
+    title: "Puxar",
+    focus: "costas · bíceps",
+    estimatedMin: 50,
+    exercises: [
+      { exerciseId: "barra-fixa", sets: 3, reps: "6-10", restSec: 90, unit: "corpo" },
+      { exerciseId: "remada-curvada", sets: 3, reps: "8-10", restSec: 90, loadHint: load, unit: "kg" },
+      { exerciseId: "pulldown", sets: 3, reps: "10-12", restSec: 75, loadHint: load * 0.7, unit: "kg" },
+      { exerciseId: "rosca-direta", sets: 3, reps: "10-12", restSec: 60, loadHint: load * 0.35, unit: "kg" },
+      { exerciseId: "face-pull", sets: 3, reps: "12-15", restSec: 45, loadHint: load * 0.25, unit: "kg" },
+    ],
+  };
+}
+
+function dayC(week: number): ProgramTrainingDay {
+  const load = 55 + week * 2.5;
+  return {
+    title: "Pernas",
+    focus: "quadriceps · posterior · core",
+    estimatedMin: 55,
+    exercises: [
+      { exerciseId: "agachamento", sets: 3, reps: "6-10", restSec: 120, loadHint: load, unit: "kg" },
+      { exerciseId: "terra-romeno", sets: 3, reps: "8-10", restSec: 90, loadHint: load * 0.85, unit: "kg" },
+      { exerciseId: "afundo", sets: 3, reps: "8-10", restSec: 75, loadHint: load * 0.4, unit: "kg" },
+      { exerciseId: "cadeira-extensora", sets: 3, reps: "10-12", restSec: 60, loadHint: load * 0.5, unit: "kg" },
+      { exerciseId: "panturrilha", sets: 3, reps: "12-15", restSec: 45, loadHint: load * 0.45, unit: "kg" },
+    ],
+  };
+}
+
+const CONTENT_BY_DAY: Record<number, string> = {
+  1: "soldiers-technique-bracing",
+  2: "soldiers-recovery-rest",
+  3: "soldiers-education-habit",
+};
+
+function buildProgramSessions(): ProgramSession[] {
+  const out: ProgramSession[] = [];
+  for (let week = 1; week <= 4; week += 1) {
+    const templates = [dayA(week), dayB(week), dayC(week)];
+    templates.forEach((training, idx) => {
+      const day = idx + 1;
+      out.push({
+        id: `program-base-4w-w${week}d${day}`,
+        programId: "program-base-4w",
+        week,
+        day,
+        contentItemId: CONTENT_BY_DAY[day],
+        training: training as unknown as Record<string, unknown>,
+      });
+    });
+  }
+  return out;
+}
+
+export const CONTENT_OS_PROGRAM_SESSIONS: ProgramSession[] = buildProgramSessions();
 
 export const CONTENT_OS_ITEMS: PublicContentItem[] = [
   {

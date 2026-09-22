@@ -42,3 +42,9 @@ supabase/.temp/
 # Optional local catalog dump (names only). Never commit third-party media.
 content/exercise-catalog/import/
 
+# TACO licensed dumps (never commit)
+**/taco-foods.json
+**/seed-taco-import.sql
+supabase/seed-taco*.sql
+
+

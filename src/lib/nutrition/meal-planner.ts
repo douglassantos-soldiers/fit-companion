@@ -73,12 +73,10 @@ export function computeNutritionGoals(
   let proteinG = Math.round(weightKg * PROTEIN_PER_KG[profile.goal]);
   let kcal = Math.round(weightKg * KCAL_PER_KG[profile.goal]);
 
-  if (insights?.adaptations.kcalDelta) {
-    kcal = Math.max(1400, kcal + insights.adaptations.kcalDelta);
-  }
   if (insights?.adaptations.proteinBias === "up") {
     proteinG = Math.round(proteinG * 1.1);
   }
+  // Weekly kcal delta is applied once via Decision / engine.calorieDelta — not here.
   if (engine?.calorieDelta) {
     kcal = Math.max(1400, kcal + engine.calorieDelta);
   }

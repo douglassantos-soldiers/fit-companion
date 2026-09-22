@@ -30,8 +30,11 @@ import type {
 import { plateauExerciseIds, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { computeMuscleLoad } from "@/lib/training/muscle-load";
 import { detectTravelFromNotes, type ReasonCode } from "@/lib/engine/reason-codes";
+import { computeWeeklyKcalAdaptation } from "@/lib/engine/nutrition/weekly-kcal-adapt";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
 import { resolvedAvailableMin } from "@/lib/engine/session-time";
+import { blockPhaseWeekHint } from "@/lib/training/training-block";
+import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import {
   todayKey,
   type AppState,
@@ -169,7 +172,11 @@ export function buildContextSnapshot(
   const sessions3d = state.sessions.filter((s) => s.date.slice(0, 10) >= cutoff3);
   const hardCount = sessions3d.filter((s) => s.rpe === "dificil").length;
   const hardStreak = insights?.hardRpeStreak ?? consecutiveHardRpeStreak(state.sessions);
-  const weekHint = insights?.adaptations.weekHint ?? null;
+  const learnedHint = insights?.adaptations.weekHint ?? null;
+  const weekHint =
+    learnedHint === "deload" || learnedHint === "push"
+      ? learnedHint
+      : (blockPhaseWeekHint(state.activeTrainingBlock, date) ?? learnedHint);
 
   const volumeLoad: ContextSnapshot["training"]["volumeLoad"] =
     hardStreak >= 2 || weekHint === "deload" ? "high" : sessions7d.length <= 1 ? "low" : "normal";
@@ -209,8 +216,37 @@ export function buildContextSnapshot(
   }
   if (insights && insights.proteinAdherence7d < 0.7) reasonSeeds.push("protein_low");
   if (insights && insights.proteinAdherence7d < 0.55) reasonSeeds.push("nutrition_adherence_low");
-  if (c360.nutrition.weightTrendKg7d != null && c360.nutrition.weightTrendKg7d <= -0.5) {
-    reasonSeeds.push("weight_trend_down");
+  // weight_trend_* only from weekly-kcal-adapt (below) — no duplicate ±0.5 seeds
+
+  const baseGoals = nutritionGoals(profile);
+  let avgIntake: number | null = null;
+  {
+    let sum = 0;
+    let days = 0;
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(`${date}T12:00:00`);
+      d.setDate(d.getDate() - i);
+      const key = todayKey(d);
+      const dayMeals = (state.meals ?? []).filter((m) => m.date === key);
+      if (dayMeals.length) {
+        sum += dayNutritionTotals(state.meals ?? [], key).kcal;
+        days += 1;
+      }
+    }
+    if (days > 0) avgIntake = Math.round(sum / days);
+  }
+
+  const weeklyKcal = computeWeeklyKcalAdaptation({
+    goal: profile.goal,
+    date,
+    weightTrendKg7d: c360.nutrition.weightTrendKg7d,
+    loggingCompleteness7d: c360.nutrition.loggingCompleteness7d ?? 0,
+    kcalAdherence: c360.nutrition.kcalAdherence?.value ?? null,
+    avgIntakeKcal: avgIntake,
+    targetKcal: baseGoals.kcal,
+  });
+  for (const code of weeklyKcal.reasonCodes) {
+    if (!reasonSeeds.includes(code)) reasonSeeds.push(code);
   }
   if (checkIn && checkIn.availableMin < 40) reasonSeeds.push("time_limited");
   if (
@@ -286,7 +322,7 @@ export function buildContextSnapshot(
     },
     nutrition: {
       proteinAdherence7d: insights?.proteinAdherence7d ?? null,
-      kcalTrend: insights?.adaptations.kcalDelta ?? null,
+      kcalTrend: weeklyKcal.delta,
       weightTrendKg7d: c360.nutrition.weightTrendKg7d,
     },
     recovery: recoverySlice,

@@ -3,13 +3,12 @@ import type { CoachContext } from "@/lib/coach/types";
 import { exerciseById } from "@/data/exercises";
 import { sessionsInLastDays, streak, weekOverWeek } from "@/lib/engine/dimensions";
 import { trainingAdherence7d } from "@/lib/engine/behavior/adherence";
-import { learningWeekHint } from "@/lib/engine/learning";
-import { buildWeeklyPlan } from "@/lib/engine/plan";
 import { isoWeekDateKeys } from "@/lib/engine/xp";
 import { hitsForExercise, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { best1RM } from "@/lib/training/one-rm";
 import { currentPersonalRecords, detectExercisePrs } from "@/lib/training/prs";
 import { computeStrengthScore } from "@/lib/training/strength-score";
+import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { todayKey, type AppState, type SessionLog } from "@/lib/types";
 
 export type PeriodKind = "week" | "month";
@@ -102,14 +101,19 @@ function nextWeekPlan(state: AppState, now: Date): NextBlockPreview | null {
   nextMonday.setDate(nextMonday.getDate() - day + 7);
   nextMonday.setHours(12, 0, 0, 0);
 
-  const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state), {
-    likedExerciseIds: state.likedExerciseIds ?? [],
-    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-  });
+  const nextKey = todayKey(nextMonday);
+  const plan = resolveTrainingPlanDays(state, nextKey);
+  if (!plan.length) return null;
 
   const weekKeys = isoWeekDateKeys(nextMonday);
+  const label = state.activeTrainingBlock
+    ? `Próxima semana da trilha · ${weekKeys[0]!.slice(5)} → ${weekKeys[6]!.slice(5)}`
+    : state.activeTrainingPlanId
+      ? `Próxima rotina · ${weekKeys[0]!.slice(5)} → ${weekKeys[6]!.slice(5)}`
+      : `Próximo bloco · ${weekKeys[0]!.slice(5)} → ${weekKeys[6]!.slice(5)}`;
+
   return {
-    label: `Próximo bloco · ${weekKeys[0]!.slice(5)} → ${weekKeys[6]!.slice(5)}`,
+    label,
     days: plan.map((d) => ({
       title: d.title,
       focus: d.focus,

@@ -36,12 +36,30 @@ export type ContentProgram = {
   publishAt?: string;
 };
 
+/** Authoritative training prescription inside program_sessions.training_json */
+export type ProgramTrainingExercise = {
+  exerciseId: string;
+  sets: number;
+  reps: string;
+  restSec?: number;
+  loadHint?: number;
+  unit?: "kg" | "corpo" | "min";
+};
+
+export type ProgramTrainingDay = {
+  title?: string;
+  focus?: string;
+  estimatedMin?: number;
+  exercises: ProgramTrainingExercise[];
+};
+
 export type ProgramSession = {
   id: string;
   programId: string;
   week: number;
   day: number;
   contentItemId?: string;
+  /** Authoritative workout when parseProgramTraining succeeds; else editorial theme bag. */
   training?: Record<string, unknown>;
   nutrition?: Record<string, unknown>;
   recovery?: Record<string, unknown>;

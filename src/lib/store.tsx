@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import { allQuestsComplete, bumpManualQuest, ensureDailyQuests } from "@/data/daily-quests";
 import { runBehaviorLoop } from "@/lib/engine/behavior";
 import { presetById } from "@/data/meal-presets";
@@ -135,8 +136,8 @@ function refreshRestock(
   });
   return mergeRestockWithConsumption(withConf, s.supplementDoseLogs ?? [], s.supplementFrequencies);
 }
-import { planDayForToday, buildWeeklyPlan } from "@/lib/engine/plan";
-import { learningWeekHint } from "@/lib/engine/learning";
+import { planDayForToday } from "@/lib/engine/plan";
+import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { rollCosmeticReward } from "@/lib/engine/rewards";
 import {
   emptyState,
@@ -150,9 +151,40 @@ import {
   type Profile,
   type ProgressPhotoEntry,
   type SavedMeal,
+  type SavedTrainingPlan,
+  type CustomFood,
   type SessionLog,
   type Theme,
 } from "@/lib/types";
+import {
+  applyUserCatalog,
+} from "@/lib/nutrition/food-catalog";
+import { mergeFavoriteFoodIds } from "@/lib/nutrition/favorite-foods-merge";
+import {
+  buildCustomFood,
+  removeCustomFoodFromList,
+  upsertCustomFoodList,
+  type CustomFoodInput,
+} from "@/lib/nutrition/custom-foods";
+import {
+  forkDayPlan,
+  forkWeekPlan,
+  mergeSavedTrainingPlans,
+  removeSavedTrainingPlan,
+  upsertSavedTrainingPlan,
+} from "@/lib/training/saved-training-plans";
+import {
+  activeBlockFromProgram,
+  archiveTrainingBlock,
+  blockContainsDayId,
+  completeBlockDay,
+  mergeActiveTrainingBlock,
+  mergeTrainingBlockHistory,
+  pushBlockHistory,
+} from "@/lib/training/training-block";
+import { listContentOsPrograms, listContentOsSessions } from "@/lib/content/catalog";
+import type { PlannedDay } from "@/lib/training/plan";
+import { weekStartKey } from "@/lib/engine/xp";
 import {
   emptyMeasurement,
   mergeMeasurementsByDate,
@@ -199,8 +231,31 @@ interface Store {
     >,
   ) => void;
   toggleFavoriteMeal: (presetId: string) => void;
+  toggleFavoriteFood: (foodId: string) => void;
   saveMealTemplate: (meal: Omit<SavedMeal, "id" | "createdAt"> & { id?: string }) => void;
   removeSavedMeal: (id: string) => void;
+  upsertCustomFood: (input: CustomFoodInput) => CustomFood;
+  removeCustomFood: (id: string) => void;
+  forkWeeklyPlan: (days: PlannedDay[], name?: string) => SavedTrainingPlan;
+  saveDayAsRoutine: (day: PlannedDay, name?: string) => SavedTrainingPlan;
+  removeTrainingPlan: (id: string) => void;
+  activateTrainingPlan: (id: string) => void;
+  clearActiveTrainingPlan: () => void;
+  enrollInProgram: (programId: string) => boolean;
+  leaveTrainingBlock: () => void;
+  replacePrescribedExercise: (
+    dayId: string,
+    fromExerciseId: string,
+    to: {
+      exerciseId: string;
+      name: string;
+      sets?: number;
+      reps?: string;
+      restSec?: number;
+      suggestedLoad?: number;
+      unit?: "kg" | "corpo" | "min";
+    },
+  ) => void;
   setExercisePreference: (
     exerciseId: string,
     preference: "like" | "dislike" | "clear" | "preferred" | "disliked" | "avoided" | "neutral",
@@ -377,6 +432,19 @@ function mergeSavedMeals(local?: SavedMeal[], remote?: SavedMeal[]): SavedMeal[]
   return [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 40);
 }
 
+function mergeCustomFoods(local?: CustomFood[], remote?: CustomFood[]): CustomFood[] {
+  const byId = new Map<string, CustomFood>();
+  for (const f of remote ?? []) {
+    if (f?.id) byId.set(f.id, f);
+  }
+  for (const f of local ?? []) {
+    if (f?.id) byId.set(f.id, f);
+  }
+  return [...byId.values()]
+    .sort((a, b) => (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt))
+    .slice(0, 60);
+}
+
 function withQuests(s: AppState, deviceId: string): AppState {
   const loop = runBehaviorLoop(s);
   return ensureDailyQuests(s, deviceId, todayKeyForProfile(s.profile), {
@@ -444,6 +512,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const id = getDeviceId();
     deviceId.current = id;
     setState(withQuests({ ...emptyState, ...local }, id));
+    applyUserCatalog(local.customFoods ?? []);
     applyTheme(local.theme ?? "dark");
     setHydrated(true);
 
@@ -471,7 +540,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void getPublicCatalog()
       .then((payload) => {
         try {
-          applyPublicCatalog(JSON.parse(payload.json) as PublicCatalog);
+          applyPublicCatalog(JSON.parse(payload.json) as PublicCatalog, stateRef.current.customFoods ?? []);
         } catch (e) {
           console.warn("Catalog parse failed", e);
         }
@@ -548,7 +617,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               sessionFx: local.sessionFx ?? remote.sessionFx ?? true,
               favoriteMealPresetIds:
                 local.favoriteMealPresetIds ?? remote.favoriteMealPresetIds ?? [],
+              favoriteFoodIds: mergeFavoriteFoodIds(local.favoriteFoodIds, remote.favoriteFoodIds),
               savedMeals: mergeSavedMeals(local.savedMeals, remote.savedMeals),
+              customFoods: mergeCustomFoods(local.customFoods, remote.customFoods),
+              savedTrainingPlans: mergeSavedTrainingPlans(
+                local.savedTrainingPlans,
+                remote.savedTrainingPlans,
+              ),
+              activeTrainingPlanId:
+                local.activeTrainingPlanId ?? remote.activeTrainingPlanId ?? null,
+              activeTrainingPlanWeekKey:
+                local.activeTrainingPlanWeekKey ?? remote.activeTrainingPlanWeekKey ?? null,
+              activeTrainingBlock: mergeActiveTrainingBlock(
+                local.activeTrainingBlock,
+                remote.activeTrainingBlock,
+              ),
+              trainingBlockHistory: mergeTrainingBlockHistory(
+                local.trainingBlockHistory,
+                remote.trainingBlockHistory,
+              ),
               wearableConnections: mergeWearableConnections(
                 local.wearableConnections,
                 remote.wearableConnections,
@@ -622,6 +709,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id,
           );
           setState(merged);
+          applyUserCatalog(merged.customFoods ?? []);
           applyTheme(merged.theme ?? "dark");
           void refreshDecisionContextBestEffort(id).then((snap) => {
             if (!snap) return;
@@ -710,12 +798,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const day =
       state.profile != null
-        ? planDayForToday(
-            buildWeeklyPlan(state.profile, state.sessions, learningWeekHint(state), {
-              likedExerciseIds: state.likedExerciseIds ?? [],
-              dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-            }),
-          )
+        ? planDayForToday(resolveTrainingPlanDays(state))
         : null;
     scheduleLocalReminders({
       enabled: true,
@@ -736,6 +819,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     state.freezeUsedDates,
     state.streakFreezes,
     state.xpByDate,
+    state.activeTrainingBlock?.id,
+    state.activeTrainingPlanId,
   ]);
 
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
@@ -780,6 +865,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((s) => {
           const prev = withQuests(s, deviceId.current);
           let next = withSnapshot({ ...prev, sessions: [session, ...prev.sessions] });
+          if (blockContainsDayId(next.activeTrainingBlock, session.dayId)) {
+            const prevBlock = next.activeTrainingBlock!;
+            const { block: advanced, finished, weekAdvanced } = completeBlockDay(
+              prevBlock,
+              session.dayId,
+            );
+            if (finished) {
+              next = {
+                ...next,
+                activeTrainingBlock: null,
+                trainingBlockHistory: pushBlockHistory(
+                  next.trainingBlockHistory,
+                  archiveTrainingBlock(advanced, "completed"),
+                ),
+              };
+              toast.success(`Trilha concluída: ${advanced.name}`);
+            } else {
+              next = { ...next, activeTrainingBlock: advanced };
+              if (weekAdvanced) {
+                toast.success(`Semana ${advanced.currentWeekIndex + 1} do bloco`);
+              }
+            }
+          }
           const awarded = applyXpAward(next, xpGain);
           next = afterXpSideEffects(prev, awarded.state, deviceId.current, {
             fromSession: session,
@@ -1041,6 +1149,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             : [...ids, presetId];
           return { ...s, favoriteMealPresetIds: next };
         }),
+      toggleFavoriteFood: (foodId) =>
+        update((s) => {
+          const ids = s.favoriteFoodIds ?? [];
+          const next = ids.includes(foodId)
+            ? ids.filter((x) => x !== foodId)
+            : [foodId, ...ids].slice(0, 60);
+          return { ...s, favoriteFoodIds: next };
+        }),
       saveMealTemplate: (meal) =>
         update((s) => {
           const saved: SavedMeal = {
@@ -1057,6 +1173,174 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...s,
           savedMeals: (s.savedMeals ?? []).filter((m) => m.id !== id),
         })),
+      upsertCustomFood: (input) => {
+        const existing = input.id
+          ? stateRef.current.customFoods?.find((f) => f.id === input.id)
+          : undefined;
+        const food = buildCustomFood({ ...input, id: existing?.id ?? input.id });
+        if (existing) {
+          food.createdAt = existing.createdAt;
+          food.updatedAt = new Date().toISOString();
+        }
+        update((s) => {
+          const next = upsertCustomFoodList(s.customFoods ?? [], food);
+          applyUserCatalog(next);
+          return { ...s, customFoods: next };
+        });
+        return food;
+      },
+      removeCustomFood: (id) =>
+        update((s) => {
+          const next = removeCustomFoodFromList(s.customFoods ?? [], id);
+          applyUserCatalog(next);
+          return { ...s, customFoods: next };
+        }),
+      forkWeeklyPlan: (days, name) => {
+        const plan = forkWeekPlan(days, name);
+        update((s) => ({
+          ...s,
+          savedTrainingPlans: upsertSavedTrainingPlan(s.savedTrainingPlans ?? [], plan),
+        }));
+        return plan;
+      },
+      saveDayAsRoutine: (day, name) => {
+        const plan = forkDayPlan(day, name);
+        update((s) => ({
+          ...s,
+          savedTrainingPlans: upsertSavedTrainingPlan(s.savedTrainingPlans ?? [], plan),
+        }));
+        return plan;
+      },
+      removeTrainingPlan: (id) =>
+        update((s) => ({
+          ...s,
+          savedTrainingPlans: removeSavedTrainingPlan(s.savedTrainingPlans ?? [], id),
+          activeTrainingPlanId: s.activeTrainingPlanId === id ? null : s.activeTrainingPlanId,
+          activeTrainingPlanWeekKey:
+            s.activeTrainingPlanId === id ? null : s.activeTrainingPlanWeekKey,
+        })),
+      activateTrainingPlan: (id) =>
+        update((s) => {
+          let history = s.trainingBlockHistory ?? [];
+          if (s.activeTrainingBlock) {
+            history = pushBlockHistory(
+              history,
+              archiveTrainingBlock(s.activeTrainingBlock, "left"),
+            );
+          }
+          return withSnapshot({
+            ...s,
+            activeTrainingPlanId: id,
+            activeTrainingPlanWeekKey: weekStartKey(),
+            activeTrainingBlock: null,
+            trainingBlockHistory: history,
+          });
+        }),
+      clearActiveTrainingPlan: () =>
+        update((s) =>
+          withSnapshot({
+            ...s,
+            activeTrainingPlanId: null,
+            activeTrainingPlanWeekKey: null,
+          }),
+        ),
+      enrollInProgram: (programId) => {
+        const program = listContentOsPrograms().find((p) => p.id === programId);
+        if (!program) return false;
+        const block = activeBlockFromProgram(program, listContentOsSessions(programId));
+        if (!block) return false;
+        update((s) => {
+          let history = s.trainingBlockHistory ?? [];
+          if (s.activeTrainingBlock) {
+            history = pushBlockHistory(
+              history,
+              archiveTrainingBlock(s.activeTrainingBlock, "left"),
+            );
+          }
+          return withSnapshot({
+            ...s,
+            activeTrainingBlock: block,
+            trainingBlockHistory: history,
+            activeTrainingPlanId: null,
+            activeTrainingPlanWeekKey: null,
+          });
+        });
+        return true;
+      },
+      leaveTrainingBlock: () =>
+        update((s) => {
+          if (!s.activeTrainingBlock) return s;
+          return withSnapshot({
+            ...s,
+            activeTrainingBlock: null,
+            trainingBlockHistory: pushBlockHistory(
+              s.trainingBlockHistory,
+              archiveTrainingBlock(s.activeTrainingBlock, "left"),
+            ),
+          });
+        }),
+      replacePrescribedExercise: (dayId, fromExerciseId, to) =>
+        update((s) => {
+          const patchEx = <
+            T extends {
+              exerciseId: string;
+              name: string;
+              sets: number;
+              reps: string;
+              restSec: number;
+              suggestedLoad?: number;
+              unit: "kg" | "corpo" | "min";
+            },
+          >(
+            ex: T,
+          ): T => {
+            if (ex.exerciseId !== fromExerciseId) return ex;
+            return {
+              ...ex,
+              exerciseId: to.exerciseId,
+              name: to.name,
+              sets: to.sets ?? ex.sets,
+              reps: to.reps ?? ex.reps,
+              restSec: to.restSec ?? ex.restSec,
+              unit: to.unit ?? ex.unit,
+              ...(to.suggestedLoad != null
+                ? { suggestedLoad: to.suggestedLoad }
+                : "suggestedLoad" in ex
+                  ? { suggestedLoad: ex.suggestedLoad }
+                  : {}),
+            };
+          };
+
+          if (s.activeTrainingBlock) {
+            const weeks = s.activeTrainingBlock.weeks.map((w) => ({
+              ...w,
+              days: w.days.map((d) =>
+                d.id !== dayId ? d : { ...d, exercises: d.exercises.map(patchEx) },
+              ),
+            }));
+            return withSnapshot({
+              ...s,
+              activeTrainingBlock: { ...s.activeTrainingBlock, weeks },
+            });
+          }
+
+          const stickyId = s.activeTrainingPlanId;
+          if (stickyId) {
+            const plans = (s.savedTrainingPlans ?? []).map((p) => {
+              if (p.id !== stickyId) return p;
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                days: p.days.map((d) =>
+                  d.id !== dayId ? d : { ...d, exercises: d.exercises.map(patchEx) },
+                ),
+              };
+            });
+            return withSnapshot({ ...s, savedTrainingPlans: plans });
+          }
+
+          return s;
+        }),
       setExercisePreference: (exerciseId, preference) =>
         update((s) => {
           const mapped =
@@ -1789,6 +2073,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       reset: () => {
         skipPush.current = true;
         setState(emptyState);
+        applyUserCatalog([]);
         applyTheme("dark");
         if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
         // Local-only clear — does not wipe server account data
@@ -1796,6 +2081,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearAccountData: async () => {
         skipPush.current = true;
         setState(emptyState);
+        applyUserCatalog([]);
         applyTheme("dark");
         if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
         const { clearUserDataFn } = await import("@/lib/sync.functions");

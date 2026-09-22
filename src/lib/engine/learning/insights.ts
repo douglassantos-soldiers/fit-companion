@@ -6,6 +6,7 @@ import { PRODUCTS } from "@/data/products";
 import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
 import { monthlyDoseAdherence } from "@/lib/engine/supplements";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
+import { blockPhaseWeekHint } from "@/lib/training/training-block";
 import { todayKey, type AppState, type Profile } from "@/lib/types";
 
 export interface LearningAdaptations {
@@ -103,17 +104,16 @@ export function computeLearningInsights(
     );
   }
 
+  // Weight→kcal adaptation lives in weekly-kcal-adapt (Decision SoT). Insights only narrate.
   if (trend !== null && trend > 0.5 && profile.goal === "gordura") {
-    kcalDelta = -150;
     reasons.push(
-      `Peso subiu ${trend.toFixed(1)} kg em 7 dias com objetivo de emagrecer — kcal −150.`,
+      `Peso subiu ${trend.toFixed(1)} kg em 7 dias com objetivo de emagrecer — o ajuste semanal de kcal entra no Living Plan.`,
     );
   }
 
   if (trend !== null && trend < -0.5 && profile.goal === "massa") {
-    kcalDelta = 150;
     reasons.push(
-      `Peso caiu ${Math.abs(trend).toFixed(1)} kg em 7 dias com objetivo de massa — kcal +150.`,
+      `Peso caiu ${Math.abs(trend).toFixed(1)} kg em 7 dias com objetivo de massa — o ajuste semanal de kcal entra no Living Plan.`,
     );
   }
 
@@ -178,5 +178,6 @@ export function topLearningInsight(state: AppState, date = todayKey()): string |
 /** Hint de semana utilizável pelo motor (só deload/push). */
 export function learningWeekHint(state: AppState, date = todayKey()): "deload" | "push" | null {
   const hint = computeLearningInsights(state, date)?.adaptations.weekHint;
-  return hint === "deload" || hint === "push" ? hint : null;
+  if (hint === "deload" || hint === "push") return hint;
+  return blockPhaseWeekHint(state.activeTrainingBlock, date);
 }

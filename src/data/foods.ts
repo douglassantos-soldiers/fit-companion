@@ -3,6 +3,9 @@
  * Conceptual reference only (TACO / nutribr). No licensed datasets copied.
  */
 import { FOOD_DEFS_LOTE2 } from "@/data/foods-lote2";
+import { FOOD_DEFS_BRANDS_EAN } from "@/data/foods-brands-ean";
+import { FOOD_DEFS_DELIVERY_BR } from "@/data/foods-delivery-br";
+import { applyPerformanceMicros } from "@/data/foods-performance-micros";
 import { toFood, toServings, type FoodDef } from "@/data/foods-helpers";
 import type { FoodItem, FoodServing } from "@/lib/nutrition/types";
 
@@ -128,7 +131,12 @@ const LOTE1: FoodDef[] = [
   { id: "alho", name: "Alho", category: "hortalicas", synonyms: ["alho"], kcal: 113, proteinG: 5.0, carbG: 23.0, fatG: 0.2, fiberG: 1.8, servings: [{ id: "s-dente", label: "1 dente", grams: 3, isDefault: true }] },
 ];
 
-const DEFS: FoodDef[] = [...LOTE1, ...FOOD_DEFS_LOTE2];
+const DEFS: FoodDef[] = applyPerformanceMicros([
+  ...LOTE1,
+  ...FOOD_DEFS_LOTE2,
+  ...FOOD_DEFS_DELIVERY_BR,
+  ...FOOD_DEFS_BRANDS_EAN,
+]);
 
 export const FOOD_DEFS = DEFS;
 export const FOOD_ITEMS: FoodItem[] = DEFS.map(toFood);

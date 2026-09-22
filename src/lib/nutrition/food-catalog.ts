@@ -2,7 +2,9 @@
  * Food catalog — indexed view over src/data/foods.ts, optionally merged with licensed TACO.
  */
 import { FOOD_ITEMS, FOOD_SERVINGS } from "@/data/foods";
+import { customFoodsToCatalog } from "@/lib/nutrition/custom-foods";
 import type { FoodItem, FoodServing } from "@/lib/nutrition/types";
+import type { CustomFood } from "@/lib/types";
 
 function eanDigits(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
@@ -91,6 +93,22 @@ export function applyTacoCatalog(opts: {
   const tacoServings = opts.tacoServings.filter((s) => tacoIds.has(s.foodId));
   const mergedServings = [...FOOD_SERVINGS.filter((s) => !tacoIds.has(s.foodId)), ...tacoServings];
   replaceFoodCatalog(mergedItems, mergedServings);
+}
+
+/**
+ * Overlay user custom foods onto the current catalog (after TACO merge).
+ * Replaces any previous source:"user" rows.
+ */
+export function applyUserCatalog(customFoods: CustomFood[] = []): void {
+  const prevUserIds = new Set(items.filter((f) => f.source === "user").map((f) => f.id));
+  const baseItems = items.filter((f) => f.source !== "user");
+  const baseServings = servings.filter((s) => !prevUserIds.has(s.foodId));
+  const { items: userItems, servings: userServings } = customFoodsToCatalog(customFoods);
+  const userIds = new Set(userItems.map((f) => f.id));
+  replaceFoodCatalog(
+    [...baseItems.filter((f) => !userIds.has(f.id)), ...userItems],
+    [...baseServings.filter((s) => !userIds.has(s.foodId)), ...userServings],
+  );
 }
 
 export function allFoods(activeOnly = true): FoodItem[] {

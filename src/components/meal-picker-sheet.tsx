@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { NumberInput } from "@mantine/core";
-import { Barcode, Camera, Mic, Square, Star } from "lucide-react";
+import { Barcode, Camera, Mic, Plus, Square, Star } from "lucide-react";
 import { toast } from "sonner";
+import { CustomFoodSheet } from "@/components/custom-food-sheet";
 import { MEAL_PRESETS, type MealPreset } from "@/data/meal-presets";
 import { QUALITY_LABEL, recentMealPresets, scalePreset } from "@/lib/engine/nutrition";
 import { analyzeMealAi } from "@/lib/meal-ai.functions";
@@ -15,13 +16,21 @@ import {
   type BarcodeHit,
 } from "@/lib/nutrition/barcode";
 import { searchFoods } from "@/lib/nutrition/food-search";
-import { defaultServing, servingsForFood } from "@/lib/nutrition/food-catalog";
+import { defaultServing, foodById, servingsForFood } from "@/lib/nutrition/food-catalog";
+import { foodSourceLabel } from "@/lib/nutrition/food-source-label";
+import { MealProvenanceBadge } from "@/components/meal-provenance-badge";
 import { customPickFromSaved, recentFoodsFromMeals } from "@/lib/nutrition/library";
 import { buildMealItem, mealFromItems } from "@/lib/nutrition/meal-builder";
 import { scaleMacros } from "@/lib/nutrition/nutrients";
-import type { FoodSearchHit, FoodServing } from "@/lib/nutrition/types";
+import {
+  allRecipes,
+  mealFromRecipe,
+  recipeMacrosPerServing,
+  recipeToMealItems,
+} from "@/lib/nutrition/recipes";
+import type { FoodSearchHit, FoodServing, Recipe } from "@/lib/nutrition/types";
 import { useStore } from "@/lib/store";
-import { MEAL_SLOT_LABEL, type MealItemEntry, type MealQuality, type MealSlot, type SavedMeal } from "@/lib/types";
+import { MEAL_SLOT_LABEL, type MealItemEntry, type MealNutrientSnapshot, type MealQuality, type MealSlot, type SavedMeal, type CustomFood } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,7 +39,36 @@ import { MealPresetThumb } from "@/components/meal-preset-thumb";
 import { cn } from "@/lib/utils";
 import { BARCODE_EMPTY_CAMERA, BARCODE_EMPTY_INVALID, BARCODE_EMPTY_MISS } from "@/lib/ui/platform-copy";
 
-type PickerTab = "buscar" | "alimentos" | "recentes" | "favoritos" | "salvos" | "codigo" | "foto" | "voz" | "texto";
+type PickerTab =
+  | "buscar"
+  | "alimentos"
+  | "receitas"
+  | "recentes"
+  | "favoritos"
+  | "salvos"
+  | "codigo"
+  | "foto"
+  | "voz"
+  | "texto";
+
+const RECIPE_TAG_LABEL: Record<string, string> = {
+  "alta-proteina": "proteína",
+  "refeicao-fora": "fora",
+  delivery: "delivery",
+  rapidas: "rápida",
+  "baixo-custo": "custo",
+  "pos-treino": "pós",
+  "pre-treino": "pré",
+};
+
+function recipeTagLabel(tag: string): string {
+  return RECIPE_TAG_LABEL[tag] ?? tag;
+}
+  cafe: ["cafe", "pre-treino", "rapidas"],
+  almoco: ["almoco", "delivery", "refeicao-fora"],
+  lanche: ["lanche", "pos-treino", "pre-treino", "rapidas"],
+  jantar: ["jantar", "delivery", "refeicao-fora"],
+};
 
 export type CustomMealPick = {
   label: string;
@@ -46,6 +84,7 @@ export type CustomMealPick = {
   correctedFromAi?: boolean;
   items?: MealItemEntry[];
   foodSource?: "taco" | "user" | "imported" | "ai_estimate" | "internal";
+  nutrientSnapshot?: MealNutrientSnapshot;
 };
 
 async function fileToBase64(file: Blob): Promise<{ base64: string; mimeType: string }> {
@@ -88,7 +127,8 @@ export function MealPickerSheet({
   /** AI / custom / food meal (no presetId) */
   onPickCustom?: (meal: CustomMealPick) => void;
 }) {
-  const { state, toggleFavoriteMeal, saveMealTemplate } = useStore();
+  const { state, toggleFavoriteMeal, toggleFavoriteFood, saveMealTemplate, upsertCustomFood, removeCustomFood } =
+    useStore();
   const analyze = useServerFn(analyzeMealAi);
   const lookupBarcode = useServerFn(lookupBarcodeFn);
   const [tab, setTab] = useState<PickerTab>("recentes");
@@ -114,13 +154,21 @@ export function MealPickerSheet({
   const [barcodeBusy, setBarcodeBusy] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [canScan, setCanScan] = useState(false);
+  const [recipeQuery, setRecipeQuery] = useState("");
+  const [recipeHit, setRecipeHit] = useState<Recipe | null>(null);
+  const [recipeServings, setRecipeServings] = useState(1);
 
   useEffect(() => {
     setCanScan(typeof window !== "undefined" && typeof window.BarcodeDetector === "function");
   }, []);
 
   const favorites = state.favoriteMealPresetIds ?? [];
+  const favoriteFoodIds = state.favoriteFoodIds ?? [];
+  const [deliveryOnly, setDeliveryOnly] = useState(false);
+  const [customFoodOpen, setCustomFoodOpen] = useState(false);
+  const [editingCustom, setEditingCustom] = useState<CustomFood | null>(null);
   const recent = useMemo(() => recentMealPresets(state.meals ?? [], 8), [state.meals]);
+  const customFoods = state.customFoods ?? [];
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -129,7 +177,59 @@ export function MealPickerSheet({
     return pool.filter((p) => p.label.toLowerCase().includes(q));
   }, [query, slot]);
 
-  const foodResults = useMemo(() => searchFoods(foodQuery, { limit: 12 }), [foodQuery]);
+  const foodResults = useMemo(() => {
+    const q = foodQuery.trim();
+    const searchQ = deliveryOnly && !q ? "delivery" : foodQuery;
+    const hits = searchFoods(searchQ, { limit: deliveryOnly ? 48 : 12 });
+    const filtered = !deliveryOnly
+      ? hits
+      : hits.filter((h) => {
+          const syn = (h.food.synonyms ?? []).join(" ").toLowerCase();
+          return (
+            syn.includes("delivery") ||
+            syn.includes("restaurante") ||
+            syn.includes("ifood") ||
+            syn.includes("self-service") ||
+            h.food.id.includes("delivery")
+          );
+        });
+    if (!deliveryOnly) return filtered.slice(0, 12);
+    const skip = new Set([
+      ...favoriteFoodIds,
+      ...customFoods.map((c) => c.id),
+      ...recentFoodsFromMeals(state.meals ?? [], 8).map((f) => f.id),
+    ]);
+    return filtered.filter((h) => !skip.has(h.food.id)).slice(0, 16);
+  }, [foodQuery, deliveryOnly, favoriteFoodIds, customFoods, state.meals]);
+
+  const favoriteFoods = useMemo(() => {
+    return favoriteFoodIds
+      .map((id) => foodById(id))
+      .filter((f): f is NonNullable<typeof f> => Boolean(f));
+  }, [favoriteFoodIds]);
+
+  const recipeResults = useMemo(() => {
+    const recipes = allRecipes();
+    const slotTags = SLOT_RECIPE_TAGS[slot] ?? [];
+    const q = recipeQuery.trim().toLowerCase();
+    const scored = recipes.map((r) => {
+      const tags = r.tags ?? [];
+      const slotMatch = tags.some((t) => slotTags.includes(t));
+      const nameHit = q ? r.name.toLowerCase().includes(q) : true;
+      const tagHit = q ? tags.some((t) => t.toLowerCase().includes(q)) : true;
+      const match = q ? nameHit || tagHit : true;
+      return { recipe: r, slotMatch, match };
+    });
+    return scored
+      .filter((s) => s.match)
+      .sort((a, b) => Number(b.slotMatch) - Number(a.slotMatch) || a.recipe.name.localeCompare(b.recipe.name))
+      .map((s) => s.recipe);
+  }, [recipeQuery, slot]);
+
+  const recipePreview = useMemo(() => {
+    if (!recipeHit) return null;
+    return scaleMacros(recipeMacrosPerServing(recipeHit), recipeServings);
+  }, [recipeHit, recipeServings]);
 
   const favoritePresets = useMemo(
     () => MEAL_PRESETS.filter((p) => favorites.includes(p.id)),
@@ -235,7 +335,31 @@ export function MealPickerSheet({
       sourceKind: "informed",
       confidence: 1,
       items: meal.items as MealItemEntry[],
+      foodSource: foodHit.food.source,
+      nutrientSnapshot: meal.nutrientSnapshot as MealNutrientSnapshot,
+    });
+  };
+
+  const confirmRecipe = () => {
+    if (!recipeHit || !onPickCustom) return;
+    const meal = mealFromRecipe(recipeHit.id, recipeServings);
+    if (!meal.items.length) {
+      toast.error("Receita sem ingredientes resolvidos");
+      return;
+    }
+    onPickCustom({
+      label: meal.label,
+      proteinG: meal.proteinG,
+      kcal: meal.kcal,
+      carbG: meal.carbG,
+      fatG: meal.fatG,
+      fiberG: meal.fiberG,
+      quality: meal.quality,
+      sourceKind: meal.sourceKind,
+      confidence: meal.confidence,
+      items: meal.items as MealItemEntry[],
       foodSource: "internal",
+      nutrientSnapshot: meal.nutrientSnapshot as MealNutrientSnapshot,
     });
   };
 
@@ -254,6 +378,7 @@ export function MealPickerSheet({
       confidence: meal.confidence,
       items: meal.items as MealItemEntry[],
       foodSource: meal.foodSource,
+      nutrientSnapshot: meal.nutrientSnapshot,
     };
     onPickCustom(pick);
   };
@@ -338,7 +463,23 @@ export function MealPickerSheet({
     if (aiDraft.carbG != null) pick.carbG = aiDraft.carbG;
     if (aiDraft.fatG != null) pick.fatG = aiDraft.fatG;
     if (aiDraft.fiberG != null) pick.fiberG = aiDraft.fiberG;
-    if (items?.length) pick.items = items;
+    if (items?.length) {
+      pick.items = items;
+      const fromItems = mealFromItems(items as Parameters<typeof mealFromItems>[0]);
+      pick.nutrientSnapshot = fromItems.nutrientSnapshot as MealNutrientSnapshot;
+    } else {
+      pick.nutrientSnapshot = {
+        energyKcal: aiDraft.kcal,
+        proteinG: aiDraft.proteinG,
+        carbG: aiDraft.carbG ?? 0,
+        fatG: aiDraft.fatG ?? 0,
+        ...(aiDraft.fiberG != null ? { fiberG: aiDraft.fiberG } : {}),
+        capturedAt: new Date().toISOString(),
+        source: "ai_estimate",
+        kind: "estimated",
+        confidence: aiDraft.confidence ?? 0.55,
+      };
+    }
     onPickCustom(pick);
   };
 
@@ -475,6 +616,7 @@ export function MealPickerSheet({
   };
 
   return (
+    <>
     <SoldiersOverlay
       open
       onClose={onClose}
@@ -497,9 +639,14 @@ export function MealPickerSheet({
           ) : null}
           {aiDraft.needsConfirmation !== false ? (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              Confirme antes de salvar — confiança {Math.round(aiDraft.confidence * 100)}%
+              Confirme antes de salvar
             </p>
           ) : null}
+          <MealProvenanceBadge
+            source="ai_estimate"
+            confidence={aiDraft.confidence}
+            kind="estimated"
+          />
           <Input
             value={aiDraft.label}
             onChange={(e) => setAiDraft({ ...aiDraft, label: e.target.value })}
@@ -557,8 +704,7 @@ export function MealPickerSheet({
             </ul>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            Estimativa · {QUALITY_LABEL[aiDraft.quality]} · confiança{" "}
-            {Math.round(aiDraft.confidence * 100)}%
+            {QUALITY_LABEL[aiDraft.quality]}
             {aiDraft.notes ? ` · ${aiDraft.notes}` : ""}
           </p>
           <div className="flex gap-2">
@@ -583,9 +729,15 @@ export function MealPickerSheet({
           <div>
             <p className="text-display text-lg">{foodHit.food.name}</p>
             <p className="text-xs text-muted-foreground">
-              {foodHit.food.category} · {foodHit.food.source}
+              {foodHit.food.category}
               {foodHit.food.brand ? ` · ${foodHit.food.brand}` : ""}
             </p>
+            <MealProvenanceBadge
+              className="mt-1"
+              source={foodHit.food.source}
+              confidence={foodHit.food.confidence}
+              kind="observed"
+            />
           </div>
           <div className="flex flex-wrap gap-2">
             {servingsForFood(foodHit.food.id).map((s) => (
@@ -633,6 +785,22 @@ export function MealPickerSheet({
             >
               Voltar
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 px-3"
+              aria-label={
+                favoriteFoodIds.includes(foodHit.food.id) ? "Remover favorito" : "Favoritar"
+              }
+              onClick={() => toggleFavoriteFood(foodHit.food.id)}
+            >
+              <Star
+                className={cn(
+                  "size-4",
+                  favoriteFoodIds.includes(foodHit.food.id) && "fill-primary text-primary",
+                )}
+              />
+            </Button>
             <Button type="button" className="flex-1" disabled={!onPickCustom} onClick={confirmFood}>
               Adicionar
             </Button>
@@ -648,14 +816,20 @@ export function MealPickerSheet({
             <p className="text-xs text-muted-foreground">
               {barcodeHit.ean}
               {barcodeHit.brand ? ` · ${barcodeHit.brand}` : ""}
-              {barcodeHit.source === "imported" ? " · Open Food Facts" : " · catálogo"}
             </p>
+            <MealProvenanceBadge
+              className="mt-1"
+              source={barcodeHit.source}
+              confidence={barcodeHit.confidence}
+              kind={barcodeHit.kind}
+              warnEstimated={barcodeHit.kind === "estimated"}
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Porção {Math.round(barcodeHit.grams)} g ·{" "}
             <span className="font-semibold text-foreground">{Math.round(barcodeHit.per100g.proteinG)} g</span> P / 100 g ·{" "}
             <span className="font-semibold text-foreground">{Math.round(barcodeHit.per100g.energyKcal)}</span> kcal / 100 g
-            {barcodeHit.kind === "estimated" ? " · macros incompletos (estimado)" : ""}
+            {barcodeHit.kind === "estimated" ? " · macros incompletos" : ""}
           </p>
           <div className="flex gap-2">
             <Button
@@ -671,6 +845,58 @@ export function MealPickerSheet({
             </Button>
             <Button type="button" className="flex-1" disabled={!onPickCustom} onClick={confirmBarcode}>
               Confirmar
+            </Button>
+          </div>
+        </div>
+      ) : recipeHit ? (
+        <div className="space-y-4">
+          <div>
+            <p className="text-display text-lg">{recipeHit.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {recipeHit.items.length} ingredientes
+              {recipeHit.tags?.length ? ` · ${recipeHit.tags.slice(0, 3).join(", ")}` : ""}
+            </p>
+            <MealProvenanceBadge
+              className="mt-1"
+              source="internal"
+              confidence={0.9}
+              kind="derived"
+            />
+          </div>
+          <NumberInput
+            label="Porções"
+            value={recipeServings}
+            onChange={(v) => setRecipeServings(typeof v === "number" ? v : 1)}
+            min={0.5}
+            max={4}
+            step={0.5}
+            decimalScale={1}
+            clampBehavior="strict"
+          />
+          {recipePreview ? (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{Math.round(recipePreview.proteinG)} g</span> P ·{" "}
+              <span className="font-semibold text-foreground">{Math.round(recipePreview.carbG)} g</span> C ·{" "}
+              <span className="font-semibold text-foreground">{Math.round(recipePreview.fatG)} g</span> G ·{" "}
+              <span className="font-semibold text-foreground">{Math.round(recipePreview.energyKcal)}</span> kcal
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setRecipeHit(null)}
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={!onPickCustom || !recipeHit || recipeToMealItems(recipeHit.id, recipeServings).length === 0}
+              onClick={confirmRecipe}
+            >
+              Adicionar
             </Button>
           </div>
         </div>
@@ -720,6 +946,9 @@ export function MealPickerSheet({
               <TabsTrigger value="alimentos" className="flex-1 min-w-[4.5rem]">
                 Alimentos
               </TabsTrigger>
+              <TabsTrigger value="receitas" className="flex-1 min-w-[4.5rem]">
+                Receitas
+              </TabsTrigger>
               <TabsTrigger value="favoritos" className="flex-1 min-w-[4.5rem]">
                 Favoritos
               </TabsTrigger>
@@ -765,18 +994,132 @@ export function MealPickerSheet({
                 placeholder="Buscar alimento (arroz, frango…)"
                 autoFocus
               />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryOnly(false)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-semibold",
+                    !deliveryOnly
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-white/10 text-muted-foreground",
+                  )}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryOnly(true)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-semibold",
+                    deliveryOnly
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-white/10 text-muted-foreground",
+                  )}
+                >
+                  Delivery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCustom(null);
+                    setCustomFoodOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-muted-foreground"
+                >
+                  <Plus className="size-3" /> Meu alimento
+                </button>
+              </div>
               <ul className="max-h-64 space-y-1 overflow-y-auto">
+                {!foodQuery.trim() && customFoods.length ? (
+                  <>
+                    <li className="px-1 pb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Meus alimentos
+                    </li>
+                    {customFoods.slice(0, 8).map((cf) => {
+                      const food = foodById(cf.id);
+                      if (!food) return null;
+                      return (
+                        <li key={`cf-${cf.id}`} className="flex items-stretch gap-1">
+                          <button
+                            type="button"
+                            className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                            onClick={() => {
+                              const serving = defaultServing(food.id) ?? servingsForFood(food.id)[0];
+                              if (!serving) return;
+                              setFoodHit({
+                                food,
+                                serving,
+                                summary: scaleMacros(food.per100g, serving.gramsEquivalent / 100),
+                                score: 1,
+                              });
+                              setFoodServing(serving);
+                              setFoodQty(1);
+                            }}
+                          >
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">{food.name}</span>
+                              <span className="text-xs text-muted-foreground">Meu alimento</span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </>
+                ) : null}
+                {!foodQuery.trim() && favoriteFoods.length ? (
+                  <>
+                    <li className="px-1 pb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Favoritos
+                    </li>
+                    {favoriteFoods.slice(0, 8).map((food) => (
+                      <li key={`fav-${food.id}`} className="flex items-stretch gap-1">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                          onClick={() => {
+                            const serving = defaultServing(food.id) ?? servingsForFood(food.id)[0];
+                            if (!serving) return;
+                            setFoodHit({
+                              food,
+                              serving,
+                              summary: scaleMacros(food.per100g, serving.gramsEquivalent / 100),
+                              score: 1,
+                            });
+                            setFoodServing(serving);
+                            setFoodQty(1);
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{food.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {foodSourceLabel(food.source)}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Remover favorito"
+                          className="flex w-10 shrink-0 items-center justify-center rounded-xl border border-border text-primary"
+                          onClick={() => toggleFavoriteFood(food.id)}
+                        >
+                          <Star className="size-4 fill-primary" />
+                        </button>
+                      </li>
+                    ))}
+                  </>
+                ) : null}
                 {!foodQuery.trim() && recentFoods.length ? (
-                  <li className="px-1 pb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <li className="px-1 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
                     Recentes
                   </li>
                 ) : null}
                 {!foodQuery.trim()
                   ? recentFoods.map((food) => (
-                      <li key={`recent-${food.id}`}>
+                      <li key={`recent-${food.id}`} className="flex items-stretch gap-1">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
                           onClick={() => pickRecentFood(food.id)}
                         >
                           <span className="min-w-0">
@@ -784,30 +1127,123 @@ export function MealPickerSheet({
                             <span className="text-xs text-muted-foreground">Recente no diário</span>
                           </span>
                         </button>
+                        <button
+                          type="button"
+                          aria-label={
+                            favoriteFoodIds.includes(food.id) ? "Remover favorito" : "Favoritar"
+                          }
+                          className={cn(
+                            "flex w-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-primary",
+                            favoriteFoodIds.includes(food.id) && "text-primary",
+                          )}
+                          onClick={() => toggleFavoriteFood(food.id)}
+                        >
+                          <Star
+                            className={cn(
+                              "size-4",
+                              favoriteFoodIds.includes(food.id) && "fill-primary",
+                            )}
+                          />
+                        </button>
                       </li>
                     ))
                   : null}
-                {foodResults.map((hit) => (
-                  <li key={hit.food.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
-                      onClick={() => {
-                        setFoodHit(hit);
-                        setFoodServing(hit.serving);
-                        setFoodQty(1);
-                      }}
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold">{hit.food.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {hit.serving.label} · {Math.round(hit.summary.proteinG)}g P ·{" "}
-                          {Math.round(hit.summary.energyKcal)} kcal
-                        </span>
-                      </span>
-                    </button>
+                {foodQuery.trim() || deliveryOnly
+                  ? foodResults.map((hit) => (
+                      <li key={hit.food.id} className="flex items-stretch gap-1">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                          onClick={() => {
+                            setFoodHit(hit);
+                            setFoodServing(hit.serving);
+                            setFoodQty(1);
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{hit.food.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {hit.serving.label} · {Math.round(hit.summary.proteinG)}g P ·{" "}
+                              {Math.round(hit.summary.energyKcal)} kcal ·{" "}
+                              {foodSourceLabel(hit.food.source)}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={
+                            favoriteFoodIds.includes(hit.food.id)
+                              ? "Remover favorito"
+                              : "Favoritar"
+                          }
+                          className={cn(
+                            "flex w-10 shrink-0 items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-primary",
+                            favoriteFoodIds.includes(hit.food.id) && "text-primary",
+                          )}
+                          onClick={() => toggleFavoriteFood(hit.food.id)}
+                        >
+                          <Star
+                            className={cn(
+                              "size-4",
+                              favoriteFoodIds.includes(hit.food.id) && "fill-primary",
+                            )}
+                          />
+                        </button>
+                      </li>
+                    ))
+                  : null}
+                {deliveryOnly && foodResults.length === 0 ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">
+                    Nenhum item delivery — busque por nome ou desative o filtro.
                   </li>
-                ))}
+                ) : null}
+                {!foodQuery.trim() &&
+                !deliveryOnly &&
+                !customFoods.length &&
+                !favoriteFoods.length &&
+                !recentFoods.length ? (
+                  <li className="py-6 text-center text-sm text-muted-foreground">
+                    Busque um alimento ou cadastre o seu em Meu alimento.
+                  </li>
+                ) : null}
+              </ul>
+            </TabsContent>
+
+            <TabsContent value="receitas" className="mt-3 space-y-3">
+              <Input
+                value={recipeQuery}
+                onChange={(e) => setRecipeQuery(e.target.value)}
+                placeholder="Buscar receita…"
+                autoFocus
+              />
+              <ul className="max-h-64 space-y-1 overflow-y-auto">
+                {recipeResults.length ? (
+                  recipeResults.map((recipe) => {
+                    const per = recipeMacrosPerServing(recipe);
+                    return (
+                      <li key={recipe.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                          onClick={() => {
+                            setRecipeHit(recipe);
+                            setRecipeServings(1);
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{recipe.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(per.proteinG)}g P · {Math.round(per.energyKcal)} kcal / porção
+                              {recipe.tags?.length ? ` · ${recipeTagLabel(recipe.tags[0]!)}` : ""}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <li className="py-6 text-center text-sm text-muted-foreground">Nenhuma receita</li>
+                )}
               </ul>
             </TabsContent>
 
@@ -889,17 +1325,71 @@ export function MealPickerSheet({
               />
             </TabsContent>
 
-            <TabsContent value="favoritos" className="mt-3">
-              <PresetList
-                presets={list}
-                favorites={favorites}
-                onToggleFavorite={toggleFavoriteMeal}
-                onSelect={(p) => {
-                  setSelected(p);
-                  setServings(1);
-                }}
-                empty="Nenhum favorito ainda"
-              />
+            <TabsContent value="favoritos" className="mt-3 space-y-4">
+              {favoriteFoods.length ? (
+                <div>
+                  <p className="mb-2 px-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Alimentos
+                  </p>
+                  <ul className="space-y-1">
+                    {favoriteFoods.map((food) => (
+                      <li key={food.id} className="flex items-stretch gap-1">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center rounded-lg px-2 py-2 text-left hover:bg-muted/60"
+                          onClick={() => {
+                            const serving =
+                              defaultServing(food.id) ?? servingsForFood(food.id)[0];
+                            if (!serving) return;
+                            setFoodHit({
+                              food,
+                              serving,
+                              summary: scaleMacros(food.per100g, serving.gramsEquivalent / 100),
+                              score: 1,
+                            });
+                            setFoodServing(serving);
+                            setFoodQty(1);
+                          }}
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{food.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {foodSourceLabel(food.source)}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Remover favorito"
+                          className="flex w-10 shrink-0 items-center justify-center rounded-xl border border-border text-primary"
+                          onClick={() => toggleFavoriteFood(food.id)}
+                        >
+                          <Star className="size-4 fill-primary" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div>
+                <p className="mb-2 px-1 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Presets
+                </p>
+                <PresetList
+                  presets={list}
+                  favorites={favorites}
+                  onToggleFavorite={toggleFavoriteMeal}
+                  onSelect={(p) => {
+                    setSelected(p);
+                    setServings(1);
+                  }}
+                  empty={
+                    favoriteFoods.length
+                      ? "Nenhum preset favorito"
+                      : "Nenhum favorito ainda"
+                  }
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="salvos" className="mt-3">
@@ -995,6 +1485,20 @@ export function MealPickerSheet({
         </div>
       )}
     </SoldiersOverlay>
+    <CustomFoodSheet
+      open={customFoodOpen}
+      onClose={() => {
+        setCustomFoodOpen(false);
+        setEditingCustom(null);
+      }}
+      foods={customFoods}
+      editing={editingCustom}
+      onSave={(input) => {
+        upsertCustomFood(input);
+      }}
+      onRemove={(id) => removeCustomFood(id)}
+    />
+    </>
   );
 }
 

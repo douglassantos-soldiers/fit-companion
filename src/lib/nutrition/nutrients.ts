@@ -144,9 +144,32 @@ export const MICRO_LABELS_PT: Record<string, string> = {
   vitaminCMg: "Vitamina C",
   vitaminDUcg: "Vitamina D",
   vitaminB12Ucg: "Vitamina B12",
+  fiberG: "Fibra",
+  sodiumMg: "Sódio",
 };
 
-export type DayMicroLine = { key: string; label: string; value: number; unit: string };
+/** Whitelist — performance panel only (never open MicroKey list). */
+export const PERFORMANCE_MICRO_KEYS = ["fiberG", "sodiumMg", "ironMg", "vitaminDUcg"] as const;
+export type PerformanceMicroKey = (typeof PERFORMANCE_MICRO_KEYS)[number];
+
+export const PERFORMANCE_MICRO_TARGETS: Record<
+  PerformanceMicroKey,
+  { goal: number; unit: string; label: string; ceiling?: boolean }
+> = {
+  fiberG: { goal: 30, unit: "g", label: "Fibra" },
+  sodiumMg: { goal: 2000, unit: "mg", label: "Sódio", ceiling: true },
+  ironMg: { goal: 14, unit: "mg", label: "Ferro" },
+  vitaminDUcg: { goal: 15, unit: "µg", label: "Vitamina D" },
+};
+
+export type DayMicroLine = {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
+  goal?: number;
+  ceiling?: boolean;
+};
 
 function collectExtras(item: MealItemEntry | undefined, acc: Record<string, { value: number; unit: string }>) {
   if (!item) return;
@@ -183,4 +206,48 @@ export function dayMicrosFromMeals(meals: MealEntry[]): DayMicroLine[] | null {
     }))
     .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   return lines.length ? lines : null;
+}
+
+/**
+ * Performance micros only: fiber, sodium, iron, vitamin D.
+ * Always returns 4 lines when meals.length > 0; never leaks other micros.
+ */
+export function dayPerformanceMicros(meals: MealEntry[]): DayMicroLine[] | null {
+  if (!meals.length) return null;
+
+  const acc: Record<PerformanceMicroKey, number> = {
+    fiberG: 0,
+    sodiumMg: 0,
+    ironMg: 0,
+    vitaminDUcg: 0,
+  };
+
+  for (const meal of meals) {
+    if (meal.items?.length) {
+      for (const item of meal.items) {
+        const snap = item.nutrientSnapshot;
+        acc.fiberG += snap?.fiberG ?? 0;
+        acc.sodiumMg += snap?.sodiumMg ?? 0;
+        acc.ironMg += snap?.extras?.ironMg?.value ?? 0;
+        acc.vitaminDUcg += snap?.extras?.vitaminDUcg?.value ?? 0;
+      }
+    } else {
+      acc.fiberG += meal.fiberG ?? meal.nutrientSnapshot?.fiberG ?? 0;
+      acc.sodiumMg += meal.nutrientSnapshot?.sodiumMg ?? 0;
+      acc.ironMg += meal.nutrientSnapshot?.extras?.ironMg?.value ?? 0;
+      acc.vitaminDUcg += meal.nutrientSnapshot?.extras?.vitaminDUcg?.value ?? 0;
+    }
+  }
+
+  return PERFORMANCE_MICRO_KEYS.map((key) => {
+    const meta = PERFORMANCE_MICRO_TARGETS[key];
+    return {
+      key,
+      label: meta.label,
+      value: round1(acc[key]),
+      unit: meta.unit,
+      goal: meta.goal,
+      ...(meta.ceiling ? { ceiling: true } : {}),
+    };
+  });
 }

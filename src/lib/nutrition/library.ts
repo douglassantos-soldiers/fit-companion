@@ -4,7 +4,8 @@
 import { MEAL_PRESETS, type MealPreset } from "@/data/meal-presets";
 import { recentMealPresets } from "@/lib/engine/nutrition";
 import { foodById } from "@/lib/nutrition/food-catalog";
-import type { FoodItem } from "@/lib/nutrition/types";
+import { mealFromItems } from "@/lib/nutrition/meal-builder";
+import type { FoodItem, MealItem } from "@/lib/nutrition/types";
 import type { MealEntry, MealItemEntry, MealQuality, SavedMeal } from "@/lib/types";
 
 export function savedMealFromEntry(entry: MealEntry): Omit<SavedMeal, "id" | "createdAt"> {
@@ -102,6 +103,7 @@ export function customPickFromSaved(saved: SavedMeal): {
   items?: MealItemEntry[];
   sourceKind: "informed";
   foodSource: "user";
+  nutrientSnapshot?: MealItemEntry["nutrientSnapshot"];
 } {
   const pick: ReturnType<typeof customPickFromSaved> = {
     label: saved.label,
@@ -114,6 +116,10 @@ export function customPickFromSaved(saved: SavedMeal): {
   if (saved.carbG != null) pick.carbG = saved.carbG;
   if (saved.fatG != null) pick.fatG = saved.fatG;
   if (saved.fiberG != null) pick.fiberG = saved.fiberG;
-  if (saved.items.length) pick.items = saved.items;
+  if (saved.items.length) {
+    pick.items = saved.items;
+    const built = mealFromItems(saved.items as MealItem[], saved.label);
+    pick.nutrientSnapshot = built.nutrientSnapshot as MealItemEntry["nutrientSnapshot"];
+  }
   return pick;
 }

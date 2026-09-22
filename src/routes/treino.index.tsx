@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
+  Bookmark,
   CalendarDays,
   ChevronRight,
+  Download,
   History,
   Play,
   Settings2,
@@ -35,7 +37,13 @@ import {
   consecutiveHardRpeStreak,
 } from "@/lib/engine/recovery";
 import { useStore } from "@/lib/store";
+import { downloadSessionsCsv } from "@/lib/training/export-sessions-csv";
 import { GYM_GEAR_OPTIONS, matchesInventory } from "@/lib/training/inventory";
+import {
+  isStickyPlanActive,
+} from "@/lib/training/saved-training-plans";
+import { blockDisplayWeek } from "@/lib/training/training-block";
+import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import {
   FOCUS_MUSCLE_LABEL,
@@ -69,7 +77,20 @@ export const Route = createFileRoute("/treino/")({
 const FOCUS_OPTIONS = Object.keys(FOCUS_MUSCLE_LABEL) as FocusMuscle[];
 
 function TrainingPage() {
-  const { state, hydrated, patchProfile, setExercisePreference, saveDayCheckIn } = useStore();
+  const {
+    state,
+    hydrated,
+    patchProfile,
+    setExercisePreference,
+    saveDayCheckIn,
+    forkWeeklyPlan,
+    saveDayAsRoutine,
+    removeTrainingPlan,
+    activateTrainingPlan,
+    clearActiveTrainingPlan,
+    leaveTrainingBlock,
+    replacePrescribedExercise,
+  } = useStore();
   const todayCheck = state.dayCheckIns?.[todayKey()];
   const [equipOverride, setEquipOverride] = useState<Equipment | null>(
     todayCheck?.equipment ?? null,
@@ -120,7 +141,11 @@ function TrainingPage() {
   }
 
   const profile = state.profile;
-  const { days: plan, weekMode } = planResult;
+  const sticky = isStickyPlanActive(state);
+  const block = state.activeTrainingBlock;
+  const generatedDays = planResult.days;
+  const plan = block || sticky ? resolveTrainingPlanDays(state) : generatedDays;
+  const weekMode = planResult.weekMode;
   const todayWeekday = new Date().getDay();
   const todayDay = plan.find((d) => d.weekday === todayWeekday) ?? plan[0] ?? null;
   const decisionCtx = decisionContextForUi(state);
@@ -178,6 +203,53 @@ function TrainingPage() {
             <Play className="size-4" /> Treinar agora
           </Button>
         </Link>
+      ) : null}
+
+      {block ? (
+        <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">Bloco ativo</p>
+            <p className="truncate text-sm font-semibold">
+              {block.name} · Semana {blockDisplayWeek(block)}/{block.durationWeeks}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Link to="/conteudo">
+              <Button type="button" size="sm" variant="ghost">
+                Trilhas
+              </Button>
+            </Link>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                leaveTrainingBlock();
+                toast.success("Saiu do bloco — plano genérico de volta");
+              }}
+            >
+              Sair
+            </Button>
+          </div>
+        </div>
+      ) : sticky ? (
+        <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">Rotina</p>
+            <p className="truncate text-sm font-semibold">{sticky.name}</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              clearActiveTrainingPlan();
+              toast.success("Rotina sticky removida");
+            }}
+          >
+            Sair
+          </Button>
+        </div>
       ) : null}
 
       <div className="mb-4 flex justify-end">
@@ -248,15 +320,49 @@ function TrainingPage() {
           <TabsTrigger value="semana" className="flex-1">
             <CalendarDays className="size-4" /> Semana
           </TabsTrigger>
+          <TabsTrigger value="rotinas" className="flex-1">
+            <Bookmark className="size-4" /> Rotinas
+          </TabsTrigger>
           <TabsTrigger value="historico" className="flex-1">
             <History className="size-4" /> Histórico
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="semana" className="mt-4 space-y-3">
+          {sticky ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+              <span className="min-w-0 truncate font-semibold text-primary">
+                Rotina: {sticky.name}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  clearActiveTrainingPlan();
+                  toast.success("Voltou ao plano gerado");
+                }}
+              >
+                Plano gerado
+              </Button>
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10 flex-1"
+              onClick={() => {
+                const saved = forkWeeklyPlan(plan);
+                toast.success(`Salvo: ${saved.name}`);
+              }}
+            >
+              <Bookmark className="size-4" /> Fork da semana
+            </Button>
+          </div>
           {plan.map((day) => (
             <article key={day.id} className="surface-card p-5">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">
                     {WEEKDAY_LABELS[day.weekday]}
@@ -267,6 +373,18 @@ function TrainingPage() {
                     {day.focus} · ~{day.estimatedMin} min
                   </p>
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="shrink-0"
+                  onClick={() => {
+                    const saved = saveDayAsRoutine(day);
+                    toast.success(`Dia salvo: ${saved.name}`);
+                  }}
+                >
+                  <Bookmark className="size-3.5" />
+                </Button>
               </div>
               <ul className="mt-3 space-y-2">
                 {day.exercises.map((ex) => {
@@ -311,6 +429,89 @@ function TrainingPage() {
           ))}
         </TabsContent>
 
+        <TabsContent value="rotinas" className="mt-4 space-y-3">
+          <Button
+            type="button"
+            className="h-11 w-full font-bold uppercase tracking-wide"
+            onClick={() => {
+              const saved = forkWeeklyPlan(plan);
+              toast.success(`Fork salvo: ${saved.name}`);
+            }}
+          >
+            <Bookmark className="size-4" /> Fork desta semana
+          </Button>
+          {(state.savedTrainingPlans ?? []).length === 0 ? (
+            <EmptyState
+              variant="treino"
+              title="Nenhuma rotina ainda"
+              description="Faça fork da semana atual ou salve um dia com o ícone de marcador."
+            />
+          ) : (
+            (state.savedTrainingPlans ?? []).map((routine) => {
+              const firstDay = routine.days[0];
+              const isActive = sticky?.id === routine.id;
+              return (
+                <article key={routine.id} className="surface-card space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+                        {routine.kind === "week" ? "Semana" : "Dia"} · {routine.days.length} dia
+                        {routine.days.length === 1 ? "" : "s"}
+                      </p>
+                      <h2 className="truncate text-lg">{routine.name}</h2>
+                      {firstDay ? (
+                        <p className="text-xs text-muted-foreground">
+                          {firstDay.title}
+                          {routine.days.length > 1 ? ` +${routine.days.length - 1}` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        removeTrainingPlan(routine.id);
+                        toast.success("Rotina removida");
+                      }}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={isActive ? "default" : "secondary"}
+                      className="h-10 flex-1"
+                      onClick={() => {
+                        activateTrainingPlan(routine.id);
+                        toast.success("Rotina ativa nesta semana");
+                      }}
+                    >
+                      {isActive ? "Em uso" : "Usar esta semana"}
+                    </Button>
+                    {firstDay ? (
+                      <Link
+                        to="/treino/sessao/$id"
+                        params={{ id: firstDay.id }}
+                        search={{ express: expressForDay(firstDay.id), from: "treino" }}
+                        className="flex-1"
+                        onClick={() => {
+                          if (!isActive) activateTrainingPlan(routine.id);
+                        }}
+                      >
+                        <Button type="button" className="h-10 w-full">
+                          <Play className="size-4" /> Iniciar
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </TabsContent>
+
         <TabsContent value="historico" className="mt-4 space-y-3">
           {state.sessions.length === 0 ? (
             <EmptyState
@@ -339,26 +540,43 @@ function TrainingPage() {
               }
             />
           ) : (
-            state.sessions.map((s) => (
-              <Link
-                key={s.id}
-                to="/treino/historico/$sessionId"
-                params={{ sessionId: s.id }}
-                className="block"
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 w-full"
+                onClick={() => {
+                  if (!state.sessions.length) {
+                    toast.message("Nenhuma sessão para exportar");
+                    return;
+                  }
+                  downloadSessionsCsv(state.sessions);
+                  toast.success("CSV baixado");
+                }}
               >
-                <article className="surface-card p-4 transition-colors hover:border-primary">
-                  <div className="flex justify-between">
-                    <h2 className="text-base">{s.title}</h2>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {new Date(s.date).toLocaleDateString("pt-BR")} · {s.durationMin} min ·{" "}
-                    {s.volumeKg.toLocaleString("pt-BR")} kg · {s.exercises.length} exercícios
-                    {s.rpe ? ` · RPE ${s.rpe}` : ""}
-                  </p>
-                </article>
-              </Link>
-            ))
+                <Download className="size-4" /> Exportar CSV
+              </Button>
+              {state.sessions.map((s) => (
+                <Link
+                  key={s.id}
+                  to="/treino/historico/$sessionId"
+                  params={{ sessionId: s.id }}
+                  className="block"
+                >
+                  <article className="surface-card p-4 transition-colors hover:border-primary">
+                    <div className="flex justify-between">
+                      <h2 className="text-base">{s.title}</h2>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {new Date(s.date).toLocaleDateString("pt-BR")} · {s.durationMin} min ·{" "}
+                      {s.volumeKg.toLocaleString("pt-BR")} kg · {s.exercises.length} exercícios
+                      {s.rpe ? ` · RPE ${s.rpe}` : ""}
+                    </p>
+                  </article>
+                </Link>
+              ))}
+            </>
           )}
         </TabsContent>
       </Tabs>
@@ -465,8 +683,17 @@ function TrainingPage() {
           options={swapOptions}
           emptyLabel="Nenhuma alternativa agora."
           onPick={(alt) => {
-            if (swapFor) setExercisePreference(swapFor.exerciseId, "avoided");
-            setExercisePreference(alt.id, "preferred");
+            if (!swapFor) return;
+            if (block || sticky) {
+              replacePrescribedExercise(swapFor.dayId, swapFor.exerciseId, {
+                exerciseId: alt.id,
+                name: alt.name,
+                unit: alt.unit,
+              });
+            } else {
+              setExercisePreference(swapFor.exerciseId, "avoided");
+              setExercisePreference(alt.id, "preferred");
+            }
             setSwapFor(null);
             toast.success(`Trocado para ${alt.name}`);
           }}

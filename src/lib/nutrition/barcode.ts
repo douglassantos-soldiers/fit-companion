@@ -2,7 +2,8 @@
  * Barcode / EAN helpers (Fase 13). Local catalog first; OFF mapping is pure.
  */
 import { allFoods, defaultServing, foodByEan } from "@/lib/nutrition/food-catalog";
-import { qualityFromMacros, scaleMacros } from "@/lib/nutrition/nutrients";
+import { mealFromItems } from "@/lib/nutrition/meal-builder";
+import { scaleMacros } from "@/lib/nutrition/nutrients";
 import type {
   FoodItem,
   FoodSource,
@@ -186,19 +187,20 @@ export function mealItemFromBarcode(hit: BarcodeHit): MealItem {
 
 export function mealFromBarcode(hit: BarcodeHit) {
   const item = mealItemFromBarcode(hit);
-  const m = item.nutrientSnapshot;
+  const built = mealFromItems([item], hit.brand ? `${hit.name} · ${hit.brand}` : hit.name);
   return {
-    label: hit.brand ? `${hit.name} · ${hit.brand}` : hit.name,
-    proteinG: Math.round(m.proteinG),
-    kcal: Math.round(m.energyKcal),
-    carbG: Math.round(m.carbG),
-    fatG: Math.round(m.fatG),
-    fiberG: Math.round(m.fiberG ?? 0),
-    quality: qualityFromMacros(m.proteinG, m.energyKcal),
-    items: [item],
+    label: built.label,
+    proteinG: built.proteinG,
+    kcal: built.kcal,
+    carbG: built.carbG,
+    fatG: built.fatG,
+    fiberG: built.fiberG,
+    quality: built.quality,
+    items: built.items,
     sourceKind: item.sourceKind,
     foodSource: hit.source,
     confidence: hit.confidence,
+    nutrientSnapshot: built.nutrientSnapshot,
   };
 }
 

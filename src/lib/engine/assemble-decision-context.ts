@@ -25,6 +25,12 @@ import {
 import type { AppState } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 import { DEFAULT_USER_TIMEZONE, normalizeUserTimezone } from "@/lib/timezone";
+import {
+  hasPrescribedPlan,
+  planSourceFingerprint,
+  resolveTrainingPlanDays,
+} from "@/lib/training/resolve-plan-days";
+import type { PlannedDay } from "@/lib/training/plan";
 
 export type AssembleDecisionContextOpts = {
   date?: string;
@@ -65,21 +71,29 @@ export function assembleDecisionContext(
     sessionRpeHardStreak: recovery.hardRpeStreak,
   };
 
-  const { days: plan } = buildWeeklyPlanDetailed(
-    profile,
-    state.sessions,
-    equipment,
-    learningWeekHint(state, date),
-    {
-      likedExerciseIds: state.likedExerciseIds ?? [],
-      dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-      exercisePreferences: state.exercisePreferences,
-      recoveryCtx,
-    },
-  );
+  const weekHint = learningWeekHint(state, date);
+  let plan: PlannedDay[];
+  if (hasPrescribedPlan(state, date)) {
+    plan = resolveTrainingPlanDays(state, date);
+  } else {
+    const detailed = buildWeeklyPlanDetailed(
+      profile,
+      state.sessions,
+      equipment,
+      weekHint,
+      {
+        likedExerciseIds: state.likedExerciseIds ?? [],
+        dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+        exercisePreferences: state.exercisePreferences,
+        recoveryCtx,
+      },
+    );
+    plan = detailed.days;
+  }
   const day = planDayForToday(plan, new Date(`${date}T12:00:00`));
   const plannedMinutes = day?.estimatedMin ?? 0;
   const hasTrainingDay = Boolean(day);
+  const planSource = planSourceFingerprint(state, date);
 
   const context = buildContextSnapshot(state, date, userId, recovery, learning);
   if (!context) return null;
@@ -135,6 +149,7 @@ export function assembleDecisionContext(
     reasonSeeds: context.reasonSeeds ?? [],
     behaviorTriggers: (living.behavior?.triggers ?? []).map((t) => t.key),
     learningConfidence: learning.learningConfidence,
+    planSource,
   });
 
   const snapshot: DecisionContextSnapshot = {

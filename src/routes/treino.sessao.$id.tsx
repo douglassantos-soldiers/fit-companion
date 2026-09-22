@@ -23,7 +23,6 @@ import { isQuestComplete, questById } from "@/data/daily-quests";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
 import {
   buildExpressSession,
-  buildWeeklyPlan,
   sessionVolume,
   type PlannedExercise,
 } from "@/lib/engine/plan";
@@ -40,9 +39,11 @@ import {
   suggestLoadDrop,
   type LoadDropSuggestion,
 } from "@/lib/training/intra-session";
-import { logsFromPlanned, setsFromPlanned } from "@/lib/training/session-logs";
+import { logsFromPlanned, setsFromPlanned, propagateSetToFollowing, nextWorkingSetFromLast } from "@/lib/training/session-logs";
+import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
+import { scalePlannedDayVolume } from "@/lib/training/training-block";
 import { parseRepTarget } from "@/lib/training/effort";
-import { progressionForExercise, weekModifier } from "@/lib/engine/progression";
+import { progressionForExercise, weekModifier, roundLoad } from "@/lib/engine/progression";
 import { clearSupersetPair, nextAfterSetComplete, partnerIndex } from "@/lib/training/superset";
 import { useSessionWakeLock } from "@/lib/session/wake-lock";
 import { dailyXp, XP } from "@/lib/engine/xp";
@@ -205,13 +206,18 @@ function SessionPage() {
       : null;
   const day = useMemo(() => {
     if (!state.profile) return null;
-    const base =
-      buildWeeklyPlan(state.profile, state.sessions, learningWeekHint(state), {
-        likedExerciseIds: state.likedExerciseIds ?? [],
-        dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-        exercisePreferences: state.exercisePreferences,
-      }).find((d) => d.id === id) ?? null;
+    const weekDays = resolveTrainingPlanDays(state);
+    let base = weekDays.find((d) => d.id === id) ?? null;
     if (!base) return null;
+    const decisionCtx = decisionContextForUi(state);
+    const mode = decisionCtx?.decisions.trainingMode;
+    const vol = decisionCtx?.decisions.trainingVolume ?? 1;
+    if (
+      state.activeTrainingBlock &&
+      (mode === "deload" || (typeof vol === "number" && vol < 0.99))
+    ) {
+      base = scalePlannedDayVolume(base, vol, roundLoad);
+    }
     return express ? buildExpressSession(base) : base;
   }, [state, id, express]);
 
@@ -355,18 +361,14 @@ function SessionPage() {
     setLogs((prev) =>
       prev.map((l, i) => {
         if (i !== safeExIdx) return l;
-        const last = l.sets[l.sets.length - 1];
         return {
           ...l,
           sets: [
             ...l.sets,
-            {
-              reps: last?.reps ?? parseRepTarget(activePlanned?.reps ?? "10"),
-              weightKg: last?.weightKg ?? activePlanned?.suggestedLoad ?? 0,
-              done: false,
-              type: "working" as const,
-              setNumber: l.sets.length + 1,
-            },
+            nextWorkingSetFromLast(l.sets, {
+              reps: parseRepTarget(activePlanned?.reps ?? "10"),
+              weightKg: activePlanned?.suggestedLoad ?? 0,
+            }),
           ],
         };
       }),
@@ -566,15 +568,19 @@ function SessionPage() {
     const exIdx = safeExIdx;
     const setIdx = workingSetIdx;
     const restSec = workingSet.restSec ?? activePlanned.restSec;
+    const completedSnapshot = {
+      weightKg: workingSet.weightKg,
+      reps: workingSet.reps,
+    };
 
-    const nextLogs = logs.map((l, i) =>
-      i !== exIdx
-        ? l
-        : {
-            ...l,
-            sets: l.sets.map((s, j) => (j !== setIdx ? s : { ...s, done: true, restSec })),
-          },
-    );
+    const nextLogs = logs.map((l, i) => {
+      if (i !== exIdx) return l;
+      const marked = l.sets.map((s, j) => (j !== setIdx ? s : { ...s, done: true, restSec }));
+      return {
+        ...l,
+        sets: propagateSetToFollowing(marked, setIdx, completedSnapshot),
+      };
+    });
     setLogs(nextLogs);
 
     const setsAfter = nextLogs[exIdx]!.sets;
@@ -647,6 +653,7 @@ function SessionPage() {
     ? alternativesFor(activeLog.exerciseId, profile.equipment, profile.restrictions, {
         preferences: state.exercisePreferences,
         preferPublishedMedia: true,
+        preferNonMachine: swapReason === "busy_machine",
       }).filter((e) => matchesInventory(e, profile.equipment, profile.equipmentInventory))
     : [];
 
@@ -722,6 +729,12 @@ function SessionPage() {
             onAddSet={addSet}
             onSwap={() => openSwap("swap")}
             onBusyMachine={() => openSwap("busy_machine")}
+            homeBar={
+              profile.equipment === "casa" ||
+              (profile.equipmentInventory?.length
+                ? !profile.equipmentInventory.includes("barra")
+                : false)
+            }
             onPrevExercise={() => setActiveExIdx((i) => Math.max(0, i - 1))}
             onNextExercise={() => setActiveExIdx((i) => Math.min(planned.length - 1, i + 1))}
             onPreference={(pref) => setExercisePreference(activePlanned.exerciseId, pref)}

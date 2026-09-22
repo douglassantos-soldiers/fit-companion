@@ -227,8 +227,19 @@ export function materializeLivingPlan(opts: {
     whyByChange.push({
       key: "calories",
       label: "Calorias",
-      reason: kcalDecision.explanation,
+      reason: `Ajuste da semana: ${kcalDecision.explanation}`,
     });
+  } else if (kcalDecision) {
+    const gate =
+      kcalDecision.reasonCodes.includes("incomplete_logging") ||
+      kcalDecision.reasonCodes.includes("adherence_gate");
+    if (gate) {
+      whyByChange.push({
+        key: "calories",
+        label: "Calorias",
+        reason: kcalDecision.explanation,
+      });
+    }
   }
   if (proteinDecision && proteinDecision.decisionValue === "up") {
     whyByChange.push({

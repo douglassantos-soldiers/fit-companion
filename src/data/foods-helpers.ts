@@ -2,7 +2,13 @@
  * Shared food seed helpers — lote 1 + lote 2.
  * Internal macros only; no licensed TACO rows.
  */
-import type { FoodCategory, FoodItem, FoodServing, MacroSnapshot } from "@/lib/nutrition/types";
+import type {
+  FoodCategory,
+  FoodItem,
+  FoodServing,
+  MacroSnapshot,
+  NutrientValue,
+} from "@/lib/nutrition/types";
 
 export const INTERNAL_SOURCE_VERSION = "soldiers-internal-v1";
 
@@ -12,6 +18,8 @@ export type FoodDef = {
   category: FoodCategory;
   synonyms?: string[];
   brand?: string;
+  /** Real GTIN/EAN when known — never invent. */
+  ean?: string;
   /** per 100g */
   kcal: number;
   proteinG: number;
@@ -20,13 +28,31 @@ export type FoodDef = {
   fiberG?: number;
   sugarG?: number;
   sodiumMg?: number;
+  /** Performance micros per 100g (optional curated) */
+  ironMg?: number;
+  vitaminDUcg?: number;
   servings?: Array<{ id: string; label: string; grams: number; isDefault?: boolean }>;
   confidence?: number;
   sourceVersion?: string;
 };
 
-export function per100(d: FoodDef): MacroSnapshot {
+function microExtra(
+  key: "ironMg" | "vitaminDUcg",
+  value: number,
+  unit: string,
+): NutrientValue {
   return {
+    key,
+    value,
+    unit,
+    source: "internal",
+    kind: "observed",
+    confidence: 0.8,
+  };
+}
+
+export function per100(d: FoodDef): MacroSnapshot {
+  const out: MacroSnapshot = {
     energyKcal: d.kcal,
     proteinG: d.proteinG,
     carbG: d.carbG,
@@ -35,6 +61,13 @@ export function per100(d: FoodDef): MacroSnapshot {
     ...(d.sugarG != null ? { sugarG: d.sugarG } : {}),
     ...(d.sodiumMg != null ? { sodiumMg: d.sodiumMg } : {}),
   };
+  const extras: Record<string, NutrientValue> = {};
+  if (d.ironMg != null && d.ironMg > 0) extras.ironMg = microExtra("ironMg", d.ironMg, "mg");
+  if (d.vitaminDUcg != null && d.vitaminDUcg > 0) {
+    extras.vitaminDUcg = microExtra("vitaminDUcg", d.vitaminDUcg, "µg");
+  }
+  if (Object.keys(extras).length) out.extras = extras;
+  return out;
 }
 
 export function toFood(d: FoodDef): FoodItem {
@@ -50,6 +83,7 @@ export function toFood(d: FoodDef): FoodItem {
     per100g: per100(d),
   };
   if (d.brand) item.brand = d.brand;
+  if (d.ean) item.ean = d.ean.replace(/\D/g, "");
   if (d.synonyms?.length) item.synonyms = d.synonyms;
   if (d.sourceVersion) item.sourceVersion = d.sourceVersion;
   return item;

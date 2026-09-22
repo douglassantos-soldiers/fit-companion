@@ -36,6 +36,8 @@ export interface Exercise {
 export interface AlternativesForOpts {
   preferences?: Record<string, ExercisePreferenceValue>;
   preferPublishedMedia?: boolean;
+  /** When machine is busy, prefer free-weight / bodyweight alternatives. */
+  preferNonMachine?: boolean;
 }
 
 function plannerFromLibrary(): Exercise[] {
@@ -105,6 +107,20 @@ function hasPublishedMedia(exerciseId: string): boolean {
   return resolveExerciseMedia(exerciseId).source === "soldiers";
 }
 
+function looksLikeMachine(ex: Exercise): boolean {
+  const id = ex.id.toLowerCase();
+  const name = ex.name.toLowerCase();
+  return (
+    id.includes("maquina") ||
+    id.includes("smith") ||
+    id.includes("hack") ||
+    id.includes("leg-press") ||
+    id.includes("crossover") ||
+    name.includes("máquina") ||
+    name.includes("smith")
+  );
+}
+
 /** Alternativas para trocar na sessão: lista explícita do CMS, senão swapGroup/grupo. */
 export function alternativesFor(
   exerciseId: string,
@@ -117,6 +133,7 @@ export function alternativesFor(
   const avoided = normalizeRestrictions(restrictions);
   const explicit = getAlternativeIds(exerciseId);
   const preferMedia = opts.preferPublishedMedia !== false;
+  const preferNonMachine = opts.preferNonMachine === true;
 
   const equipOk = (e: Exercise) => matchesEquipment(e, equipment);
 
@@ -140,6 +157,11 @@ export function alternativesFor(
     const sameSwapA = a.swapGroup === current.swapGroup ? 0 : 1;
     const sameSwapB = b.swapGroup === current.swapGroup ? 0 : 1;
     if (sameSwapA !== sameSwapB) return sameSwapA - sameSwapB;
+    if (preferNonMachine) {
+      const machA = looksLikeMachine(a) ? 1 : 0;
+      const machB = looksLikeMachine(b) ? 1 : 0;
+      if (machA !== machB) return machA - machB;
+    }
     if (preferMedia) {
       const mediaA = hasPublishedMedia(a.id) ? 0 : 1;
       const mediaB = hasPublishedMedia(b.id) ? 0 : 1;

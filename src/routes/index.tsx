@@ -58,7 +58,6 @@ import {
 import {
   computeLearningInsights,
   topLearningInsight,
-  learningWeekHint,
 } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
 import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
@@ -83,7 +82,7 @@ import {
   nutritionProofLine,
   proteinGapLine,
 } from "@/lib/nutrition/log-loop";
-import { buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
+import { planDayForToday } from "@/lib/engine/plan";
 import {
   daySummary,
   nextOnboardingTip,
@@ -105,6 +104,8 @@ import { todayMetrics, todaySupplements, useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import { trainingProofLine } from "@/lib/training/proof";
 import { computeStrengthScore } from "@/lib/training/strength-score";
+import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
+import { blockDisplayWeek } from "@/lib/training/training-block";
 import { DAILY_XP_GOAL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
 import { PeriodReviewCard } from "@/components/progress/period-review-card";
 import { brandLevel } from "@/lib/engine/brand-level";
@@ -166,6 +167,7 @@ function Today() {
     saveLivingPlanFeedback,
     dismissCoachNudge,
     markCoachNudgeShown,
+    leaveTrainingBlock,
   } = useStore();
   const [mealSlot, setMealSlot] = useState<MealSlot | null>(null);
   const [eatServings, setEatServings] = useState<number | null>(null);
@@ -306,10 +308,7 @@ function Today() {
   const insights = computeLearningInsights(state);
   const userCtx = buildUserContext(state, state.userId);
   const insightLine = userCtx.headline ?? topLearningInsight(state);
-  const plan = buildWeeklyPlan(profile, state.sessions, learningWeekHint(state), {
-    likedExerciseIds: state.likedExerciseIds ?? [],
-    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-  });
+  const plan = resolveTrainingPlanDays(state);
   const day = planDayForToday(plan);
   const decisionCtx = decisionContextForUi(state, todayKey());
   const expressToday = decisionCtx ? selectTrainingMode(decisionCtx) === "express" : false;
@@ -596,6 +595,39 @@ function Today() {
         </div>
       ) : null}
 
+      {state.activeTrainingBlock ? (
+        <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">
+              Bloco
+            </p>
+            <p className="truncate text-sm font-semibold">
+              {state.activeTrainingBlock.name} · Semana{" "}
+              {blockDisplayWeek(state.activeTrainingBlock)}/
+              {state.activeTrainingBlock.durationWeeks}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Link to="/conteudo">
+              <Button type="button" size="sm" variant="ghost">
+                Trilhas
+              </Button>
+            </Link>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                leaveTrainingBlock();
+                toast.success("Saiu do bloco");
+              }}
+            >
+              Sair
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {living ? (
         <LivingPlanHero
           plan={living}
@@ -812,24 +844,41 @@ function Today() {
             </div>
           );
         }
-        if (blockId === "weekPrs" && persona === "consistente" && weekPrs.length) {
+        if (blockId === "weekPrs" && persona === "consistente" && (weekPrs.length || strengthScore)) {
           return (
             <div key="weekPrs" className="mb-3 space-y-1">
-              <p className="text-sm font-semibold text-primary">
-                {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
-              </p>
+              {weekPrs.length ? (
+                <p className="text-sm font-semibold text-primary">
+                  {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
+                </p>
+              ) : null}
               {strengthScore ? (
-                <Link to="/progresso" className="block text-xs text-muted-foreground">
-                  Strength Score {strengthScore.score}
-                  {strengthScore.delta28d != null
-                    ? ` (${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d)`
-                    : ""}
+                <Link
+                  to="/progresso"
+                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold">Strength Score</span>
+                    <span className="text-[0.65rem] uppercase text-muted-foreground">
+                      {strengthScore.coldStart
+                        ? "Estimativa"
+                        : `${strengthScore.evidenceCount} lifts`}
+                      {strengthScore.delta28d != null
+                        ? ` · ${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className="text-display text-xl text-primary">{strengthScore.score}</span>
                 </Link>
               ) : null}
             </div>
           );
         }
-        if (blockId === "periodReview" && weekReview && weekReview.sessions > 0) {
+        if (
+          blockId === "periodReview" &&
+          weekReview &&
+          (weekReview.sessions > 0 || weekReview.isSundayRitual)
+        ) {
           return <PeriodReviewCard key="periodReview" review={weekReview} />;
         }
         if (blockId === "streakRisk") return null;

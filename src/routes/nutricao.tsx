@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   Settings2,
+  ShoppingCart,
   Star,
   Trash2,
   Utensils,
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { MealEditSheet } from "@/components/meal-edit-sheet";
 import { MealPickerSheet } from "@/components/meal-picker-sheet";
+import { ShoppingWeekSheet } from "@/components/shopping-week-sheet";
 import { MealPresetThumb } from "@/components/meal-preset-thumb";
 import { MetricRing } from "@/components/metric-ring";
 import { NutritionAjustesSheet } from "@/components/today/nutrition-ajustes-sheet";
@@ -44,7 +46,7 @@ import {
   proteinGapLine,
 } from "@/lib/nutrition/log-loop";
 import { customPickFromSaved, nutritionLibrary, savedMealFromEntry } from "@/lib/nutrition/library";
-import { dayMicrosFromMeals } from "@/lib/nutrition/nutrients";
+import { dayPerformanceMicros } from "@/lib/nutrition/nutrients";
 import { wheyMacrosFromDoses } from "@/lib/nutrition/whey";
 import { useStore } from "@/lib/store";
 import {
@@ -139,6 +141,7 @@ function NutritionPage() {
   const [editing, setEditing] = useState<MealEntry | null>(null);
   const [focusSlot, setFocusSlot] = useState<MealSlot | "todos">("todos");
   const [ajustesOpen, setAjustesOpen] = useState(false);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
   const [servingsBySlot, setServingsBySlot] = useState<Partial<Record<MealSlot, number>>>({});
   const [libSlot, setLibSlot] = useState<MealSlot>("almoco");
   const lesson = lessonForToday(
@@ -176,7 +179,20 @@ function NutritionPage() {
   const nextEmpty = mealPlan.slots.find((s) => s.status === "suggested")?.slot;
   const gap = proteinGapLine(totals.proteinG, goals.proteinG, nextEmpty);
   const todayMeals = (state.meals ?? []).filter((m) => m.date.slice(0, 10) === todayKey());
-  const micros = dayMicrosFromMeals(todayMeals);
+  const micros = dayPerformanceMicros(todayMeals);
+  const kcalTrend = decisionCtx?.context.nutrition.kcalTrend ?? 0;
+  const weeklyKcalHint =
+    Math.abs(kcalTrend) >= 100
+      ? `Ajuste semanal: ${kcalTrend > 0 ? "+" : ""}${kcalTrend} kcal${
+          decisionCtx?.context.reasonSeeds.includes("weight_trend_up") ||
+          decisionCtx?.context.reasonSeeds.includes("weight_trend_down")
+            ? " (tendência de peso)"
+            : decisionCtx?.context.reasonSeeds.includes("adherence_gate") ||
+                decisionCtx?.context.reasonSeeds.includes("incomplete_logging")
+              ? " (adesão/registro)"
+              : ""
+        }`
+      : null;
   const qualityLine =
     todayMeals.length > 0
       ? `${todayMeals.filter((m) => m.quality === "verde").length} verdes · ${todayMeals.filter((m) => m.quality === "laranja").length} ocasionais`
@@ -216,6 +232,7 @@ function NutritionPage() {
     if (meal.fatG != null) entry.fatG = meal.fatG;
     if (meal.fiberG != null) entry.fiberG = meal.fiberG;
     if (meal.items) entry.items = meal.items;
+    if (meal.nutrientSnapshot) entry.nutrientSnapshot = meal.nutrientSnapshot;
     addMealEntry(entry);
     toast.success(`${saved.label} registrado`);
   };
@@ -282,6 +299,9 @@ function NutritionPage() {
               {whey.scoops ? ` · ${whey.scoops} scoop whey` : ""}
             </p>
           ) : null}
+          {weeklyKcalHint ? (
+            <p className="mb-3 text-xs text-muted-foreground">{weeklyKcalHint}</p>
+          ) : null}
           {qualityLine ? <p className="mb-3 text-xs text-muted-foreground">{qualityLine}</p> : null}
 
           <section className="surface-glass space-y-4 p-4">
@@ -308,22 +328,60 @@ function NutritionPage() {
               goal={goals.fatG ?? Math.round((goals.kcal * 0.25) / 9)}
               unit=" g"
             />
-            <MacroBar label="Fibra" current={totals.fiberG} goal={30} unit=" g" />
           </section>
 
           {micros ? (
-            <section className="surface-glass mt-3 space-y-2 p-4">
-              <p className="text-sm font-semibold">Micronutrientes</p>
-              <ul className="space-y-1 text-xs text-muted-foreground">
-                {micros.map((m) => (
-                  <li key={m.key} className="flex items-baseline justify-between gap-2">
-                    <span>{m.label}</span>
-                    <span className="font-semibold text-foreground">
-                      {m.value} {m.unit}
-                    </span>
-                  </li>
-                ))}
+            <section className="surface-glass mt-3 space-y-3 p-4">
+              <div>
+                <p className="text-sm font-semibold">Performance</p>
+                <p className="text-[0.65rem] text-muted-foreground">
+                  Fibra, sódio, ferro e vitamina D — nutrientes que importam no dia a dia.
+                </p>
+              </div>
+              <ul className="space-y-2.5">
+                {micros.map((m) => {
+                  const goal = m.goal ?? 1;
+                  const pct = m.ceiling
+                    ? Math.min(100, Math.round((m.value / goal) * 100))
+                    : Math.min(100, Math.round((m.value / goal) * 100));
+                  const overCeiling = Boolean(m.ceiling && m.value > goal);
+                  return (
+                    <li key={m.key} className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="text-muted-foreground">{m.label}</span>
+                        <span
+                          className={cn(
+                            "font-semibold tabular-nums",
+                            overCeiling ? "text-destructive" : "text-foreground",
+                          )}
+                        >
+                          {m.value} {m.unit}
+                          <span className="font-normal text-muted-foreground">
+                            {" "}
+                            / {goal} {m.unit}
+                            {m.ceiling ? " máx" : ""}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            overCeiling ? "bg-destructive" : "bg-primary",
+                          )}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
+              {micros.some((m) => (m.key === "ironMg" || m.key === "vitaminDUcg") && m.value === 0) &&
+              micros.filter((m) => m.key === "ironMg" || m.key === "vitaminDUcg").every((m) => m.value === 0) ? (
+                <p className="text-[0.65rem] text-muted-foreground">
+                  Ferro e vitamina D: disponíveis via código de barras / TACO / alimento com dado.
+                </p>
+              ) : null}
             </section>
           ) : null}
 
@@ -590,9 +648,21 @@ function NutritionPage() {
         </TabsContent>
 
         <TabsContent value="semana" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Sugestões dos próximos 7 dias. O diário continua no dia escolhido.
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Sugestões dos próximos 7 dias. O diário continua no dia escolhido.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="shrink-0 gap-1"
+              onClick={() => setShoppingOpen(true)}
+            >
+              <ShoppingCart className="size-3.5" />
+              Preparar a semana
+            </Button>
+          </div>
           {weekPlan.map((day) => {
             const label = new Date(`${day.date}T12:00:00`).toLocaleDateString("pt-BR", {
               weekday: "short",
@@ -832,6 +902,7 @@ function NutritionPage() {
             if (meal.correctedFromAi != null) entry.correctedFromAi = meal.correctedFromAi;
             if (meal.items) entry.items = meal.items;
             if (meal.foodSource) entry.foodSource = meal.foodSource;
+            if (meal.nutrientSnapshot) entry.nutrientSnapshot = meal.nutrientSnapshot;
             addMealEntry(entry);
             setPickerSlot(null);
             toast.success("Refeição adicionada");
@@ -861,6 +932,13 @@ function NutritionPage() {
           patchProfile(patch);
           toast.success("Nutrição atualizada");
         }}
+      />
+
+      <ShoppingWeekSheet
+        open={shoppingOpen}
+        onClose={() => setShoppingOpen(false)}
+        weekPlan={weekPlan}
+        meals={state.meals ?? []}
       />
     </AppShell>
   );

@@ -27,11 +27,31 @@ export const lookupBarcodeFn = createServerFn({ method: "POST" })
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
     try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${data.ean}.json`, {
+      const res = await fetch(`https://br.openfoodfacts.org/api/v2/product/${data.ean}.json`, {
         signal: ctrl.signal,
         headers: { "User-Agent": "SoldiersTraining/1.0 (nutrition barcode)" },
       });
-      if (!res.ok) return { found: false, error: res.status === 404 ? "not_found" : "upstream" };
+      if (!res.ok) {
+        // Fallback to world OFF if BR host misses
+        const world = await fetch(`https://world.openfoodfacts.org/api/v2/product/${data.ean}.json`, {
+          signal: ctrl.signal,
+          headers: { "User-Agent": "SoldiersTraining/1.0 (nutrition barcode)" },
+        });
+        if (!world.ok) return { found: false, error: res.status === 404 ? "not_found" : "upstream" };
+        const json = (await world.json()) as {
+          status?: number;
+          product?: {
+            product_name?: string;
+            brands?: string;
+            nutriments?: Record<string, number | string | undefined>;
+            serving_quantity?: number | string;
+          };
+        };
+        if (json.status !== 1 || !json.product) return { found: false, error: "not_found" };
+        const hit = barcodeHitFromOffProduct(data.ean, json.product);
+        if (!hit) return { found: false, error: "not_found" };
+        return { found: true, hit };
+      }
       const json = (await res.json()) as {
         status?: number;
         product?: {

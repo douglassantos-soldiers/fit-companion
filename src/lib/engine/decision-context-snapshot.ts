@@ -56,6 +56,8 @@ export type DecisionInputFingerprintParts = {
   reasonSeeds: string[];
   behaviorTriggers: string[];
   learningConfidence?: number | null;
+  /** Block / sticky / generated — invalidates cache on enroll or activate routine */
+  planSource?: string;
 };
 
 export function fingerprintDecisionInputs(parts: DecisionInputFingerprintParts): string {
@@ -80,6 +82,7 @@ export function fingerprintDecisionInputs(parts: DecisionInputFingerprintParts):
     [...parts.reasonSeeds].sort().join(","),
     [...parts.behaviorTriggers].sort().join(","),
     String(parts.learningConfidence ?? ""),
+    parts.planSource ?? "generated",
   ].join("|");
   return `v1:${djb2(canonical)}`;
 }

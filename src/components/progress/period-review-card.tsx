@@ -39,6 +39,11 @@ export function PeriodReviewCard({ review }: { review: PeriodReview }) {
           <p className="text-[0.65rem] uppercase text-muted-foreground">Força</p>
         </div>
       </div>
+      {review.isSundayRitual && review.sessions === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Sem treinos esta semana — o ritual volta quando você retomar.
+        </p>
+      ) : null}
       {review.volumeDeltaPct != null ? (
         <p className="mt-2 text-xs text-muted-foreground">
           Volume {review.volumeDeltaPct > 0 ? "+" : ""}
@@ -59,6 +64,20 @@ export function PeriodReviewCard({ review }: { review: PeriodReview }) {
         <p className="mt-1 text-sm font-semibold">
           Melhor evolução: {review.bestEvolution.name} +{review.bestEvolution.deltaKg} kg
         </p>
+      ) : null}
+      {review.wins.length > 0 ? (
+        <ul className="mt-2 space-y-0.5 text-xs text-primary">
+          {review.wins.slice(0, 2).map((w) => (
+            <li key={w}>· {w}</li>
+          ))}
+        </ul>
+      ) : null}
+      {review.risks.length > 0 ? (
+        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+          {review.risks.slice(0, 2).map((r) => (
+            <li key={r}>· {r}</li>
+          ))}
+        </ul>
       ) : null}
       {review.nextBlock && review.nextBlock.days.length > 0 ? (
         <div className="mt-3 rounded-xl border border-white/10 px-3 py-2">
