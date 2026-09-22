@@ -16,7 +16,7 @@ import { buildLivingPlanWithDecisions } from "@/lib/engine/living-plan";
 import { decisionsFromBundle, rankRecommendations } from "@/lib/engine/recommendation";
 import { aggregateNutrition } from "@/lib/customer360/aggregators/nutrition";
 import { previewCustomer360FromState } from "@/lib/customer360/recompute.server";
-import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
+import { getUserTodayKey, DEFAULT_USER_TIMEZONE, withProfileTimezone, normalizeUserTimezone } from "@/lib/timezone";
 import { buildQaScenario, isQaModeEnabled } from "@/lib/qa/scenarios";
 import { emptyState, todayKey } from "@/lib/types";
 import { patternKeyFromEvaluation } from "@/lib/engine/outcome-learning";
@@ -79,6 +79,14 @@ describe("PHASE 8.5 timezone", () => {
   it("todayKey defaults to America/Sao_Paulo calendar", () => {
     expect(DEFAULT_USER_TIMEZONE).toBe("America/Sao_Paulo");
     expect(todayKey()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("withProfileTimezone fills missing zone and normalizes invalid", () => {
+    const filled = withProfileTimezone({ name: "A" } as { name: string; timezone?: string }, "America/Manaus");
+    expect(filled.timezone).toBe("America/Manaus");
+    const kept = withProfileTimezone({ timezone: "UTC" }, "America/Manaus");
+    expect(kept.timezone).toBe("UTC");
+    expect(normalizeUserTimezone("Not/AZone")).toBe(DEFAULT_USER_TIMEZONE);
   });
 });
 

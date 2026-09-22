@@ -14,6 +14,7 @@ import { presetById } from "@/data/meal-presets";
 import { performanceDimensions } from "@/lib/engine/dimensions";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
 import { applyDecisionContextToState } from "@/lib/engine/decision-context-snapshot";
+import { withProfileTimezone } from "@/lib/timezone";
 import { scalePreset } from "@/lib/engine/nutrition";
 import { grantPendingAchievements } from "@/lib/engine/achievements";
 import { prsAchievedInSession } from "@/lib/engine/period-review";
@@ -291,9 +292,11 @@ function load(): AppState {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return emptyState;
     const parsed = JSON.parse(raw) as AppState;
+    const profile = parsed.profile ? withProfileTimezone(parsed.profile) : parsed.profile;
     return {
       ...emptyState,
       ...parsed,
+      profile,
       socialPrivacy: normalizeSocialPrivacy(parsed.socialPrivacy, parsed.shareProgress !== false),
     };
   } catch {
@@ -742,20 +745,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lastSessionXp,
       setProfile: (profile) => {
         const wasFirst = !stateRef.current.profile;
-        update((s) => withSnapshot(withQuests({ ...s, profile }, deviceId.current)));
+        const nextProfile = withProfileTimezone(profile);
+        update((s) => withSnapshot(withQuests({ ...s, profile: nextProfile }, deviceId.current)));
         if (deviceId.current) {
-          void ensureSocialProfile(deviceId.current, profile.name).catch((err) =>
+          void ensureSocialProfile(deviceId.current, nextProfile.name).catch((err) =>
             console.warn("ensureSocialProfile failed", err),
           );
         }
         if (wasFirst && deviceId.current) {
-          emitAppEvent(deviceId.current, "onboarding_completed", { goal: profile.goal });
+          emitAppEvent(deviceId.current, "onboarding_completed", { goal: nextProfile.goal });
         }
       },
       patchProfile: (patch) => {
         update((s) => {
           if (!s.profile) return s;
-          return withSnapshot({ ...s, profile: { ...s.profile, ...patch } });
+          return withSnapshot({
+            ...s,
+            profile: withProfileTimezone({ ...s.profile, ...patch }),
+          });
         });
       },
       addSession: (session, opts) => {

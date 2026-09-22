@@ -260,6 +260,7 @@ function profilePrefsFromRow(
     | "equipmentInventory"
     | "typicalSessionMin"
     | "onboardingComplete"
+    | "timezone"
   >
 > {
   if (!prefs || typeof prefs !== "object") return {};
@@ -284,6 +285,9 @@ function profilePrefsFromRow(
   if (typeof p["typicalSessionMin"] === "number") out.typicalSessionMin = p["typicalSessionMin"];
   if (p["onboardingComplete"] === true || p["onboardingComplete"] === false) {
     out.onboardingComplete = p["onboardingComplete"] === true;
+  }
+  if (typeof p["timezone"] === "string" && p["timezone"].trim()) {
+    out.timezone = p["timezone"].trim();
   }
   return out;
 }
@@ -454,6 +458,11 @@ function assembleStateFromRows(opts: {
   )[0];
   const p = profiles[0];
   const prefs = profilePrefsFromRow(p?.["prefs"]);
+  const columnTz =
+    typeof p?.["timezone"] === "string" && String(p["timezone"]).trim()
+      ? String(p["timezone"]).trim()
+      : undefined;
+  if (columnTz) prefs.timezone = columnTz;
 
   const sessionById = new Map<string, Row>();
   for (const s of sessions) {
@@ -655,6 +664,7 @@ export async function pushStateServer(
             weight_kg: state.profile.weightKg,
             equipment: state.profile.equipment,
             restrictions: state.profile.restrictions,
+            timezone: state.profile.timezone ?? "America/Sao_Paulo",
             prefs: {
               skipBreakfast: state.profile.skipBreakfast === true,
               lunchOutOften: state.profile.lunchOutOften === true,
@@ -666,6 +676,7 @@ export async function pushStateServer(
               equipmentInventory: state.profile.equipmentInventory,
               typicalSessionMin: state.profile.typicalSessionMin,
               onboardingComplete: state.profile.onboardingComplete === true,
+              timezone: state.profile.timezone ?? "America/Sao_Paulo",
             },
             version: nextVersion((remoteProfile as { version?: number } | null)?.version),
             updated_at: new Date().toISOString(),

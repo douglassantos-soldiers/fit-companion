@@ -287,6 +287,16 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
         ...(prefs["onboardingComplete"] === true || prefs["onboardingComplete"] === false
           ? { onboardingComplete: prefs["onboardingComplete"] === true }
           : {}),
+        ...((typeof profileRow["timezone"] === "string" && profileRow["timezone"].trim()) ||
+        (typeof prefs["timezone"] === "string" && prefs["timezone"].trim())
+          ? {
+              timezone: String(
+                (typeof profileRow["timezone"] === "string" && profileRow["timezone"].trim()
+                  ? profileRow["timezone"]
+                  : prefs["timezone"]) ?? "America/Sao_Paulo",
+              ).trim(),
+            }
+          : {}),
       }
     : null;
 

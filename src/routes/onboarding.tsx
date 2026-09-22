@@ -19,6 +19,7 @@ import { SESSION_DURATION_LABEL, SESSION_DURATION_OPTIONS } from "@/lib/engine/s
 import { defaultInventory, GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
 import { resolveTrainingWeekdays, WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import { useStore } from "@/lib/store";
+import { detectClientTimezone } from "@/lib/timezone";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -84,6 +85,7 @@ function Onboarding() {
     }),
     equipmentInventory: inventory.length ? inventory : defaultInventory(equipment),
     typicalSessionMin,
+    timezone: detectClientTimezone(),
     onboardingComplete: false,
     createdAt: new Date().toISOString(),
   });

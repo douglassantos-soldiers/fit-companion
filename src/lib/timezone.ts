@@ -17,6 +17,24 @@ export function normalizeUserTimezone(tz: string | null | undefined): string {
   }
 }
 
+/** Browser IANA zone when available; otherwise Soldiers default (BR). */
+export function detectClientTimezone(): string {
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return normalizeUserTimezone(resolved);
+  } catch {
+    return DEFAULT_USER_TIMEZONE;
+  }
+}
+
+/** Fill missing profile.timezone without overwriting an explicit value. */
+export function withProfileTimezone<T extends { timezone?: string }>(profile: T, tz?: string | null): T {
+  if (profile.timezone && String(profile.timezone).trim()) {
+    return { ...profile, timezone: normalizeUserTimezone(profile.timezone) };
+  }
+  return { ...profile, timezone: normalizeUserTimezone(tz ?? detectClientTimezone()) };
+}
+
 /**
  * Calendar date key (YYYY-MM-DD) in the user's timezone.
  */
