@@ -17,6 +17,7 @@ export function evaluateAchievements(state: AppState): AchievementId[] {
   if (sessions.length >= 100) unlocked.push("workouts-100");
   if (volume >= 100_000) unlocked.push("volume-100k");
   if ((state.challenges ?? []).length >= 1) unlocked.push("first-challenge");
+  if (state.hasFollowedSomeone) unlocked.push("first-friend");
 
   return unlocked;
 }

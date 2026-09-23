@@ -51,6 +51,8 @@ import { brandLevel } from "@/lib/engine/brand-level";
 import { pendingAchievements, achievementTitles } from "@/lib/engine/achievements";
 import { prsAchievedInSession } from "@/lib/engine/period-review";
 import { trackOutcome } from "@/lib/outcome";
+import { emitUserEvent } from "@/lib/events/emit";
+import { EVENT_TAXONOMY } from "@/lib/events/taxonomy";
 import { listMyClubs, publishClubStory, uploadCheckinImage } from "@/lib/social";
 import { getDeviceId } from "@/lib/sync";
 import { SOLDIERS_BORDER, SOLDIERS_YELLOW } from "@/lib/ui-theme";
@@ -583,6 +585,22 @@ function SessionPage() {
     });
     setLogs(nextLogs);
 
+    emitUserEvent({
+      type: EVENT_TAXONOMY.SET_COMPLETED,
+      entityType: "session",
+      entityId: id,
+      metadata: {
+        dayId: id,
+        exerciseId: activePlanned.exerciseId,
+        setIndex: setIdx,
+        weightKg: workingSet.weightKg,
+        reps: workingSet.reps,
+        ...(workingSet.rir != null ? { rir: workingSet.rir } : {}),
+        ...(workingSet.rpe != null ? { rpe: workingSet.rpe } : {}),
+      },
+      idempotencyKey: `workout:${id}:set_completed:${activePlanned.exerciseId}:${setIdx}`,
+    });
+
     const setsAfter = nextLogs[exIdx]!.sets;
     const exerciseDone = setsAfter.every((s) => s.done || s.skipped);
     const step = nextAfterSetComplete({
@@ -727,6 +745,20 @@ function SessionPage() {
             onCompleteSet={completeSet}
             onSkipSet={skipSet}
             onAddSet={addSet}
+            onRepeatLastSet={() => {
+              if (!activeLog || workingSetIdx <= 0) return;
+              const prev = [...activeLog.sets]
+                .slice(0, workingSetIdx)
+                .reverse()
+                .find((s) => s.done && !s.skipped);
+              if (!prev) return;
+              updateSet(safeExIdx, workingSetIdx, {
+                weightKg: prev.weightKg,
+                reps: prev.reps,
+                ...(prev.rir != null ? { rir: prev.rir } : {}),
+                ...(prev.rpe != null ? { rpe: prev.rpe } : {}),
+              });
+            }}
             onSwap={() => openSwap("swap")}
             onBusyMachine={() => openSwap("busy_machine")}
             homeBar={

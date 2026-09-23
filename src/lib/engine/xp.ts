@@ -12,6 +12,8 @@ export const XP = {
   kudos: 1,
   kudosCap: 3,
   questsCompleteBonus: 5,
+  /** Awarded once when a joined challenge reaches complete. */
+  challenge: 5,
 } as const;
 
 export function lifetimeXp(state: Pick<AppState, "xpByDate">): number {

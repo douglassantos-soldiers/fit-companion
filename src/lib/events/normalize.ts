@@ -83,9 +83,10 @@ export function buildIdempotencyKey(
   switch (type) {
     case "workout_started":
     case "workout_completed":
+    case "set_completed":
     case "workout_skipped":
     case "workout_modified":
-      return id ? `workout:${id}:${type}` : undefined;
+      return id ? `workout:${id}:${type}${opts.suffix ? `:${opts.suffix}` : ""}` : undefined;
     case "meal_logged":
     case "meal_updated":
     case "meal_deleted":

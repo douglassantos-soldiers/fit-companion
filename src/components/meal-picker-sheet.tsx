@@ -64,6 +64,8 @@ const RECIPE_TAG_LABEL: Record<string, string> = {
 function recipeTagLabel(tag: string): string {
   return RECIPE_TAG_LABEL[tag] ?? tag;
 }
+
+const SLOT_RECIPE_TAGS: Record<string, string[]> = {
   cafe: ["cafe", "pre-treino", "rapidas"],
   almoco: ["almoco", "delivery", "refeicao-fora"],
   lanche: ["lanche", "pos-treino", "pre-treino", "rapidas"],

@@ -4,7 +4,7 @@
  * program-base-4w training_json contract (authoritative):
  *   { title?, focus?, estimatedMin?, exercises: [{ exerciseId, sets, reps, restSec?, loadHint?, unit? }] }
  * Editorial bags like `{ theme: "técnica" }` are ignored by parseProgramTraining.
- * Enrollment builds ActiveTrainingBlock client-side (AppState retention) — no server enroll table in P2.
+ * Enrollment builds ActiveTrainingBlock client-side and syncs to content_progress via enrollProgram.
  */
 import type { PublicContentItem } from "@/lib/content-match";
 import type {

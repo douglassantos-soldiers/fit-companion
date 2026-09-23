@@ -30,6 +30,7 @@ import {
 } from "@/lib/social";
 import { listPendingInvitesFn, listFollowingForInviteFn } from "@/lib/social/graph.functions";
 import { suggestProfileChallenges, isProfileGeneratedChallenge } from "@/lib/engine/profile-challenges";
+import { suggestAiChallenges, isAiGeneratedChallenge } from "@/lib/challenges/ai-suggest";
 import { useStore } from "@/lib/store";
 import { resolveChallengeMedia } from "@/lib/soldiers-media";
 import { getDeviceId } from "@/lib/sync";
@@ -163,13 +164,16 @@ function SocialHubPage() {
     if (kind === "steps") setStepsInput("");
   };
 
-  const catalogChallenges = CHALLENGES.filter((c) => !isProfileGeneratedChallenge(c.id));
+  const catalogChallenges = CHALLENGES.filter(
+    (c) => !isProfileGeneratedChallenge(c.id) && !isAiGeneratedChallenge(c.id),
+  );
   const profileChallenges = suggestProfileChallenges({
     level: state.profile?.level ?? null,
     sessionCount: state.sessions.length,
     hasClub: clubs.length > 0,
     followingCount,
   });
+  const aiSuggestions = suggestAiChallenges(state);
 
   return (
     <AppShell title="Social" subtitle="Para você · clube · desafios">
@@ -285,6 +289,24 @@ function SocialHubPage() {
           ) : null}
 
           <WearableProvidersPanel />
+
+          {aiSuggestions.length ? (
+            <section className="space-y-3">
+              <p className="eyebrow px-1">Desafios personalizados (IA)</p>
+              {aiSuggestions.map(({ challenge: c, why }) => (
+                <div key={c.id} className="space-y-1">
+                  <HubChallengeCard
+                    c={c}
+                    state={state}
+                    joined={joined}
+                    deviceId={deviceId}
+                    toggleChallenge={toggleChallenge}
+                  />
+                  <p className="px-1 text-[0.65rem] text-muted-foreground">{why}</p>
+                </div>
+              ))}
+            </section>
+          ) : null}
 
           {profileChallenges.length ? (
             <section className="space-y-3">

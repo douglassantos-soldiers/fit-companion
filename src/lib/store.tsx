@@ -41,6 +41,7 @@ import {
   syncLeaguePoints,
   saveSocialPrivacyRemote,
 } from "@/lib/social";
+import { socialWriteFn } from "@/lib/social-write.functions";
 import { challengeById, computePersonalTarget, isPersonalizedChallenge } from "@/data/challenges";
 import { hubById } from "@/data/hubs";
 import { joinHub as joinHubRemote, leaveHub as leaveHubRemote } from "@/lib/hubs";
@@ -293,6 +294,7 @@ interface Store {
   };
   ingestActivityLogs: (entries: ActivityLogEntry[]) => void;
   setWearableConnection: (conn: WearableConnection) => void;
+  markFollowedSomeone: () => void;
   pushChat: (role: "coach" | "user", text: string) => void;
   setTheme: (theme: Theme) => void;
   setShareProgress: (share: boolean) => void;
@@ -381,6 +383,8 @@ function withSnapshot(s: AppState): AppState {
     decisionContextByDate: s.decisionContextByDate ?? {},
     challengeBaselines: s.challengeBaselines ?? {},
     challengePersonalTargets: s.challengePersonalTargets ?? {},
+    challengeXpAwardedIds: s.challengeXpAwardedIds ?? [],
+    hasFollowedSomeone: Boolean(s.hasFollowedSomeone),
     activityLogs: s.activityLogs ?? [],
     joinedHubIds: s.joinedHubIds ?? [],
     dimensionSnapshots: [...rest, { date, scores }].sort((a, b) => (a.date < b.date ? -1 : 1)),
@@ -892,6 +896,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           next = afterXpSideEffects(prev, awarded.state, deviceId.current, {
             fromSession: session,
           });
+          // XP once per completed challenge (§35 / gamificação)
+          const awardedIds = new Set(next.challengeXpAwardedIds ?? []);
+          for (const cid of next.challenges ?? []) {
+            if (awardedIds.has(cid)) continue;
+            const challenge = challengeById(cid);
+            if (!challenge) continue;
+            const progressOpts: import("@/lib/social").ChallengeProgressOpts = {
+              activityLogs: next.activityLogs,
+            };
+            if (next.challengeBaselines?.[cid] != null)
+              progressOpts.baseline = next.challengeBaselines[cid];
+            if (next.challengePersonalTargets?.[cid] != null) {
+              progressOpts.personalTarget = next.challengePersonalTargets[cid];
+            }
+            const progress = challengeProgress(challenge, next.sessions, progressOpts);
+            if (!progress.complete) continue;
+            const chXp = applyXpAward(next, XP.challenge);
+            next = chXp.state;
+            awardedIds.add(cid);
+            next = { ...next, challengeXpAwardedIds: [...awardedIds] };
+            if (deviceId.current) {
+              emitAppEvent(
+                deviceId.current,
+                "challenge_completed",
+                { challengeId: cid },
+                { entityType: "challenge", entityId: cid },
+              );
+            }
+          }
           const granted = grantPendingAchievements(next);
           next = granted.state;
           if (
@@ -1265,6 +1298,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             activeTrainingPlanWeekKey: null,
           });
         });
+        if (deviceId.current) {
+          void socialWriteFn({
+            data: { op: "enrollProgram", deviceId: deviceId.current, programId },
+          }).catch((err) => console.warn("enrollProgram sync failed", err));
+        }
         return true;
       },
       leaveTrainingBlock: () =>
@@ -1676,6 +1714,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((s) => {
           const rest = (s.wearableConnections ?? []).filter((c) => c.provider !== conn.provider);
           return { ...s, wearableConnections: [...rest, conn] };
+        }),
+      markFollowedSomeone: () =>
+        update((s) => {
+          if (s.hasFollowedSomeone) return s;
+          const next = { ...s, hasFollowedSomeone: true };
+          const granted = grantPendingAchievements(next);
+          return granted.state;
         }),
       toggleHub: (hubId) => {
         const current = stateRef.current;

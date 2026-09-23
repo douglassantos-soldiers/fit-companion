@@ -5,7 +5,8 @@ export type AchievementId =
   | "streak-30"
   | "workouts-100"
   | "volume-100k"
-  | "first-challenge";
+  | "first-challenge"
+  | "first-friend";
 
 export interface AchievementDef {
   id: AchievementId;
@@ -14,6 +15,7 @@ export interface AchievementDef {
   emoji: string;
 }
 
+/** Plano §38 — conquistas alinhadas a comportamentos reais de treino/social. */
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "first-workout",
@@ -56,6 +58,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: "Primeiro desafio",
     description: "Entre no seu primeiro desafio.",
     emoji: "🎯",
+  },
+  {
+    id: "first-friend",
+    title: "Primeiro amigo",
+    description: "Siga alguém na comunidade Soldiers.",
+    emoji: "🤝",
   },
 ];
 

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmOverlay } from "@/components/confirm-overlay";
 import { blockUser, followUser, muteUser, unfollowUser, unmuteUser } from "@/lib/social";
+import { useStore } from "@/lib/store";
 
 export function FollowActions({
   deviceId,
@@ -23,6 +24,7 @@ export function FollowActions({
   blocked?: boolean;
   onChanged?: () => void;
 }) {
+  const { markFollowedSomeone } = useStore();
   const [blockOpen, setBlockOpen] = useState(false);
   if (isSelf) return null;
   return (
@@ -36,6 +38,7 @@ export function FollowActions({
             : followUser(deviceId, targetUserId, displayName);
           void op
             .then(() => {
+              if (!viewerFollows) markFollowedSomeone();
               toast.success(viewerFollows ? "Deixou de seguir" : "Seguindo");
               onChanged?.();
             })

@@ -15,6 +15,8 @@ export type ProgressionReasonCode =
   | "LAST_SESSION"
   | "RPE_EASY_BUMP"
   | "RPE_HARD_HOLD"
+  | "RIR_EASY_BUMP"
+  | "RIR_HARD_HOLD"
   | "HARD_STREAK_DELOAD"
   | "PARTIAL_FAILURE"
   | "PLATEAU_HOLD"
@@ -28,6 +30,7 @@ export interface ProgressionEvidence {
   lastLoad?: number;
   lastReps?: number;
   lastRpe?: SessionRpe;
+  lastAvgRir?: number;
   estimated1rm?: number;
   plateau?: boolean;
 }
@@ -111,6 +114,8 @@ export const PROGRESSION_CODE_LABEL: Record<ProgressionReasonCode, string> = {
   LAST_SESSION: "Mantém carga da última sessão",
   RPE_EASY_BUMP: "RPE fácil: +2,5 kg",
   RPE_HARD_HOLD: "RPE difícil: mantém carga",
+  RIR_EASY_BUMP: "RIR ≥2 no topo da faixa: +2,5 kg",
+  RIR_HARD_HOLD: "RIR 0–1: mantém carga",
   HARD_STREAK_DELOAD: "2 sessões difíceis: carga −10%",
   PARTIAL_FAILURE: "Falha parcial: mantém carga, reduz volume",
   PLATEAU_HOLD: "Plateau: mantém carga",
@@ -151,8 +156,14 @@ export function decideProgression(input: ProgressionInput): ProgressionDecision 
     const lastLoad = lastHit.maxWeightKg;
     const avgReps = lastHit.avgReps || parseRepTarget(input.baseReps);
     const rpe = lastHit.rpe;
+    const avgRir = lastHit.avgRir;
     const hardStreak =
       hits.length >= 2 && hits.slice(0, 2).every((h) => h.rpe === "dificil");
+    const topOfRepRange = avgReps >= minReps;
+    const rirEasy = avgRir != null && avgRir >= 2;
+    const rirHard = avgRir != null && avgRir <= 1;
+
+    if (avgRir != null) evidence.lastAvgRir = avgRir;
 
     if (unit === "kg" && lastLoad > 0) {
       load = lastLoad;
@@ -170,6 +181,11 @@ export function decideProgression(input: ProgressionInput): ProgressionDecision 
         const nextMin = Math.max(minReps - 1, parseRepTarget(input.baseReps) - 1);
         reps = formatReps(nextMin, input.goal);
         codes.push("PARTIAL_FAILURE");
+      } else if (avgRir != null && topOfRepRange && rirEasy) {
+        load = roundLoad(lastLoad + 2.5);
+        codes.push("RIR_EASY_BUMP");
+      } else if (avgRir != null && rirHard) {
+        codes.push("RIR_HARD_HOLD");
       } else if (avgReps >= minReps && (rpe === "facil" || rpe === "ok" || !rpe)) {
         load = roundLoad(lastLoad + 2.5);
         codes.push(rpe === "facil" ? "RPE_EASY_BUMP" : "PROGRESSION_READY");

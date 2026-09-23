@@ -75,6 +75,8 @@ export interface NutritionProfile {
   countWheyInMacros?: boolean;
 }
 
+export type BiologicalSex = "masculino" | "feminino" | "outro" | "prefiro_nao";
+
 export interface Profile {
   name: string;
   goal: Goal;
@@ -83,6 +85,8 @@ export interface Profile {
   age: number;
   heightCm: number;
   weightKg: number;
+  /** Optional demographic for nutrition/BMR estimates — never required. */
+  sex?: BiologicalSex;
   equipment: Equipment;
   restrictions: string[];
   createdAt: string;
@@ -609,6 +613,10 @@ export interface AppState {
   livingPlanFeedback: Record<string, LivingPlanFeedback>;
   /** Local mirror of challenge_invites sent (Fase 16 gen-convide-3). */
   challengeInvitesSent: number;
+  /** Challenge ids that already awarded XP.challenge (idempotent). */
+  challengeXpAwardedIds: string[];
+  /** True after the user successfully follows someone (achievement first-friend). */
+  hasFollowedSomeone: boolean;
   /** Last Coach overlay dismiss (ISO). Cap 1/day. */
   coachNudgeDismissedAt: string | null;
   /** Last Coach overlay shown (ISO). Cap 1/day. */
@@ -696,6 +704,8 @@ export const emptyState: AppState = {
   exercisePreferences: {},
   livingPlanFeedback: {},
   challengeInvitesSent: 0,
+  challengeXpAwardedIds: [],
+  hasFollowedSomeone: false,
   coachNudgeDismissedAt: null,
   coachNudgeShownAt: null,
 };
@@ -713,6 +723,13 @@ export const LEVEL_LABEL: Record<Level, string> = {
   iniciante: "Iniciante",
   intermediario: "Intermediário",
   avancado: "Avançado",
+};
+
+export const SEX_LABEL: Record<BiologicalSex, string> = {
+  masculino: "Masculino",
+  feminino: "Feminino",
+  outro: "Outro",
+  prefiro_nao: "Prefiro não informar",
 };
 
 export const FOCUS_MUSCLE_LABEL: Record<FocusMuscle, string> = {

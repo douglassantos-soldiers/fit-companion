@@ -104,7 +104,8 @@ export type SocialWriteOp =
       targetId: string;
       reason: string;
     }
-  | { op: "savePrivacy"; deviceId: string; privacy: Record<string, string> };
+  | { op: "savePrivacy"; deviceId: string; privacy: Record<string, string> }
+  | { op: "enrollProgram"; deviceId: string; programId: string };
 
 function clubCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -882,6 +883,24 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     case "savePrivacy": {
       const { savePrivacyServer } = await import("@/lib/social/graph.server");
       return savePrivacyServer(op.deviceId, normalizeSocialPrivacy(op.privacy));
+    }
+    case "enrollProgram": {
+      const identity = await assertDevice(op.deviceId);
+      const programId = String(op.programId ?? "").trim();
+      if (!programId) throw new Error("programId obrigatório");
+      const { error } = await db.from("content_progress").upsert(
+        {
+          user_id: identity.userId,
+          content_id: programId,
+          completion_percent: 0,
+          saved: true,
+          dismissed: false,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,content_id" },
+      );
+      if (error) throw error;
+      return { ok: true, programId };
     }
     default:
       throw new Error("op inválida");

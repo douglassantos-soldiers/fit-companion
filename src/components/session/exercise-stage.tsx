@@ -37,6 +37,7 @@ export function ExerciseStage({
   onCompleteSet,
   onSkipSet,
   onAddSet,
+  onRepeatLastSet,
   onSwap,
   onBusyMachine,
   onPrevExercise,
@@ -60,6 +61,8 @@ export function ExerciseStage({
   onCompleteSet: () => void;
   onSkipSet?: () => void;
   onAddSet?: () => void;
+  /** Copy carga/reps/RIR from the previous completed set in this exercise. */
+  onRepeatLastSet?: () => void;
   onSwap: () => void;
   onBusyMachine?: () => void;
   onPrevExercise: () => void;
@@ -340,6 +343,11 @@ export function ExerciseStage({
           {setLog.done ? "Série concluída" : setLog.type === "warmup" ? "Concluir aquecimento" : "Concluir série"}
         </ShinyButton>
         <div className="flex gap-2">
+          {onRepeatLastSet ? (
+            <Button type="button" variant="outline" className="h-10 flex-1" onClick={onRepeatLastSet} disabled={setLog.done}>
+              <RefreshCw className="size-3.5" /> Repetir última
+            </Button>
+          ) : null}
           {onSkipSet ? (
             <Button type="button" variant="outline" className="h-10 flex-1" onClick={onSkipSet} disabled={setLog.done}>
               <SkipForward className="size-3.5" /> Pular

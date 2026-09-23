@@ -6,6 +6,7 @@
 export const CANONICAL_EVENT_TYPES = [
   "workout_started",
   "workout_completed",
+  "set_completed",
   "workout_skipped",
   "workout_modified",
   "meal_logged",

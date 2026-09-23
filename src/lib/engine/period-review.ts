@@ -1,15 +1,20 @@
 import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
 import type { CoachContext } from "@/lib/coach/types";
+import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
+import { buildCustomer360FromState } from "@/lib/customer360";
 import { exerciseById } from "@/data/exercises";
 import { sessionsInLastDays, streak, weekOverWeek } from "@/lib/engine/dimensions";
 import { trainingAdherence7d } from "@/lib/engine/behavior/adherence";
+import { consecutiveHardRpeStreak } from "@/lib/engine/recovery";
+import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
+import { computeLearningInsights } from "@/lib/engine/learning";
 import { isoWeekDateKeys } from "@/lib/engine/xp";
 import { hitsForExercise, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { best1RM } from "@/lib/training/one-rm";
 import { currentPersonalRecords, detectExercisePrs } from "@/lib/training/prs";
 import { computeStrengthScore } from "@/lib/training/strength-score";
 import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
-import { todayKey, type AppState, type SessionLog } from "@/lib/types";
+import { GOAL_LABEL, LEVEL_LABEL, todayKey, type AppState, type SessionLog } from "@/lib/types";
 
 export type PeriodKind = "week" | "month";
 
@@ -122,7 +127,8 @@ function nextWeekPlan(state: AppState, now: Date): NextBlockPreview | null {
   };
 }
 
-function stubCoachContext(state: AppState): CoachContext {
+/** Full coach context for period review — replaces the former stub. */
+function buildPeriodCoachContext(state: AppState): CoachContext {
   const date = todayKey();
   const p = state.profile;
   const sessions7d = sessionsInLastDays(state.sessions, 7).length;
@@ -137,28 +143,50 @@ function stubCoachContext(state: AppState): CoachContext {
     .sort((a, b) => b.estimated1rm - a.estimated1rm)
     .slice(0, 5);
 
+  const decision =
+    state.decisionContextByDate?.[date] ??
+    (p ? assembleDecisionContext(state, { date, source: "offline_legacy" }) : null);
+  const living = decision?.livingPlan ?? state.livingPlans?.[date] ?? null;
+  const checkIn = state.dayCheckIns?.[date];
+  const insights = p ? computeLearningInsights(state) : null;
+  const goals = p ? nutritionGoals(p, insights) : null;
+  const totals = dayNutritionTotals(state.meals ?? [], date);
+  const c360 = buildCustomer360FromState(
+    state,
+    state.userId != null ? { userId: state.userId, date } : { date },
+  );
+  const hardStreak = consecutiveHardRpeStreak(state.sessions);
+  const safety = decision?.safety;
+
   return {
     userId: state.userId ?? "local",
     date,
     profile: p
       ? {
           name: p.name,
-          goal: p.goal,
-          level: p.level,
+          goal: GOAL_LABEL[p.goal],
+          level: LEVEL_LABEL[p.level],
           weightKg: p.weightKg,
           daysPerWeek: p.daysPerWeek,
           equipment: p.equipment,
           restrictions: p.restrictions,
+          ...(p.primaryBlocker ? { primaryBlocker: p.primaryBlocker } : {}),
         }
       : null,
-    goals: null,
+    goals: goals
+      ? {
+          proteinG: goals.proteinG,
+          kcal: goals.kcal,
+          waterMl: goals.waterMl,
+        }
+      : null,
     training: {
       streak: streak(state.sessions, { freezeUsedDates: state.freezeUsedDates }),
       sessions7d,
       sessions28d: sessionsInLastDays(state.sessions, 28).length,
-      todayMode: null,
-      todayTitle: null,
-      volumeFactor: null,
+      todayMode: living?.workout.mode ?? null,
+      todayTitle: living?.workout.title ?? null,
+      volumeFactor: living?.workout.volumeFactor ?? null,
       lastSessionDate: state.sessions[0]?.date.slice(0, 10) ?? null,
       lastSessionRpe: state.sessions[0]?.rpe ?? null,
     },
@@ -167,19 +195,19 @@ function stubCoachContext(state: AppState): CoachContext {
       top1rm,
     },
     recovery: {
-      level: null,
-      score: null,
-      sleepHours: state.dayCheckIns?.[date]?.sleepHours ?? null,
-      energy: state.dayCheckIns?.[date]?.energy ?? null,
-      hardRpeStreak: 0,
+      level: c360.recovery.level ?? (living?.traffic.recovery === "green" ? "recovered" : living?.traffic.recovery === "red" ? "low" : "moderate"),
+      score: c360.recovery.recoveryScore,
+      sleepHours: checkIn?.sleepHours ?? null,
+      energy: checkIn?.energy ?? null,
+      hardRpeStreak: hardStreak,
     },
     nutrition: {
-      proteinG: 0,
-      carbG: 0,
-      fatG: 0,
-      kcal: 0,
-      mealsLogged: (state.meals ?? []).filter((m) => m.date.slice(0, 10) === date).length,
-      proteinTarget: null,
+      proteinG: totals.proteinG,
+      carbG: totals.carbG ?? 0,
+      fatG: totals.fatG ?? 0,
+      kcal: totals.kcal,
+      mealsLogged: totals.count,
+      proteinTarget: goals?.proteinG ?? null,
       loggingConfidence: null,
     },
     supplements: { routineIds: state.supplementRoutine ?? [], adherence30d: null },
@@ -191,23 +219,35 @@ function stubCoachContext(state: AppState): CoachContext {
         limit.setDate(limit.getDate() - 6);
         return d >= todayKey(limit);
       }).length,
-      coachMessages: 0,
+      coachMessages: state.chat?.length ?? 0,
     },
-    customer360: { nutritionAdherence: null, recoveryScore: null, performanceScore: null },
-    todayDecisions: [],
+    customer360: {
+      nutritionAdherence: c360.nutrition.proteinAdherence7d,
+      recoveryScore: c360.recovery.recoveryScore,
+      performanceScore: c360.performance.sessions28d,
+    },
+    todayDecisions:
+      decision?.decisions.decisions.map((d) => ({
+        type: d.decisionType,
+        value: String(d.decisionValue),
+        reasonCodes: d.reasonCodes,
+        confidence: d.confidence,
+        explanation: d.explanation,
+        source: "server_snapshot" as const,
+      })) ?? [],
     recentDecisions: [],
     userPatterns: [],
     safety: {
-      escalateCare: false,
-      blockStims: false,
-      preferLightTraining: false,
-      flags: [],
-      reasons: [],
+      escalateCare: Boolean(safety?.escalateCare),
+      blockStims: Boolean(safety?.blockStims),
+      preferLightTraining: Boolean(safety?.preferLightTraining),
+      flags: safety?.flags ?? [],
+      reasons: safety?.reasons ?? [],
     },
     memory: [],
-    livingSummary: "",
-    why: [],
-    reasonCodes: [],
+    livingSummary: living?.narrative ?? "",
+    why: living?.why ?? [],
+    reasonCodes: living?.whyByChange?.map((w) => w.key) ?? [],
   };
 }
 
@@ -227,7 +267,7 @@ export function periodReview(state: AppState, kind: PeriodKind, now = new Date()
       : consistencyPct;
   const wow = weekOverWeek(state.sessions);
   const volumeDeltaPct = kind === "week" ? wow.volumeDeltaPct : null;
-  const coach = weeklyReviewWorkflow(stubCoachContext(state));
+  const coach = weeklyReviewWorkflow(buildPeriodCoachContext(state));
   const best = bestEvolution(state.sessions, range.start, range.end);
   const strength = computeStrengthScore(state.sessions, state.profile, now);
   const sundayRitual = kind === "week" && isSunday(now);

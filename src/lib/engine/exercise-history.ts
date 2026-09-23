@@ -12,6 +12,8 @@ export interface ExerciseHit {
   setsTotal: number;
   allDone: boolean;
   rpe?: SessionRpe;
+  /** Mean RIR on completed working sets when logged. */
+  avgRir?: number;
 }
 
 export type ExerciseTrend = "up" | "flat" | "down" | "unknown";
@@ -47,6 +49,13 @@ export function hitsForExercise(exerciseId: string, sessions: SessionLog[]): Exe
         : 0;
     const volumeKg = doneSets.reduce((sum, s) => sum + s.reps * (s.weightKg || 0), 0);
     const derivedRpe = session.rpe ?? sessionRpeFromSets(log.sets);
+    const rirSets = doneSets.filter((s) => typeof s.rir === "number");
+    const avgRir =
+      rirSets.length > 0
+        ? Math.round(
+            (rirSets.reduce((sum, s) => sum + (s.rir ?? 0), 0) / rirSets.length) * 10,
+          ) / 10
+        : undefined;
     hits.push({
       sessionId: session.id,
       date: session.date,
@@ -57,6 +66,7 @@ export function hitsForExercise(exerciseId: string, sessions: SessionLog[]): Exe
       setsTotal: pool.length,
       allDone: pool.length > 0 && pool.every((s) => s.done || s.skipped),
       ...(derivedRpe ? { rpe: derivedRpe } : {}),
+      ...(avgRir != null ? { avgRir } : {}),
     });
   }
   return hits;

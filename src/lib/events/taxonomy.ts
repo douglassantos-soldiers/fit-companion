@@ -7,6 +7,7 @@ export const EVENT_TAXONOMY = {
   SESSION_STARTED: "session_started",
   PROFILE_UPDATED: "profile_updated",
   DAY_CHECKIN_COMPLETED: "day_checkin_completed",
+  SET_COMPLETED: "set_completed",
   WORKOUT_STARTED: "workout_started",
   WORKOUT_COMPLETED: "workout_completed",
   WORKOUT_RPE_LOGGED: "workout_rpe_logged",
