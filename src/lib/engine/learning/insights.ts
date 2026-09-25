@@ -91,7 +91,7 @@ export function computeLearningInsights(
   const supplementAdherence30d = monthAdh.pct / 100;
 
   const reasons: string[] = [];
-  let kcalDelta = 0;
+  const kcalDelta = 0;
   let proteinBias: "up" | "hold" = "hold";
   let preferGreenMeals = false;
   let weekHint: LearningAdaptations["weekHint"] = null;

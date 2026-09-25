@@ -30,6 +30,7 @@ import type {
 import { plateauExerciseIds, listExercisesWithHistory } from "@/lib/engine/exercise-history";
 import { computeMuscleLoad } from "@/lib/training/muscle-load";
 import { detectTravelFromNotes, type ReasonCode } from "@/lib/engine/reason-codes";
+import { SLEEP_GOOD_HOURS, SLEEP_LOW_HOURS } from "@/lib/engine/decision-thresholds";
 import { computeWeeklyKcalAdaptation } from "@/lib/engine/nutrition/weekly-kcal-adapt";
 import { recentDayCheckIns } from "@/lib/sync/day-checkin";
 import { resolvedAvailableMin } from "@/lib/engine/session-time";
@@ -71,11 +72,16 @@ export type ContextSnapshot = {
     checkInConfidence?: number;
     wearableConfidence?: number;
     sourceSummary?: RecoverySourceSummary;
+    /** Wearable vitals folded from RecoverySnapshot — not part of decision fingerprint. */
+    wearable?: {
+      restingHr: number | null;
+      hrv: number | null;
+    };
   };
   sleep: {
     hours: number | null;
     avg7d: number | null;
-    source: "checkin" | "profile" | "unknown";
+    source: "checkin" | "profile" | "wearable" | "unknown";
   };
   energy: DayEnergy | null;
   adherence: {
@@ -148,6 +154,9 @@ export function buildContextSnapshot(
   if (recoverySnap.sourceSummary.sleep === "checkin" && recoverySnap.sleep != null) {
     sleepHours = recoverySnap.sleep;
     sleepSource = "checkin";
+  } else if (recoverySnap.sourceSummary.sleep === "wearable" && recoverySnap.sleep != null) {
+    sleepHours = recoverySnap.sleep;
+    sleepSource = "wearable";
   } else if (checkIn?.sleepHours != null) {
     sleepHours = checkIn.sleepHours;
     sleepSource = "checkin";
@@ -199,9 +208,9 @@ export function buildContextSnapshot(
   const adhereScore = adherenceScore(dims);
   const reasonSeeds: ReasonCode[] = [];
 
-  if (sleepSource === "checkin" && sleepHours != null && sleepHours < 6)
+  if (sleepSource === "checkin" && sleepHours != null && sleepHours < SLEEP_LOW_HOURS)
     reasonSeeds.push("sleep_low");
-  else if (sleepSource === "checkin" && sleepHours != null && sleepHours >= 7)
+  else if (sleepSource === "checkin" && sleepHours != null && sleepHours >= SLEEP_GOOD_HOURS)
     reasonSeeds.push("sleep_good");
 
   if (checkIn?.energy === "baixa") reasonSeeds.push("energy_low");
@@ -309,6 +318,10 @@ export function buildContextSnapshot(
     checkInConfidence: recoverySnap.checkInConfidence,
     wearableConfidence: recoverySnap.wearableConfidence,
     sourceSummary: recoverySnap.sourceSummary,
+    wearable: {
+      restingHr: recoverySnap.wearable?.restingHr ?? null,
+      hrv: recoverySnap.wearable?.hrv ?? null,
+    },
   };
 
   return {

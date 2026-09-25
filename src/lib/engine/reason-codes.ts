@@ -1,7 +1,11 @@
 /**
  * Structured reason codes for Context + Decision Engine (FASE 4).
  * Engines emit codes; explainWhy renders Portuguese copy — AI does not invent rules.
+ * SoT remains snake_case; SCREAMING aliases are for Coach / Why UI only.
  */
+
+/** Bump when adding/removing codes or changing alias map semantics. */
+export const REASON_CODES_VERSION = 2;
 
 export const REASON_CODES = [
   "sleep_low",
@@ -194,30 +198,83 @@ export const REASON_CODE_META: Record<
   },
 };
 
-/** SCREAMING aliases for docs / Coach (SoT remains snake_case). */
+/** SCREAMING aliases for docs / Coach / Why panel (SoT remains snake_case). */
 export const REASON_CODE_ALIASES: Record<string, ReasonCode> = {
   LOW_SLEEP: "sleep_low",
+  HIGH_SLEEP: "sleep_good",
+  HIGH_RECOVERY: "sleep_good",
+  RECOVERY_IMPROVED: "low_muscle_fatigue",
+  HIGH_FATIGUE: "energy_low",
+  ENERGY_LOW: "energy_low",
+  ENERGY_HIGH: "energy_high",
   HIGH_RPE_STREAK: "rpe_high",
   LOW_RECOVERY: "recovery_low",
+  HIGH_RECOVERY_LOAD: "recovery_low",
+  HIGH_TRAINING_LOAD: "excessive_muscle_load",
+  LIMITED_TIME: "time_limited",
   SHORT_AVAILABLE_TIME: "time_limited",
   NO_EQUIPMENT: "equipment_limited",
+  TRAINING_PROGRESS: "progression_ready",
   PROGRESSION_READY: "progression_ready",
+  PLATEAU: "plateau_detected",
   PLATEAU_DETECTED: "plateau_detected",
+  NUTRITION_ADHERENCE: "protein_low",
   LOW_NUTRITION_ADHERENCE: "nutrition_adherence_low",
+  LOW_ADHERENCE: "adherence_drop",
+  ADHERENCE_DROP: "adherence_drop",
   WEEKEND_ADHERENCE_PATTERN: "weekend_adherence_pattern",
   EXPRESS_HIGH_ADHERENCE: "express_high_adherence",
+  REST_DAY: "deload_week",
+  DELOAD_WEEK: "deload_week",
   MUSCLE_FATIGUE: "excessive_muscle_load",
   MUSCLE_UNDERTRAINED: "undertrained_muscle",
+  TRAVEL: "travel",
+  PAIN_SIGNAL: "pain_signal",
+  ESCALATE_CARE: "escalate_care",
+  STIM_RESTRICTION: "stim_restriction",
 };
 
 export function isReasonCode(raw: string): raw is ReasonCode {
   return (REASON_CODES as readonly string[]).includes(raw);
 }
 
+/** Prefer snake SoT; resolve SCREAMING alias when needed. */
+export function canonicalReasonCode(raw: string): ReasonCode {
+  if (isReasonCode(raw)) return raw;
+  const aliased = REASON_CODE_ALIASES[raw] ?? REASON_CODE_ALIASES[raw.toUpperCase()];
+  if (aliased) return aliased;
+  return raw as ReasonCode;
+}
+
+/** Map snake → preferred SCREAMING alias for explain UI. */
+export function toReasonAlias(code: ReasonCode): string {
+  const preferred: Partial<Record<ReasonCode, string>> = {
+    sleep_low: "LOW_SLEEP",
+    sleep_good: "HIGH_SLEEP",
+    energy_low: "HIGH_FATIGUE",
+    energy_high: "ENERGY_HIGH",
+    rpe_high: "HIGH_RPE_STREAK",
+    recovery_low: "LOW_RECOVERY",
+    time_limited: "LIMITED_TIME",
+    equipment_limited: "NO_EQUIPMENT",
+    progression_ready: "TRAINING_PROGRESS",
+    plateau_detected: "PLATEAU",
+    protein_low: "NUTRITION_ADHERENCE",
+    nutrition_adherence_low: "LOW_NUTRITION_ADHERENCE",
+    adherence_drop: "LOW_ADHERENCE",
+    excessive_muscle_load: "HIGH_TRAINING_LOAD",
+    low_muscle_fatigue: "RECOVERY_IMPROVED",
+    deload_week: "REST_DAY",
+    travel: "TRAVEL",
+    pain_signal: "PAIN_SIGNAL",
+    escalate_care: "ESCALATE_CARE",
+    stim_restriction: "STIM_RESTRICTION",
+  };
+  return preferred[code] ?? code.toUpperCase();
+}
+
 /** Map Safety Engine flags → reason codes. */
-export function reasonCodesFromSafetyFlags(
-  flags: Array<string>,
-): ReasonCode[] {
+export function reasonCodesFromSafetyFlags(flags: Array<string>): ReasonCode[] {
   const out: ReasonCode[] = [];
   for (const f of flags) {
     if (f === "low_sleep") out.push("sleep_low");

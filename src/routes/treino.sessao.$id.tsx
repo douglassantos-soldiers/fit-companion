@@ -21,11 +21,7 @@ import { alternativesFor, exerciseById } from "@/data/exercises";
 import { matchesInventory } from "@/lib/training/inventory";
 import { isQuestComplete, questById } from "@/data/daily-quests";
 import { performanceDimensions, performanceScore, streak } from "@/lib/engine/dimensions";
-import {
-  buildExpressSession,
-  sessionVolume,
-  type PlannedExercise,
-} from "@/lib/engine/plan";
+import { buildExpressSession, sessionVolume, type PlannedExercise } from "@/lib/engine/plan";
 import { learningWeekHint } from "@/lib/engine/learning";
 import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
 import {
@@ -39,7 +35,12 @@ import {
   suggestLoadDrop,
   type LoadDropSuggestion,
 } from "@/lib/training/intra-session";
-import { logsFromPlanned, setsFromPlanned, propagateSetToFollowing, nextWorkingSetFromLast } from "@/lib/training/session-logs";
+import {
+  logsFromPlanned,
+  setsFromPlanned,
+  propagateSetToFollowing,
+  nextWorkingSetFromLast,
+} from "@/lib/training/session-logs";
 import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { scalePlannedDayVolume } from "@/lib/training/training-block";
 import { parseRepTarget } from "@/lib/training/effort";
@@ -129,12 +130,11 @@ function SessionPage() {
   const expressLock = useRef<boolean | null>(null);
   if (expressLock.current == null && state.profile) {
     const todaySession = isTodayPlannedDay(id, decisionCtx);
-    const accepted = state.dayCheckIns?.[todayKey()]?.acceptedTrainingMode;
+    // Mode SoT = Decision snapshot (acceptedTrainingMode enters via check-in → reassemble)
     expressLock.current = todaySession
       ? todaySessionShouldBeExpress({
           snapshot: decisionCtx,
           isTodaySession: true,
-          ...(accepted ? { acceptedTrainingMode: accepted } : {}),
         })
       : searchExpress === true;
   }

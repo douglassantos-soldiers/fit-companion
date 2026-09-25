@@ -21,6 +21,8 @@ import {
   type OutcomeQuality,
   type OutcomeWindow,
 } from "@/lib/engine/attribution";
+import { isLearningSignal } from "@/lib/engine/learning/signals";
+import type { LearningSignal } from "@/lib/engine/learning/types";
 import { logEngineDecision, logEngineError } from "@/lib/engine/observability";
 import type { OutcomeMetrics } from "@/lib/engine/outcome-learning";
 
@@ -419,7 +421,10 @@ export async function explainDecisionAttribution(
         (outcome?.attribution_type as AttributionExplanation["attributionType"]) ?? null,
       attributionConfidence:
         outcome?.attribution_confidence != null ? Number(outcome.attribution_confidence) : null,
-      learningSignal: outcome?.learning_signal ?? null,
+      learningSignal: ((): LearningSignal | null => {
+        const raw = outcome?.learning_signal;
+        return typeof raw === "string" && isLearningSignal(raw) ? raw : null;
+      })(),
       outcomeQuality: (outcome?.outcome_quality as OutcomeQuality | undefined) ?? "unknown",
     });
   } catch (e) {

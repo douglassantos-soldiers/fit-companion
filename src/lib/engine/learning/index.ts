@@ -29,7 +29,7 @@ export {
 } from "@/lib/engine/learning/adapters";
 export type {
   LearningDomain,
-  LearningOutcome,
+  LearningResultKind,
   LearningEvidence,
   LearningPattern,
   InterventionResponse,
@@ -39,6 +39,43 @@ export type {
   LearningSnapshot,
 } from "@/lib/engine/learning/types";
 export { LEARNING_SIGNALS } from "@/lib/engine/learning/types";
+export { LEARNING_ENGINE_VERSION, LEARNING_CONTRACT_VERSION } from "@/lib/engine/learning/version";
+export {
+  toLearningDecisionRef,
+  type LearningDecisionRef,
+} from "@/lib/engine/learning/decision-ref";
+export {
+  fromAiOutcome,
+  toAiOutcome,
+  normalizeAdherence,
+  isPartialAdherence,
+  type LearningOutcome,
+  type LearningOutcomeResult,
+  type LearningOutcomeQuality,
+  type AiOutcomeLike,
+} from "@/lib/engine/learning/outcome";
+export {
+  buildLearningEvent,
+  buildLearningEventId,
+  type LearningEvent,
+  type LearningEventKind,
+  type LearningEventDomain,
+  type EngineLearningEvent,
+} from "@/lib/engine/learning/events";
+export {
+  buildLearningSignalRecord,
+  buildSignalNarrative,
+  resolveSignalKey,
+  isLearningSignal,
+  type LearningSignalRecord,
+} from "@/lib/engine/learning/signals";
+export {
+  runLearningCycle,
+  type RunLearningCycleInput,
+  type RunLearningCycleResult,
+  type LearningCycleStatus,
+  type LearningRecoveryContext,
+} from "@/lib/engine/learning/run-learning";
 export {
   extractUserPatterns,
   patternInsights,

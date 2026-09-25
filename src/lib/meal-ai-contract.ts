@@ -11,6 +11,8 @@ export type MealAiMode = "photo" | "voice" | "text";
 export interface MealAiInput {
   mode: MealAiMode;
   slot: MealSlot;
+  /** Device canal — required for resolveTrustedIdentity (never trust client userId). */
+  deviceId: string;
   /** Base64 without data-URL prefix for photo/voice */
   mediaBase64?: string;
   mimeType?: string;
@@ -46,7 +48,8 @@ export interface MealAiSuggestion {
   needsConfirmation?: boolean;
 }
 
-export type MealAiError = "unauthorized" | "rate_limited" | "not_configured" | "upstream" | "invalid";
+export type MealAiError =
+  "unauthorized" | "rate_limited" | "not_configured" | "upstream" | "invalid";
 
 const SLOTS: MealSlot[] = ["cafe", "almoco", "lanche", "jantar"];
 const QUALITIES: MealQuality[] = ["verde", "amarelo", "laranja"];
@@ -59,11 +62,17 @@ export function parseMealAiInput(input: unknown): MealAiInput {
   if (!value.slot || !SLOTS.includes(value.slot)) {
     throw new Error("Slot inválido");
   }
+  const deviceId = String(value.deviceId ?? "").trim();
+  if (!deviceId || deviceId.length < 8) {
+    throw new Error("deviceId inválido");
+  }
 
   if (value.mode === "text") {
-    const text = String(value.text ?? "").trim().slice(0, MAX_TEXT);
+    const text = String(value.text ?? "")
+      .trim()
+      .slice(0, MAX_TEXT);
     if (!text) throw new Error("Texto ausente");
-    return { mode: "text", slot: value.slot, text };
+    return { mode: "text", slot: value.slot, deviceId, text };
   }
 
   const mediaBase64 = String(value.mediaBase64 ?? "").replace(/^data:[^;]+;base64,/, "");
@@ -78,6 +87,7 @@ export function parseMealAiInput(input: unknown): MealAiInput {
   return {
     mode: value.mode,
     slot: value.slot,
+    deviceId,
     mediaBase64,
     mimeType,
     ...(value.text ? { text: String(value.text).slice(0, MAX_TEXT) } : {}),
@@ -87,7 +97,9 @@ export function parseMealAiInput(input: unknown): MealAiInput {
 function parseCandidate(raw: unknown): MealAiCandidate | null {
   if (!raw || typeof raw !== "object") return null;
   const c = raw as Record<string, unknown>;
-  const name = String(c["name"] ?? "").trim().slice(0, 120);
+  const name = String(c["name"] ?? "")
+    .trim()
+    .slice(0, 120);
   if (!name) return null;
   const out: MealAiCandidate = {
     name,
@@ -109,15 +121,23 @@ export function parseMealAiSuggestion(raw: unknown): MealAiSuggestion {
   const value = (typeof raw === "string" ? safeJson(raw) : raw) as Partial<MealAiSuggestion> | null;
   if (!value || typeof value !== "object") throw new Error("Resposta inválida");
 
-  const label = String(value.label ?? "").trim().slice(0, 120);
+  const label = String(value.label ?? "")
+    .trim()
+    .slice(0, 120);
   const proteinG = Math.max(0, Math.min(200, Math.round(Number(value.proteinG) || 0)));
   const kcal = Math.max(0, Math.min(3000, Math.round(Number(value.kcal) || 0)));
   const carbG =
-    value.carbG != null ? Math.max(0, Math.min(500, Math.round(Number(value.carbG) || 0))) : undefined;
+    value.carbG != null
+      ? Math.max(0, Math.min(500, Math.round(Number(value.carbG) || 0)))
+      : undefined;
   const fatG =
-    value.fatG != null ? Math.max(0, Math.min(200, Math.round(Number(value.fatG) || 0))) : undefined;
+    value.fatG != null
+      ? Math.max(0, Math.min(200, Math.round(Number(value.fatG) || 0)))
+      : undefined;
   const fiberG =
-    value.fiberG != null ? Math.max(0, Math.min(100, Math.round(Number(value.fiberG) || 0))) : undefined;
+    value.fiberG != null
+      ? Math.max(0, Math.min(100, Math.round(Number(value.fiberG) || 0)))
+      : undefined;
   const quality = QUALITIES.includes(value.quality as MealQuality)
     ? (value.quality as MealQuality)
     : proteinG >= 30
@@ -132,7 +152,8 @@ export function parseMealAiSuggestion(raw: unknown): MealAiSuggestion {
     ? value.candidates.map(parseCandidate).filter((c): c is MealAiCandidate => Boolean(c))
     : [];
 
-  const ambiguous = candidates.length > 1 && candidates.some((c) => c.confidence < CONFIRM_THRESHOLD);
+  const ambiguous =
+    candidates.length > 1 && candidates.some((c) => c.confidence < CONFIRM_THRESHOLD);
   const needsConfirmation =
     value.needsConfirmation === true ||
     confidence < CONFIRM_THRESHOLD ||
@@ -240,7 +261,7 @@ export function mergeVoiceParseIntoSuggestion(
       return cand;
     });
 
-  const candidates = fromVoice.length ? fromVoice : suggestion.candidates ?? [];
+  const candidates = fromVoice.length ? fromVoice : (suggestion.candidates ?? []);
   let proteinG = suggestion.proteinG;
   let kcal = suggestion.kcal;
   let carbG = suggestion.carbG;
@@ -257,7 +278,10 @@ export function mergeVoiceParseIntoSuggestion(
     label = voice.items.map((i) => i.foodName ?? i.foodId).join(", ");
   }
 
-  const confidence = Math.min(suggestion.confidence, voice.overallConfidence || suggestion.confidence);
+  const confidence = Math.min(
+    suggestion.confidence,
+    voice.overallConfidence || suggestion.confidence,
+  );
   const needsConfirmation =
     suggestion.needsConfirmation !== false &&
     (voice.needsConfirmation || confidence < CONFIRM_THRESHOLD || candidates.length === 0);

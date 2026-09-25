@@ -45,7 +45,21 @@ export const savePushSubscription = createServerFn({ method: "POST" })
     });
   });
 
-export const sendDailyPushesFn = createServerFn({ method: "POST" }).handler(async () => {
-  const { sendDailyPushes } = await import("@/lib/push.server");
-  return sendDailyPushes();
-});
+export const sendDailyPushesFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => {
+    const secret = String((input as { cronSecret?: string } | null)?.cronSecret ?? "").trim();
+    return { cronSecret: secret };
+  })
+  .handler(async ({ data }) => {
+    const expected = (process.env["CRON_SECRET"] ?? "").trim();
+    if (!expected || data.cronSecret !== expected) {
+      try {
+        const { requireAdminSession } = await import("@/lib/access-session.server");
+        requireAdminSession();
+      } catch {
+        throw new Error("UNAUTHORIZED");
+      }
+    }
+    const { sendDailyPushes } = await import("@/lib/push.server");
+    return sendDailyPushes();
+  });

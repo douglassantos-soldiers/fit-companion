@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey, readAccessSession } from "@/lib/access-session.server";
+import { rateLimitKey } from "@/lib/access-session.server";
+import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import {
   mealAiSystemPrompt,
   mergeVoiceParseIntoSuggestion,
@@ -22,7 +23,11 @@ function enrichWithCatalog(text: string, suggestion: MealAiSuggestion): MealAiSu
   return mergeVoiceParseIntoSuggestion(suggestion, voice);
 }
 
-async function estimateFromText(text: string, slot: ReturnType<typeof parseMealAiInput>["slot"], key: string) {
+async function estimateFromText(
+  text: string,
+  slot: ReturnType<typeof parseMealAiInput>["slot"],
+  key: string,
+) {
   // Deterministic catalog parse first — high confidence can skip inventing quantities
   const voice = parseVoiceFoodText(text);
   if (voice.items.length > 0 && voice.overallConfidence >= 0.75 && !voice.needsConfirmation) {
@@ -122,7 +127,11 @@ async function estimateFromPhoto(
   return parseMealAiSuggestion(content);
 }
 
-async function transcribeVoice(base64: string, mimeType: string, key: string): Promise<string | null> {
+async function transcribeVoice(
+  base64: string,
+  mimeType: string,
+  key: string,
+): Promise<string | null> {
   const binary = Buffer.from(base64, "base64");
   const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
   const form = new FormData();
@@ -146,14 +155,18 @@ async function transcribeVoice(base64: string, mimeType: string, key: string): P
 
 /**
  * Meal AI — vision / Whisper / text → structured macros.
- * Requires access session cookie. Rate-limited per email.
+ * Requires resolveTrustedIdentity (access cookie + device bind). Rate-limited per user.
  */
 export const analyzeMealAi = createServerFn({ method: "POST" })
   .inputValidator(parseMealAiInput)
   .handler(async ({ data }): Promise<MealAiResult> => {
-    const session = readAccessSession();
-    if (!session) return { error: "unauthorized" };
-    if (!rateLimitKey(`meal-ai:${session.email}`, 40, 60 * 60_000)) {
+    const identity = await resolveTrustedIdentity({
+      deviceId: data.deviceId,
+      requireAccess: true,
+    });
+    if (!identity) return { error: "unauthorized" };
+    const rlKey = identity.email ?? identity.userId;
+    if (!rateLimitKey(`meal-ai:${rlKey}`, 40, 60 * 60_000)) {
       return { error: "rate_limited" };
     }
 

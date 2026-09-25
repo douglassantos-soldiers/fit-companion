@@ -1270,7 +1270,7 @@ export async function exportUserDataServer(deviceId: string): Promise<{
   ok: boolean;
   json: string;
 }> {
-  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: false });
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false, json: "" };
   const db = await adminDbLoose();
   if (!db) return { ok: false, json: "" };

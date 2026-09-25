@@ -73,6 +73,16 @@ export async function logRecommendationDecisions(opts: {
   engine?: string;
   snapshotVersion?: number;
   inputFingerprint?: string;
+  /** FASE 2 Decision contract rows (evidence / expires / ids) — optional enrichment */
+  decisionContracts?: Array<{
+    decision_id: string;
+    decision_type: string;
+    evidence: DecisionEvidence;
+    expires_at: string;
+    context_version: number;
+    confidence: number;
+    reason_codes: string[];
+  }>;
 }): Promise<{ ok: boolean }> {
   const t0 = Date.now();
   try {
@@ -80,6 +90,7 @@ export async function logRecommendationDecisions(opts: {
     if (!db || !opts.userId) return { ok: false };
 
     const engine = opts.engine ?? "decision_v1";
+    const contractByType = new Map((opts.decisionContracts ?? []).map((c) => [c.decision_type, c]));
 
     const { data: priorRows } = await db
       .from("recommendation_decisions")
@@ -96,7 +107,6 @@ export async function logRecommendationDecisions(opts: {
       if (!existing || (row.outcome && !existing.outcome)) {
         priorByType.set(t, row);
       }
-      // Also index by legacy snake if prior was written as canonical
       const legacyKey = t.includes("_") ? t : null;
       if (legacyKey) priorByType.set(legacyKey, row);
     }
@@ -111,16 +121,23 @@ export async function logRecommendationDecisions(opts: {
     for (const d of opts.decisions) {
       const decisionType = canonicalTypeForDecision(d);
       keepTypes.add(decisionType);
-      // Also match prior snake rows for outcome preservation
       const prior = priorByType.get(decisionType) ?? priorByType.get(d.decisionType) ?? null;
-      const evidence = buildEvidence(d, opts.snapshot);
+      const contract = contractByType.get(decisionType);
+      const evidence = contract?.evidence ?? buildEvidence(d, opts.snapshot);
 
-      const row = {
+      const row: Record<string, unknown> = {
         user_id: opts.userId,
         date: opts.date,
         engine,
         decision_type: decisionType,
-        decision_value: { value: d.decisionValue },
+        decision_value: {
+          value: d.decisionValue,
+          ...(contract?.decision_id ? { decision_id: contract.decision_id } : {}),
+          ...(contract?.expires_at ? { expires_at: contract.expires_at } : {}),
+          ...(contract?.context_version != null
+            ? { context_version: contract.context_version }
+            : {}),
+        },
         reason_codes: d.reasonCodes,
         input_snapshot: inputSnapshot,
         evidence,
@@ -288,7 +305,8 @@ export async function appendOutcomeMetrics(opts: {
     }
 
     const extras: import("@/lib/engine/attribution").AttributionExtras = { volumeReduced };
-    if (opts.metrics.workoutCompleted != null) extras.workoutCompleted = opts.metrics.workoutCompleted;
+    if (opts.metrics.workoutCompleted != null)
+      extras.workoutCompleted = opts.metrics.workoutCompleted;
     if (opts.metrics.rpe !== undefined) extras.rpe = opts.metrics.rpe ?? null;
 
     const { recordAttributedEvent } = await import("@/lib/engine/attribution.server");

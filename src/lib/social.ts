@@ -6,8 +6,15 @@ import {
   type Challenge,
 } from "@/data/challenges";
 import { sessionsInLastDays } from "@/lib/engine/dimensions";
-import { supabase } from "@/integrations/supabase/client";
 import { socialWriteFn } from "@/lib/social-write.functions";
+import {
+  fetchLeaderboardFn,
+  listMyClubsFn,
+  fetchClubLeagueFn,
+  fetchClubStoriesFn,
+  uploadCheckinImageFn,
+} from "@/lib/social-read.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { catalogById } from "@/lib/training/exercise-catalog";
 import type { ActivityLogEntry, AppState, ProofSource, ProofStatus, SessionLog } from "@/lib/types";
 
@@ -84,7 +91,11 @@ function isCardioSession(s: SessionLog) {
   return s.exercises.some((e) => CARDIO_IDS.some((id) => e.exerciseId.includes(id)));
 }
 
-function activityInWindow(logs: ActivityLogEntry[] | undefined, days: number, kind: ActivityLogEntry["kind"]) {
+function activityInWindow(
+  logs: ActivityLogEntry[] | undefined,
+  days: number,
+  kind: ActivityLogEntry["kind"],
+) {
   const limit = new Date();
   limit.setDate(limit.getDate() - days);
   return (logs ?? []).filter((l) => l.kind === kind && new Date(l.date) >= limit);
@@ -131,7 +142,10 @@ export function challengeRawValue(
   }
   if (challenge.metric === "steps") {
     return Math.round(
-      activityInWindow(activityLogs, challenge.durationDays, "steps").reduce((s, l) => s + l.value, 0),
+      activityInWindow(activityLogs, challenge.durationDays, "steps").reduce(
+        (s, l) => s + l.value,
+        0,
+      ),
     );
   }
   if (challenge.metric === "football_sessions") {
@@ -146,12 +160,18 @@ export function challengeRawValue(
       0,
     );
     // ~6 min/km rough proxy for self-reported run time
-    return Math.round(runKm * 6 + recent.filter(isCardioSession).reduce((s, x) => s + x.durationMin, 0));
+    return Math.round(
+      runKm * 6 + recent.filter(isCardioSession).reduce((s, x) => s + x.durationMin, 0),
+    );
   }
   return recent.length;
 }
 
-export function challengeValue(challengeId: string, sessions: SessionLog[], activityLogs?: ActivityLogEntry[]) {
+export function challengeValue(
+  challengeId: string,
+  sessions: SessionLog[],
+  activityLogs?: ActivityLogEntry[],
+) {
   const c = challengeById(challengeId);
   if (!c) return 0;
   return challengeRawValue(c, sessions, activityLogs);
@@ -174,7 +194,10 @@ export function challengeProgress(
   const opts: ChallengeProgressOpts =
     typeof baselineOrOpts === "object" && baselineOrOpts !== null
       ? baselineOrOpts
-      : { ...(maybeOpts ?? {}), baseline: typeof baselineOrOpts === "number" ? baselineOrOpts : maybeOpts?.baseline };
+      : {
+          ...(maybeOpts ?? {}),
+          baseline: typeof baselineOrOpts === "number" ? baselineOrOpts : maybeOpts?.baseline,
+        };
 
   const current = challengeRawValue(challenge, sessions, opts.activityLogs, {
     invitesSent: opts.invitesSent,
@@ -197,8 +220,7 @@ export function challengeProgress(
   }
   if (isPersonalizedChallenge(challenge)) {
     const base = Math.max(0, opts.baseline ?? 0);
-    const personalTarget =
-      opts.personalTarget ?? computePersonalTarget(challenge, base);
+    const personalTarget = opts.personalTarget ?? computePersonalTarget(challenge, base);
     const pct = (current / Math.max(personalTarget, 1)) * 100;
     const barPct = Math.min(100, Math.max(0, pct));
     return {
@@ -226,7 +248,10 @@ export function challengeProgress(
   };
 }
 
-export function challengeProgressFromState(challengeId: string, state: AppState): ChallengeProgress | null {
+export function challengeProgressFromState(
+  challengeId: string,
+  state: AppState,
+): ChallengeProgress | null {
   const c = challengeById(challengeId);
   if (!c) return null;
   return challengeProgress(c, state.sessions, {
@@ -364,14 +389,15 @@ export async function syncChallengeProgress(
 export async function syncAllJoinedChallenges(state: AppState, deviceId: string) {
   if (!state.shareProgress || !state.profile) return;
   const name = state.profile.name;
-    const { validateChallengeProgress } = await import("@/lib/engine/anti-fraud");
-    const { challengeProofFromLogs } = await import("@/lib/wearables/challenge-proof");
+  const { validateChallengeProgress } = await import("@/lib/engine/anti-fraud");
+  const { challengeProofFromLogs } = await import("@/lib/wearables/challenge-proof");
   for (const id of state.challenges) {
     const c = challengeById(id);
     if (!c) continue;
     const progressOpts: ChallengeProgressOpts = {};
     if (state.activityLogs) progressOpts.activityLogs = state.activityLogs;
-    if (state.challengeBaselines?.[id] != null) progressOpts.baseline = state.challengeBaselines[id];
+    if (state.challengeBaselines?.[id] != null)
+      progressOpts.baseline = state.challengeBaselines[id];
     if (state.challengePersonalTargets?.[id] != null) {
       progressOpts.personalTarget = state.challengePersonalTargets[id];
     }
@@ -418,101 +444,34 @@ export async function fetchParticipantCount(challengeId: string): Promise<number
   return count ?? 0;
 }
 
-export async function fetchLeaderboard(challengeId: string, deviceId: string): Promise<LeaderboardRow[] | null> {
-  const c = challengeById(challengeId);
-  const relative = c ? isRelativeChallenge(c) : false;
-  const personalized = c ? isPersonalizedChallenge(c) : false;
-  const rankByPct = relative || personalized;
-
-  let query = supabase
-    .from("challenge_progress")
-    .select(
-      "device_id, user_id, value, baseline_value, pct_value, personal_target, proof_status, proof_source, fraud_flags" as never,
-    )
-    .eq("challenge_id", challengeId)
-    .limit(40);
-
-  const { data, error } = rankByPct
-    ? await query.order("pct_value" as never, { ascending: false, nullsFirst: false })
-    : await query.order("value", { ascending: false });
-
-  if (error) {
-    const fallback = await supabase
-      .from("challenge_progress")
-      .select("device_id, value")
-      .eq("challenge_id", challengeId)
-      .order("value", { ascending: false })
-      .limit(20);
-    if (fallback.error) return null;
-    const ids = (fallback.data ?? []).map((r) => r.device_id);
-    const { data: profiles } = await supabase
-      .from("social_profiles")
-      .select("device_id, display_name")
-      .in("device_id", ids);
-    const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
-    return (fallback.data ?? []).map((r, i) => ({
-      deviceId: r.device_id,
-      displayName: nameMap.get(r.device_id) || "Soldado",
-      value: Number(r.value),
-      rank: i + 1,
-      isYou: r.device_id === deviceId,
-    }));
+export async function fetchLeaderboard(
+  challengeId: string,
+  deviceId: string,
+): Promise<LeaderboardRow[] | null> {
+  try {
+    const rows = await fetchLeaderboardFn({ data: { challengeId, deviceId } });
+    if (!rows) return null;
+    return rows.map((r) => {
+      const row: LeaderboardRow = {
+        deviceId: r.deviceId,
+        displayName: r.displayName,
+        value: r.value,
+        rank: r.rank,
+        isYou: r.isYou,
+      };
+      if (r.pct != null) row.pct = r.pct;
+      if (r.personalTarget != null) row.personalTarget = r.personalTarget;
+      const ps = parseProofStatus(r.proofStatus);
+      const src = parseProofSource(r.proofSource);
+      if (ps) row.proofStatus = ps;
+      if (src) row.proofSource = src;
+      if (r.flagged) row.flagged = true;
+      return row;
+    });
+  } catch (e) {
+    console.error("fetchLeaderboard failed", e);
+    return null;
   }
-
-  // Dedupe multi-device rows of the same user (keep best rank / first)
-  type ProgRow = {
-    device_id: string;
-    user_id?: string | null;
-    value: number;
-    baseline_value?: number | null;
-    pct_value?: number | null;
-    personal_target?: number | null;
-    proof_status?: string | null;
-    proof_source?: string | null;
-    fraud_flags?: unknown;
-  };
-  const rows = (data ?? []) as unknown as ProgRow[];
-  const seenUsers = new Set<string>();
-  const deduped: ProgRow[] = [];
-  for (const r of rows) {
-    const key = r.user_id || r.device_id;
-    if (seenUsers.has(key)) continue;
-    seenUsers.add(key);
-    deduped.push(r);
-    if (deduped.length >= 20) break;
-  }
-
-  const ids = deduped.map((r) => r.device_id);
-  const { data: profiles } = await supabase
-    .from("social_profiles")
-    .select("device_id, display_name, app_user_id" as never)
-    .in("device_id", ids);
-  const nameMap = new Map(
-    (profiles ?? []).map((p: { device_id: string; display_name: string }) => [
-      p.device_id,
-      p.display_name,
-    ]),
-  );
-
-  return deduped.map((r, i) => {
-    const value = rankByPct ? Number(r.pct_value ?? 0) : Number(r.value);
-    const proofStatus = parseProofStatus(r.proof_status);
-    const proofSource = parseProofSource(r.proof_source);
-    const flagged = Array.isArray(r.fraud_flags) && r.fraud_flags.length > 0;
-    const row: LeaderboardRow = {
-      deviceId: r.device_id,
-      displayName: nameMap.get(r.device_id) || "Soldado",
-      value,
-      rank: i + 1,
-      isYou: r.device_id === deviceId,
-    };
-    if (rankByPct) row.pct = Number(r.pct_value ?? 0);
-    if (r.personal_target != null) row.personalTarget = Number(r.personal_target);
-    if (proofStatus) row.proofStatus = proofStatus;
-    if (proofSource) row.proofSource = proofSource;
-    if (flagged) row.flagged = true;
-    return row;
-  });
 }
 
 export async function publishProofEvent(
@@ -523,7 +482,11 @@ export async function publishProofEvent(
   await publishEvent(deviceId, displayName, "proof", payload);
 }
 
-export async function createClub(deviceId: string, name: string, displayName: string): Promise<ClubSummary> {
+export async function createClub(
+  deviceId: string,
+  name: string,
+  displayName: string,
+): Promise<ClubSummary> {
   const res = await socialWriteFn({
     data: { op: "createClub", deviceId, name, displayName },
   });
@@ -532,7 +495,11 @@ export async function createClub(deviceId: string, name: string, displayName: st
   return club;
 }
 
-export async function joinClubByCode(deviceId: string, code: string, displayName: string): Promise<ClubSummary> {
+export async function joinClubByCode(
+  deviceId: string,
+  code: string,
+  displayName: string,
+): Promise<ClubSummary> {
   const res = await socialWriteFn({
     data: { op: "joinClub", deviceId, code, displayName },
   });
@@ -542,39 +509,23 @@ export async function joinClubByCode(deviceId: string, code: string, displayName
 }
 
 export async function listMyClubs(deviceId: string): Promise<ClubSummary[]> {
-  const { data: memberships, error } = await supabase.from("club_members").select("club_id").eq("device_id", deviceId);
-  if (error || !memberships?.length) return [];
-
-  const clubIds = memberships.map((m) => m.club_id);
-  const { data: clubs } = await supabase.from("clubs").select("id, name, code").in("id", clubIds);
-  if (!clubs?.length) return [];
-
-  const out: ClubSummary[] = [];
-  for (const club of clubs) {
-    const { data: members } = await supabase.from("club_members").select("device_id, user_id").eq("club_id", club.id);
-    const memberIds = (members ?? []).map((m) => m.device_id);
-    const { data: profiles } = await supabase
-      .from("social_profiles")
-      .select("device_id, display_name, app_user_id")
-      .in("device_id", memberIds);
-    const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
-    const userMap = new Map(
-      (members ?? []).map((m) => [m.device_id, (m as { user_id?: string | null }).user_id ?? undefined]),
-    );
-    out.push({
-      id: club.id,
-      name: club.name,
-      code: club.code,
-      memberCount: memberIds.length,
-      members: memberIds.map((id) => {
-        const userId = userMap.get(id);
-        return userId
-          ? { deviceId: id, displayName: nameMap.get(id) || "Soldado", userId }
-          : { deviceId: id, displayName: nameMap.get(id) || "Soldado" };
-      }),
-    });
+  try {
+    const clubs = await listMyClubsFn({ data: { deviceId } });
+    return (clubs ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
+      code: c.code,
+      memberCount: c.memberCount,
+      members: c.members.map((m) => ({
+        deviceId: m.deviceId,
+        displayName: m.displayName,
+        ...(m.userId ? { userId: m.userId } : {}),
+      })),
+    }));
+  } catch (e) {
+    console.error("listMyClubs failed", e);
+    return [];
   }
-  return out;
 }
 
 export async function publishEvent(
@@ -764,10 +715,16 @@ export async function inviteToChallenge(
   toUserId: string,
   displayName: string,
 ) {
-  await socialWriteFn({ data: { op: "inviteChallenge", deviceId, challengeId, toUserId, displayName } });
+  await socialWriteFn({
+    data: { op: "inviteChallenge", deviceId, challengeId, toUserId, displayName },
+  });
 }
 
-export async function acceptChallengeInvite(deviceId: string, inviteId: string, displayName: string) {
+export async function acceptChallengeInvite(
+  deviceId: string,
+  inviteId: string,
+  displayName: string,
+) {
   return socialWriteFn({ data: { op: "acceptInvite", deviceId, inviteId, displayName } });
 }
 
@@ -782,7 +739,10 @@ export async function saveSocialPrivacyRemote(
   await socialWriteFn({ data: { op: "savePrivacy", deviceId, privacy } });
 }
 
-export async function fetchClubFeed(memberDeviceIds: string[], limit = 40): Promise<ActivityEvent[] | null> {
+export async function fetchClubFeed(
+  memberDeviceIds: string[],
+  limit = 40,
+): Promise<ActivityEvent[] | null> {
   if (!memberDeviceIds.length) return [];
   const ids = memberDeviceIds.slice(0, 50);
   const { data, error } = await supabase
@@ -855,7 +815,11 @@ export async function fetchClubWeeklyRanking(
     map.set(id, { displayName: "Soldado", sessions: 0, volumeKg: 0 });
   }
   for (const e of data ?? []) {
-    const cur = map.get(e.device_id) ?? { displayName: e.display_name || "Soldado", sessions: 0, volumeKg: 0 };
+    const cur = map.get(e.device_id) ?? {
+      displayName: e.display_name || "Soldado",
+      sessions: 0,
+      volumeKg: 0,
+    };
     cur.displayName = e.display_name || cur.displayName;
     cur.sessions += 1;
     const vol = Number((e.payload as Record<string, unknown> | null)?.["volumeKg"] ?? 0);
@@ -891,7 +855,11 @@ export async function publishSessionEvent(
   });
 }
 
-export async function publishBadgeEvent(deviceId: string, displayName: string, challengeId: string) {
+export async function publishBadgeEvent(
+  deviceId: string,
+  displayName: string,
+  challengeId: string,
+) {
   await publishEvent(deviceId, displayName, "badge", {
     challengeId,
     title: challengeById(challengeId)?.title,
@@ -907,11 +875,16 @@ export async function publishRetentionEvent(
   await publishEvent(deviceId, displayName, kind, payload);
 }
 
-/** Upsert weekly league points for all clubs the device belongs to. */
-export async function syncLeaguePoints(deviceId: string, displayName: string, pointsDeltaOrToday: number) {
+/** Upsert weekly league points — server computes from sessions; client points ignored. */
+export async function syncLeaguePoints(
+  deviceId: string,
+  displayName: string,
+  _pointsIgnored?: number,
+) {
   if (!deviceId) return;
+  void _pointsIgnored;
   await socialWriteFn({
-    data: { op: "syncLeague", deviceId, displayName, points: pointsDeltaOrToday },
+    data: { op: "syncLeague", deviceId, displayName },
   });
 }
 
@@ -920,52 +893,23 @@ export async function fetchClubLeague(
   memberDeviceIds: string[],
   yourDeviceId: string,
 ): Promise<LeagueRow[] | null> {
-  const weekStart = weekStartMonday();
-  const { data, error } = await supabase
-    .from("club_league_weeks")
-    .select("device_id, points")
-    .eq("club_id", clubId)
-    .eq("week_start", weekStart)
-    .order("points", { ascending: false })
-    .limit(20);
-  if (error) {
-    const fallback = await fetchClubWeeklyRanking(memberDeviceIds, yourDeviceId);
-    if (!fallback) return null;
-    const n = fallback.length;
-    return fallback.map((r) => ({
+  try {
+    const rows = await fetchClubLeagueFn({
+      data: { clubId, memberDeviceIds, yourDeviceId },
+    });
+    if (!rows) return null;
+    return rows.map((r) => ({
       deviceId: r.deviceId,
       displayName: r.displayName,
-      points: r.volumeKg,
+      points: r.points,
       rank: r.rank,
       isYou: r.isYou,
-      zone: (r.rank <= 3 ? "promo" : r.rank > n - 3 && n >= 6 ? "risk" : "mid") as LeagueRow["zone"],
+      zone: r.zone,
     }));
+  } catch (e) {
+    console.error("fetchClubLeague failed", e);
+    return null;
   }
-
-  const ids = [...new Set([...(data ?? []).map((r: { device_id: string }) => r.device_id), ...memberDeviceIds])];
-  const { data: profiles } = await supabase.from("social_profiles").select("device_id, display_name").in("device_id", ids);
-  const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
-  const pointMap = new Map(
-    (data ?? []).map((r: { device_id: string; points: number }) => [r.device_id, Number(r.points)]),
-  );
-
-  const rows = memberDeviceIds
-    .map((id) => ({
-      deviceId: id,
-      displayName: nameMap.get(id) || "Soldado",
-      points: Number(pointMap.get(id) ?? 0),
-      rank: 0,
-      isYou: id === yourDeviceId,
-      zone: "mid" as LeagueRow["zone"],
-    }))
-    .sort((a, b) => b.points - a.points)
-    .map((r, i) => ({ ...r, rank: i + 1 }));
-
-  const n = rows.length;
-  return rows.map((r) => ({
-    ...r,
-    zone: (r.rank <= 3 ? "promo" : r.rank > n - 3 && n >= 6 ? "risk" : "mid") as LeagueRow["zone"],
-  }));
 }
 
 export async function ensureFriendQuest(
@@ -1025,15 +969,26 @@ export async function bumpFriendQuestOnSession(deviceId: string) {
 
 export async function uploadCheckinImage(deviceId: string, file: File): Promise<string | null> {
   if (!deviceId) return null;
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `${deviceId}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from("checkins").upload(path, file, { upsert: true });
-  if (error) {
-    console.error("Upload check-in falhou", error);
+  try {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+    const bytesBase64 = btoa(binary);
+    const ext = file.name.split(".").pop() || "jpg";
+    const res = await uploadCheckinImageFn({
+      data: {
+        deviceId,
+        bytesBase64,
+        contentType: file.type || "image/jpeg",
+        fileExt: ext,
+      },
+    });
+    return res.url ?? null;
+  } catch (e) {
+    console.error("Upload check-in falhou", e);
     return null;
   }
-  const { data } = supabase.storage.from("checkins").getPublicUrl(path);
-  return data.publicUrl;
 }
 
 export async function publishSessionWithImage(
@@ -1050,28 +1005,15 @@ export async function publishSessionWithImage(
   });
 }
 
-export async function fetchClubStories(clubId: string): Promise<ClubStory[]> {
-  const since = new Date();
-  since.setHours(since.getHours() - 24);
-  const { data, error } = await supabase
-    .from("club_stories")
-    .select("id, club_id, device_id, image_url, created_at")
-    .eq("club_id", clubId)
-    .gte("created_at", since.toISOString())
-    .order("created_at", { ascending: false })
-    .limit(30);
-  if (error || !data?.length) return [];
-  const ids = data.map((s: { device_id: string }) => s.device_id);
-  const { data: profiles } = await supabase.from("social_profiles").select("device_id, display_name").in("device_id", ids);
-  const nameMap = new Map((profiles ?? []).map((p) => [p.device_id, p.display_name]));
-  return data.map((s: { id: string; club_id: string; device_id: string; image_url: string; created_at: string }) => ({
-    id: s.id,
-    clubId: s.club_id,
-    deviceId: s.device_id,
-    displayName: nameMap.get(s.device_id) || "Soldado",
-    imageUrl: s.image_url,
-    createdAt: s.created_at,
-  }));
+export async function fetchClubStories(clubId: string, deviceId?: string): Promise<ClubStory[]> {
+  const id = deviceId || "";
+  if (!id) return [];
+  try {
+    return (await fetchClubStoriesFn({ data: { clubId, deviceId: id } })) ?? [];
+  } catch (e) {
+    console.error("fetchClubStories failed", e);
+    return [];
+  }
 }
 
 export async function publishClubStory(clubId: string, deviceId: string, imageUrl: string) {

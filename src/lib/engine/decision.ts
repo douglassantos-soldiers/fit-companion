@@ -3,6 +3,11 @@
  * Extracts training/nutrition/stim decisions from Context Snapshot + Safety.
  */
 import type { ContextSnapshot } from "@/lib/engine/context-snapshot";
+import {
+  SLEEP_LOW_HOURS,
+  SLEEP_VERY_LOW_HOURS,
+  TIME_LIMITED_MIN,
+} from "@/lib/engine/decision-thresholds";
 import { decisionConfidence, explainWhy } from "@/lib/engine/explain";
 import { reasonCodesFromSafetyFlags, type ReasonCode } from "@/lib/engine/reason-codes";
 import type { SafetyVerdict } from "@/lib/engine/safety";
@@ -83,11 +88,11 @@ export function computeDecisions(
     allSeeds.includes("sleep_low") ||
     (snapshot.sleep.source === "checkin" &&
       snapshot.sleep.hours != null &&
-      snapshot.sleep.hours < 6);
+      snapshot.sleep.hours < SLEEP_LOW_HOURS);
   const energyLow = allSeeds.includes("energy_low") || snapshot.energy === "baixa";
   const timeLimited =
     allSeeds.includes("time_limited") ||
-    (snapshot.availableTimeMin != null && snapshot.availableTimeMin < 40);
+    (snapshot.availableTimeMin != null && snapshot.availableTimeMin < TIME_LIMITED_MIN);
   const availableMin = snapshot.availableTimeMin ?? 60;
   const deloadWeek = allSeeds.includes("deload_week") || snapshot.training.weekHint === "deload";
   const recoveryLow =
@@ -159,7 +164,8 @@ export function computeDecisions(
   } else if (deloadWeek || sleepStress || safety.preferLightTraining || recoveryLow) {
     trainingMode = "deload";
     trainingVolume =
-      (snapshot.sleep.hours != null && snapshot.sleep.hours < 5.5) || safety.preferLightTraining
+      (snapshot.sleep.hours != null && snapshot.sleep.hours < SLEEP_VERY_LOW_HOURS) ||
+      safety.preferLightTraining
         ? 0.55
         : 0.7;
     sessionDuration = Math.round(plannedMinutes * trainingVolume);

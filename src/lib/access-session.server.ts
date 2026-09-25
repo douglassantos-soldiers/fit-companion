@@ -113,7 +113,9 @@ function signRaw(data: string) {
   return createHmac("sha256", secret()).update(data).digest("base64url");
 }
 
-export function encodeAccessToken(payload: Omit<AccessSessionPayload, "exp"> & { exp?: number }): string {
+export function encodeAccessToken(
+  payload: Omit<AccessSessionPayload, "exp"> & { exp?: number },
+): string {
   const body: AccessSessionPayload = {
     email: payload.email.trim().toLowerCase(),
     tier: payload.tier === "performance" ? "performance" : "base",
@@ -144,16 +146,26 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
     return null;
   }
   try {
-    const json = JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as AccessSessionPayload;
+    const json = JSON.parse(
+      Buffer.from(data, "base64url").toString("utf8"),
+    ) as AccessSessionPayload & { role?: string };
+    // Reject admin token shape (role without access session fields)
+    if (typeof (json as { role?: unknown }).role === "string") return null;
     if (!json.email || !json.exp || json.exp * 1000 < Date.now()) return null;
+    // Access sessions always encode tier explicitly
+    if (json.tier !== "base" && json.tier !== "performance") return null;
     const lastPaidAt =
-      typeof json.lastPaidAt === "string" && json.lastPaidAt.length > 8 ? json.lastPaidAt : undefined;
+      typeof json.lastPaidAt === "string" && json.lastPaidAt.length > 8
+        ? json.lastPaidAt
+        : undefined;
     if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt)) return null;
     return {
       email: String(json.email).toLowerCase(),
-      tier: json.tier === "performance" ? "performance" : "base",
+      tier: json.tier,
       exp: Number(json.exp),
-      ...(typeof json.userId === "string" && json.userId.length >= 8 ? { userId: json.userId } : {}),
+      ...(typeof json.userId === "string" && json.userId.length >= 8
+        ? { userId: json.userId }
+        : {}),
       ...(lastPaidAt ? { lastPaidAt } : {}),
     };
   } catch {
@@ -173,17 +185,47 @@ export function readAccessSession(): AccessSessionPayload | null {
   }
 }
 
-export function encodeAdminToken(email: string): string {
+/**
+ * Raw access cookie value (for deriving a non-reversible sessionId).
+ * Never log or return this to clients.
+ */
+export function readAccessSessionToken(): string | null {
+  try {
+    const raw = getCookie(ACCESS_COOKIE);
+    if (!raw || !decodeAccessToken(raw)) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/** Stable opaque session id from access token (sha256 hex, truncated). */
+export function deriveAccessSessionId(token: string | null | undefined): string | null {
+  if (!token) return null;
+  return createHash("sha256").update(token).digest("hex").slice(0, 32);
+}
+
+export type AdminRole = "admin" | "editor" | "support" | "analyst";
+
+export type AdminSessionPayload = {
+  role: AdminRole;
+  email: string;
+  exp: number;
+};
+
+export function encodeAdminToken(email: string, role: AdminRole = "admin"): string {
   const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
   const data = b64url(
-    JSON.stringify({ role: "admin", email: email.trim().toLowerCase(), exp }),
+    JSON.stringify({
+      role,
+      email: email.trim().toLowerCase(),
+      exp,
+    }),
   );
   return `${data}.${signRaw(data)}`;
 }
 
-export function decodeAdminToken(
-  token: string | undefined | null,
-): { role: "admin"; email: string; exp: number } | null {
+export function decodeAdminToken(token: string | undefined | null): AdminSessionPayload | null {
   if (!token?.includes(".")) return null;
   const [data, sig] = token.split(".");
   if (!data || !sig) return null;
@@ -202,7 +244,16 @@ export function decodeAdminToken(
       email?: string;
       exp?: number;
     };
-    if (json.role !== "admin" || typeof json.exp !== "number" || json.exp * 1000 <= Date.now()) {
+    const roleRaw = String(json.role ?? "admin");
+    const role: AdminRole =
+      roleRaw === "editor" || roleRaw === "support" || roleRaw === "analyst" || roleRaw === "admin"
+        ? roleRaw
+        : "admin";
+    // Legacy PIN tokens only ever issued "admin"; reject unknown
+    if (role !== "admin" && role !== "editor" && role !== "support" && role !== "analyst") {
+      return null;
+    }
+    if (typeof json.exp !== "number" || json.exp * 1000 <= Date.now()) {
       return null;
     }
     const email = String(json.email ?? "")
@@ -211,7 +262,7 @@ export function decodeAdminToken(
     const fallback = (process.env["ADMIN_EMAIL"] ?? "").trim().toLowerCase();
     const resolved = email.includes("@") ? email : fallback;
     if (!resolved.includes("@")) return null;
-    return { role: "admin", email: resolved, exp: json.exp };
+    return { role, email: resolved, exp: json.exp };
   } catch {
     return null;
   }
@@ -219,6 +270,22 @@ export function decodeAdminToken(
 
 export function readAdminSession(): boolean {
   return Boolean(decodeAdminToken(getCookie("soldiers_admin")));
+}
+
+export function readAdminSessionPayload(): AdminSessionPayload | null {
+  return decodeAdminToken(getCookie("soldiers_admin"));
+}
+
+/** Throws if admin cookie missing/invalid or role not allowed. */
+export function requireAdminSession(allowed: AdminRole[] = ["admin"]): AdminSessionPayload {
+  const session = readAdminSessionPayload();
+  if (!session) throw new Error("UNAUTHORIZED_ADMIN");
+  if (!allowed.includes(session.role)) throw new Error("UNAUTHORIZED_ADMIN_ROLE");
+  return session;
+}
+
+export function assertAdminRole(allowed: AdminRole[] = ["admin"]): AdminSessionPayload {
+  return requireAdminSession(allowed);
 }
 
 /** App pages + server fns: access cookie, or admin session as performance. */
@@ -234,9 +301,9 @@ export function readAppAccessSession(): AccessSessionPayload | null {
   };
 }
 
-export function setAdminSessionCookie(email: string) {
+export function setAdminSessionCookie(email: string, role: AdminRole = "admin") {
   assertSecurityConfiguration();
-  setCookie("soldiers_admin", encodeAdminToken(email), {
+  setCookie("soldiers_admin", encodeAdminToken(email, role), {
     httpOnly: true,
     secure: isProduction(),
     sameSite: "lax",
@@ -249,20 +316,13 @@ export function clearAdminSessionCookie() {
   deleteCookie("soldiers_admin", { path: "/" });
 }
 
-/** Throws if admin cookie is missing/invalid. Use in admin-only server handlers. */
-export function requireAdminSession(): void {
-  if (!readAdminSession()) {
-    throw new Error("UNAUTHORIZED_ADMIN");
-  }
-}
-
 function secretEqual(a: string, b: string) {
   const ha = createHash("sha256").update(a).digest();
   const hb = createHash("sha256").update(b).digest();
   return timingSafeEqual(ha, hb);
 }
 
-async function verifyAdminAuthUser(email: string, password: string): Promise<boolean> {
+async function verifyAdminAuthUser(email: string, password: string): Promise<AdminRole | false> {
   const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "";
   const anon =
     process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || "";
@@ -273,9 +333,17 @@ async function verifyAdminAuthUser(email: string, password: string): Promise<boo
   });
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) return false;
-  const role = (data.user.app_metadata as { role?: string } | undefined)?.role;
+  const roleRaw = (data.user.app_metadata as { role?: string } | undefined)?.role;
   await client.auth.signOut();
-  return role === "admin";
+  if (
+    roleRaw === "admin" ||
+    roleRaw === "editor" ||
+    roleRaw === "support" ||
+    roleRaw === "analyst"
+  ) {
+    return roleRaw;
+  }
+  return false;
 }
 
 export async function authenticateAdmin(
@@ -291,6 +359,23 @@ export async function authenticateAdmin(
   if (await verifyAdminAuthUser(email, password)) return "ok";
   if (!envConfigured) return "not_configured";
   return "invalid";
+}
+
+/** Authenticate and return role for cookie (PIN legacy → admin). */
+export async function authenticateAdminWithRole(
+  email: string,
+  password: string,
+): Promise<{ ok: true; role: AdminRole } | { ok: false; reason: "invalid" | "not_configured" }> {
+  const expectedEmail = (process.env["ADMIN_EMAIL"] ?? "").trim().toLowerCase();
+  const expectedPass = process.env["ADMIN_PASSWORD"] || process.env["ADMIN_PIN"] || "";
+  const envConfigured = Boolean(expectedEmail && expectedPass);
+  const envOk =
+    envConfigured && secretEqual(email, expectedEmail) && secretEqual(password, expectedPass);
+  if (envOk) return { ok: true, role: "admin" };
+  const authRole = await verifyAdminAuthUser(email, password);
+  if (authRole) return { ok: true, role: authRole };
+  if (!envConfigured) return { ok: false, reason: "not_configured" };
+  return { ok: false, reason: "invalid" };
 }
 
 /** In-memory rate limit buckets (per process). */

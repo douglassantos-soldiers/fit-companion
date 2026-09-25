@@ -65,3 +65,7 @@ Versão: `snapshot_version` incrementa só quando `input_fingerprint` muda. Fing
 ## Observabilidade
 
 `logEngineDecision` / `logEngineError` em persistência e load do snapshot (`engine=decision_v1`, `decisionType=snapshot`).
+
+## Próximo passo — FASE 2
+
+Para o mapa de consolidação do Decision Engine (pipeline Context → Safety → Decision, contratos e escopo por engine), ver [decision-consolidation.md](./decision-consolidation.md).

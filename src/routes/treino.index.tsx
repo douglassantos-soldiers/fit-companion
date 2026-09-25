@@ -24,6 +24,7 @@ import { learningWeekHint } from "@/lib/engine/learning";
 import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
 import {
   isTodayPlannedDay,
+  selectTrainingMode,
   todaySessionShouldBeExpress,
 } from "@/lib/engine/decision-context-snapshot";
 import {
@@ -39,9 +40,7 @@ import {
 import { useStore } from "@/lib/store";
 import { downloadSessionsCsv } from "@/lib/training/export-sessions-csv";
 import { GYM_GEAR_OPTIONS, matchesInventory } from "@/lib/training/inventory";
-import {
-  isStickyPlanActive,
-} from "@/lib/training/saved-training-plans";
+import { isStickyPlanActive } from "@/lib/training/saved-training-plans";
 import { blockDisplayWeek } from "@/lib/training/training-block";
 import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
@@ -109,6 +108,7 @@ function TrainingPage() {
 
   const planResult = useMemo(() => {
     if (!state.profile) return null;
+    // Weekly candidates for display — today's mode comes from Decision snapshot
     return buildWeeklyPlanDetailed(
       state.profile,
       state.sessions,
@@ -149,12 +149,13 @@ function TrainingPage() {
   const todayWeekday = new Date().getDay();
   const todayDay = plan.find((d) => d.weekday === todayWeekday) ?? plan[0] ?? null;
   const decisionCtx = decisionContextForUi(state);
+  const trainingMode = decisionCtx ? selectTrainingMode(decisionCtx) : null;
   const expressForDay = (dayId: string) => {
-    const accepted = todayCheck?.acceptedTrainingMode;
+    // Mode SoT = Decision; acceptedTrainingMode only if already reflected in snapshot
     return todaySessionShouldBeExpress({
       snapshot: decisionCtx,
       isTodaySession: isTodayPlannedDay(dayId, decisionCtx) || dayId === todayDay?.id,
-      ...(accepted ? { acceptedTrainingMode: accepted } : {}),
+      ...(trainingMode === "express" ? { acceptedTrainingMode: "express" as const } : {}),
     });
   };
   const activeEquip = equipOverride ?? todayCheck?.equipment ?? profile.equipment;
@@ -208,7 +209,9 @@ function TrainingPage() {
       {block ? (
         <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">Bloco ativo</p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">
+              Bloco ativo
+            </p>
             <p className="truncate text-sm font-semibold">
               {block.name} · Semana {blockDisplayWeek(block)}/{block.durationWeeks}
             </p>

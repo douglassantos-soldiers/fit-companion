@@ -157,6 +157,8 @@ export async function persistDecisionContextSnapshot(
 async function logAuthoritativeDecisions(snapshot: DecisionContextSnapshot): Promise<void> {
   try {
     const { logRecommendationDecisions } = await import("@/lib/decision-log.server");
+    const { decisionsFromBundle } = await import("@/lib/engine/decision-contract");
+    const contracts = decisionsFromBundle(snapshot);
     await logRecommendationDecisions({
       userId: snapshot.userId,
       date: snapshot.date,
@@ -165,6 +167,7 @@ async function logAuthoritativeDecisions(snapshot: DecisionContextSnapshot): Pro
       engine: snapshot.engineVersion,
       snapshotVersion: snapshot.snapshotVersion,
       inputFingerprint: snapshot.inputFingerprint,
+      decisionContracts: contracts,
     });
   } catch (e) {
     logEngineError({
@@ -179,6 +182,8 @@ async function logAuthoritativeDecisions(snapshot: DecisionContextSnapshot): Pro
 
 /**
  * Hydrate domain, stale-recompute C360, assemble, persist, dual-write decision log.
+ * Early-return: when stored fingerprint matches assembled inputs, reuse payload and only
+ * run attribution stamp/sweep (no re-upsert / no re-log of decisions).
  */
 export async function getOrBuildDecisionContext(
   userId: string,
@@ -233,6 +238,8 @@ export async function getOrBuildDecisionContext(
     });
   }
 
+  const stored = await loadStoredDecisionContext(userId, targetDate);
+
   const assembled = assembleDecisionContext(state, {
     date: targetDate,
     timezone,
@@ -240,6 +247,7 @@ export async function getOrBuildDecisionContext(
     source: "server",
     customer360Version,
     stale360,
+    ...(stored ? { snapshotVersion: stored.snapshot_version } : {}),
     ...(Object.keys(learningPrior).length ? { learningPrior } : {}),
   });
 
@@ -247,29 +255,59 @@ export async function getOrBuildDecisionContext(
     return { snapshot: null, state, customer360, stale360 };
   }
 
-  const persisted = await persistDecisionContextSnapshot(assembled);
-  const snapshot: DecisionContextSnapshot = {
-    ...assembled,
-    snapshotVersion: persisted.snapshotVersion,
-    source: "server",
-  };
+  const fingerprintUnchanged =
+    stored != null && stored.input_fingerprint === assembled.inputFingerprint;
 
-  if (persisted.ok) {
-    await logAuthoritativeDecisions(snapshot);
-    try {
-      const { upsertBehaviorExperiments } = await import("@/lib/engine/behavior/persist.server");
-      if (snapshot.behavior?.experiments?.length) {
-        await upsertBehaviorExperiments(userId, snapshot.behavior.experiments);
+  let snapshot: DecisionContextSnapshot;
+  let persistOk = true;
+
+  if (fingerprintUnchanged && stored) {
+    snapshot = {
+      ...stored.payload,
+      snapshotVersion: stored.snapshot_version,
+      customer360Version,
+      stale360,
+      source: "server",
+      inputFingerprint: stored.input_fingerprint,
+      engineVersion: stored.payload.engineVersion || DECISION_ENGINE_VERSION,
+    };
+    logEngineDecision({
+      userId,
+      date: targetDate,
+      engine: snapshot.engineVersion,
+      decisionType: "snapshot",
+      success: true,
+      durationMs: 0,
+      reason: "fingerprint_early_return",
+    });
+  } else {
+    const persisted = await persistDecisionContextSnapshot(assembled);
+    persistOk = persisted.ok;
+    snapshot = {
+      ...assembled,
+      snapshotVersion: persisted.snapshotVersion,
+      source: "server",
+    };
+    if (persistOk) {
+      await logAuthoritativeDecisions(snapshot);
+      try {
+        const { upsertBehaviorExperiments } = await import("@/lib/engine/behavior/persist.server");
+        if (snapshot.behavior?.experiments?.length) {
+          await upsertBehaviorExperiments(userId, snapshot.behavior.experiments);
+        }
+      } catch (e) {
+        logEngineError({
+          userId,
+          engine: snapshot.engineVersion,
+          operation: "persist_experiments",
+          errorCode: "persist_failed",
+          message: String(e),
+        });
       }
-    } catch (e) {
-      logEngineError({
-        userId,
-        engine: snapshot.engineVersion,
-        operation: "persist_experiments",
-        errorCode: "persist_failed",
-        message: String(e),
-      });
     }
+  }
+
+  if (persistOk || fingerprintUnchanged) {
     try {
       const { stampExpectedActions, sweepDelayedOutcomes, recordAttributedEvent } =
         await import("@/lib/engine/attribution.server");

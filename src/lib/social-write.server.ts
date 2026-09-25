@@ -4,12 +4,7 @@
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
-import {
-  challengeById,
-  isPersonalizedChallenge,
-  isRelativeChallenge,
-} from "@/data/challenges";
-import { validateChallengeProgress } from "@/lib/engine/anti-fraud";
+import { challengeById, isPersonalizedChallenge, isRelativeChallenge } from "@/data/challenges";
 import {
   isReactionKind,
   normalizeSocialPrivacy,
@@ -17,6 +12,45 @@ import {
   shouldPublishEvent,
   stripSensitiveSocialPayload,
 } from "@/lib/social/visibility";
+import {
+  assertBothClubMembersByUser,
+  assertChallengeOwnershipByUser,
+  isAllowedCheckinImageUrl,
+  scoreChallengeProgress,
+} from "@/lib/security-authz";
+import { computeWeeklyLeaguePoints } from "@/lib/league-points.server";
+
+/** Membership by user_id (preferred); legacy device_id only when user_id is null. */
+async function isClubMemberByUser(
+  db: NonNullable<Awaited<ReturnType<typeof adminDbLoose>>>,
+  clubId: string,
+  userId: string,
+  deviceId: string,
+): Promise<boolean> {
+  const { data: byUser } = await db
+    .from("club_members")
+    .select("club_id")
+    .eq("club_id", clubId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (byUser) return true;
+  const { data: byDevice } = await db
+    .from("club_members")
+    .select("club_id, user_id")
+    .eq("club_id", clubId)
+    .eq("device_id", deviceId)
+    .maybeSingle();
+  if (!byDevice) return false;
+  if (byDevice.user_id == null) {
+    await db
+      .from("club_members")
+      .update({ user_id: userId })
+      .eq("club_id", clubId)
+      .eq("device_id", deviceId);
+    return true;
+  }
+  return byDevice.user_id === userId;
+}
 
 export type SocialWriteOp =
   | { op: "ensureProfile"; deviceId: string; displayName: string }
@@ -36,9 +70,10 @@ export type SocialWriteOp =
       value: number;
       displayName: string;
       baseline?: number;
+      personalTarget?: number;
+      /** @deprecated ignored — server computes */
       pct?: number;
       complete?: boolean;
-      personalTarget?: number;
       fraudFlags?: unknown[];
       proofStatus?: string;
       proofSource?: string;
@@ -58,7 +93,7 @@ export type SocialWriteOp =
       payload?: Record<string, unknown>;
     }
   | { op: "giveKudos"; eventId: string; current: number; deviceId: string }
-  | { op: "syncLeague"; deviceId: string; displayName: string; points: number }
+  | { op: "syncLeague"; deviceId: string; displayName: string; points?: number }
   | {
       op: "ensureFriendQuest";
       deviceId: string;
@@ -75,7 +110,8 @@ export type SocialWriteOp =
       op: "linkAuthSocial";
       deviceId: string;
       displayName: string;
-      authUserId: string;
+      /** @deprecated ignored — Auth session only */
+      authUserId?: string;
     }
   | { op: "reportEvent"; deviceId: string; eventId: string; reason: string }
   | { op: "follow"; deviceId: string; targetUserId: string; displayName: string }
@@ -126,8 +162,18 @@ async function isBlockedEitherWay(
   b: string,
 ) {
   const [out, inn] = await Promise.all([
-    db.from("social_blocks").select("blocker_id").eq("blocker_id", a).eq("blocked_id", b).maybeSingle(),
-    db.from("social_blocks").select("blocker_id").eq("blocker_id", b).eq("blocked_id", a).maybeSingle(),
+    db
+      .from("social_blocks")
+      .select("blocker_id")
+      .eq("blocker_id", a)
+      .eq("blocked_id", b)
+      .maybeSingle(),
+    db
+      .from("social_blocks")
+      .select("blocker_id")
+      .eq("blocker_id", b)
+      .eq("blocked_id", a)
+      .maybeSingle(),
   ]);
   return Boolean(out.data || inn.data);
 }
@@ -184,16 +230,27 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       const needsBaseline =
         c && (isRelativeChallenge(c) || isPersonalizedChallenge(c)) && op.baseline !== undefined;
       if (needsBaseline) {
+        const rawBaseline = Math.max(0, Number(op.baseline));
+        const baseline = Math.min(rawBaseline, 1_000_000);
         const personalTarget = isPersonalizedChallenge(c!)
-          ? (op.personalTarget ?? undefined)
+          ? Math.min(Math.max(1, Number(op.personalTarget ?? 1)), 1_000_000)
           : undefined;
+        const scored = scoreChallengeProgress({
+          value: baseline,
+          baseline,
+          metric: c!.metric ?? "sessoes",
+          ...(personalTarget != null ? { personalTarget } : {}),
+        });
         const { error: progErr } = await db.from("challenge_progress").upsert(
           {
             device_id: op.deviceId,
             user_id: identity.userId,
             challenge_id: op.challengeId,
-            value: op.baseline,
-            baseline_value: op.baseline,
+            recorded_value: scored.recordedValue,
+            eligible_value: scored.eligibleValue,
+            verification_status: scored.verificationStatus,
+            value: scored.eligibleValue,
+            baseline_value: baseline,
             pct_value: 0,
             personal_target: personalTarget ?? null,
             proof_status: "self_reported",
@@ -201,7 +258,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
               c!.metric === "steps" || c!.metric === "football_sessions"
                 ? "app_manual"
                 : "app_session",
-            fraud_flags: [],
+            fraud_flags: scored.flags,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "device_id,challenge_id" },
@@ -253,9 +310,30 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       return { ok: true };
     }
     case "leaveChallenge": {
-      await assertDevice(op.deviceId);
-      await db.from("challenge_entries").delete().eq("device_id", op.deviceId).eq("challenge_id", op.challengeId);
-      await db.from("challenge_progress").delete().eq("device_id", op.deviceId).eq("challenge_id", op.challengeId);
+      const identity = await assertDevice(op.deviceId);
+      await db
+        .from("challenge_entries")
+        .delete()
+        .eq("user_id", identity.userId)
+        .eq("challenge_id", op.challengeId);
+      await db
+        .from("challenge_progress")
+        .delete()
+        .eq("user_id", identity.userId)
+        .eq("challenge_id", op.challengeId);
+      // Legacy rows without user_id
+      await db
+        .from("challenge_entries")
+        .delete()
+        .eq("device_id", op.deviceId)
+        .eq("challenge_id", op.challengeId)
+        .is("user_id", null);
+      await db
+        .from("challenge_progress")
+        .delete()
+        .eq("device_id", op.deviceId)
+        .eq("challenge_id", op.challengeId)
+        .is("user_id", null);
       return { ok: true };
     }
     case "syncChallengeProgress": {
@@ -265,51 +343,88 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         deviceId: op.deviceId,
         displayName: op.displayName,
       });
+      const { data: entryByUser } = await db
+        .from("challenge_entries")
+        .select("device_id, user_id")
+        .eq("user_id", identity.userId)
+        .eq("challenge_id", op.challengeId)
+        .maybeSingle();
+      const { data: entryByDevice } = entryByUser
+        ? { data: null }
+        : await db
+            .from("challenge_entries")
+            .select("device_id, user_id")
+            .eq("device_id", op.deviceId)
+            .eq("challenge_id", op.challengeId)
+            .maybeSingle();
+      const entry = entryByUser ?? entryByDevice;
+      if (!entry) throw new Error("Não inscrito neste desafio");
+      const entryUserIds = [identity.userId];
+      if (entry.user_id && entry.user_id !== identity.userId) {
+        throw new Error("Não inscrito neste desafio");
+      }
+      if (!assertChallengeOwnershipByUser(entryUserIds, identity.userId)) {
+        throw new Error("Não inscrito neste desafio");
+      }
+
       const c = challengeById(op.challengeId);
       const relative = c ? isRelativeChallenge(c) : false;
       const personalized = c ? isPersonalizedChallenge(c) : false;
-      const baseline = op.baseline ?? 0;
-      const personalTarget = op.personalTarget;
-      let pct = op.pct ?? null;
+      const baseline = Math.max(0, Number(op.baseline ?? 0));
+      const personalTarget =
+        op.personalTarget != null && Number.isFinite(Number(op.personalTarget))
+          ? Math.min(Math.max(1, Number(op.personalTarget)), 1_000_000)
+          : undefined;
+
+      const scored = scoreChallengeProgress({
+        value: Number(op.value),
+        baseline,
+        metric: c?.metric ?? "sessoes",
+        ...(personalTarget != null ? { personalTarget } : {}),
+      });
+
+      let pct = scored.pct;
       if (pct == null && relative) {
-        pct = ((op.value - baseline) / Math.max(baseline, 1)) * 100;
+        pct = ((scored.eligibleValue - baseline) / Math.max(baseline, 1)) * 100;
       } else if (pct == null && personalized && personalTarget) {
-        pct = (op.value / Math.max(personalTarget, 1)) * 100;
+        pct = (scored.eligibleValue / Math.max(personalTarget, 1)) * 100;
       }
-      const fraud =
-        op.fraudFlags ??
-        validateChallengeProgress({
-          value: op.value,
-          baseline,
-          metric: c?.metric ?? "sessoes",
-          ...(personalTarget != null ? { personalTarget } : {}),
-        }).flags;
+
+      const proofSource =
+        c?.metric === "steps" || c?.metric === "football_sessions" ? "app_manual" : "app_session";
+
       const { error } = await db.from("challenge_progress").upsert(
         {
           device_id: op.deviceId,
           user_id: identity.userId,
           challenge_id: op.challengeId,
-          value: op.value,
+          recorded_value: scored.recordedValue,
+          eligible_value: scored.eligibleValue,
+          verification_status: scored.verificationStatus,
+          value: scored.eligibleValue,
           baseline_value: baseline,
           pct_value: pct,
           personal_target: personalTarget ?? null,
-          proof_status: op.proofStatus ?? "self_reported",
-          proof_source: op.proofSource ?? "app_session",
-          fraud_flags: fraud,
+          proof_status: "self_reported",
+          proof_source: proofSource,
+          fraud_flags: scored.flags,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "device_id,challenge_id" },
       );
       if (error) throw error;
+
       const done =
-        op.complete ??
-        (c
-          ? relative
-            ? (pct ?? 0) >= (c.targetPct ?? c.target)
-            : personalized && personalTarget
-              ? op.value >= personalTarget
-              : op.value >= c.target
-          : false);
+        scored.verificationStatus !== "rejected" &&
+        Boolean(
+          c
+            ? relative
+              ? (pct ?? 0) >= (c.targetPct ?? c.target)
+              : personalized && personalTarget
+                ? scored.eligibleValue >= personalTarget
+                : scored.eligibleValue >= c.target
+            : false,
+        );
       if (c && done) {
         await executeSocialWrite({
           op: "publishEvent",
@@ -319,12 +434,14 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           payload: {
             challengeId: op.challengeId,
             title: c.title,
-            value: op.value,
+            value: scored.eligibleValue,
+            recordedValue: scored.recordedValue,
             pct: pct ?? undefined,
             relative,
             personalized,
             personalTarget,
             proofStatus: "self_reported",
+            verificationStatus: scored.verificationStatus,
           },
         });
         try {
@@ -338,7 +455,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
             entityId: op.challengeId,
             metadata: {
               challengeId: op.challengeId,
-              value: op.value,
+              value: scored.eligibleValue,
               personalTarget,
             },
             idempotencyKey: `challenge:${op.challengeId}:challenge_completed`,
@@ -358,7 +475,13 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           )
           .catch(() => undefined);
       }
-      return { ok: true, done };
+      return {
+        ok: true,
+        done,
+        verificationStatus: scored.verificationStatus,
+        eligibleValue: scored.eligibleValue,
+        recordedValue: scored.recordedValue,
+      };
     }
     case "createClub": {
       const identity = await assertDevice(op.deviceId);
@@ -409,10 +532,12 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         .maybeSingle();
       if (error) throw error;
       if (!club) throw new Error("Código inválido");
-      await db.from("club_members").upsert(
-        { club_id: club.id, device_id: op.deviceId, user_id: identity.userId },
-        { onConflict: "club_id,device_id" },
-      );
+      await db
+        .from("club_members")
+        .upsert(
+          { club_id: club.id, device_id: op.deviceId, user_id: identity.userId },
+          { onConflict: "club_id,device_id" },
+        );
       return { ok: true, clubId: club.id };
     }
     case "publishEvent": {
@@ -448,16 +573,28 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       });
     }
     case "syncLeague": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
+      // Ignore client-supplied points entirely (P0)
+      void op.points;
       await executeSocialWrite({
         op: "ensureProfile",
         deviceId: op.deviceId,
         displayName: op.displayName,
       });
-      const { data: memberships } = await db
+      const points = await computeWeeklyLeaguePoints(identity.userId);
+      const { data: membershipsByUser } = await db
         .from("club_members")
         .select("club_id")
-        .eq("device_id", op.deviceId);
+        .eq("user_id", identity.userId);
+      const { data: membershipsByDevice } = await db
+        .from("club_members")
+        .select("club_id, user_id")
+        .eq("device_id", op.deviceId)
+        .is("user_id", null);
+      const memberships = [
+        ...(membershipsByUser ?? []),
+        ...((membershipsByDevice ?? []) as Array<{ club_id: string }>),
+      ];
       const weekStart = (() => {
         const d = new Date();
         const day = (d.getDay() + 6) % 7;
@@ -475,26 +612,67 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           .eq("device_id", op.deviceId)
           .maybeSingle();
         const prev = Number(existing?.points ?? 0);
-        const points = Math.max(prev, op.points);
+        // Monotonic: never decrease from verified server score
+        const next = Math.max(prev, points);
         await db.from("club_league_weeks").upsert(
           {
             club_id: m.club_id,
             week_start: weekStart,
             device_id: op.deviceId,
-            points,
+            points: next,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "club_id,week_start,device_id" },
         );
       }
-      return { ok: true };
+      return { ok: true, points };
     }
     case "ensureFriendQuest": {
       const identity = await assertDevice(op.deviceId);
-      const partnerIdentity = await resolveTrustedIdentity({
-        deviceId: op.partnerDeviceId,
-        requireAccess: false,
-      });
+      if (!op.partnerDeviceId || op.partnerDeviceId === op.deviceId) {
+        throw new Error("Parceiro inválido");
+      }
+      const { data: members } = await db
+        .from("club_members")
+        .select("device_id, user_id")
+        .eq("club_id", op.clubId);
+      const memberRows = (members ?? []) as Array<{
+        device_id: string;
+        user_id?: string | null;
+      }>;
+      const memberUserIds = memberRows
+        .map((m) => m.user_id)
+        .filter((id): id is string => Boolean(id));
+      // Resolve partner user via device registry / membership row
+      const partnerRow = memberRows.find((m) => m.device_id === op.partnerDeviceId);
+      let partnerUserId = partnerRow?.user_id ?? null;
+      if (!partnerUserId) {
+        const { getUserIdForDevice } = await import("@/lib/identity");
+        partnerUserId = await getUserIdForDevice(op.partnerDeviceId);
+      }
+      if (!partnerUserId) throw new Error("Ambos devem ser membros do clube");
+      const actorInClub =
+        memberUserIds.includes(identity.userId) ||
+        memberRows.some(
+          (m) =>
+            m.device_id === op.deviceId && (m.user_id == null || m.user_id === identity.userId),
+        );
+      const partnerInClub =
+        memberUserIds.includes(partnerUserId) ||
+        memberRows.some((m) => m.device_id === op.partnerDeviceId);
+      if (!actorInClub || !partnerInClub) {
+        throw new Error("Ambos devem ser membros do clube");
+      }
+      if (
+        !assertBothClubMembersByUser(
+          [...new Set([...memberUserIds, identity.userId, partnerUserId])],
+          identity.userId,
+          partnerUserId,
+        )
+      ) {
+        throw new Error("Ambos devem ser membros do clube");
+      }
+
       const { data: existing } = await db
         .from("friend_quests")
         .select("*")
@@ -525,7 +703,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           device_a: op.deviceId,
           device_b: op.partnerDeviceId,
           user_id_a: identity.userId,
-          ...(partnerIdentity?.userId ? { user_id_b: partnerIdentity.userId } : {}),
+          ...(partnerUserId ? { user_id_b: partnerUserId } : {}),
           target: 4,
           progress_a: 0,
           progress_b: 0,
@@ -548,7 +726,28 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       };
     }
     case "bumpFriendQuest": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
+      // Require a verified session today (idempotent bump per day via engagement marker)
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: sessionToday } = await db
+        .from("sessions")
+        .select("client_id")
+        .eq("user_id", identity.userId)
+        .eq("date", today)
+        .limit(1)
+        .maybeSingle();
+      if (!sessionToday) return { ok: true, skipped: true, reason: "no_session" };
+
+      const bumpKey = `friend_quest_bump:${op.weekStart}:${today}`;
+      const { data: already } = await db
+        .from("engagement_events")
+        .select("id")
+        .eq("device_id", op.deviceId)
+        .eq("name", bumpKey)
+        .limit(1)
+        .maybeSingle();
+      if (already) return { ok: true, skipped: true, reason: "already_bumped" };
+
       const { data: rows } = await db
         .from("friend_quests")
         .select("*")
@@ -561,10 +760,25 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           : { progress_b: (row.progress_b ?? 0) + 1 };
         await db.from("friend_quests").update(patch).eq("id", row.id);
       }
+      await db.from("engagement_events").insert({
+        device_id: op.deviceId,
+        name: bumpKey,
+        props: { userId: identity.userId, weekStart: op.weekStart },
+      });
       return { ok: true };
     }
     case "publishClubStory": {
-      await assertDevice(op.deviceId);
+      const identity = await assertDevice(op.deviceId);
+      const isMember = await isClubMemberByUser(db, op.clubId, identity.userId, op.deviceId);
+      if (!isMember) throw new Error("Você não é membro deste clube");
+
+      const supabaseHost = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "")
+        .replace(/^https?:\/\//, "")
+        .split("/")[0];
+      if (!isAllowedCheckinImageUrl(op.imageUrl, supabaseHost || undefined)) {
+        throw new Error("URL de mídia inválida");
+      }
+
       const { error } = await db.from("club_stories").insert({
         club_id: op.clubId,
         device_id: op.deviceId,
@@ -575,10 +789,12 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     }
     case "hubJoin": {
       const identity = await assertDevice(op.deviceId);
-      const { error } = await db.from("hub_members").upsert(
-        { hub_id: op.hubId, device_id: op.deviceId, user_id: identity.userId },
-        { onConflict: "hub_id,device_id" },
-      );
+      const { error } = await db
+        .from("hub_members")
+        .upsert(
+          { hub_id: op.hubId, device_id: op.deviceId, user_id: identity.userId },
+          { onConflict: "hub_id,device_id" },
+        );
       if (error) throw error;
       return { ok: true };
     }
@@ -601,8 +817,35 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           updated_at: new Date().toISOString(),
         })
         .eq("device_id", op.deviceId);
-      const { linkAuthUserId } = await import("@/lib/identity");
-      await linkAuthUserId({ userId: identity.userId, authUserId: op.authUserId });
+
+      // Never trust client authUserId — resolve from Supabase Auth cookie/session if present
+      void op.authUserId;
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "";
+        const anon =
+          process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+          process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+          "";
+        if (url && anon) {
+          const { getCookie } = await import("@tanstack/react-start/server");
+          // Prefer Authorization-style project cookies if available; otherwise skip link
+          const accessToken = getCookie("sb-access-token") || getCookie("sb-auth-token");
+          if (accessToken) {
+            const client = createClient(url, anon, {
+              global: { headers: { Authorization: `Bearer ${accessToken}` } },
+              auth: { persistSession: false, autoRefreshToken: false },
+            });
+            const { data: auth } = await client.auth.getUser();
+            if (auth.user?.id) {
+              const { linkAuthUserId } = await import("@/lib/identity");
+              await linkAuthUserId({ userId: identity.userId, authUserId: auth.user.id });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("linkAuthSocial auth session resolve skipped", e);
+      }
       return { ok: true, userId: identity.userId };
     }
     case "reportEvent": {
@@ -619,10 +862,12 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
       if (op.targetUserId === identity.userId) throw new Error("Não dá para seguir a si mesmo");
       const blocked = await isBlockedEitherWay(db, identity.userId, op.targetUserId);
       if (blocked) throw new Error("Usuário indisponível");
-      const { error } = await db.from("social_follows").upsert(
-        { follower_id: identity.userId, following_id: op.targetUserId },
-        { onConflict: "follower_id,following_id" },
-      );
+      const { error } = await db
+        .from("social_follows")
+        .upsert(
+          { follower_id: identity.userId, following_id: op.targetUserId },
+          { onConflict: "follower_id,following_id" },
+        );
       if (error) throw error;
       await executeSocialWrite({
         op: "publishEvent",
@@ -656,10 +901,12 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     case "block": {
       const identity = await assertDevice(op.deviceId);
       if (op.targetUserId === identity.userId) throw new Error("Não dá para bloquear a si mesmo");
-      const { error } = await db.from("social_blocks").upsert(
-        { blocker_id: identity.userId, blocked_id: op.targetUserId },
-        { onConflict: "blocker_id,blocked_id" },
-      );
+      const { error } = await db
+        .from("social_blocks")
+        .upsert(
+          { blocker_id: identity.userId, blocked_id: op.targetUserId },
+          { onConflict: "blocker_id,blocked_id" },
+        );
       if (error) throw error;
       await db
         .from("social_follows")
@@ -685,10 +932,12 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     case "mute": {
       const identity = await assertDevice(op.deviceId);
       if (op.targetUserId === identity.userId) throw new Error("Não dá para silenciar a si mesmo");
-      const { error } = await db.from("social_mutes").upsert(
-        { user_id: identity.userId, muted_id: op.targetUserId },
-        { onConflict: "user_id,muted_id" },
-      );
+      const { error } = await db
+        .from("social_mutes")
+        .upsert(
+          { user_id: identity.userId, muted_id: op.targetUserId },
+          { onConflict: "user_id,muted_id" },
+        );
       if (error) throw error;
       return { ok: true };
     }
@@ -704,53 +953,72 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     case "react": {
       const identity = await assertDevice(op.deviceId);
       if (!isReactionKind(op.kind)) throw new Error("Reação inválida");
-      const { error } = await db.from("activity_reactions").upsert(
-        { event_id: op.eventId, user_id: identity.userId, kind: op.kind },
-        { onConflict: "event_id,user_id" },
-      );
+      const { data: ev } = await db
+        .from("activity_events")
+        .select("id, user_id, hidden_at, payload")
+        .eq("id", op.eventId)
+        .maybeSingle();
+      if (!ev || ev.hidden_at) throw new Error("Evento indisponível");
+      if (ev.user_id) {
+        const blocked = await isBlockedEitherWay(db, identity.userId, ev.user_id);
+        if (blocked) throw new Error("Evento indisponível");
+      }
+      const { error } = await db
+        .from("activity_reactions")
+        .upsert(
+          { event_id: op.eventId, user_id: identity.userId, kind: op.kind },
+          { onConflict: "event_id,user_id" },
+        );
       if (error) throw error;
       if (op.kind === "fire") {
-        await db.from("activity_kudos").upsert(
-          { event_id: op.eventId, device_id: op.deviceId },
-          { onConflict: "event_id,device_id" },
-        );
+        await db
+          .from("activity_kudos")
+          .upsert(
+            { event_id: op.eventId, device_id: op.deviceId },
+            { onConflict: "event_id,device_id" },
+          );
       }
       const { data: reacts } = await db
         .from("activity_reactions")
         .select("kind")
         .eq("event_id", op.eventId);
-      const fireCount = ((reacts ?? []) as Array<{ kind: string }>).filter((r) => r.kind === "fire").length;
+      const fireCount = ((reacts ?? []) as Array<{ kind: string }>).filter(
+        (r) => r.kind === "fire",
+      ).length;
       await db.from("activity_events").update({ kudos_count: fireCount }).eq("id", op.eventId);
       try {
-        const { data: ev } = await db
-          .from("activity_events")
-          .select("user_id, device_id")
-          .eq("id", op.eventId)
-          .maybeSingle();
-        let targetUserId = (ev?.user_id as string | null) ?? null;
-        if (!targetUserId && ev?.device_id) {
-          const { getUserIdForDevice } = await import("@/lib/identity");
-          targetUserId = await getUserIdForDevice(String(ev.device_id));
-        }
-        if (targetUserId && targetUserId !== identity.userId) {
-          const { notifyUserPush } = await import("@/lib/push.server");
-          await notifyUserPush({
-            userId: targetUserId,
-            category: "kudos",
-            title: "Reação",
-            body: "Alguém reagiu ao seu check-in.",
-            respectQuietHours: false,
-          });
+        if (ev.user_id && ev.user_id !== identity.userId) {
+          void import("@/lib/push.server")
+            .then(({ notifyUserPush }) =>
+              notifyUserPush({
+                userId: ev.user_id!,
+                category: "kudos",
+                title: "Kudos",
+                body: "Alguém reagiu ao seu check-in.",
+                respectQuietHours: true,
+              }),
+            )
+            .catch(() => undefined);
         }
       } catch {
-        /* best-effort */
+        /* ignore */
       }
-      return { ok: true, kind: op.kind };
+      return { ok: true, kudos: fireCount };
     }
     case "comment": {
       const identity = await assertDevice(op.deviceId);
       const body = sanitizeCommentBody(op.body);
       if (!body) throw new Error("Comentário vazio");
+      const { data: ev } = await db
+        .from("activity_events")
+        .select("id, user_id, hidden_at")
+        .eq("id", op.eventId)
+        .maybeSingle();
+      if (!ev || ev.hidden_at) throw new Error("Evento indisponível");
+      if (ev.user_id) {
+        const blocked = await isBlockedEitherWay(db, identity.userId, ev.user_id);
+        if (blocked) throw new Error("Evento indisponível");
+      }
       const { error } = await db.from("activity_comments").insert({
         event_id: op.eventId,
         user_id: identity.userId,
@@ -847,7 +1115,8 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         .select("id, challenge_id, to_user_id, status")
         .eq("id", op.inviteId)
         .maybeSingle();
-      if (!invite || String(invite.to_user_id) !== identity.userId) throw new Error("Convite inválido");
+      if (!invite || String(invite.to_user_id) !== identity.userId)
+        throw new Error("Convite inválido");
       if (invite.status !== "pending") throw new Error("Convite já respondido");
       await db.from("challenge_invites").update({ status: "accepted" }).eq("id", op.inviteId);
       await executeSocialWrite({

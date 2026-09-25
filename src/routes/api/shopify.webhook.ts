@@ -138,6 +138,22 @@ export const Route = createFileRoute("/api/shopify/webhook")({
               magicTokenPlain: magicToken,
               magicExpiresAt: expires.toISOString(),
             });
+            try {
+              const { writeAudit } = await import("@/lib/admin.server");
+              await writeAudit(
+                "entitlement_shopify_webhook",
+                {
+                  email: snapshot.email,
+                  orderId: snapshot.orderId,
+                  productIds: snapshot.productIds,
+                  resource_type: "app_entitlement_emails",
+                  resource_id: snapshot.email,
+                },
+                "shopify_webhook",
+              );
+            } catch (auditErr) {
+              console.warn("entitlement audit skipped", auditErr);
+            }
           } catch (e) {
             console.error("Shopify webhook persist failed", e);
             return new Response("db error", { status: 500 });

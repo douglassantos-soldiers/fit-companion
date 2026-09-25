@@ -1,8 +1,9 @@
 /**
  * Server-only Admin Console helpers (CMS, lookup, entitlement, Shopify ops).
  */
-import { requireAdminSession } from "@/lib/access-session.server";
+import { requireAdminSession, readAdminSessionPayload } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
+import type { OrderSnapshot } from "@/lib/shopify.server";
 import { emptyCmsState, type CmsState } from "@/lib/cms";
 import { isSoldiersOwnedUrl } from "@/lib/soldiers-media-governance";
 import type { AccessTier } from "@/data/shopify-product-map";
@@ -15,6 +16,8 @@ export type AdminAuditAction =
   | "entitlement_resync"
   | "entitlement_grant"
   | "entitlement_revoke"
+  | "entitlement_shopify_webhook"
+  | "entitlement_device_attach"
   | "user_suspend"
   | "user_ban"
   | "user_unsuspend"
@@ -32,7 +35,12 @@ export type AdminAuditAction =
   | "comment_hide"
   | "comment_unhide"
   | "shopify_customers_import"
-  | "media_status_change";
+  | "media_status_change"
+  | "leaderboard_correction"
+  | "challenge_moderation"
+  | "social_moderation"
+  | "access_session_establish"
+  | "destructive_action";
 
 export type AdminUserLookup = {
   email: string;
@@ -80,21 +88,48 @@ export type ShopifyOpsSnapshot = {
 const emptyCms = (): CmsState => emptyCmsState();
 
 export function assertAdmin() {
-  requireAdminSession();
+  requireAdminSession(["admin", "editor", "support"]);
 }
 
 export async function writeAudit(
   action: AdminAuditAction,
   target: Record<string, unknown>,
-  actor: string = ADMIN_ACTOR,
+  actor?: string,
 ): Promise<void> {
   const db = await adminDbLoose();
   if (!db) return;
-  const { error } = await db.from("admin_audit_log").insert({
+  const session = readAdminSessionPayload();
+  const resolvedActor = actor ?? session?.email ?? ADMIN_ACTOR;
+  const enriched = {
     action,
     target,
-    actor,
-  });
+    actor: resolvedActor,
+    actor_id: session?.email ?? resolvedActor,
+    user_id: typeof target["userId"] === "string" ? target["userId"] : null,
+    resource_type:
+      typeof target["resource_type"] === "string"
+        ? target["resource_type"]
+        : typeof target["email"] === "string"
+          ? "entitlement"
+          : null,
+    resource_id:
+      typeof target["resource_id"] === "string"
+        ? target["resource_id"]
+        : typeof target["email"] === "string"
+          ? target["email"]
+          : null,
+    metadata: target as never,
+  };
+  let { error } = await db.from("admin_audit_log").insert(enriched);
+  if (error) {
+    // Pre-migration fallback (no extended columns / action check)
+    const retry = await db.from("admin_audit_log").insert({
+      action,
+      target,
+      actor: resolvedActor,
+    });
+    error = retry.error;
+  }
   if (error) console.error("admin_audit_log insert failed", error);
 }
 
@@ -240,7 +275,7 @@ export async function lookupUserByEmail(email: string): Promise<AdminUserLookup>
 
   let userId: string | null = null;
   let devices: AdminUserLookup["devices"] = [];
-  let orders: AdminUserLookup["orders"] = [];
+  const orders: AdminUserLookup["orders"] = [];
   let entitlementMeta: AdminUserLookup["entitlement"] = null;
   let accountStatus: AdminUserLookup["accountStatus"] = null;
 

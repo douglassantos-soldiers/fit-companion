@@ -3,6 +3,7 @@
  * Pure TypeScript; no network. Does not diagnose.
  * Date-aware: always evaluate against the same calendar date as Living Plan / Today.
  */
+import { SLEEP_LOW_HOURS } from "@/lib/engine/decision-thresholds";
 import { computeRecoverySnapshot, type RecoverySnapshot } from "@/lib/engine/recovery";
 import type { AppState, Goal } from "@/lib/types";
 import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
@@ -62,7 +63,7 @@ export function evaluateSafetyForDate(
   let escalateCare = false;
 
   if (checkIn) {
-    if (checkIn.sleepHours < 6) {
+    if (checkIn.sleepHours < SLEEP_LOW_HOURS) {
       flags.push("low_sleep");
       reasons.push("Sono baixo — evite estimulantes e prefira treino leve.");
       blockStims = true;

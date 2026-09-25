@@ -7,15 +7,17 @@ import {
 } from "@/lib/engine/dimensions";
 import {
   computeLearningInsights,
-  learningWeekHint,
   extractUserPatterns,
   patternInsights,
 } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
-import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
+import {
+  selectNutritionOpts,
+  selectWhyPanel,
+  type DecisionContextSnapshot,
+} from "@/lib/engine/decision-context-snapshot";
 import { buildDailyMealPlan, dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
-import { buildWeeklyPlan, planDayForToday } from "@/lib/engine/plan";
 import { evaluateSafetyForDate } from "@/lib/engine/safety";
 import { activeHubForState } from "@/data/hubs";
 import {
@@ -50,18 +52,6 @@ export function buildCoachContextFromState(
     };
   }
 
-  const insights = computeLearningInsights(state);
-  const goals = nutritionGoals(p, insights);
-  const plan = buildWeeklyPlan(p, state.sessions, learningWeekHint(state), {
-    likedExerciseIds: state.likedExerciseIds ?? [],
-    dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-  });
-  const today = planDayForToday(plan);
-  const mealPlan = buildDailyMealPlan(p, state, todayKey(), insights);
-  const dims = performanceDimensions(state, p);
-  const recent = sessionsInLastDays(state.sessions, 7);
-  const metrics = state.days[todayKey()];
-  const totals = dayNutritionTotals(state.meals ?? []);
   const date = todayKey();
   const decisionSnapshot =
     opts?.decisionSnapshot ??
@@ -69,12 +59,25 @@ export function buildCoachContextFromState(
     assembleDecisionContext(state, { date, source: "offline_legacy" });
   const living = decisionSnapshot?.livingPlan ?? state.livingPlans?.[date] ?? null;
   const builtDecisions = decisionSnapshot?.decisions ?? null;
+  const whyPanel = decisionSnapshot ? selectWhyPanel(decisionSnapshot) : null;
+  const nutritionOpts = decisionSnapshot ? selectNutritionOpts(decisionSnapshot, state) : {};
+  const insights = computeLearningInsights(state);
+  const goals = nutritionGoals(p, insights, nutritionOpts);
+  const mealPlan = buildDailyMealPlan(p, state, date, insights, nutritionOpts);
+  const dims = performanceDimensions(state, p);
+  const recent = sessionsInLastDays(state.sessions, 7);
+  const metrics = state.days[date];
+  const totals = dayNutritionTotals(state.meals ?? []);
   const checkIn = state.dayCheckIns?.[date];
   const activeHub = activeHubForState(state.joinedHubIds);
   const ctx = buildUserContext(state, state.userId);
   const patterns = extractUserPatterns(state);
   const patternLines = patternInsights(patterns);
   const safety = decisionSnapshot?.safety ?? evaluateSafetyForDate(state, date);
+  // Training title from Living Plan (Decision) — do not remount weekly plan for mode
+  const todayTitle = living?.workout.title
+    ? `${living.workout.title} — ${living.workout.mode} (${living.workout.estimatedMin} min)`
+    : null;
 
   const mealLines = mealPlan.slots
     .map((s) => {
@@ -90,7 +93,7 @@ export function buildCoachContextFromState(
       ? [`Aprendizados recentes:`, ...insights.reasons.map((r) => `- ${r}`)]
       : ["Aprendizados recentes: nenhum ajuste automático no momento."];
 
-  const why = living?.why?.length ? living.why : ctx.why;
+  const why = living?.why?.length ? living.why : (whyPanel?.explanations ?? ctx.why);
   const whyBlock = why.length ? [`Por que o plano de hoje:`, ...why.map((r) => `- ${r}`)] : [];
 
   const whyByChangeBlock = living?.whyByChange?.length
@@ -101,7 +104,11 @@ export function buildCoachContextFromState(
     ? [`Contexto de hoje (Context Engine):`, ...ctx.why.map((r) => `- ${r}`)]
     : ["Contexto de hoje: estável."];
 
-  const reasonBlock = ctx.reasonCodes.length ? [`Reason codes: ${ctx.reasonCodes.join(", ")}`] : [];
+  const reasonBlock = whyPanel?.reason_aliases.length
+    ? [`Reason codes: ${whyPanel.reason_aliases.join(", ")}`]
+    : ctx.reasonCodes.length
+      ? [`Reason codes: ${ctx.reasonCodes.join(", ")}`]
+      : [];
 
   const decisions =
     builtDecisions?.decisions.map((d) => ({
@@ -133,10 +140,17 @@ export function buildCoachContextFromState(
     ? `treino ${living.workout.mode} (${living.workout.title}, volume ${Math.round(living.workout.volumeFactor * 100)}%) | macros ${living.nutrition.proteinG}g / ${living.nutrition.kcal} kcal | sono meta ${living.sleepTargetHours}h | hábito ${living.habits.title} | freio ${living.blocker?.label ?? "—"}`
     : "indisponível";
 
+  const evidenceBlock = whyPanel?.evidence.metrics
+    ? [
+        `Evidence: sleep=${String(whyPanel.evidence.metrics["sleepHours"] ?? "—")} | recovery=${String(whyPanel.evidence.metrics["recovery"] ?? "—")} | availableMin=${String(whyPanel.evidence.metrics["availableMin"] ?? "—")}`,
+      ]
+    : [];
+
   const contextText = [
     "Baseie-se nos dados abaixo. Nunca invente números. Não dê diagnóstico médico.",
     "Use os aprendizados e o plano alimentar sugerido quando falar de nutrição.",
     "Não assuma objetivo a partir de produtos comprados — objetivo vem do perfil.",
+    "Readiness ≠ diagnóstico médico.",
     "",
     `Nome: ${p.name}`,
     `Objetivo: ${GOAL_LABEL[p.goal]} | Nível: ${LEVEL_LABEL[p.level]} | Local: ${p.equipment}`,
@@ -156,10 +170,10 @@ export function buildCoachContextFromState(
     `Living plan: ${livingSummary}`,
     `Streak: ${streak(state.sessions)} dia(s) | Treinos nos últimos 7 dias: ${recent.length}`,
     `Treinos registrados no total: ${state.sessions.length}`,
-    today
-      ? `Treino de hoje (semana): ${today.title} — ${today.focus} (${today.estimatedMin} min)`
+    todayTitle
+      ? `Treino de hoje (Decision/Living Plan): ${todayTitle}`
       : "Hoje é descanso (sem treino agendado)",
-    `Metas nutricionais (ajustadas): ${goals.proteinG} g proteína | ${goals.kcal} kcal | água ${goals.waterMl} ml`,
+    `Metas nutricionais (Decision opts): ${goals.proteinG} g proteína | ${goals.kcal} kcal | água ${goals.waterMl} ml`,
     `Nutrição hoje: ${totals.proteinG} g proteína | ${totals.kcal} kcal | ${totals.count} refeições`,
     `Plano alimentar de hoje: ${mealLines}`,
     `Hidratação hoje: ${metrics?.waterMl ?? 0} ml`,
@@ -174,6 +188,7 @@ export function buildCoachContextFromState(
       : "Sem hub ativo",
     "",
     ...safetyBlock,
+    ...evidenceBlock,
     ...contextBlock,
     ...reasonBlock,
     ...decisionBlock,

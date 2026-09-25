@@ -13,7 +13,8 @@ import type { LearningInsights } from "@/lib/engine/learning/insights";
 export type LearningDomain =
   "training" | "nutrition" | "recovery" | "behavior" | "coach" | "challenge";
 
-export type LearningOutcome = "success" | "fail" | "neutral";
+/** Intervention / pattern outcome label (legacy FASE 5). Not the Decision→Outcome record. */
+export type LearningResultKind = "success" | "fail" | "neutral";
 
 export type LearningEvidenceSource = "session" | "meal" | "checkin" | "outcome" | "experiment";
 

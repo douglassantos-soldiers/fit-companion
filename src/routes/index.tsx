@@ -55,15 +55,14 @@ import {
   adherenceScore,
   streak,
 } from "@/lib/engine/dimensions";
-import {
-  computeLearningInsights,
-  topLearningInsight,
-} from "@/lib/engine/learning";
+import { computeLearningInsights, topLearningInsight } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
 import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
 import {
   selectNutritionOpts,
+  selectPrimaryAction,
   selectTrainingMode,
+  selectWhyPanel,
   shouldRefreshDecisionContextForToday,
 } from "@/lib/engine/decision-context-snapshot";
 import { trackOutcome } from "@/lib/outcome";
@@ -268,7 +267,7 @@ function Today() {
         const [league, fq, st] = await Promise.all([
           fetchClubLeague(club.id, ids, deviceId),
           ensureFriendQuest(deviceId, club, state.profile?.name || "Soldado"),
-          fetchClubStories(club.id),
+          fetchClubStories(club.id, deviceId),
         ]);
         if (cancelled) return;
         setLeagueMe(league?.find((r) => r.isYou) ?? null);
@@ -305,13 +304,18 @@ function Today() {
   }
 
   const profile = state.profile;
+  const decisionCtx = decisionContextForUi(state, todayKey());
   const insights = computeLearningInsights(state);
   const userCtx = buildUserContext(state, state.userId);
   const insightLine = userCtx.headline ?? topLearningInsight(state);
-  const plan = resolveTrainingPlanDays(state);
-  const day = planDayForToday(plan);
-  const decisionCtx = decisionContextForUi(state, todayKey());
+  // Candidates for cover / session id — mode & duration come only from Decision
+  const planCandidates = resolveTrainingPlanDays(state);
+  const dayCandidates = planDayForToday(planCandidates);
+  const workoutDayId = decisionCtx?.livingPlan.workout.dayId ?? dayCandidates?.id ?? null;
+  const workoutCoverId = dayCandidates?.exercises[0]?.exerciseId ?? null;
   const expressToday = decisionCtx ? selectTrainingMode(decisionCtx) === "express" : false;
+  const primaryFromDecision = decisionCtx ? selectPrimaryAction(decisionCtx) : null;
+  const whyPanel = decisionCtx ? selectWhyPanel(decisionCtx) : null;
   const doneToday = state.sessions.some((s) => s.date.slice(0, 10) === todayKey());
   const metrics = todayMetrics(state);
   const taken = todaySupplements(state);
@@ -522,7 +526,7 @@ function Today() {
 
       <HomeProgressCard
         score={score}
-        exerciseMin={living?.workout.estimatedMin ?? day?.estimatedMin ?? 0}
+        exerciseMin={living?.workout.estimatedMin ?? dayCandidates?.estimatedMin ?? 0}
         questsDone={questsDone}
         questsTarget={3}
         streakDays={st}
@@ -579,7 +583,7 @@ function Today() {
         </button>
       ) : null}
 
-      {persona === "inativo" && day && !doneToday ? (
+      {persona === "inativo" && workoutDayId && !doneToday ? (
         <div className="surface-glass mb-4 border-primary/30 p-4">
           <p className="eyebrow">Retomar</p>
           <p className="mt-1 text-sm font-semibold">
@@ -587,7 +591,7 @@ function Today() {
           </p>
           <Link
             to="/treino/sessao/$id"
-            params={{ id: day.id }}
+            params={{ id: workoutDayId }}
             search={{ express: expressToday, from: "hoje" }}
           >
             <Button className="mt-3 h-11 w-full font-bold uppercase">Retomar treino</Button>
@@ -598,9 +602,7 @@ function Today() {
       {state.activeTrainingBlock ? (
         <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">
-              Bloco
-            </p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-primary">Bloco</p>
             <p className="truncate text-sm font-semibold">
               {state.activeTrainingBlock.name} · Semana{" "}
               {blockDisplayWeek(state.activeTrainingBlock)}/
@@ -632,9 +634,11 @@ function Today() {
         <LivingPlanHero
           plan={living}
           doneToday={doneToday}
-          cover={day?.exercises[0] ? resolveExerciseMedia(day.exercises[0].exerciseId) : null}
+          cover={workoutCoverId ? resolveExerciseMedia(workoutCoverId) : null}
           checkIn={todayCheckIn}
-          defaultAvailableMin={resolvedAvailableMin(todayCheckIn, profile)}
+          defaultAvailableMin={
+            decisionCtx?.context.availableTimeMin ?? resolvedAvailableMin(todayCheckIn, profile)
+          }
           feedback={state.livingPlanFeedback?.[todayKey()] ?? null}
           onFeedback={(vote, reason) => {
             saveLivingPlanFeedback(todayKey(), vote, reason);
@@ -656,9 +660,12 @@ function Today() {
             const action: LivingPlanPrimaryAction = {
               id: topRec.id,
               title: topRec.title,
-              reason: topRec.reason,
+              reason: whyPanel?.explanations[0] ?? topRec.reason,
             };
             if (topRec.href) action.href = topRec.href;
+            if (primaryFromDecision === "rest" || primaryFromDecision === "sleep") {
+              action.reason = whyPanel?.reason_aliases.slice(0, 3).join(" · ") || action.reason;
+            }
             return action;
           })()}
           onPrimaryAction={() => {
@@ -732,10 +739,10 @@ function Today() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {day ? (
+            {workoutDayId ? (
               <Link
                 to="/treino/sessao/$id"
-                params={{ id: day.id }}
+                params={{ id: workoutDayId }}
                 search={{ express: expressToday, from: "hoje" }}
               >
                 <Button size="sm">Treinar</Button>
@@ -832,7 +839,9 @@ function Today() {
                   <span>
                     <span className="block text-sm font-semibold">Strength Score</span>
                     <span className="text-[0.65rem] uppercase text-muted-foreground">
-                      {strengthScore.coldStart ? "Estimativa" : `${strengthScore.evidenceCount} lifts`}
+                      {strengthScore.coldStart
+                        ? "Estimativa"
+                        : `${strengthScore.evidenceCount} lifts`}
                       {strengthScore.delta28d != null
                         ? ` · ${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d`
                         : ""}
@@ -844,7 +853,11 @@ function Today() {
             </div>
           );
         }
-        if (blockId === "weekPrs" && persona === "consistente" && (weekPrs.length || strengthScore)) {
+        if (
+          blockId === "weekPrs" &&
+          persona === "consistente" &&
+          (weekPrs.length || strengthScore)
+        ) {
           return (
             <div key="weekPrs" className="mb-3 space-y-1">
               {weekPrs.length ? (

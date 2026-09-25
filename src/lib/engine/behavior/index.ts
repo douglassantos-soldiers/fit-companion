@@ -31,7 +31,7 @@ export {
 
 import { computeLearningSnapshot } from "@/lib/engine/learning/snapshot";
 import { applyInterventionOutcome, scalarsFromResponses } from "@/lib/engine/learning/responses";
-import type { LearningOutcome } from "@/lib/engine/learning/types";
+import type { LearningResultKind } from "@/lib/engine/learning/types";
 import type { LearnedPattern } from "@/lib/engine/learned-patterns";
 import type {
   BehaviorLoopResult,
@@ -80,7 +80,7 @@ export function applyBehaviorOutcome(
 export function applyInterventionResult(
   profile: BehaviorProfile,
   type: InterventionType,
-  result: LearningOutcome,
+  result: LearningResultKind,
   at = todayKey(),
 ): BehaviorProfile {
   const fromScalar = Object.entries(profile.interventionResponse).map(([key, confidence]) => ({

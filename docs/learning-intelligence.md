@@ -2,6 +2,8 @@
 
 A Fase 5 consolida Learning Engine e Behavior Engine numa **camada superior de aprendizado** em `src/lib/engine/learning/`.
 
+> **Contrato canônico do ciclo Decision→Outcome→Signal:** ver [LEARNING_ENGINE.md](./LEARNING_ENGINE.md) (`runLearningCycle`).
+
 Learning **não é diagnóstico psicológico**. Não inventa personalidade nem traços clínicos.
 
 ## Pipeline

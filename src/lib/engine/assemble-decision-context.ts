@@ -72,22 +72,17 @@ export function assembleDecisionContext(
   };
 
   const weekHint = learningWeekHint(state, date);
+  /** Training candidates — Decision Engine chooses mode/volume; Living Plan materializes. */
   let plan: PlannedDay[];
   if (hasPrescribedPlan(state, date)) {
     plan = resolveTrainingPlanDays(state, date);
   } else {
-    const detailed = buildWeeklyPlanDetailed(
-      profile,
-      state.sessions,
-      equipment,
-      weekHint,
-      {
-        likedExerciseIds: state.likedExerciseIds ?? [],
-        dislikedExerciseIds: state.dislikedExerciseIds ?? [],
-        exercisePreferences: state.exercisePreferences,
-        recoveryCtx,
-      },
-    );
+    const detailed = buildWeeklyPlanDetailed(profile, state.sessions, equipment, weekHint, {
+      likedExerciseIds: state.likedExerciseIds ?? [],
+      dislikedExerciseIds: state.dislikedExerciseIds ?? [],
+      exercisePreferences: state.exercisePreferences,
+      recoveryCtx,
+    });
     plan = detailed.days;
   }
   const day = planDayForToday(plan, new Date(`${date}T12:00:00`));
@@ -98,6 +93,7 @@ export function assembleDecisionContext(
   const context = buildContextSnapshot(state, date, userId, recovery, learning);
   if (!context) return null;
 
+  // Context → Safety → Decision (never Decision → Safety)
   const safety = evaluateSafetyForDate(state, date, recovery);
   const decisions = computeDecisions(context, safety, {
     plannedMinutes,

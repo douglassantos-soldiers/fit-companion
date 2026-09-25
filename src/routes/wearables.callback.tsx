@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { syncWearableFn } from "@/lib/wearables/wearable.functions";
 import { useStore } from "@/lib/store";
+import { getDeviceId } from "@/lib/sync";
 
 export const Route = createFileRoute("/wearables/callback")({
   validateSearch: (search: Record<string, unknown>): { code?: string; state?: string } => {
@@ -32,7 +33,7 @@ function WearableCallbackPage() {
         void navigate({ to: "/social", search: { tab: "desafios" } });
         return;
       }
-      const res = await sync({ data: { provider, code } });
+      const res = await sync({ data: { provider, code, deviceId: getDeviceId() } });
       if (res.ok) {
         ingestActivityLogs(res.logs);
         setWearableConnection({

@@ -1,9 +1,11 @@
 /**
  * Wearable OAuth (Fase 15). No-op without env. Apple/HC never verify on web.
+ * Auth via resolveTrustedIdentity — never trust session.userId alone without device bind.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey, readAccessSession } from "@/lib/access-session.server";
+import { rateLimitKey } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
+import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import {
   normalizeGarminActivities,
   normalizeStravaActivities,
@@ -54,11 +56,21 @@ export const getWearableProvidersFn = createServerFn({ method: "GET" }).handler(
   },
 );
 
-function parseProvider(input: unknown): { provider: "strava" | "garmin"; code?: string } {
-  const p = String((input as { provider?: string } | null)?.provider ?? "strava");
+function parseProvider(input: unknown): {
+  provider: "strava" | "garmin";
+  deviceId: string;
+  code?: string;
+} {
+  const raw = input as { provider?: string; deviceId?: string; code?: string } | null;
+  const p = String(raw?.provider ?? "strava");
   if (p !== "strava" && p !== "garmin") throw new Error("provider inválido");
-  const codeRaw = String((input as { code?: string } | null)?.code ?? "").trim();
-  const out: { provider: "strava" | "garmin"; code?: string } = { provider: p };
+  const deviceId = String(raw?.deviceId ?? "").trim();
+  if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
+  const codeRaw = String(raw?.code ?? "").trim();
+  const out: { provider: "strava" | "garmin"; deviceId: string; code?: string } = {
+    provider: p,
+    deviceId,
+  };
   if (codeRaw) out.code = codeRaw;
   return out;
 }
@@ -69,9 +81,13 @@ export const connectWearableFn = createServerFn({ method: "POST" })
     async ({
       data,
     }): Promise<{ ok: true; authUrl: string } | { ok: false; reason: WearableFnError }> => {
-      const session = readAccessSession();
-      if (!session) return { ok: false, reason: "unauthorized" };
-      if (!rateLimitKey(`wearable-connect:${session.email}`, 20, 60 * 60_000)) {
+      const identity = await resolveTrustedIdentity({
+        deviceId: data.deviceId,
+        requireAccess: true,
+      });
+      if (!identity) return { ok: false, reason: "unauthorized" };
+      const rlKey = identity.email ?? identity.userId;
+      if (!rateLimitKey(`wearable-connect:${rlKey}`, 20, 60 * 60_000)) {
         return { ok: false, reason: "rate_limited" };
       }
       const redirect = `${appOrigin()}/wearables/callback`;
@@ -89,11 +105,10 @@ export const connectWearableFn = createServerFn({ method: "POST" })
   );
 
 async function saveTokens(
-  userId: string | undefined,
+  userId: string,
   provider: "strava" | "garmin",
   tokens: { access_token: string; refresh_token?: string; expires_in?: number },
 ) {
-  if (!userId) return;
   const db = await adminDbLoose();
   if (!db) return;
   const expires =
@@ -111,21 +126,17 @@ async function saveTokens(
 }
 
 async function persistWearableActivities(
-  userId: string | undefined,
+  userId: string,
   provider: "strava" | "garmin",
   logs: ActivityLogEntry[],
 ) {
-  if (!userId || !logs.length) return;
+  if (!logs.length) return;
   const { activitiesFromWearableLogs } = await import("@/lib/athlete/normalize");
   const { upsertActivities } = await import("@/lib/athlete/persist.server");
   await upsertActivities(userId, activitiesFromWearableLogs(userId, logs, provider));
 }
 
-async function loadToken(
-  userId: string | undefined,
-  provider: "strava" | "garmin",
-): Promise<string | null> {
-  if (!userId) return null;
+async function loadToken(userId: string, provider: "strava" | "garmin"): Promise<string | null> {
   const db = await adminDbLoose();
   if (!db) return null;
   const { data } = await db
@@ -146,15 +157,20 @@ export const syncWearableFn = createServerFn({ method: "POST" })
     }): Promise<
       { ok: true; logs: ActivityLogEntry[] } | { ok: false; reason: WearableFnError }
     > => {
-      const session = readAccessSession();
-      if (!session) return { ok: false, reason: "unauthorized" };
-      if (!rateLimitKey(`wearable-sync:${session.email}`, 30, 60 * 60_000)) {
+      const identity = await resolveTrustedIdentity({
+        deviceId: data.deviceId,
+        requireAccess: true,
+      });
+      if (!identity) return { ok: false, reason: "unauthorized" };
+      const rlKey = identity.email ?? identity.userId;
+      if (!rateLimitKey(`wearable-sync:${rlKey}`, 30, 60 * 60_000)) {
         return { ok: false, reason: "rate_limited" };
       }
+      const userId = identity.userId;
 
       if (data.provider === "strava") {
         if (!stravaOAuthConfigured()) return { ok: false, reason: "not_configured" };
-        let token = await loadToken(session.userId, "strava");
+        let token = await loadToken(userId, "strava");
         if (data.code) {
           try {
             const res = await fetch("https://www.strava.com/oauth/token", {
@@ -180,7 +196,7 @@ export const syncWearableFn = createServerFn({ method: "POST" })
             };
             if (json.refresh_token) stored.refresh_token = json.refresh_token;
             if (json.expires_in != null) stored.expires_in = json.expires_in;
-            await saveTokens(session.userId, "strava", stored);
+            await saveTokens(userId, "strava", stored);
           } catch {
             return { ok: false, reason: "upstream" };
           }
@@ -194,7 +210,7 @@ export const syncWearableFn = createServerFn({ method: "POST" })
           const payload = await act.json();
           const samples = normalizeStravaActivities(payload);
           const logs = samplesToActivityLogs(samples, "oauth");
-          await persistWearableActivities(session.userId, "strava", logs);
+          await persistWearableActivities(userId, "strava", logs);
           return { ok: true, logs };
         } catch {
           return { ok: false, reason: "upstream" };
@@ -202,7 +218,7 @@ export const syncWearableFn = createServerFn({ method: "POST" })
       }
 
       if (!garminOAuthConfigured()) return { ok: false, reason: "not_configured" };
-      let token = await loadToken(session.userId, "garmin");
+      let token = await loadToken(userId, "garmin");
       if (data.code) {
         try {
           const res = await fetch("https://diauth.garmin.com/di-oauth2/authorize/token", {
@@ -229,7 +245,7 @@ export const syncWearableFn = createServerFn({ method: "POST" })
           };
           if (json.refresh_token) stored.refresh_token = json.refresh_token;
           if (json.expires_in != null) stored.expires_in = json.expires_in;
-          await saveTokens(session.userId, "garmin", stored);
+          await saveTokens(userId, "garmin", stored);
         } catch {
           return { ok: false, reason: "upstream" };
         }
@@ -243,7 +259,7 @@ export const syncWearableFn = createServerFn({ method: "POST" })
         const payload = await act.json();
         const samples = normalizeGarminActivities(payload);
         const logs = samplesToActivityLogs(samples, "oauth");
-        await persistWearableActivities(session.userId, "garmin", logs);
+        await persistWearableActivities(userId, "garmin", logs);
         return { ok: true, logs };
       } catch {
         return { ok: false, reason: "upstream" };

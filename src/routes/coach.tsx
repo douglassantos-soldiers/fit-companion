@@ -11,6 +11,8 @@ import { makeProposal } from "@/lib/coach/proposals";
 import type { CoachProposal } from "@/lib/coach/types";
 import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
 import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import { selectNutritionOpts } from "@/lib/engine/decision-context-snapshot";
 import { buildDailyMealPlan } from "@/lib/engine/nutrition";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
@@ -27,7 +29,10 @@ export const Route = createFileRoute("/coach")({
         content: "Seu coach de performance responde com base nos seus treinos, peso e aderência.",
       },
       { property: "og:title", content: "Performance Coach" },
-      { property: "og:description", content: "Ajustes de treino, volume e suplementação em conversa." },
+      {
+        property: "og:description",
+        content: "Ajustes de treino, volume e suplementação em conversa.",
+      },
     ],
   }),
   component: CoachPage,
@@ -89,13 +94,19 @@ function formatCoachReply(text: string, structured?: CoachStructuredReply | null
     parts.push(`\n\nAtenção: ${structured.safetyNotice}`);
   }
   if (structured.kind === "why" && structured.why.length) {
-    parts.push(`\n\nPor quê:\n${structured.why.slice(0, 4).map((w) => `• ${w}`).join("\n")}`);
+    parts.push(
+      `\n\nPor quê:\n${structured.why
+        .slice(0, 4)
+        .map((w) => `• ${w}`)
+        .join("\n")}`,
+    );
   }
   if (structured.evidence) {
     const e = structured.evidence;
     const bits: string[] = [];
     if (e.sleepHours != null) bits.push(`sono ${e.sleepHours}h`);
-    if (e.hardRpeStreak != null && e.hardRpeStreak > 0) bits.push(`RPE difícil ×${e.hardRpeStreak}`);
+    if (e.hardRpeStreak != null && e.hardRpeStreak > 0)
+      bits.push(`RPE difícil ×${e.hardRpeStreak}`);
     if (e.decisionSummary) bits.push(e.decisionSummary);
     if (e.trainingMode) bits.push(`modo ${e.trainingMode}`);
     if (bits.length) parts.push(`\n\nEvidências: ${bits.join(" · ")}`);
@@ -105,13 +116,23 @@ function formatCoachReply(text: string, structured?: CoachStructuredReply | null
 
 function CoachPage() {
   const navigate = useNavigate();
-  const { state, hydrated, pushChat, markQuestCoachOpened, saveDayCheckIn, refreshLivingPlan, addWater, addMealEntry } =
-    useStore();
+  const {
+    state,
+    hydrated,
+    pushChat,
+    markQuestCoachOpened,
+    saveDayCheckIn,
+    refreshLivingPlan,
+    addWater,
+    addMealEntry,
+  } = useStore();
   const askAi = useServerFn(askAiCoach);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastActions, setLastActions] = useState<NonNullable<CoachStructuredReply["actions"]>>([]);
-  const [lastProposals, setLastProposals] = useState<NonNullable<CoachStructuredReply["proposals"]>>([]);
+  const [lastProposals, setLastProposals] = useState<
+    NonNullable<CoachStructuredReply["proposals"]>
+  >([]);
   const endRef = useRef<HTMLDivElement>(null);
   const offlineToastShown = useRef(false);
   const stateRef = useRef(state);
@@ -206,16 +227,18 @@ function CoachPage() {
     pushChat("user", label);
     setBusy(true);
     setLastProposals([]);
-    void runAi(snapshot, label, coachReply(promptId, snapshot)).then(({ text: reply, offline, reason }) => {
-      pushChat("coach", reply);
-      if (offline) notifyOfflineOnce(reason);
-      setLastProposals((prev) => {
-        if (prev.length) return prev;
-        const local = localProposalForPrompt(promptId);
-        return local ? [local] : [];
-      });
-      setBusy(false);
-    });
+    void runAi(snapshot, label, coachReply(promptId, snapshot)).then(
+      ({ text: reply, offline, reason }) => {
+        pushChat("coach", reply);
+        if (offline) notifyOfflineOnce(reason);
+        setLastProposals((prev) => {
+          if (prev.length) return prev;
+          const local = localProposalForPrompt(promptId);
+          return local ? [local] : [];
+        });
+        setBusy(false);
+      },
+    );
   };
 
   const send = () => {
@@ -226,16 +249,18 @@ function CoachPage() {
     setText("");
     setBusy(true);
     setLastProposals([]);
-    void runAi(snapshot, value, coachFreeform(value, snapshot)).then(({ text: reply, offline, reason }) => {
-      pushChat("coach", reply);
-      if (offline) notifyOfflineOnce(reason);
-      setLastProposals((prev) => {
-        if (prev.length) return prev;
-        const local = localProposalForFreeform(value);
-        return local ? [local] : [];
-      });
-      setBusy(false);
-    });
+    void runAi(snapshot, value, coachFreeform(value, snapshot)).then(
+      ({ text: reply, offline, reason }) => {
+        pushChat("coach", reply);
+        if (offline) notifyOfflineOnce(reason);
+        setLastProposals((prev) => {
+          if (prev.length) return prev;
+          const local = localProposalForFreeform(value);
+          return local ? [local] : [];
+        });
+        setBusy(false);
+      },
+    );
   };
 
   const hasUserMessage = state.chat.some((m) => m.role === "user");
@@ -254,7 +279,13 @@ function CoachPage() {
             className="h-12 rounded-full border-white/10 bg-card/40 backdrop-blur"
             disabled={busy}
           />
-          <Button size="icon" className="size-12 glow-primary" onClick={send} aria-label="Enviar" disabled={busy}>
+          <Button
+            size="icon"
+            className="size-12 glow-primary"
+            onClick={send}
+            aria-label="Enviar"
+            disabled={busy}
+          >
             <Send className="size-4" />
           </Button>
         </div>
@@ -281,7 +312,8 @@ function CoachPage() {
           </div>
           <h2 className="mt-4 text-2xl">Bem-vindo ao Coach</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Pergunte qualquer coisa — treino, comida, recuperação ou suplementos com base nos seus dados.
+            Pergunte qualquer coisa — treino, comida, recuperação ou suplementos com base nos seus
+            dados.
           </p>
           <p className="eyebrow mt-6 mb-2 text-left">Sugestões rápidas</p>
           <div className="grid grid-cols-2 gap-2 text-left">
@@ -316,7 +348,9 @@ function CoachPage() {
           </div>
         ))}
         {busy ? (
-          <div className="surface-glass max-w-[85%] animate-pulse px-4 py-3 text-sm text-muted-foreground">…</div>
+          <div className="surface-glass max-w-[85%] animate-pulse px-4 py-3 text-sm text-muted-foreground">
+            …
+          </div>
         ) : null}
         <div ref={endRef} />
       </div>
@@ -330,7 +364,11 @@ function CoachPage() {
               className="rounded-full border border-primary bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary"
               onClick={() => {
                 const todayCheck = state.dayCheckIns?.[todayKey()];
-                const mealPlan = state.profile ? buildDailyMealPlan(state.profile, state, todayKey()) : null;
+                const decisionCtx = decisionContextForUi(state, todayKey());
+                const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
+                const mealPlan = state.profile
+                  ? buildDailyMealPlan(state.profile, state, todayKey(), undefined, engine)
+                  : null;
                 const result = acceptCoachProposal(p, {
                   ...(todayCheck ? { checkIn: todayCheck } : {}),
                   mealPlan,

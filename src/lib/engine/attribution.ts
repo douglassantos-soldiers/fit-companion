@@ -8,6 +8,7 @@ import {
   refineWorkoutModeCanonical,
 } from "@/lib/engine/performance-decision-types";
 import type { PatternKind } from "@/lib/engine/learned-patterns";
+import type { LearningSignal } from "@/lib/engine/learning/types";
 
 export const ATTRIBUTION_ENGINE = "attribution_v1";
 export const LEARNING_CONFIDENCE_MIN = 0.6;
@@ -75,7 +76,7 @@ export type AttributionHit = {
   outcomeType: string;
   outcomeWindow: OutcomeWindow;
   outcomeQuality: OutcomeQuality;
-  learningSignal: string | null;
+  learningSignal: LearningSignal | null;
 };
 
 export type AttributionExplanation = {
@@ -89,7 +90,7 @@ export type AttributionExplanation = {
   attributionType: AttributionType | null;
   attributionConfidence: number | null;
   relatedDirectly: boolean;
-  learningSignal: string | null;
+  learningSignal: LearningSignal | null;
   fedLearning: boolean;
 };
 
@@ -189,7 +190,7 @@ function ofType(decisions: DecisionRef[], types: string[]): DecisionRef[] {
   return decisions.filter((d) => set.has(canonicalDecisionType(d.decisionType, d.decisionValue)));
 }
 
-function expressSignal(decision: DecisionRef, extras?: AttributionExtras): string | null {
+function expressSignal(decision: DecisionRef, extras?: AttributionExtras): LearningSignal | null {
   const type = canonicalDecisionType(decision.decisionType, decision.decisionValue);
   const express = extras?.express === true || decision.decisionValue === "express";
   if (type === "WORKOUT_MODE" && express && extras?.workoutCompleted !== false) {
@@ -405,7 +406,7 @@ export function patternKindFromLearningSignal(signal: string | null): PatternKin
   return null;
 }
 
-export function learningSignalFromAttribution(hit: AttributionHit): string | null {
+export function learningSignalFromAttribution(hit: AttributionHit): LearningSignal | null {
   if (!shouldLearnFromAttribution(hit)) return null;
   return hit.learningSignal;
 }
@@ -471,7 +472,7 @@ export function explainAttributionFromParts(opts: {
   outcomeWindow: OutcomeWindow | null;
   attributionType: AttributionType | null;
   attributionConfidence: number | null;
-  learningSignal: string | null;
+  learningSignal: LearningSignal | null;
   outcomeQuality?: OutcomeQuality | null;
 }): AttributionExplanation {
   const attributionType = opts.attributionType;

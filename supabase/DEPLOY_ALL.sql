@@ -2,7 +2,11 @@
 -- Project: zphtvrsxlhfgltwgbreu
 -- Paste into Supabase SQL Editor → Run
 -- Generated: 2026-09-17T23:26:57.4233513-03:00
-
+--
+-- !!! DO NOT RUN after FASE1/FASE2 security harden !!!
+-- This bundle reintroduces USING(true) WITH CHECK(true) policies.
+-- Use versioned migrations under supabase/migrations/ instead.
+--
 
 
 -- ========== 20260913001917_d8e39ee3-454b-4a4e-94f6-35ffa13963a2.sql ==========

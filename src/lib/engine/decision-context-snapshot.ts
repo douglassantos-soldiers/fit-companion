@@ -146,6 +146,9 @@ export function selectNutritionOpts(
   return opts;
 }
 
+export { selectWhyPanel } from "@/lib/engine/decision-contract";
+export type { WhyPanel } from "@/lib/engine/decision-contract";
+
 export function applyDecisionContextToState(
   state: AppState,
   snapshot: DecisionContextSnapshot,

@@ -1,4 +1,9 @@
 -- Creator Hubs MVP (consumer): seeded Performance Hubs
+--
+-- !!! DO NOT RUN after FASE1/FASE2 security harden !!!
+-- This script grants anon/authenticated ALL + USING(true) on hubs.
+-- Use versioned migrations under supabase/migrations/ instead.
+--
 CREATE TABLE IF NOT EXISTS public.hubs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   slug TEXT NOT NULL UNIQUE,

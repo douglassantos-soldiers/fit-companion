@@ -157,9 +157,7 @@ import {
   type SessionLog,
   type Theme,
 } from "@/lib/types";
-import {
-  applyUserCatalog,
-} from "@/lib/nutrition/food-catalog";
+import { applyUserCatalog } from "@/lib/nutrition/food-catalog";
 import { mergeFavoriteFoodIds } from "@/lib/nutrition/favorite-foods-merge";
 import {
   buildCustomFood,
@@ -370,6 +368,10 @@ function applyTheme(theme: Theme) {
   root.dataset["theme"] = theme;
 }
 
+/**
+ * After domain mutations: keep server DecisionContext authoritative.
+ * Never overwrite source:"server". Offline reassembles only when cache missing/stale.
+ */
 function withSnapshot(s: AppState): AppState {
   if (!s.profile) return s;
   const date = todayKeyForProfile(s.profile);
@@ -402,6 +404,16 @@ function withSnapshot(s: AppState): AppState {
     source: "offline_legacy",
   });
   if (!assembled) return withDims;
+  if (
+    cached?.source === "offline_legacy" &&
+    cached.inputFingerprint === assembled.inputFingerprint
+  ) {
+    return {
+      ...withDims,
+      livingPlans: { ...withDims.livingPlans, [date]: cached.livingPlan },
+      decisionContextByDate: { ...withDims.decisionContextByDate, [date]: cached },
+    };
+  }
   return applyDecisionContextToState(withDims, assembled);
 }
 
@@ -544,7 +556,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void getPublicCatalog()
       .then((payload) => {
         try {
-          applyPublicCatalog(JSON.parse(payload.json) as PublicCatalog, stateRef.current.customFoods ?? []);
+          applyPublicCatalog(
+            JSON.parse(payload.json) as PublicCatalog,
+            stateRef.current.customFoods ?? [],
+          );
         } catch (e) {
           console.warn("Catalog parse failed", e);
         }
@@ -800,10 +815,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearLocalReminders();
       return;
     }
-    const day =
-      state.profile != null
-        ? planDayForToday(resolveTrainingPlanDays(state))
-        : null;
+    const day = state.profile != null ? planDayForToday(resolveTrainingPlanDays(state)) : null;
     scheduleLocalReminders({
       enabled: true,
       hour: state.reminderHour ?? 18,
@@ -871,10 +883,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           let next = withSnapshot({ ...prev, sessions: [session, ...prev.sessions] });
           if (blockContainsDayId(next.activeTrainingBlock, session.dayId)) {
             const prevBlock = next.activeTrainingBlock!;
-            const { block: advanced, finished, weekAdvanced } = completeBlockDay(
-              prevBlock,
-              session.dayId,
-            );
+            const {
+              block: advanced,
+              finished,
+              weekAdvanced,
+            } = completeBlockDay(prevBlock, session.dayId);
             if (finished) {
               next = {
                 ...next,
@@ -1431,7 +1444,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const already = taken.includes(id);
           took = !already;
           let doseLogs = [...(prev.supplementDoseLogs ?? [])];
-          let frequencies = { ...(prev.supplementFrequencies ?? {}) };
+          const frequencies = { ...(prev.supplementFrequencies ?? {}) };
           let nextTaken: string[];
 
           if (already) {

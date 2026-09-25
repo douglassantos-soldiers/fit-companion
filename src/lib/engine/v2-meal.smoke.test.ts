@@ -81,17 +81,25 @@ describe("relative challenges", () => {
 describe("meal-ai contract", () => {
   it("parses valid photo/text input and rejects bad payloads", () => {
     expect(() => parseMealAiInput({})).toThrow(/Modo/);
-    expect(() => parseMealAiInput({ mode: "text", slot: "almoco" })).toThrow(/Texto/);
+    expect(() => parseMealAiInput({ mode: "text", slot: "almoco", deviceId: "device-aaaaaaaa" })).toThrow(
+      /Texto/,
+    );
+    expect(() =>
+      parseMealAiInput({ mode: "text", slot: "almoco", text: "arroz", deviceId: "short" }),
+    ).toThrow(/deviceId/);
     const text = parseMealAiInput({
       mode: "text",
       slot: "almoco",
+      deviceId: "device-aaaaaaaa",
       text: "arroz feijão frango",
     });
     expect(text.mode).toBe("text");
+    expect(text.deviceId).toBe("device-aaaaaaaa");
 
     const photo = parseMealAiInput({
       mode: "photo",
       slot: "jantar",
+      deviceId: "device-bbbbbbbb",
       mediaBase64: "aGVsbG8=",
       mimeType: "image/jpeg",
     });

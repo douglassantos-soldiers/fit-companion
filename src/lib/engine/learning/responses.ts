@@ -2,7 +2,7 @@
  * InterventionResponse — counts from persisted outcomes, never invented traits.
  */
 import type { InterventionType } from "@/lib/engine/behavior/types";
-import type { InterventionResponse, LearningOutcome } from "@/lib/engine/learning/types";
+import type { InterventionResponse, LearningResultKind } from "@/lib/engine/learning/types";
 
 export function emptyInterventionResponse(type: InterventionType): InterventionResponse {
   return {
@@ -28,7 +28,7 @@ export function confidenceFromCounts(
 export function applyInterventionOutcome(
   list: InterventionResponse[],
   type: InterventionType,
-  result: LearningOutcome,
+  result: LearningResultKind,
   at: string,
 ): InterventionResponse[] {
   const next = [...list];

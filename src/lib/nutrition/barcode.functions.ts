@@ -1,26 +1,38 @@
 /**
- * Open Food Facts barcode lookup (Fase 13). No Postgres write. Access session + rate limit.
+ * Open Food Facts barcode lookup (Fase 13). No Postgres write.
+ * Auth via resolveTrustedIdentity (access cookie + device bind).
  */
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey, readAccessSession } from "@/lib/access-session.server";
+import { rateLimitKey } from "@/lib/access-session.server";
+import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import { barcodeHitFromOffProduct, parseEan, type BarcodeHit } from "@/lib/nutrition/barcode";
 
 export type BarcodeLookupResult =
   | { found: true; hit: BarcodeHit; error?: undefined }
-  | { found: false; error?: "unauthorized" | "rate_limited" | "invalid" | "upstream" | "not_found" };
+  | {
+      found: false;
+      error?: "unauthorized" | "rate_limited" | "invalid" | "upstream" | "not_found";
+    };
 
-function parseInput(input: unknown): { ean: string } {
-  const ean = parseEan(String((input as { ean?: string } | null)?.ean ?? ""));
+function parseInput(input: unknown): { ean: string; deviceId: string } {
+  const raw = input as { ean?: string; deviceId?: string } | null;
+  const ean = parseEan(String(raw?.ean ?? ""));
   if (!ean) throw new Error("ean inválido");
-  return { ean };
+  const deviceId = String(raw?.deviceId ?? "").trim();
+  if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
+  return { ean, deviceId };
 }
 
 export const lookupBarcodeFn = createServerFn({ method: "POST" })
   .inputValidator(parseInput)
   .handler(async ({ data }): Promise<BarcodeLookupResult> => {
-    const session = readAccessSession();
-    if (!session) return { found: false, error: "unauthorized" };
-    if (!rateLimitKey(`barcode:${session.email}`, 60, 60 * 60_000)) {
+    const identity = await resolveTrustedIdentity({
+      deviceId: data.deviceId,
+      requireAccess: true,
+    });
+    if (!identity) return { found: false, error: "unauthorized" };
+    const rlKey = identity.email ?? identity.userId;
+    if (!rateLimitKey(`barcode:${rlKey}`, 60, 60 * 60_000)) {
       return { found: false, error: "rate_limited" };
     }
 
@@ -32,12 +44,15 @@ export const lookupBarcodeFn = createServerFn({ method: "POST" })
         headers: { "User-Agent": "SoldiersTraining/1.0 (nutrition barcode)" },
       });
       if (!res.ok) {
-        // Fallback to world OFF if BR host misses
-        const world = await fetch(`https://world.openfoodfacts.org/api/v2/product/${data.ean}.json`, {
-          signal: ctrl.signal,
-          headers: { "User-Agent": "SoldiersTraining/1.0 (nutrition barcode)" },
-        });
-        if (!world.ok) return { found: false, error: res.status === 404 ? "not_found" : "upstream" };
+        const world = await fetch(
+          `https://world.openfoodfacts.org/api/v2/product/${data.ean}.json`,
+          {
+            signal: ctrl.signal,
+            headers: { "User-Agent": "SoldiersTraining/1.0 (nutrition barcode)" },
+          },
+        );
+        if (!world.ok)
+          return { found: false, error: res.status === 404 ? "not_found" : "upstream" };
         const json = (await world.json()) as {
           status?: number;
           product?: {

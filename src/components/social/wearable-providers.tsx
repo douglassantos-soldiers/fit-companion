@@ -15,6 +15,7 @@ import {
   watchNativeWearableMessages,
 } from "@/lib/wearables/native-bridge";
 import { useStore } from "@/lib/store";
+import { getDeviceId } from "@/lib/sync";
 import type { WearableLinkStatus, WearableProviderId } from "@/lib/types";
 
 const LABELS: Record<WearableProviderId, string> = {
@@ -83,7 +84,7 @@ export function WearableProvidersPanel() {
   const onConnect = async (provider: "strava" | "garmin") => {
     setBusy(provider);
     try {
-      const res = await connect({ data: { provider } });
+      const res = await connect({ data: { provider, deviceId: getDeviceId() } });
       if (!res.ok) {
         toast.message(
           res.reason === "not_configured"
@@ -103,7 +104,7 @@ export function WearableProvidersPanel() {
   const onSync = async (provider: "strava" | "garmin") => {
     setBusy(provider);
     try {
-      const res = await sync({ data: { provider } });
+      const res = await sync({ data: { provider, deviceId: getDeviceId() } });
       if (!res.ok) {
         toast.message(
           res.reason === "not_configured"

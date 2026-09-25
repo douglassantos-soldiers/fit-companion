@@ -9,6 +9,7 @@ import { QUALITY_LABEL, recentMealPresets, scalePreset } from "@/lib/engine/nutr
 import { analyzeMealAi } from "@/lib/meal-ai.functions";
 import type { MealAiSuggestion } from "@/lib/meal-ai-contract";
 import { lookupBarcodeFn } from "@/lib/nutrition/barcode.functions";
+import { getDeviceId } from "@/lib/sync";
 import {
   lookupLocalBarcode,
   mealFromBarcode,
@@ -256,7 +257,7 @@ export function MealPickerSheet({
     setBarcodeBusy(true);
     setBarcodeError(null);
     try {
-      const res = await lookupBarcode({ data: { ean: parsed } });
+      const res = await lookupBarcode({ data: { ean: parsed, deviceId: getDeviceId() } });
       if (res.found) {
         setBarcodeHit(res.hit);
         return;
@@ -492,7 +493,7 @@ export function MealPickerSheet({
       const compressed = await compressImage(file);
       const { base64, mimeType } = await fileToBase64(compressed);
       const res = await analyze({
-        data: { mode: "photo", slot, mediaBase64: base64, mimeType },
+        data: { mode: "photo", slot, deviceId: getDeviceId(), mediaBase64: base64, mimeType },
       });
       if (res.error) {
         if (res.error === "not_configured") {
@@ -552,7 +553,7 @@ export function MealPickerSheet({
     try {
       const { base64, mimeType } = await fileToBase64(blob);
       const res = await analyze({
-        data: { mode: "voice", slot, mediaBase64: base64, mimeType },
+        data: { mode: "voice", slot, deviceId: getDeviceId(), mediaBase64: base64, mimeType },
       });
       if (res.error) {
         if (res.error === "not_configured") {
@@ -590,7 +591,7 @@ export function MealPickerSheet({
     setAiDraft(null);
     try {
       const res = await analyze({
-        data: { mode: "text", slot, text },
+        data: { mode: "text", slot, deviceId: getDeviceId(), text },
       });
       if (res.error) {
         if (res.error === "not_configured") {

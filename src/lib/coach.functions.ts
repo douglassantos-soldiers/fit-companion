@@ -5,7 +5,6 @@ import {
   readAccessSession,
 } from "@/lib/access-session.server";
 import {
-  buildCoachSystemPrompt,
   buildStructuredCoachReply,
   detectCoachIntent,
   parseCoachInput,
@@ -25,21 +24,15 @@ import {
   proposalFromDecisions,
   validateProposalAgainstDecisionEngine,
 } from "@/lib/coach/proposals";
-import { callCoachProvider } from "@/lib/coach/provider";
-import { prefetchToolsForTurn } from "@/lib/coach/tools";
-import { morningCheckinWorkflow } from "@/lib/coach/workflows/morning-checkin";
-import { nutritionReviewWorkflow } from "@/lib/coach/workflows/nutrition-review";
-import { plateauAnalysisWorkflow } from "@/lib/coach/workflows/plateau-analysis";
-import { postWorkoutWorkflow } from "@/lib/coach/workflows/post-workout";
-import { recoveryAdjustmentWorkflow } from "@/lib/coach/workflows/recovery-adjustment";
 import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
+import { postWorkoutWorkflow } from "@/lib/coach/workflows/post-workout";
 import { evaluateSafetyForDate } from "@/lib/engine/safety";
 import { EVENT_TAXONOMY } from "@/lib/events/taxonomy";
-import type { WorkflowResult } from "@/lib/coach/types";
+import type { CoachProposal } from "@/lib/coach/types";
 import { todayKey } from "@/lib/types";
 
 export type { CoachProvider, CoachStructuredReply };
-export { parseCoachInput, buildCoachSystemPrompt };
+export { parseCoachInput, buildCoachSystemPrompt } from "@/lib/coach-contract";
 
 function coachRateLimits() {
   const rpm = Number(process.env["COACH_RPM"] ?? 10);
@@ -75,40 +68,8 @@ function logCoachUsage(entry: {
 /** Re-export typed builder for tests / other server modules */
 export { buildCoachContext };
 
-function pickWorkflow(
-  hint: string | undefined,
-  lastUser: string,
-  ctx: Awaited<ReturnType<typeof buildCoachContext>>,
-): WorkflowResult | null {
-  const state = ctx.state;
-  if (hint === "morning-checkin" || /bom\s*dia|check.?in|como\s+estou\s+hoje/i.test(lastUser)) {
-    return morningCheckinWorkflow(ctx.typed);
-  }
-  if (hint === "weekly-review" || /revis[aã]o\s+semanal|resumo\s+da\s+semana/i.test(lastUser)) {
-    return weeklyReviewWorkflow(ctx.typed);
-  }
-  if (
-    hint === "post-workout" ||
-    /p[oó]s.?treino|depois\s+do\s+treino|acabei\s+de\s+treinar/i.test(lastUser)
-  ) {
-    const last =
-      [...(state.sessions ?? [])].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
-    return postWorkoutWorkflow(ctx.typed, last, state.sessions ?? []);
-  }
-  if (hint === "recovery-adjustment" || /recupera|cansad|sono\s+ruim|fatigue/i.test(lastUser)) {
-    return recoveryAdjustmentWorkflow(ctx.typed);
-  }
-  if (hint === "plateau-analysis" || /plateau|estagnad|n[aã]o\s+evolu/i.test(lastUser)) {
-    return plateauAnalysisWorkflow(ctx.typed, state.sessions ?? []);
-  }
-  if (hint === "nutrition-review" || /nutri[cç][aã]o|prote[ií]na|macros/i.test(lastUser)) {
-    return nutritionReviewWorkflow(ctx.typed);
-  }
-  return null;
-}
-
 /**
- * AI Coach 2.0 / Phase 3 — context + tools + workflows server-side.
+ * AI Coach — Coach Agent path (Orchestrator → Specialists → FactPack).
  * Client must NOT send critical context (ignored if present).
  */
 export const askAiCoach = createServerFn({ method: "POST" })
@@ -152,40 +113,54 @@ export const askAiCoach = createServerFn({ method: "POST" })
     const turnKind = classifyCoachTurn(lastUser);
     const intent = detectCoachIntent(lastUser);
 
-    // Safety first for medical / actionable
     const safetyNotice =
       requiresSafetyFirst(turnKind) || ctx.typed.safety.escalateCare
         ? ctx.safetyNotice
         : ctx.safetyNotice;
 
-    const workflow = pickWorkflow(data.workflow, lastUser, ctx);
-
-    // Prefetch tools for explainability (factual / explanatory)
-    let toolPack: Record<string, unknown> = {};
-    if (turnKind === "factual" || turnKind === "explanatory" || intent === "why") {
-      try {
-        toolPack = await prefetchToolsForTurn(identity.userId, lastUser);
-      } catch {
-        toolPack = {};
-      }
-    }
-
-    const evidence = workflow?.evidence ?? evidenceFromContext(ctx.typed);
     const snap = ctx.state.decisionContextByDate?.[day] ?? null;
     const builtDecisions = snap?.decisions ?? null;
     const safety = snap?.safety ?? evaluateSafetyForDate(ctx.state, day);
 
-    let proposal =
-      workflow?.proposal ??
-      (builtDecisions
-        ? proposalFromDecisions(
-            builtDecisions,
-            safety,
-            evidence as Record<string, string | number | boolean | null>,
-          )
-        : null);
+    // Coach Agent path (Orchestrator → Specialists → FactPack) — default, no LLM authority
+    const { runCoachAgent } = await import("@/ai/agents/coach");
+    const contextAvailable = Boolean(snap) || Boolean(ctx.livingSummary);
+    const coachOut = await runCoachAgent({
+      trustedUserId: identity.userId,
+      message: lastUser,
+      contextAvailable,
+      ...(builtDecisions ? { decisions: builtDecisions } : {}),
+      safety,
+      forceSafetyBlock: Boolean(safety.escalateCare && turnKind === "actionable"),
+    });
 
-    if (proposal) {
+    let proposal = null as CoachProposal | null;
+    if (coachOut.factPack?.proposal && coachOut.factPack.proposalStatus === "accepted") {
+      const p = coachOut.factPack.proposal;
+      const typeMap = [
+        "REDUCE_VOLUME",
+        "DELOAD",
+        "REST",
+        "CHECKIN",
+        "EXPRESS_WORKOUT",
+        "FULL_WORKOUT",
+        "NUTRITION_FOCUS",
+        "SLEEP_FOCUS",
+      ] as const;
+      const mappedType = typeMap.includes(p.proposed_type as (typeof typeMap)[number])
+        ? (p.proposed_type as CoachProposal["type"])
+        : ("REDUCE_VOLUME" as const);
+      proposal = {
+        type: mappedType,
+        action: "adapt_workout",
+        value: p.proposed_value,
+        reasonCodes: p.reason_codes,
+        evidence: evidenceFromContext(ctx.typed) as Record<
+          string,
+          string | number | boolean | null
+        >,
+        confidence: p.confidence,
+      };
       const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
       proposal = validated.proposal;
       if (proposal) {
@@ -200,40 +175,41 @@ export const askAiCoach = createServerFn({ method: "POST" })
           confidence: proposal.confidence,
         });
       }
+    } else if (builtDecisions && !coachOut.factPack?.proposal) {
+      proposal = proposalFromDecisions(
+        builtDecisions,
+        safety,
+        evidenceFromContext(ctx.typed) as Record<string, string | number | boolean | null>,
+      );
+      const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
+      proposal = validated.proposal;
     }
 
-    const actions = workflow?.actions?.length ? workflow.actions : actionsForProposal(proposal);
-
-    const toolBlock =
-      Object.keys(toolPack).length > 0
-        ? `\n\nDados de tools (server-fetched):\n${JSON.stringify(toolPack).slice(0, 6000)}`
-        : "";
-    const workflowBlock = workflow
-      ? `\n\nWorkflow ${workflow.workflow}:\n${workflow.analysis.join("\n")}\nOutcome esperado: ${workflow.outcomeExpectation}`
-      : "";
-
-    const system = buildCoachSystemPrompt(
-      ctx.contextText + toolBlock + workflowBlock,
-      safetyNotice,
-    );
+    const actions = actionsForProposal(proposal);
+    const structuredKind =
+      coachOut.intentKind === "why_plan_changed" || intent === "why"
+        ? ("why" as const)
+        : intent === "today"
+          ? ("today" as const)
+          : ("general" as const);
 
     const structured: CoachStructuredReply = buildStructuredCoachReply({
-      kind: intent,
-      summary:
-        workflow?.wins?.[0] ??
-        (intent === "today"
-          ? `Hoje: ${ctx.livingSummary}`
-          : intent === "why"
-            ? (ctx.why[0] ??
-              "O plano reflete as decisões do Decision Engine para o seu contexto de hoje.")
-            : ctx.livingSummary),
-      why: workflow?.analysis?.length ? workflow.analysis : ctx.why,
-      decisions: ctx.decisions,
+      kind: structuredKind,
+      summary: coachOut.structured.summary || ctx.livingSummary,
+      why: coachOut.structured.why.length > 0 ? coachOut.structured.why : ctx.why,
+      decisions:
+        coachOut.structured.decisions.length > 0
+          ? coachOut.structured.decisions.map((d) => ({
+              type: "note",
+              value: d,
+              explanation: d,
+            }))
+          : ctx.decisions,
       ...(safetyNotice ? { safetyNotice } : {}),
       turnKind,
       ...(proposal ? { proposals: [proposal] } : {}),
       ...(actions.length ? { actions } : {}),
-      evidence,
+      evidence: evidenceFromContext(ctx.typed),
     });
 
     try {
@@ -247,7 +223,9 @@ export const askAiCoach = createServerFn({ method: "POST" })
           provider: data.provider,
           intent,
           turnKind,
-          workflow: workflow?.workflow ?? null,
+          coachAgent: true,
+          coachStatus: coachOut.status,
+          planId: coachOut.plan_id ?? null,
         },
       });
     } catch {
@@ -261,7 +239,6 @@ export const askAiCoach = createServerFn({ method: "POST" })
       messageCount: data.messages.length,
     });
 
-    // Persist a light preference/fact when user states something actionable (not full chat)
     if (turnKind === "actionable" && lastUser.length > 8) {
       void upsertCoachMemory({
         userId: identity.userId,
@@ -272,34 +249,22 @@ export const askAiCoach = createServerFn({ method: "POST" })
       });
     }
 
-    const providerResult = await callCoachProvider({
-      provider: data.provider,
-      system,
-      messages: data.messages,
-    });
-
     const latencyMs = Date.now() - started;
-    if (providerResult.error) {
-      logCoachUsage({
-        userId: identity.userId,
-        provider: data.provider === "chatgpt" ? "openai" : "anthropic",
-        model: providerResult.model,
-        success: false,
-        latencyMs,
-        error: providerResult.error,
-      });
-      return { text: "", structured, error: providerResult.error };
-    }
-
     logCoachUsage({
       userId: identity.userId,
-      provider: data.provider === "chatgpt" ? "openai" : "anthropic",
-      model: providerResult.model,
-      success: true,
+      provider: "coach_agent",
+      model: "runCoachAgent",
+      success: coachOut.ok || coachOut.status === "insufficient_context",
       latencyMs,
+      ...(coachOut.error_code ? { error: coachOut.error_code } : {}),
     });
 
-    return { text: providerResult.text, structured };
+    return {
+      text: coachOut.text,
+      structured,
+      coachAgent: true as const,
+      status: coachOut.status,
+    };
   });
 
 /** Server fn: weekly review without LLM (deterministic). */
