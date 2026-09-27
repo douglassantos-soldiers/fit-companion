@@ -203,10 +203,22 @@ describe("Skills Framework", () => {
   });
 
   it("habit_intervention and progression emit proposals", async () => {
+    const habitTool: SkillCallTool = async (toolId) => {
+      if (toolId === "get_nutrition") {
+        return {
+          ok: true,
+          data: { nutrition: { mealsLoggedToday: 0, proteinAdherence7d: 0.4 } },
+        };
+      }
+      if (toolId === "get_recent_outcomes") {
+        return { ok: true, data: { outcomes: [] } };
+      }
+      return mockCallTool(toolId);
+    };
     const habit = await runSkill({
       skillId: "habit_intervention",
       trustedUserId: USER,
-      callTool: mockCallTool,
+      callTool: habitTool,
     });
     expect(habit.data?.proposal?.proposed_type).toBe("CHECKIN");
 
@@ -216,6 +228,16 @@ describe("Skills Framework", () => {
       callTool: mockCallTool,
     });
     expect(prog.data?.proposal?.proposed_type).toBe("PROGRESSION");
+  });
+
+  it("habit_intervention skips proposal when adherence looks healthy", async () => {
+    const habit = await runSkill({
+      skillId: "habit_intervention",
+      trustedUserId: USER,
+      callTool: mockCallTool,
+    });
+    expect(habit.ok).toBe(true);
+    expect(habit.data?.proposal ?? null).toBeNull();
   });
 
   it("explain_decision surfaces why/what/expected from tools", async () => {

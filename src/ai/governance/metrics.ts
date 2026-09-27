@@ -16,8 +16,12 @@ export type AiLatencyStats = {
 export type AiMetrics = {
   agent_success_rate: number;
   agent_failure_rate: number;
+  /** Fraction of finished agent runs with status blocked_by_safety */
+  safety_rejection_rate: number;
   tool_error_rate: number;
   rag_hit_rate: number;
+  /** Fraction of RAG audits that failed / errored */
+  rag_failure_rate: number;
   retrieval_relevance: number;
   decision_success_rate: number;
   action_adherence: number;
@@ -31,6 +35,8 @@ export type AiMetrics = {
     rag: number;
     decisions: number;
     outcomes: number;
+    safety_blocks: number;
+    rag_failures: number;
   };
 };
 
@@ -81,11 +87,19 @@ export function computeAiMetricsFromAudits(
   const agentFail = agentDone.filter(
     (a) => a.status === "failed" || a.status === "blocked_by_safety",
   ).length;
+  const safetyBlocks = agentDone.filter((a) => a.status === "blocked_by_safety").length;
   const toolErr = tools.filter((t) => t.status === "failed" || t.status === "denied").length;
   const ragHits = rag.filter((r) => {
     const n = r.metadata?.["hit_count"];
     return typeof n === "number" ? n > 0 : r.status === "hit";
   }).length;
+  const ragFailures = rag.filter(
+    (r) =>
+      r.status === "error" ||
+      r.status === "failed" ||
+      r.status === "timeout" ||
+      r.metadata?.["error_code"] != null,
+  ).length;
   const topScores = rag
     .map((r) => r.metadata?.["top_score"])
     .filter((v): v is number => typeof v === "number");
@@ -128,8 +142,10 @@ export function computeAiMetricsFromAudits(
   return {
     agent_success_rate: rate(agentOk, agentDone.length),
     agent_failure_rate: rate(agentFail, agentDone.length),
+    safety_rejection_rate: rate(safetyBlocks, agentDone.length),
     tool_error_rate: rate(toolErr, tools.length),
     rag_hit_rate: rate(ragHits, rag.length),
+    rag_failure_rate: rate(ragFailures, rag.length),
     retrieval_relevance,
     decision_success_rate: rate(decisionOk, decisions.length),
     action_adherence,
@@ -147,6 +163,8 @@ export function computeAiMetricsFromAudits(
       rag: rag.length,
       decisions: decisions.length,
       outcomes: outcomes.length,
+      safety_blocks: safetyBlocks,
+      rag_failures: ragFailures,
     },
   };
 }
@@ -169,9 +187,15 @@ export function computeAiMetrics(opts?: ComputeAiMetricsOpts): AiMetrics {
   const agentFail = agentDone.filter(
     (a) => a.status === "failed" || a.status === "blocked_by_safety",
   ).length;
+  const safetyBlocks = agentDone.filter((a) => a.status === "blocked_by_safety").length;
 
   const toolErr = tools.filter((t) => t.status === "failed" || t.status === "denied").length;
   const ragHits = rag.filter((r) => r.hits.length > 0).length;
+  const ragFailuresMem = audits.filter(
+    (a) =>
+      a.kind === "rag_retrieval" &&
+      (a.status === "error" || a.status === "failed" || a.status === "timeout"),
+  ).length;
   const topScores = rag.map((r) => r.hits[0]?.score ?? 0);
   const retrieval_relevance =
     topScores.length === 0
@@ -228,8 +252,10 @@ export function computeAiMetrics(opts?: ComputeAiMetricsOpts): AiMetrics {
   return {
     agent_success_rate: rate(agentOk, agentDone.length),
     agent_failure_rate: rate(agentFail, agentDone.length),
+    safety_rejection_rate: rate(safetyBlocks, agentDone.length),
     tool_error_rate: rate(toolErr, tools.length),
     rag_hit_rate: rate(ragHits, rag.length),
+    rag_failure_rate: rate(ragFailuresMem, rag.length || audits.filter((a) => a.kind === "rag_retrieval").length),
     retrieval_relevance,
     decision_success_rate: rate(decisionOk, decisions.length),
     action_adherence,
@@ -247,6 +273,8 @@ export function computeAiMetrics(opts?: ComputeAiMetricsOpts): AiMetrics {
       rag: rag.length,
       decisions: decisions.length,
       outcomes: outcomes.length,
+      safety_blocks: safetyBlocks,
+      rag_failures: ragFailuresMem,
     },
   };
 }
@@ -258,4 +286,79 @@ export function summarizeAuditKinds(audits: AiAuditEvent[]): Record<string, numb
     out[a.kind] = (out[a.kind] ?? 0) + 1;
   }
   return out;
+}
+
+export type CostBreakdownRow = {
+  key: string;
+  provider: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost: number;
+  actual_cost: number | null;
+  events: number;
+};
+
+/** Aggregate cost by provider/model from audits (estimated only; actual usually null). */
+export function computeCostBreakdown(audits: AiAuditEvent[]): {
+  by_model: CostBreakdownRow[];
+  by_agent: Array<{ agent_id: string; estimated_cost: number; events: number }>;
+  by_user: Array<{ user_id: string; estimated_cost: number; events: number }>;
+  cost_per_decision: number;
+  total_estimated: number;
+} {
+  const byModel = new Map<string, CostBreakdownRow>();
+  const byAgent = new Map<string, { agent_id: string; estimated_cost: number; events: number }>();
+  const byUser = new Map<string, { user_id: string; estimated_cost: number; events: number }>();
+  let total = 0;
+  let decisionCount = 0;
+
+  for (const a of audits) {
+    if (a.kind === "decision") decisionCount += 1;
+    const cost = typeof a.estimated_cost === "number" ? a.estimated_cost : 0;
+    total += cost;
+    const provider =
+      typeof a.metadata?.["provider"] === "string" ? a.metadata["provider"] : null;
+    const model = typeof a.model === "string" ? a.model : null;
+    const key = `${provider ?? "unknown"}:${model ?? "unknown"}`;
+    const row = byModel.get(key) ?? {
+      key,
+      provider,
+      model,
+      input_tokens: 0,
+      output_tokens: 0,
+      estimated_cost: 0,
+      actual_cost: null,
+      events: 0,
+    };
+    row.input_tokens += a.token_usage?.input ?? 0;
+    row.output_tokens += a.token_usage?.output ?? 0;
+    row.estimated_cost += cost;
+    row.events += 1;
+    byModel.set(key, row);
+
+    if (a.agent_id) {
+      const ag = byAgent.get(a.agent_id) ?? {
+        agent_id: a.agent_id,
+        estimated_cost: 0,
+        events: 0,
+      };
+      ag.estimated_cost += cost;
+      ag.events += 1;
+      byAgent.set(a.agent_id, ag);
+    }
+    const uid = String(a.user_id ?? "unknown");
+    const u = byUser.get(uid) ?? { user_id: uid, estimated_cost: 0, events: 0 };
+    u.estimated_cost += cost;
+    u.events += 1;
+    byUser.set(uid, u);
+  }
+
+  return {
+    by_model: [...byModel.values()].sort((a, b) => b.estimated_cost - a.estimated_cost),
+    by_agent: [...byAgent.values()].sort((a, b) => b.estimated_cost - a.estimated_cost),
+    by_user: [...byUser.values()].sort((a, b) => b.estimated_cost - a.estimated_cost),
+    cost_per_decision: decisionCount > 0 ? Math.round((total / decisionCount) * 1000) / 1000 : 0,
+    total_estimated: Math.round(total * 1000) / 1000,
+  };
 }

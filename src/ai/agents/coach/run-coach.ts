@@ -38,6 +38,7 @@ import {
   type BuiltCoachResponse,
 } from "@/ai/agents/coach/respond";
 import { recordAgentRun } from "@/ai/agents/runtime/agent-run-log";
+import { mergeSpecialistProposals } from "@/ai/decision-pipeline/merge";
 
 export type RunCoachAgentInput = {
   trustedUserId: string | null;
@@ -292,12 +293,18 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
   let proposal: DecisionProposal | null = null;
   let proposalStatus: CoachFactPack["proposalStatus"] = "none";
   let proposalRejectReason: string | undefined;
+  let mergeConflicts = 0;
+  let mergeReason: string | undefined;
 
-  for (const r of specialistResults) {
-    if (r.proposal && (!proposal || r.proposal.confidence > proposal.confidence)) {
-      proposal = r.proposal;
-    }
-  }
+  const merge = mergeSpecialistProposals({
+    specialistResults,
+    safety: input.safety ?? null,
+    userId,
+    runId: coachRunId,
+  });
+  proposal = merge.selected;
+  mergeConflicts = merge.conflicts.length;
+  mergeReason = merge.resolution_reason;
 
   if (input.forceSafetyBlock && proposal) {
     proposalStatus = "safety_blocked";
@@ -327,6 +334,12 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
   } else if (proposal) {
     // No live snapshot in this call — keep proposal as informational only (not applied)
     proposalStatus = "accepted";
+  } else if (merge.discarded.some((d) => d.discarded_reason === "missing_evidence")) {
+    proposalStatus = "none";
+    proposalRejectReason = "missing_evidence";
+  } else if (merge.discarded.some((d) => d.discarded_reason === "low_confidence")) {
+    proposalStatus = "none";
+    proposalRejectReason = "low_confidence";
   }
 
   const factPack = buildFactPack({
@@ -362,6 +375,8 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       latency_ms: 0,
       specialist_count: agent_runs.length,
       intent_kind: intentKind,
+      merge_conflicts: mergeConflicts,
+      ...(mergeReason ? { merge_reason: mergeReason } : {}),
     },
   });
 

@@ -21,6 +21,7 @@ import {
 import { LEARNING_ENGINE_VERSION } from "@/lib/engine/learning/version";
 import { learningBiasAllowed } from "@/lib/engine/learning-guardrails";
 import type { RecoveryLevel } from "@/lib/engine/recovery/types";
+import { isLearningEnabled } from "@/ai/runtime/feature-flags";
 
 export type LearningCycleStatus =
   "learned" | "insufficient_outcome" | "conflict" | "blocked" | "noop";
@@ -104,6 +105,14 @@ function detectConflict(outcome: LearningOutcome, siblings: LearningOutcome[]): 
  * Signals only — Decision Engine / Safety remain authoritative for rules and apply.
  */
 export function runLearningCycle(input: RunLearningCycleInput): RunLearningCycleResult {
+  if (!isLearningEnabled()) {
+    return {
+      events: [],
+      signals: [],
+      status: "noop",
+      engineVersion: LEARNING_ENGINE_VERSION,
+    };
+  }
   const decision = toLearningDecisionRef(input.decision);
   const engineVersion = LEARNING_ENGINE_VERSION;
   const events: LearningEvent[] = [];

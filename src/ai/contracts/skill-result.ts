@@ -28,4 +28,18 @@ export type SkillResult = {
   confidence: number;
   warnings: string[];
   proposal?: SkillProposal | null;
+  /** FASE 16 — RAG status when skill declared required_knowledge */
+  rag_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  retrieval_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  evidence_available?: boolean;
+  citations?: Array<{
+    citation_id: string;
+    document_id: string;
+    chunk_id: string;
+    title: string;
+    score: number;
+    excerpt: string;
+    source_id?: string;
+    retrieval_id?: string;
+  }>;
 };

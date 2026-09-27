@@ -24,6 +24,9 @@ export type RetrieveKnowledgeOptions = {
   mode?: KnowledgeRetrievalMode;
   /** Prefer chunks whose metadata.kb_ref is in this list */
   kbRefs?: string[];
+  /** Point-in-time retrieval for historical explainability */
+  asOf?: string;
+  timeoutMs?: number;
   /** Governance correlation only — never used as chunk filter. */
   audit?: {
     userId?: string;
@@ -47,11 +50,11 @@ export type IngestResult = {
 
 export type KnowledgeSourceAdapter = {
   source: KnowledgeSource;
-  /** Real sources wire here later; production adapters return []. */
   loadDocuments: () => Promise<KnowledgeDocument[]>;
 };
 
 export type RetrieveKnowledgeResult = {
   retrieval: KnowledgeRetrieval;
   citations: KnowledgeCitation[];
+  evidence_quality?: import("@/ai/rag/evidence/quality").EvidenceQualityScores;
 };

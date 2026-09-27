@@ -1,5 +1,6 @@
 /**
- * Retrieval — semantic (cosine) + keyword fallback + filters + scoring.
+ * Retrieval — hybrid semantic + keyword + metadata + rerank + evidence quality.
+ * RAG never invents evidence on failure.
  */
 
 import type { KnowledgeCitation } from "@/ai/contracts/knowledge-citation";
@@ -7,11 +8,13 @@ import type {
   KnowledgeRetrieval,
   KnowledgeRetrievalHit,
   KnowledgeRetrievalMode,
+  RagRuntimeStatus,
 } from "@/ai/contracts/knowledge-retrieval";
 import { RAG_ERROR, RagError } from "@/ai/rag/core/errors";
-import { listKnowledgeChunks } from "@/ai/rag/core/store";
 import type { RetrieveKnowledgeOptions, RetrieveKnowledgeResult } from "@/ai/rag/core/types";
+import { getVectorStore } from "@/ai/rag/core/vector-store";
 import { cosineSimilarity, getEmbeddingProvider, tokenize } from "@/ai/rag/embeddings";
+import { evaluateEvidenceQuality } from "@/ai/rag/evidence/quality";
 import { rerankHits } from "@/ai/rag/reranking";
 
 function newRetrievalId(): string {
@@ -33,26 +36,70 @@ function excerpt(text: string, max = 160): string {
   return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
 }
 
-function toCitation(hit: KnowledgeRetrievalHit): KnowledgeCitation {
+function buildCitation(
+  hit: KnowledgeRetrievalHit,
+  retrievalId: string,
+): KnowledgeCitation {
+  const section =
+    typeof hit.metadata?.["section"] === "string" ? hit.metadata["section"] : undefined;
+  const version =
+    typeof hit.metadata?.["document_version"] === "string"
+      ? hit.metadata["document_version"]
+      : undefined;
+  const effective =
+    typeof hit.metadata?.["effective_date"] === "string"
+      ? hit.metadata["effective_date"]
+      : undefined;
   const c: KnowledgeCitation = {
     citation_id: `cite_${hit.chunk_id}`,
     document_id: hit.document_id,
     chunk_id: hit.chunk_id,
     title: hit.title,
-    score: hit.score,
+    score: hit.rerank_score ?? hit.score,
     excerpt: hit.excerpt,
+    retrieval_id: retrievalId,
+    source: hit.source_id,
+    document: hit.document_id,
+    chunk: hit.chunk_id,
   };
   if (hit.source_id) c.source_id = hit.source_id;
   if (hit.uri) c.uri = hit.uri;
+  if (section) c.section = section;
+  if (version) c.document_version = version;
+  if (effective) c.effective_date = effective;
   return c;
 }
 
 export function getCitationsFromRetrieval(retrieval: KnowledgeRetrieval): KnowledgeCitation[] {
-  return retrieval.hits.map(toCitation);
+  return retrieval.hits.map((h) => h.citation ?? buildCitation(h, retrieval.retrieval_id));
 }
 
-export async function retrieveKnowledge(
-  opts: RetrieveKnowledgeOptions,
+export type RetrieveKnowledgeOptionsExt = RetrieveKnowledgeOptions & {
+  asOf?: string;
+  timeoutMs?: number;
+};
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new RagError(RAG_ERROR.TIMEOUT, "retrieval_timeout")),
+      ms,
+    );
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+async function retrieveKnowledgeInner(
+  opts: RetrieveKnowledgeOptionsExt,
 ): Promise<RetrieveKnowledgeResult> {
   const query = opts.query?.trim() ?? "";
   if (!query) {
@@ -60,16 +107,20 @@ export async function retrieveKnowledge(
   }
 
   const started = Date.now();
+  const retrieval_id = newRetrievalId();
   const mode: KnowledgeRetrievalMode = opts.mode ?? "hybrid";
   const topK = opts.topK ?? 5;
+  const asOf = opts.asOf ?? new Date().toISOString();
   const provider = getEmbeddingProvider();
   const queryEmbedding = await provider.embed(query);
   const queryTokens = tokenize(query);
+  const store = getVectorStore();
 
-  const candidates = listKnowledgeChunks({
+  const candidates = await store.listByFilter({
     ...(opts.domains ? { domains: opts.domains } : {}),
     ...(opts.metadata ? { metadata: opts.metadata } : {}),
     ...(opts.kbRefs ? { kbRefs: opts.kbRefs } : {}),
+    asOf,
   });
 
   const scored: KnowledgeRetrievalHit[] = [];
@@ -94,15 +145,19 @@ export async function retrieveKnowledge(
       keyword_score: keyword,
       title: document.title,
       excerpt: excerpt(chunk.content),
+      content: chunk.content,
       metadata: { ...document.metadata, ...(chunk.metadata ?? {}) },
     };
-    const sourceId = document.metadata["source_id"];
-    if (typeof sourceId === "string") hit.source_id = sourceId;
+    const sourceId =
+      document.source_id ??
+      (typeof document.metadata["source_id"] === "string"
+        ? document.metadata["source_id"]
+        : undefined);
+    if (sourceId) hit.source_id = sourceId;
     if (document.uri) hit.uri = document.uri;
     scored.push(hit);
   }
 
-  // Keyword fallback: if hybrid/semantic yielded nothing, retry keyword-only on same candidates
   if (scored.length === 0 && (mode === "hybrid" || mode === "semantic")) {
     for (const { document, chunk } of candidates) {
       const keyword = keywordScore(queryTokens, `${document.title} ${chunk.content}`);
@@ -116,32 +171,53 @@ export async function retrieveKnowledge(
         keyword_score: keyword,
         title: document.title,
         excerpt: excerpt(chunk.content),
+        content: chunk.content,
         metadata: { ...document.metadata, ...(chunk.metadata ?? {}) },
       };
-      const sourceId = document.metadata["source_id"];
-      if (typeof sourceId === "string") hit.source_id = sourceId;
+      const sourceId =
+        document.source_id ??
+        (typeof document.metadata["source_id"] === "string"
+          ? document.metadata["source_id"]
+          : undefined);
+      if (sourceId) hit.source_id = sourceId;
       if (document.uri) hit.uri = document.uri;
       scored.push(hit);
     }
   }
 
-  const ranked = rerankHits(
-    scored,
-    opts.domains ? { preferredDomains: opts.domains } : undefined,
-  ).slice(0, topK);
+  const ranked = rerankHits(scored, {
+    ...(opts.domains ? { preferredDomains: opts.domains } : {}),
+    asOf,
+  }).slice(0, topK);
+
+  for (const h of ranked) {
+    h.citation = buildCitation(h, retrieval_id);
+  }
+
+  const quality = evaluateEvidenceQuality(ranked, {
+    ...(opts.domains ? { preferredDomains: opts.domains } : {}),
+    asOf,
+  });
+
+  let rag_status: RagRuntimeStatus = "ok";
+  if (ranked.length === 0) rag_status = "empty";
+  else if (!quality.evidence_adequate) rag_status = "ok"; // hits exist but quality low — still ok path with flag
 
   const retrieval: KnowledgeRetrieval = {
-    retrieval_id: newRetrievalId(),
+    retrieval_id,
     query,
     mode,
     hits: ranked,
     latency_ms: Date.now() - started,
     created_at: new Date().toISOString(),
+    rag_status,
+    retrieval_status: rag_status,
+    evidence_available: ranked.length > 0 && quality.evidence_adequate,
+    as_of: asOf,
   };
   if (opts.domains) retrieval.domain_filter = opts.domains;
   if (opts.metadata) retrieval.metadata_filter = opts.metadata;
 
-  // Lazy import to avoid circular init with governance ↔ rag
   const { recordRagRetrieval } = await import("@/ai/governance/rag-retrieval-log");
   recordRagRetrieval(retrieval, {
     ...(opts.audit?.userId ? { userId: opts.audit.userId } : {}),
@@ -152,18 +228,99 @@ export async function retrieveKnowledge(
   return {
     retrieval,
     citations: getCitationsFromRetrieval(retrieval),
+    evidence_quality: quality,
   };
 }
 
-/** Resolve skill kb:* refs to citations (bridge; does not run skills). */
+export async function retrieveKnowledge(
+  opts: RetrieveKnowledgeOptionsExt,
+): Promise<RetrieveKnowledgeResult> {
+  const { isRagEnabled } = await import("@/ai/runtime/feature-flags");
+  if (!isRagEnabled()) {
+    const retrieval_id = newRetrievalId();
+    const retrieval: KnowledgeRetrieval = {
+      retrieval_id,
+      query: opts.query?.trim() ?? "",
+      mode: opts.mode ?? "hybrid",
+      hits: [],
+      latency_ms: 0,
+      created_at: new Date().toISOString(),
+      rag_status: "skipped",
+      retrieval_status: "skipped",
+      evidence_available: false,
+    };
+    return {
+      retrieval,
+      citations: [],
+      evidence_quality: evaluateEvidenceQuality([]),
+    };
+  }
+  const timeoutMs = opts.timeoutMs ?? 8_000;
+  if (timeoutMs <= 0) {
+    const retrieval_id = newRetrievalId();
+    const retrieval: KnowledgeRetrieval = {
+      retrieval_id,
+      query: opts.query?.trim() ?? "",
+      mode: opts.mode ?? "hybrid",
+      hits: [],
+      latency_ms: 0,
+      created_at: new Date().toISOString(),
+      rag_status: "timeout",
+      retrieval_status: "timeout",
+      evidence_available: false,
+    };
+    return {
+      retrieval,
+      citations: [],
+      evidence_quality: evaluateEvidenceQuality([]),
+    };
+  }
+  try {
+    return await withTimeout(retrieveKnowledgeInner(opts), timeoutMs);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const isTimeout = msg.includes("timeout");
+    const retrieval_id = newRetrievalId();
+    const status: RagRuntimeStatus = isTimeout ? "timeout" : "error";
+    const retrieval: KnowledgeRetrieval = {
+      retrieval_id,
+      query: opts.query?.trim() ?? "",
+      mode: opts.mode ?? "hybrid",
+      hits: [],
+      latency_ms: 0,
+      created_at: new Date().toISOString(),
+      rag_status: status,
+      retrieval_status: status,
+      evidence_available: false,
+    };
+    try {
+      const { recordRagRetrieval } = await import("@/ai/governance/rag-retrieval-log");
+      recordRagRetrieval(retrieval, {
+        ...(opts.audit?.userId ? { userId: opts.audit.userId } : {}),
+        ...(opts.audit?.runId ? { runId: opts.audit.runId } : {}),
+        ...(opts.audit?.agentId ? { agentId: opts.audit.agentId } : {}),
+      });
+    } catch {
+      /* ignore */
+    }
+    if (e instanceof RagError && e.message === "query_required") throw e;
+    return {
+      retrieval,
+      citations: [],
+      evidence_quality: evaluateEvidenceQuality([]),
+    };
+  }
+}
+
 export async function resolveKnowledgeRefs(
   kbRefs: string[],
-  opts?: { topKPerRef?: number },
+  opts?: { topKPerRef?: number; asOf?: string },
 ): Promise<RetrieveKnowledgeResult> {
   const topK = opts?.topKPerRef ?? 3;
   const started = Date.now();
   const allHits: KnowledgeRetrievalHit[] = [];
   const seen = new Set<string>();
+  let lastStatus: RagRuntimeStatus = "empty";
 
   for (const ref of kbRefs) {
     const partial = await retrieveKnowledge({
@@ -171,7 +328,9 @@ export async function resolveKnowledgeRefs(
       kbRefs: [ref],
       topK,
       mode: "hybrid",
+      ...(opts?.asOf ? { asOf: opts.asOf } : {}),
     });
+    lastStatus = partial.retrieval.rag_status ?? lastStatus;
     for (const h of partial.retrieval.hits) {
       if (seen.has(h.chunk_id)) continue;
       seen.add(h.chunk_id);
@@ -179,18 +338,30 @@ export async function resolveKnowledgeRefs(
     }
   }
 
+  const retrieval_id = newRetrievalId();
   const ranked = rerankHits(allHits).slice(0, topK * Math.max(1, kbRefs.length));
+  for (const h of ranked) {
+    h.citation = buildCitation(h, retrieval_id);
+  }
+  const quality = evaluateEvidenceQuality(ranked);
+  const status: RagRuntimeStatus =
+    ranked.length === 0 ? "empty" : lastStatus === "error" || lastStatus === "timeout" ? lastStatus : "ok";
+
   const retrieval: KnowledgeRetrieval = {
-    retrieval_id: newRetrievalId(),
+    retrieval_id,
     query: kbRefs.join(","),
     mode: "hybrid",
     hits: ranked,
     latency_ms: Date.now() - started,
     created_at: new Date().toISOString(),
+    rag_status: status,
+    retrieval_status: status,
+    evidence_available: ranked.length > 0 && quality.evidence_adequate,
   };
 
   return {
     retrieval,
     citations: getCitationsFromRetrieval(retrieval),
+    evidence_quality: quality,
   };
 }

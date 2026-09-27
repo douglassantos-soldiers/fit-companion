@@ -3,7 +3,11 @@
  */
 import type { SkillProposal } from "@/ai/contracts/skill-result";
 import type { TrustedUserId } from "@/ai/contracts/trusted-user-id";
-import { buildProposalId, type DecisionProposal } from "@/lib/engine/decision-proposal";
+import {
+  buildProposalId,
+  type DecisionProposal,
+  type ProposalConfidenceBreakdown,
+} from "@/lib/engine/decision-proposal";
 import { canonicalReasonCode } from "@/lib/engine/reason-codes";
 
 function djb2(str: string): string {
@@ -55,8 +59,15 @@ export function makeSkillProposal(opts: {
   return proposal;
 }
 
-/** Bridge SkillProposal → DecisionProposal (engine still decides). */
-export function toDecisionProposalFromSkill(sp: SkillProposal): DecisionProposal {
+/** Bridge SkillProposal → DecisionProposal (engine still decides). Never copies model_confidence into Decision. */
+export function toDecisionProposalFromSkill(
+  sp: SkillProposal,
+  opts?: {
+    agentId?: string;
+    modelConfidence?: number;
+    evidenceConfidence?: number;
+  },
+): DecisionProposal {
   const created_at = sp.created_at;
   const proposal_id =
     sp.proposal_id ||
@@ -66,16 +77,30 @@ export function toDecisionProposalFromSkill(sp: SkillProposal): DecisionProposal
       proposedValue: sp.proposed_value,
       createdAt: created_at,
     });
+  const breakdown: ProposalConfidenceBreakdown = {
+    proposal_confidence: sp.confidence,
+  };
+  if (opts?.modelConfidence != null) {
+    breakdown.model_confidence = Math.max(0, Math.min(1, opts.modelConfidence));
+  }
+  if (opts?.evidenceConfidence != null) {
+    breakdown.evidence_confidence = Math.max(0, Math.min(1, opts.evidenceConfidence));
+  }
+
   const out: DecisionProposal = {
     proposal_id,
     user_id: sp.user_id,
     proposed_type: sp.proposed_type,
     proposed_value: sp.proposed_value,
     reason_codes: sp.reason_codes.map((c) => canonicalReasonCode(c)),
+    // proposal score only — Decision.confidence comes from engine later
     confidence: sp.confidence,
+    confidence_breakdown: breakdown,
     source: "agent",
     created_at,
+    skill_id: sp.skill_id,
   };
   if (sp.context_id) out.context_id = sp.context_id;
+  if (opts?.agentId) out.agent_id = opts.agentId;
   return out;
 }

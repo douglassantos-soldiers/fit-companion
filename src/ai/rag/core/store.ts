@@ -1,10 +1,11 @@
 /**
- * In-memory knowledge store (versioned corpus for this phase).
- * Not User Memory. No DB access.
+ * In-memory knowledge store (versioned corpus).
+ * Not User Memory. Prefer VectorStore API for new code.
  */
 
 import type { KnowledgeChunk } from "@/ai/contracts/knowledge-chunk";
 import type { KnowledgeDocument, KnowledgeDomain } from "@/ai/contracts/knowledge-document";
+import { expandDomainFilter } from "@/ai/contracts/knowledge-document";
 import type { StoredKnowledgeEntry } from "@/ai/rag/core/types";
 
 const documents = new Map<string, StoredKnowledgeEntry>();
@@ -30,9 +31,10 @@ export function deleteKnowledgeDocument(documentId: string): boolean {
 }
 
 export function listKnowledgeDocuments(domain?: KnowledgeDomain): KnowledgeDocument[] {
+  const domains = domain ? expandDomainFilter([domain]) : undefined;
   const out: KnowledgeDocument[] = [];
   for (const entry of documents.values()) {
-    if (domain && entry.document.domain !== domain) continue;
+    if (domains && !domains.includes(entry.document.domain)) continue;
     out.push(entry.document);
   }
   return out;
@@ -44,7 +46,7 @@ export function listKnowledgeChunks(opts?: {
   kbRefs?: string[];
 }): Array<{ document: KnowledgeDocument; chunk: KnowledgeChunk }> {
   const out: Array<{ document: KnowledgeDocument; chunk: KnowledgeChunk }> = [];
-  const domains = opts?.domains;
+  const domains = expandDomainFilter(opts?.domains);
   const metadata = opts?.metadata;
   const kbRefs = opts?.kbRefs;
 
@@ -65,7 +67,11 @@ export function listKnowledgeChunks(opts?: {
     for (const chunk of entry.chunks) {
       if (kbRefs && kbRefs.length > 0) {
         const ref = chunk.metadata?.["kb_ref"] ?? entry.document.metadata["kb_ref"];
-        if (typeof ref !== "string" || !kbRefs.includes(ref)) continue;
+        const tags = entry.document.tags ?? [];
+        const okRef =
+          (typeof ref === "string" && kbRefs.includes(ref)) ||
+          tags.some((t) => kbRefs.includes(t));
+        if (!okRef) continue;
       }
       out.push({ document: entry.document, chunk });
     }

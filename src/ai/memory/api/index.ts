@@ -90,6 +90,10 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryWrit
 }
 
 export async function retrieveMemory(input: RetrieveMemoryInput): Promise<MemoryRetrieveResult> {
+  const { isMemoryEnabled } = await import("@/ai/runtime/feature-flags");
+  if (!isMemoryEnabled()) {
+    return { ok: true, records: [] };
+  }
   const userId = requireTrustedMemoryUser(input.trustedUserId);
   const store = getMemoryStore();
   const now = Date.now();

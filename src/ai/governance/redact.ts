@@ -4,7 +4,7 @@
  */
 
 const SENSITIVE_KEY =
-  /api[_-]?key|access[_-]?token|service[_-]?role|authorization|secret|password|bearer|refresh[_-]?token|private[_-]?key/i;
+  /api[_-]?key|access[_-]?token|service[_-]?role|authorization|secret|password|bearer|refresh[_-]?token|private[_-]?key|(^|_)token$|id_token|session_token|openai|anthropic/i;
 
 const MAX_STRING = 240;
 

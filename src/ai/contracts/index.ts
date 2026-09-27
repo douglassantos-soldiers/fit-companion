@@ -105,16 +105,24 @@ export {
 export type {
   KnowledgeDocument,
   KnowledgeDocumentSource,
+  KnowledgeDocumentStatus,
   KnowledgeDomain,
   KnowledgeSourceType,
 } from "./knowledge-document";
-export { KNOWLEDGE_DOMAINS } from "./knowledge-document";
+export { KNOWLEDGE_DOMAINS, expandDomainFilter } from "./knowledge-document";
 export type { KnowledgeChunk } from "./knowledge-chunk";
-export type { KnowledgeSource, KnowledgeTrustTier } from "./knowledge-source";
+export type {
+  KnowledgeSource,
+  KnowledgeTrustTier,
+  KnowledgeTrustLevel,
+  KnowledgeSourceStatus,
+} from "./knowledge-source";
+export { resolveTrustLevel, resolveSourceType } from "./knowledge-source";
 export type {
   KnowledgeRetrieval,
   KnowledgeRetrievalHit,
   KnowledgeRetrievalMode,
+  RagRuntimeStatus,
 } from "./knowledge-retrieval";
 export type { KnowledgeCitation } from "./knowledge-citation";
 export type {

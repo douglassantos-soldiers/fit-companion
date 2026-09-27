@@ -1,0 +1,63 @@
+/**
+ * Prompt registry — versioned system prompts for gateway calls.
+ */
+
+export type PromptRecord = {
+  prompt_id: string;
+  version: string;
+  domain: string;
+  agent_id: string;
+  created_at: string;
+  system: string;
+};
+
+const TRAINING_V1: PromptRecord = {
+  prompt_id: "specialist_training.v1",
+  version: "1.0.0",
+  domain: "training",
+  agent_id: "specialist_training",
+  created_at: "2026-09-27T00:00:00.000Z",
+  system: `You are the Fit Companion specialist_training analyst.
+You produce structured JSON only. You NEVER emit a final Decision, Living Plan write, or Safety override.
+Output schema:
+{
+  "analysis": object,
+  "evidence": [{ "signal": string, "value": string|number|boolean|null, "source"?: string }],
+  "confidence": number (0..1),
+  "proposal": null | {
+    "proposed_type": string,
+    "proposed_value": string|number|boolean,
+    "reason_codes": string[],
+    "confidence": number (0..1)
+  }
+}
+Proposal is a candidate only; Decision Engine remains the sole authority.
+Use provided skill/RAG/tool context; do not invent medical claims.`,
+};
+
+const PROMPTS: Record<string, PromptRecord> = {
+  [TRAINING_V1.prompt_id]: TRAINING_V1,
+};
+
+export function getPrompt(promptId: string): PromptRecord | null {
+  return PROMPTS[promptId] ?? null;
+}
+
+export function listPrompts(): PromptRecord[] {
+  return Object.values(PROMPTS);
+}
+
+export function buildMessagesForAgent(opts: {
+  promptId: string;
+  userContent: string;
+}): { messages: Array<{ role: "system" | "user"; content: string }>; prompt: PromptRecord } | null {
+  const prompt = getPrompt(opts.promptId);
+  if (!prompt) return null;
+  return {
+    prompt,
+    messages: [
+      { role: "system", content: prompt.system },
+      { role: "user", content: opts.userContent },
+    ],
+  };
+}

@@ -147,11 +147,53 @@ export async function runSkill(req: SkillInvokeRequest): Promise<SkillInvokeResu
     const conf = Math.max(0, Math.min(1, data.confidence));
     const normalized: SkillResult = {
       result: data.result,
-      evidence: data.evidence,
+      evidence: [...data.evidence],
       confidence: conf,
-      warnings: data.warnings,
+      warnings: [...data.warnings],
     };
     if (data.proposal) normalized.proposal = data.proposal;
+
+    // FASE 16 — resolve required_knowledge (kb:*) into citations; never invent
+    const kbRefs = skill.required_knowledge?.filter((r) => r.startsWith("kb:")) ?? [];
+    if (kbRefs.length > 0) {
+      try {
+        const { resolveKnowledgeRefs } = await import("@/ai/rag/retrieval");
+        const rag = await resolveKnowledgeRefs(kbRefs, { topKPerRef: 2 });
+        normalized.rag_status = rag.retrieval.rag_status ?? "empty";
+        normalized.retrieval_status = rag.retrieval.retrieval_status ?? normalized.rag_status;
+        normalized.evidence_available = Boolean(rag.retrieval.evidence_available);
+        normalized.citations = rag.citations.map((c) => ({
+          citation_id: c.citation_id,
+          document_id: c.document_id,
+          chunk_id: c.chunk_id,
+          title: c.title,
+          score: c.score,
+          excerpt: c.excerpt,
+          ...(c.source_id ? { source_id: c.source_id } : {}),
+          ...(c.retrieval_id ? { retrieval_id: c.retrieval_id } : {}),
+        }));
+        for (const c of rag.citations.slice(0, 4)) {
+          normalized.evidence.push({
+            signal: `kb:${c.document_id}`,
+            value: c.excerpt.slice(0, 120),
+            source: c.source_id ?? "rag",
+          });
+        }
+        if (!normalized.evidence_available) {
+          normalized.warnings.push(`rag_${normalized.rag_status ?? "empty"}`);
+        }
+      } catch {
+        normalized.rag_status = "error";
+        normalized.retrieval_status = "error";
+        normalized.evidence_available = false;
+        normalized.warnings.push("rag_error");
+      }
+    } else {
+      normalized.rag_status = "skipped";
+      normalized.retrieval_status = "skipped";
+      normalized.evidence_available = false;
+    }
+
     return finish({
       ok: true,
       status: "completed",
@@ -161,7 +203,7 @@ export async function runSkill(req: SkillInvokeRequest): Promise<SkillInvokeResu
         output_summary: {
           confidence: conf,
           has_proposal: Boolean(data.proposal),
-          warnings: data.warnings.length,
+          warnings: normalized.warnings.length,
         },
       },
     });

@@ -139,9 +139,119 @@ export async function loadAuditsForUser(
   }
 }
 
-/** Fire-and-forget persist from recordAudit (server-only). */
+export type LoadAuditsAdminOpts = {
+  since?: string;
+  until?: string;
+  kind?: string;
+  agent_id?: string;
+  status?: string;
+  user_id?: string;
+  model?: string;
+  /** Opaque cursor = created_at ISO of last row (descending pages). */
+  cursor?: string;
+  limit?: number;
+};
+
+export type LoadAuditsAdminResult = {
+  audits: AiAuditEvent[];
+  source: "db" | "unavailable";
+  next_cursor: string | null;
+};
+
+/**
+ * Admin-wide paginated audit load (service_role). Never unbounded.
+ */
+export async function loadAuditsAdmin(
+  opts: LoadAuditsAdminOpts = {},
+): Promise<LoadAuditsAdminResult> {
+  const limit = Math.min(200, Math.max(1, opts.limit ?? 50));
+  try {
+    const db = await getDb();
+    if (!db) return { audits: [], source: "unavailable", next_cursor: null };
+
+    let q = db.from(TABLE).select("*").order("created_at", { ascending: false }).limit(limit + 1);
+    if (opts.since) q = q.gte("created_at", opts.since);
+    if (opts.until) q = q.lte("created_at", opts.until);
+    if (opts.kind) q = q.eq("kind", opts.kind);
+    if (opts.agent_id) q = q.eq("agent_id", opts.agent_id);
+    if (opts.status) q = q.eq("status", opts.status);
+    if (opts.user_id) q = q.eq("user_id", opts.user_id);
+    if (opts.model) q = q.eq("model", opts.model);
+    if (opts.cursor) q = q.lt("created_at", opts.cursor);
+
+    const { data, error } = await q;
+    if (error) {
+      logEngineError({
+        userId: "admin",
+        engine: "ai_governance",
+        operation: "load_audits_admin",
+        errorCode: "load_failed",
+        message: String(error.message ?? error),
+      });
+      return { audits: [], source: "unavailable", next_cursor: null };
+    }
+    const rows = ((data ?? []) as Record<string, unknown>[]).map(rowToAuditEvent);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const next_cursor =
+      hasMore && page.length > 0 ? (page[page.length - 1]?.created_at ?? null) : null;
+    return { audits: page, source: "db", next_cursor };
+  } catch (e) {
+    logEngineError({
+      userId: "admin",
+      engine: "ai_governance",
+      operation: "load_audits_admin",
+      errorCode: "load_exception",
+      message: e instanceof Error ? e.message : String(e),
+    });
+    return { audits: [], source: "unavailable", next_cursor: null };
+  }
+}
+
+/** Fire-and-forget persist from recordAudit (server-only). Observational path. */
 export function schedulePersistAiAudit(event: AiAuditEvent): void {
   if (typeof window !== "undefined") return;
   if (process.env["AI_AUDIT_PERSIST"] === "0") return;
+  void persistAiAuditEvent(event);
+}
+
+/**
+ * CRITICAL audit persist — await + one retry. Still never throws to product callers
+ * when used via schedule path; returns result for certification / ops.
+ */
+export async function persistCriticalAiAudit(event: AiAuditEvent): Promise<PersistAiAuditResult> {
+  if (typeof window !== "undefined") {
+    return { ok: true, skipped: true, reason: "client" };
+  }
+  if (process.env["AI_AUDIT_PERSIST"] === "0") {
+    return { ok: true, skipped: true, reason: "disabled" };
+  }
+  let result = await persistAiAuditEvent(event);
+  if (!result.ok) {
+    result = await persistAiAuditEvent(event);
+    if (!result.ok) {
+      logEngineError({
+        userId: event.user_id,
+        engine: "ai_governance",
+        operation: "persist_critical_audit",
+        errorCode: "critical_persist_failed",
+        message: result.error,
+      });
+    }
+  }
+  return result;
+}
+
+/** Route by durability: critical awaits; observational fire-and-forget. */
+export function schedulePersistAiAuditByDurability(
+  event: AiAuditEvent,
+  durability: "critical" | "observational",
+): void {
+  if (typeof window !== "undefined") return;
+  if (process.env["AI_AUDIT_PERSIST"] === "0") return;
+  if (durability === "critical") {
+    void persistCriticalAiAudit(event);
+    return;
+  }
   void persistAiAuditEvent(event);
 }

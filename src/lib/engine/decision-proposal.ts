@@ -11,6 +11,16 @@ import type { SafetyVerdict } from "@/lib/engine/safety";
 
 export type DecisionProposalSource = "coach" | "agent" | "system";
 
+/** FASE 18 — confidence layers; only `confidence` is the proposal score (never Decision.confidence). */
+export type ProposalConfidenceBreakdown = {
+  /** LLM/gateway score — never copied into Decision.confidence */
+  model_confidence?: number;
+  /** Coverage of context/tool/RAG/memory evidence */
+  evidence_confidence?: number;
+  /** SkillProposal / candidate score (same as top-level confidence when from skill) */
+  proposal_confidence?: number;
+};
+
 export type DecisionProposal = {
   proposal_id: string;
   user_id: string;
@@ -20,8 +30,13 @@ export type DecisionProposal = {
   reason_codes: ReasonCode[];
   evidence?: DecisionEvidence;
   confidence: number;
+  /** Separated confidence layers — Decision Engine ignores these for Decision.confidence */
+  confidence_breakdown?: ProposalConfidenceBreakdown;
   source: DecisionProposalSource;
   created_at: string;
+  /** Specialist / skill provenance for merge */
+  agent_id?: string;
+  skill_id?: string;
 };
 
 export type ResolveProposalResult = {
@@ -135,6 +150,26 @@ export function parseDecisionProposal(
     proposal.context_id = contextId.trim();
   }
   if (evidence) proposal.evidence = evidence;
+  const breakdownRaw = raw["confidence_breakdown"];
+  if (isPlainObject(breakdownRaw)) {
+    const bd: ProposalConfidenceBreakdown = {};
+    if (typeof breakdownRaw["model_confidence"] === "number") {
+      bd.model_confidence = breakdownRaw["model_confidence"];
+    }
+    if (typeof breakdownRaw["evidence_confidence"] === "number") {
+      bd.evidence_confidence = breakdownRaw["evidence_confidence"];
+    }
+    if (typeof breakdownRaw["proposal_confidence"] === "number") {
+      bd.proposal_confidence = breakdownRaw["proposal_confidence"];
+    }
+    if (Object.keys(bd).length) proposal.confidence_breakdown = bd;
+  }
+  if (typeof raw["agent_id"] === "string" && raw["agent_id"].trim()) {
+    proposal.agent_id = raw["agent_id"].trim();
+  }
+  if (typeof raw["skill_id"] === "string" && raw["skill_id"].trim()) {
+    proposal.skill_id = raw["skill_id"].trim();
+  }
   return { ok: true, proposal };
 }
 

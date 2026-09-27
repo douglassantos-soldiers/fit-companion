@@ -95,17 +95,39 @@ export function registerNutritionSkills(): void {
     name: "meal_substitution",
     description: "Suggest a meal substitution idea",
     domain: "nutrition",
+    kind: "proposal",
     required_tool_ids: ["get_nutrition"],
     required_knowledge: ["kb:nutrition.meals"],
+    safety_requirements: {
+      requires_decision_authority: true,
+      proposal_only_for_side_effects: true,
+      requires_safety_gate: false,
+    },
     execute: async (ctx, input) => {
       const di = dateInput(ctx, input);
       const warnings: string[] = [];
       const nut = await requireToolData(ctx.callTool, "get_nutrition", di);
       if (!nut.ok) warnings.push(nut.warning);
-      const meals = asRecord(asRecord(nut.ok ? nut.data : {})["nutrition"])["mealsLoggedToday"];
+      const n = asRecord(asRecord(nut.ok ? nut.data : {})["nutrition"]);
+      const meals = n["mealsLoggedToday"];
+      const protein = n["proteinAdherence7d"];
+      const needSwap =
+        (typeof meals === "number" && meals > 0 && typeof protein === "number" && protein < 0.8) ||
+        (typeof meals === "number" && meals === 0);
+      const proposal = needSwap
+        ? makeSkillProposal({
+            skillId: ctx.skillId,
+            userId: ctx.userId,
+            proposedType: "NUTRITION_FOCUS",
+            proposedValue: "meal_swap_protein",
+            reasonCodes: ["meal_quality", "protein_low"],
+            confidence: 0.62,
+            note: "swap_refined_carb_for_protein_veg",
+          })
+        : null;
       return skillOk(
         {
-          suggestion: "swap_refined_carb_for_protein_veg",
+          suggestion: needSwap ? "swap_refined_carb_for_protein_veg" : "hold",
           mealsLoggedToday: typeof meals === "number" ? meals : null,
         },
         [
@@ -114,9 +136,15 @@ export function registerNutritionSkills(): void {
             value: typeof meals === "number" ? meals : null,
             source: "get_nutrition",
           },
+          {
+            signal: "proteinAdherence7d",
+            value: typeof protein === "number" ? protein : null,
+            source: "get_nutrition",
+          },
         ],
         0.6,
         warnings,
+        proposal,
       );
     },
   });

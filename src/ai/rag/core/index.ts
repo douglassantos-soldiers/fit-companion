@@ -21,6 +21,14 @@ export {
   listKnowledgeDocuments,
   upsertKnowledgeEntry,
 } from "@/ai/rag/core/store";
+export {
+  getVectorStore,
+  resetVectorStore,
+  resolveVectorStoreFromEnv,
+  setVectorStore,
+} from "@/ai/rag/core/vector-store";
+export type { VectorStore, VectorQueryOpts, StoredVectorHit } from "@/ai/rag/core/vector-store";
+export { InMemoryVectorStore } from "@/ai/rag/core/vector-store-memory";
 export type {
   IngestOptions,
   IngestResult,

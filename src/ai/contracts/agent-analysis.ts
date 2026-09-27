@@ -23,4 +23,8 @@ export type AgentAnalysisResult = {
   skill_run_ids?: string[];
   tool_call_ids?: string[];
   status: AgentAnalysisStatus;
+  /** FASE 16 — explicit RAG failure (never invent evidence) */
+  rag_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  retrieval_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  evidence_available?: boolean;
 };

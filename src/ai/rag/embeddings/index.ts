@@ -1,5 +1,6 @@
 /**
  * Embedding providers — local lexical (deterministic); swappable later.
+ * FASE 16: generateEmbedding / generateEmbeddings / similarity aliases.
  */
 
 export type EmbeddingProvider = {
@@ -9,6 +10,9 @@ export type EmbeddingProvider = {
 };
 
 const VOCAB_SIZE = 256;
+
+/** Public dim constant for VectorStore / migrations. */
+export const LOCAL_LEXICAL_EMBEDDING_DIM = VOCAB_SIZE;
 
 function tokenize(text: string): string[] {
   return text
@@ -88,6 +92,26 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   }
   const denom = Math.sqrt(na) * Math.sqrt(nb);
   return denom === 0 ? 0 : dot / denom;
+}
+
+/** FASE 16 contract alias. */
+export async function generateEmbedding(text: string): Promise<number[]> {
+  return getEmbeddingProvider().embed(text);
+}
+
+/** FASE 16 contract alias. */
+export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  const provider = getEmbeddingProvider();
+  const out: number[][] = [];
+  for (const t of texts) {
+    out.push(await provider.embed(t));
+  }
+  return out;
+}
+
+/** FASE 16 contract alias for cosineSimilarity. */
+export function similarity(a: number[], b: number[]): number {
+  return cosineSimilarity(a, b);
 }
 
 export { tokenize };

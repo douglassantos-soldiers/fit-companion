@@ -59,7 +59,9 @@ export function aggregateSpecialistOutputs(opts: {
   const confidence =
     confidences.length === 0 ? 0.4 : confidences.reduce((a, b) => a + b, 0) / confidences.length;
 
-  const proposal = bestProposal ? toDecisionProposalFromSkill(bestProposal) : null;
+  const proposal = bestProposal
+    ? toDecisionProposalFromSkill(bestProposal, { agentId: opts.agentId })
+    : null;
 
   return {
     analysis: {

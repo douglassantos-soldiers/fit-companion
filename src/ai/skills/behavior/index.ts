@@ -72,10 +72,10 @@ export function registerBehaviorSkills(): void {
   defineSkill({
     id: "habit_intervention",
     name: "habit_intervention",
-    description: "Propose check-in / habit intervention (no mutation)",
+    description: "Propose check-in / habit intervention when friction or low adherence (no mutation)",
     domain: "behavior",
     kind: "proposal",
-    required_tool_ids: ["get_recent_decisions"],
+    required_tool_ids: ["get_recent_decisions", "get_recent_outcomes", "get_nutrition"],
     required_knowledge: ["kb:behavior.habits"],
     safety_requirements: {
       requires_decision_authority: true,
@@ -86,20 +86,44 @@ export function registerBehaviorSkills(): void {
       const di = dateInput(ctx, input);
       const warnings: string[] = [];
       const decisions = await requireToolData(ctx.callTool, "get_recent_decisions", di);
+      const outcomes = await requireToolData(ctx.callTool, "get_recent_outcomes", di);
+      const nut = await requireToolData(ctx.callTool, "get_nutrition", di);
       if (!decisions.ok) warnings.push(decisions.warning);
+      if (!outcomes.ok) warnings.push(outcomes.warning);
+      if (!nut.ok) warnings.push(nut.warning);
       const list = (asRecord(decisions.ok ? decisions.data : {})["decisions"] as unknown[]) ?? [];
-      const proposal = makeSkillProposal({
-        skillId: ctx.skillId,
-        userId: ctx.userId,
-        proposedType: "CHECKIN",
-        proposedValue: true,
-        reasonCodes: ["incomplete_logging"],
-        confidence: 0.6,
-        note: "prompt_daily_checkin",
-      });
+      const outcomeList =
+        (asRecord(outcomes.ok ? outcomes.data : {})["outcomes"] as unknown[]) ?? [];
+      const meals = asRecord(asRecord(nut.ok ? nut.data : {})["nutrition"])["mealsLoggedToday"];
+      const lowLogging = typeof meals === "number" && meals === 0;
+      const noOutcomes = outcomeList.length === 0;
+      const shouldPropose = lowLogging || noOutcomes || list.length === 0;
+      const proposal = shouldPropose
+        ? makeSkillProposal({
+            skillId: ctx.skillId,
+            userId: ctx.userId,
+            proposedType: "CHECKIN",
+            proposedValue: true,
+            reasonCodes: lowLogging ? ["incomplete_logging"] : ["habit_friction"],
+            confidence: 0.6,
+            note: "prompt_daily_checkin",
+          })
+        : null;
       return skillOk(
-        { decisionCount: list.length, intervention: "checkin" },
-        [{ signal: "decisionCount", value: list.length, source: "get_recent_decisions" }],
+        {
+          decisionCount: list.length,
+          intervention: shouldPropose ? "checkin" : "none",
+          lowLogging,
+        },
+        [
+          { signal: "decisionCount", value: list.length, source: "get_recent_decisions" },
+          {
+            signal: "mealsLoggedToday",
+            value: typeof meals === "number" ? meals : null,
+            source: "get_nutrition",
+          },
+          { signal: "outcomeCount", value: outcomeList.length, source: "get_recent_outcomes" },
+        ],
         0.6,
         warnings,
         proposal,

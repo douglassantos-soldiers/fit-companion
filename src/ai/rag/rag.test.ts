@@ -1,43 +1,47 @@
 /**
- * RAG infrastructure — unit tests (fixtures only, no scientific corpus).
+ * RAG infrastructure — unit tests (fixtures + production corpus).
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   EVAL_FIXTURES,
-  KNOWLEDGE_DOMAINS,
   RAG_ERROR,
   RagError,
   clearKnowledgeStore,
-  getCitationsFromRetrieval,
+  ingestFromSource,
   ingestKnowledgeDocument,
+  listConnectedSourceIds,
   listKnowledgeDocuments,
   listKnowledgeSources,
   registerAllKnowledgeSources,
   resetEmbeddingProvider,
+  resetVectorStore,
   resolveKnowledgeRefs,
   retrieveKnowledge,
   runRagEvaluation,
   seedEvalFixtures,
+  seedProductionCorpus,
 } from "@/ai/rag";
 
 beforeEach(() => {
+  resetVectorStore();
   clearKnowledgeStore();
   resetEmbeddingProvider();
   registerAllKnowledgeSources({ force: true });
 });
 
 describe("RAG Infrastructure", () => {
-  it("registers 9 domain source placeholders", () => {
+  it("registers curated production sources", () => {
     const sources = listKnowledgeSources();
-    expect(sources.length).toBe(KNOWLEDGE_DOMAINS.length);
-    expect(new Set(sources.map((s) => s.domain))).toEqual(new Set(KNOWLEDGE_DOMAINS));
+    const ids = listConnectedSourceIds();
+    expect(sources.length).toBe(ids.length);
+    expect(sources.every((s) => s.status === "active")).toBe(true);
+    expect(sources.every((s) => s.trust_level === "curated")).toBe(true);
   });
 
-  it("production placeholders load zero documents", async () => {
-    const { ingestFromSource } = await import("@/ai/rag");
-    const results = await ingestFromSource("src_exercise_placeholder");
-    expect(results).toEqual([]);
-    expect(listKnowledgeDocuments()).toHaveLength(0);
+  it("production adapters return curated documents", async () => {
+    const results = await ingestFromSource("src_nutrition_labels");
+    expect(results.length).toBeGreaterThan(0);
+    expect(listKnowledgeDocuments("nutrition").length).toBeGreaterThan(0);
   });
 
   it("ingests fixture docs and retrieves with citations", async () => {
@@ -55,6 +59,7 @@ describe("RAG Infrastructure", () => {
     expect(citations.length).toBe(retrieval.hits.length);
     expect(citations[0]!.document_id).toBeTruthy();
     expect(citations[0]!.excerpt).toBeTruthy();
+    expect(retrieval.rag_status).toBeTruthy();
   });
 
   it("supports keyword mode and semantic mode", async () => {
@@ -99,30 +104,25 @@ describe("RAG Infrastructure", () => {
       }),
     ).rejects.toBeInstanceOf(RagError);
 
-    await expect(retrieveKnowledge({ query: "  " })).rejects.toMatchObject({
+    await expect(retrieveKnowledge({ query: "   " })).rejects.toMatchObject({
       code: RAG_ERROR.EMPTY_QUERY,
     });
   });
 
-  it("getCitationsFromRetrieval tracks sources", async () => {
-    await seedEvalFixtures();
-    const { retrieval } = await retrieveKnowledge({
-      query: "exercise catalog",
-      domains: ["exercise"],
-    });
-    const cites = getCitationsFromRetrieval(retrieval);
-    expect(cites.every((c) => c.citation_id && c.chunk_id && c.title)).toBe(true);
+  it("runRagEvaluation passes on fixtures", async () => {
+    const suite = await runRagEvaluation();
+    expect(suite.every((c) => c.passed)).toBe(true);
   });
 
-  it("evaluation suite passes", async () => {
-    const results = await runRagEvaluation();
-    expect(results.every((r) => r.passed)).toBe(true);
-    expect(results.map((r) => r.name)).toEqual([
-      "retrieval_relevance",
-      "source_quality",
-      "empty_retrieval",
-      "wrong_domain_retrieval",
-      "duplicate_documents",
-    ]);
+  it("seedProductionCorpus indexes curated knowledge", async () => {
+    const results = await seedProductionCorpus();
+    expect(results.length).toBeGreaterThan(5);
+    const { retrieval } = await retrieveKnowledge({
+      query: "Decision Engine Living Plan Proposal",
+      domains: ["performance"],
+      topK: 3,
+    });
+    expect(retrieval.hits.length).toBeGreaterThan(0);
+    expect(retrieval.hits[0]!.source_id).toBe("src_performance_os");
   });
 });

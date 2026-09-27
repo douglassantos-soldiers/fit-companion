@@ -24,6 +24,10 @@ import type { DomainContextLoader } from "@/ai/mcp/core/types";
 import { aggregateSpecialistOutputs, type SkillPartial } from "@/ai/agents/runtime/aggregate";
 import { recordAgentRun } from "@/ai/agents/runtime/agent-run-log";
 import { AGENT_ERROR, AgentError } from "@/ai/agents/runtime/errors";
+import { invokeAI, getAiRuntimeMode, type AiRuntimeMode } from "@/ai/gateway";
+import type { AIProviderId } from "@/ai/providers/types";
+import { isSpecialistsEnabled } from "@/ai/runtime/feature-flags";
+import { resolveEffectiveRuntimeMode } from "@/ai/runtime/rollback";
 
 export type RunSpecialistAgentInput = {
   trustedUserId: string | null;
@@ -37,6 +41,11 @@ export type RunSpecialistAgentInput = {
   skipKnowledge?: boolean;
   /** Coach / parent correlation */
   parentRunId?: string;
+  /** Override AI_RUNTIME_MODE (tests) */
+  runtimeMode?: AiRuntimeMode;
+  /** Force gateway provider (tests) */
+  aiProvider?: AIProviderId;
+  aiFallbackProvider?: AIProviderId;
 };
 
 export type RunSpecialistAgentResult = {
@@ -61,6 +70,35 @@ export async function runSpecialistAgent(
   const started = Date.now();
   const agentId = input.agentId;
 
+  if (!isSpecialistsEnabled()) {
+    const agent_run: AgentRun = {
+      run_id,
+      agent_id: agentId,
+      user_id: input.trustedUserId ?? "",
+      status: "cancelled",
+      created_at,
+      completed_at: new Date().toISOString(),
+      metadata: { error_code: "specialists_disabled", model: "deterministic_runtime" },
+      ...(input.parentRunId ? { parent_run_id: input.parentRunId } : {}),
+    };
+    recordAgentRun(agent_run);
+    return {
+      ok: false,
+      result: {
+        agent_id: agentId,
+        run_id,
+        user_id: input.trustedUserId ?? "",
+        analysis: { reason: "specialists_disabled" },
+        evidence: [],
+        confidence: 0,
+        proposal: null,
+        warnings: ["specialists_disabled"],
+        status: "failed",
+      },
+      agent_run,
+    };
+  }
+
   const baseRun = (): AgentRun => ({
     run_id,
     agent_id: agentId,
@@ -77,6 +115,7 @@ export async function runSpecialistAgent(
   ): RunSpecialistAgentResult => {
     const latency_ms = Date.now() - started;
     const agent = getAgent(agentId);
+    const runtime_mode = resolveEffectiveRuntimeMode(input.runtimeMode ?? getAiRuntimeMode());
     const meta: Record<string, string | number | boolean | null> = {
       agent_version: agent?.version ?? "1.0.0",
       model: "deterministic_runtime",
@@ -84,6 +123,8 @@ export async function runSpecialistAgent(
         ? partial.result.skill_run_ids.length
         : 1,
       latency_ms,
+      runtime_mode,
+      deterministic_runtime: runtime_mode === "deterministic",
     };
     const existingMeta = partial.agent_run?.metadata;
     if (existingMeta) {
@@ -215,8 +256,10 @@ export async function runSpecialistAgent(
       throw new AgentError(AGENT_ERROR.TIMEOUT, "timeout_before_work");
     }
 
-    // RAG
+    // RAG — never invent citations on failure
     const retrievalIds: string[] = [];
+    let rag_status: AgentAnalysisResult["rag_status"] = "skipped";
+    let evidence_available = false;
     if (!input.skipKnowledge && knowledgeDomains.length > 0 && intent) {
       try {
         const { citations: cites, retrieval } = await retrieveKnowledge({
@@ -224,17 +267,28 @@ export async function runSpecialistAgent(
           domains: knowledgeDomains,
           topK: 3,
           mode: "hybrid",
+          timeoutMs: 5_000,
           audit: {
             userId: userId,
             runId: run_id,
             agentId: agentId,
           },
         });
-        citations.push(...cites);
+        rag_status = retrieval.rag_status ?? (cites.length > 0 ? "ok" : "empty");
+        evidence_available = Boolean(retrieval.evidence_available);
+        if (cites.length > 0) {
+          citations.push(...cites);
+        } else {
+          warnings.push(`rag_${rag_status}`);
+        }
         if (retrieval?.retrieval_id) retrievalIds.push(retrieval.retrieval_id);
       } catch {
-        warnings.push("knowledge_retrieve_skipped");
+        rag_status = "error";
+        evidence_available = false;
+        warnings.push("rag_error");
       }
+    } else if (input.skipKnowledge) {
+      rag_status = "skipped";
     }
 
     // Tools (MCP) — optional direct; skills also call tools
@@ -312,17 +366,151 @@ export async function runSpecialistAgent(
     });
     warnings.push(...agg.warnings);
 
+    const runtime_mode = resolveEffectiveRuntimeMode(input.runtimeMode ?? getAiRuntimeMode());
+    let analysis: unknown = agg.analysis;
+    let evidence = agg.evidence;
+    let confidence = agg.confidence;
+    let proposal = agg.proposal;
+    const gatewayMeta: Record<string, string | number | boolean | null> = {
+      runtime_mode,
+      deterministic_runtime: runtime_mode === "deterministic",
+    };
+
+    // FASE 17 — AI Gateway for specialist_training (hybrid | llm only)
+    const useGateway =
+      agentId === "specialist_training" &&
+      (runtime_mode === "hybrid" || runtime_mode === "llm");
+
+    if (useGateway) {
+      const contextPayload = JSON.stringify({
+        intent,
+        skills: skillPartials.map((p) => ({
+          skillId: p.skillId,
+          result: p.result,
+          confidence: p.confidence,
+          proposal: p.proposal
+            ? {
+                proposed_type: p.proposal.proposed_type,
+                proposed_value: p.proposal.proposed_value,
+                reason_codes: p.proposal.reason_codes,
+              }
+            : null,
+        })),
+        citations: citations.slice(0, 5).map((c) => ({
+          title: c.title,
+          excerpt: c.excerpt,
+          score: c.score,
+        })),
+        memory_ids: memoryIds.slice(0, 8),
+        deterministic_analysis: agg.analysis,
+      });
+
+      const ai = await invokeAI({
+        agentId,
+        userId: userId,
+        runId: run_id,
+        userContent: contextPayload,
+        runtimeMode: runtime_mode,
+        ...(input.aiProvider ? { provider: input.aiProvider } : {}),
+        ...(input.aiFallbackProvider
+          ? { fallbackProvider: input.aiFallbackProvider }
+          : {}),
+      });
+
+      if (ai.ok) {
+        gatewayMeta["provider"] = ai.provider;
+        gatewayMeta["model"] = ai.model;
+        gatewayMeta["prompt_version"] = ai.prompt_version;
+        gatewayMeta["input_tokens"] = ai.usage.input_tokens;
+        gatewayMeta["output_tokens"] = ai.usage.output_tokens;
+        gatewayMeta["token_usage"] = JSON.stringify({
+          input: ai.usage.input_tokens,
+          output: ai.usage.output_tokens,
+        });
+        if (ai.usage.estimated_cost != null) {
+          gatewayMeta["estimated_cost"] = ai.usage.estimated_cost;
+        }
+        gatewayMeta["fallback_used"] = ai.fallback_used;
+
+        if (ai.structured) {
+          if (runtime_mode === "llm") {
+            analysis = ai.structured.analysis;
+            evidence = [...ai.structured.evidence, ...memoryEvidence];
+            confidence = ai.structured.confidence;
+            if (ai.decision_proposal) proposal = ai.decision_proposal;
+            else proposal = null;
+          } else {
+            // hybrid: enrich analysis/evidence; candidate proposal only if validated
+            analysis = {
+              deterministic: agg.analysis,
+              llm: ai.structured.analysis,
+            };
+            evidence = [
+              ...agg.evidence,
+              ...ai.structured.evidence,
+              {
+                signal: "llm_enrichment",
+                value: ai.model,
+                source: "ai_gateway",
+              },
+            ];
+            confidence = Math.min(
+              1,
+              Math.max(agg.confidence, ai.structured.confidence) * 0.95 +
+                Math.min(agg.confidence, ai.structured.confidence) * 0.05,
+            );
+            if (ai.decision_proposal) {
+              proposal = ai.decision_proposal;
+            }
+          }
+        }
+      } else {
+        gatewayMeta["gateway_error"] = ai.error.code;
+        if (runtime_mode === "llm") {
+          // llm-only: fail observable — do not invent proposal
+          warnings.push(`llm_failed:${ai.error.code}`);
+          return finish({
+            ok: false,
+            result: {
+              agent_id: agentId,
+              run_id,
+              user_id: userId,
+              analysis: null,
+              evidence: [],
+              confidence: 0,
+              warnings: [...warnings, ai.error.message],
+              status: "failed",
+              rag_status,
+              retrieval_status: rag_status,
+              evidence_available,
+            },
+            agent_run: {
+              user_id: userId,
+              error_code: ai.error.code,
+              error_message: ai.error.message.slice(0, 200),
+              metadata: gatewayMeta,
+            },
+          });
+        }
+        // hybrid: degrade to deterministic aggregation
+        warnings.push(`gateway_degraded:${ai.error.code}`);
+      }
+    }
+
     const result: AgentAnalysisResult = {
       agent_id: agentId,
       run_id,
       user_id: userId,
-      analysis: agg.analysis,
-      evidence: agg.evidence,
-      confidence: agg.confidence,
+      analysis,
+      evidence,
+      confidence,
       warnings,
       status: "completed",
+      rag_status,
+      retrieval_status: rag_status,
+      evidence_available,
     };
-    if (agg.proposal) result.proposal = agg.proposal;
+    if (proposal) result.proposal = proposal;
     if (citations.length) result.citations = citations;
     if (memoryIds.length) result.memory_ids = memoryIds;
     if (agg.skill_run_ids.length) result.skill_run_ids = agg.skill_run_ids;
@@ -336,6 +524,7 @@ export async function runSpecialistAgent(
         ...(input.plan.plan_id ? { context_fingerprint: input.plan.plan_id } : {}),
         metadata: {
           ...(retrievalIds.length ? { retrieval_ids: retrievalIds.join(",") } : {}),
+          ...gatewayMeta,
         },
       },
     });

@@ -22,6 +22,8 @@ import {
 import {
   actionsForProposal,
   proposalFromDecisions,
+  toDecisionProposal,
+  validateCoachProposalAgainstSnapshot,
   validateProposalAgainstDecisionEngine,
 } from "@/lib/coach/proposals";
 import { weeklyReviewWorkflow } from "@/lib/coach/workflows/weekly-review";
@@ -135,6 +137,14 @@ export const askAiCoach = createServerFn({ method: "POST" })
     });
 
     let proposal = null as CoachProposal | null;
+    let bridgeMeta: {
+      ok: boolean;
+      degraded: boolean;
+      reason?: string;
+      decision_id?: string;
+      living_plan_mode?: string;
+    } | null = null;
+
     if (coachOut.factPack?.proposal && coachOut.factPack.proposalStatus === "accepted") {
       const p = coachOut.factPack.proposal;
       const typeMap = [
@@ -161,6 +171,78 @@ export const askAiCoach = createServerFn({ method: "POST" })
         >,
         confidence: p.confidence,
       };
+    } else if (builtDecisions && !coachOut.factPack?.proposal) {
+      proposal = proposalFromDecisions(
+        builtDecisions,
+        safety,
+        evidenceFromContext(ctx.typed) as Record<string, string | number | boolean | null>,
+      );
+    }
+
+    // Prefer full snapshot path: CoachProposal → Decision Engine (authoritative bridge).
+    // Agents never write Living Plan; Outcome/Learning wait for real follow-through.
+    if (proposal && snap) {
+      const snapValidated = validateCoachProposalAgainstSnapshot(proposal, snap);
+      proposal = snapValidated.proposal;
+      if (proposal && snapValidated.ok) {
+        const { runAuthoritativeBridge } = await import("@/ai/e2e/authoritative-bridge");
+        const bridgeRunId =
+          coachOut.agent_runs[0]?.parent_run_id ??
+          coachOut.agent_runs[0]?.run_id ??
+          `coach_bridge_${Date.now().toString(36)}`;
+        const decisionProposal =
+          coachOut.factPack?.proposal && coachOut.factPack.proposalStatus === "accepted"
+            ? {
+                ...coachOut.factPack.proposal,
+                user_id: identity.userId,
+                context_id: snap.inputFingerprint,
+              }
+            : toDecisionProposal(proposal, {
+                userId: identity.userId,
+                contextId: snap.inputFingerprint,
+              });
+        const bridge = runAuthoritativeBridge({
+          proposal: decisionProposal,
+          snapshot: snap,
+          runId: bridgeRunId,
+          emitOutcomeAndLearning: false,
+        });
+        bridgeMeta = {
+          ok: bridge.ok,
+          degraded: bridge.degraded,
+          ...(bridge.reason ? { reason: bridge.reason } : {}),
+          ...(bridge.decision?.decision_id
+            ? { decision_id: bridge.decision.decision_id }
+            : {}),
+          ...(bridge.living_plan?.workout?.mode
+            ? { living_plan_mode: bridge.living_plan.workout.mode }
+            : {}),
+        };
+        if (!bridge.ok) {
+          // Fail-safe: do not surface a rejected proposal as actionable
+          proposal = null;
+        } else {
+          void persistCoachProposal({
+            userId: identity.userId,
+            date: day,
+            type: proposal.type,
+            action: proposal.action,
+            value: proposal.value,
+            reasonCodes: proposal.reasonCodes,
+            evidence: proposal.evidence,
+            confidence: proposal.confidence,
+          });
+        }
+      } else if (!snapValidated.ok) {
+        proposal = null;
+        bridgeMeta = {
+          ok: false,
+          degraded: true,
+          reason: snapValidated.reason,
+        };
+      }
+    } else if (proposal) {
+      // No snapshot — soft validate only (legacy / offline); never invent Decision
       const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
       proposal = validated.proposal;
       if (proposal) {
@@ -175,14 +257,6 @@ export const askAiCoach = createServerFn({ method: "POST" })
           confidence: proposal.confidence,
         });
       }
-    } else if (builtDecisions && !coachOut.factPack?.proposal) {
-      proposal = proposalFromDecisions(
-        builtDecisions,
-        safety,
-        evidenceFromContext(ctx.typed) as Record<string, string | number | boolean | null>,
-      );
-      const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
-      proposal = validated.proposal;
     }
 
     const actions = actionsForProposal(proposal);
@@ -226,6 +300,10 @@ export const askAiCoach = createServerFn({ method: "POST" })
           coachAgent: true,
           coachStatus: coachOut.status,
           planId: coachOut.plan_id ?? null,
+          bridgeOk: bridgeMeta?.ok ?? null,
+          bridgeDegraded: bridgeMeta?.degraded ?? null,
+          bridgeReason: bridgeMeta?.reason ?? null,
+          decisionId: bridgeMeta?.decision_id ?? null,
         },
       });
     } catch {
@@ -264,6 +342,7 @@ export const askAiCoach = createServerFn({ method: "POST" })
       structured,
       coachAgent: true as const,
       status: coachOut.status,
+      ...(bridgeMeta ? { authoritativeBridge: bridgeMeta } : {}),
     };
   });
 

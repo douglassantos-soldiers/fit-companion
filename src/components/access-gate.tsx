@@ -6,7 +6,7 @@ import { checkAccessSession } from "@/lib/access.functions";
 import { getAuthSession } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
-const PUBLIC_PATHS = ["/acesso", "/welcome", "/admin", "/cadastro", "/entrar", "/termos", "/privacidade", "/wearables"];
+const PUBLIC_PATHS = ["/acesso", "/welcome", "/admin", "/governance", "/cadastro", "/entrar", "/termos", "/privacidade", "/wearables"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

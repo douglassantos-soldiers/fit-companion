@@ -2,9 +2,12 @@
  * KnowledgeRetrieval — audited retrieval run (query → scored hits).
  */
 
+import type { KnowledgeCitation } from "./knowledge-citation";
 import type { KnowledgeDomain } from "./knowledge-document";
 
 export type KnowledgeRetrievalMode = "semantic" | "keyword" | "hybrid";
+
+export type RagRuntimeStatus = "ok" | "empty" | "error" | "timeout" | "skipped";
 
 export type KnowledgeRetrievalHit = {
   chunk_id: string;
@@ -13,11 +16,14 @@ export type KnowledgeRetrievalHit = {
   score: number;
   semantic_score: number;
   keyword_score: number;
+  rerank_score?: number;
   title: string;
   excerpt: string;
+  content?: string;
   source_id?: string;
   uri?: string;
   metadata?: Record<string, string | number | boolean | null>;
+  citation?: KnowledgeCitation;
 };
 
 export type KnowledgeRetrieval = {
@@ -29,4 +35,8 @@ export type KnowledgeRetrieval = {
   hits: KnowledgeRetrievalHit[];
   latency_ms: number;
   created_at: string;
+  rag_status?: RagRuntimeStatus;
+  retrieval_status?: RagRuntimeStatus;
+  evidence_available?: boolean;
+  as_of?: string;
 };

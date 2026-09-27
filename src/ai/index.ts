@@ -13,12 +13,16 @@ export type { SpecialistAgentId } from "./agents";
 export { runSpecialistAgent } from "./agents";
 export {
   AI_GOVERNANCE_VERSION,
+  AI_EVAL_VERSION,
+  GOLDEN_DATASET_VERSION,
   recordAudit,
   listAudits,
   clearAuditLog,
   computeAiMetrics,
   diagnoseAgentRun,
   runAiEvaluation,
+  runAiEvaluationV2,
+  compareEvalArtifacts,
   auditFromIdentity,
 } from "./governance";
 export type {
@@ -30,5 +34,33 @@ export type {
   EvalCaseStatus,
   EvalResult,
   EvalSuiteResult,
+  EvaluationReport,
   AgentRunDiagnosticView,
 } from "./governance";
+
+/** FASE 15 — E2E harness (tests / hardening; not Coach product path). */
+export {
+  runAiE2EPipeline,
+  buildAiExecutionTrace,
+  runAuthoritativeBridge,
+  mapLayerErrorToPipeline,
+} from "./e2e";
+export type {
+  RunAiE2EPipelineResult,
+  AiExecutionTrace,
+  AiPipelineError,
+  AiPipelineErrorCode,
+  PipelineStageResult,
+} from "./e2e";
+
+/** FASE 18 — specialist proposal merge → Decision Engine */
+export {
+  runSpecialistsDecisionPipeline,
+  mergeSpecialistProposals,
+  attachProposalEvidence,
+} from "./decision-pipeline";
+export type {
+  RunSpecialistsDecisionPipelineResult,
+  MergeProposalsResult,
+  ProposalConflict,
+} from "./decision-pipeline";

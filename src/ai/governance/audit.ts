@@ -14,7 +14,9 @@ export type AiAuditKind =
   | "rag_retrieval"
   | "decision"
   | "outcome"
-  | "learning_event";
+  | "learning_event"
+  | "ai_gateway"
+  | "proposal_merge";
 
 /** @deprecated Prefer AiAuditKind — kept for callers of auditFromIdentity. */
 export type GovernanceAuditKind = AiAuditKind;
@@ -119,10 +121,14 @@ export function recordAudit(
   buffer.push(event);
   if (buffer.length > MAX) buffer.splice(0, buffer.length - MAX);
 
-  // FASE 11 — dual-write best-effort (server only; never blocks callers)
+  // FASE 11/21 — dual-write: CRITICAL awaits retry path; observational best-effort
   if (typeof window === "undefined" && process.env["AI_AUDIT_PERSIST"] !== "0") {
-    void import("@/ai/governance/persist.server")
-      .then((m) => m.schedulePersistAiAudit(event))
+    void import("@/ai/governance/durability")
+      .then(async ({ classifyAuditDurability }) => {
+        const durability = classifyAuditDurability(event);
+        const { schedulePersistAiAuditByDurability } = await import("@/ai/governance/persist.server");
+        schedulePersistAiAuditByDurability(event, durability);
+      })
       .catch(() => {});
   }
 

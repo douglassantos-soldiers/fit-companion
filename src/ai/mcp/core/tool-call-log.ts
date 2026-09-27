@@ -12,6 +12,7 @@ export function recordToolCall(call: ToolCall): void {
   buffer.push(call);
   if (buffer.length > MAX) buffer.splice(0, buffer.length - MAX);
 
+  // skill_id = catalog id only (never skill_run_id). Run ids live in metadata / subject.
   recordAudit({
     kind: "tool_call",
     user_id: call.user_id,
@@ -19,12 +20,12 @@ export function recordToolCall(call: ToolCall): void {
     run_id: call.run_id,
     agent_id: call.agent_id,
     tool_id: call.tool_id || call.tool,
-    ...(call.skill_run_id ? { skill_id: call.skill_run_id } : {}),
     status: call.status,
     ...(call.latency_ms != null ? { latency_ms: call.latency_ms } : {}),
     created_at: call.created_at,
     summary: call.error_code ? `${call.status}:${call.error_code}` : call.status,
     metadata: {
+      ...(call.skill_run_id ? { skill_run_id: call.skill_run_id } : {}),
       ...(call.error_code ? { error_code: call.error_code } : {}),
       ...(call.denied_reason ? { denied_reason: call.denied_reason.slice(0, 120) } : {}),
       ...(call.input_hash ? { input_hash: call.input_hash } : {}),

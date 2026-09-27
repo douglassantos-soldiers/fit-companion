@@ -1,0 +1,31 @@
+# AI Evaluation gate — no deploy
+name: ai-eval
+
+on:
+  push:
+    paths:
+      - "src/ai/**"
+      - "docs/AI_EVALUATION.md"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    paths:
+      - "src/ai/**"
+      - "docs/AI_EVALUATION.md"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Run AI evaluation suites (v1 + v2)
+        run: npm run test:eval

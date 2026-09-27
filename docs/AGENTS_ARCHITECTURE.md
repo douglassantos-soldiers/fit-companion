@@ -28,11 +28,17 @@ Todo agent produz `AgentAnalysisResult`:
 ```
 createExecutionPlan → AgentExecutionPlan
   → runSpecialistAgent(agentId, plan)  // Context + MCP + Skills + RAG + Memory
+  → [specialist_training + hybrid|llm] AI Gateway → validate → proposal candidata
+  → mergeSpecialistProposals (collect → conflict → priority)  // nunca max-confidence arbitrário
   → AgentAnalysisResult (± proposal)
-  → (caller externo) Context → Safety → Decision Engine
+  → (caller) Safety → Decision Engine → Living Plan (referencia assemble)
 ```
 
 Handoffs `context_engine` / `safety_engine` / `decision_engine` no plano são **marcadores** — o specialist **não** os executa.
+
+`AI_RUNTIME_MODE` (default `deterministic`): ver [`AI_GATEWAY.md`](./AI_GATEWAY.md). Em `deterministic`, o gateway não é chamado.
+
+Merge multi-specialist: ver [`DECISION_PIPELINE.md`](./DECISION_PIPELINE.md).
 
 ## API
 
@@ -53,6 +59,6 @@ const { result } = await runSpecialistAgent({
 
 - Sem `computeDecisions` em `src/ai/agents`
 - Sem WRITE tools / mutação de Living Plan
-- LLM não é autoridade (runtime determinístico nesta fase)
+- LLM não é autoridade (default `deterministic`; hybrid/llm só proposal candidata via Gateway)
 
 Produto: [`runCoachAgent`](./COACH_AGENT.md) orquestra specialists. Coach Agent = interface; Decision Engine = autoridade.

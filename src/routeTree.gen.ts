@@ -17,6 +17,7 @@ import { Route as ClubesRouteImport } from './routes/clubes'
 import { Route as CoachRouteImport } from './routes/coach'
 import { Route as DesafiosRouteImport } from './routes/desafios'
 import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as HubsRouteImport } from './routes/hubs'
 import { Route as NutricaoRouteImport } from './routes/nutricao'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -29,6 +30,15 @@ import { Route as TermosRouteImport } from './routes/termos'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as ConteudoIndexRouteImport } from './routes/conteudo.index'
 import { Route as ConteudoIdRouteImport } from './routes/conteudo.$id'
+import { Route as GovernanceIndexRouteImport } from './routes/governance.index'
+import { Route as GovernanceAgentsRouteImport } from './routes/governance.agents'
+import { Route as GovernanceCostRouteImport } from './routes/governance.cost'
+import { Route as GovernanceDecisionsRouteImport } from './routes/governance.decisions'
+import { Route as GovernanceEvaluationRouteImport } from './routes/governance.evaluation'
+import { Route as GovernanceOverviewRouteImport } from './routes/governance.overview'
+import { Route as GovernanceRagRouteImport } from './routes/governance.rag'
+import { Route as GovernanceRunsRouteImport } from './routes/governance.runs'
+import { Route as GovernanceSafetyRouteImport } from './routes/governance.safety'
 import { Route as HubsSlugRouteImport } from './routes/hubs.$slug'
 import { Route as ProgressoIndexRouteImport } from './routes/progresso.index'
 import { Route as ProgressoCorpoRouteImport } from './routes/progresso.corpo'
@@ -82,6 +92,11 @@ const DesafiosRoute = DesafiosRouteImport.update({
 const EntrarRoute = EntrarRouteImport.update({
   id: '/entrar',
   path: '/entrar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceRoute = GovernanceRouteImport.update({
+  id: '/governance',
+  path: '/governance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HubsRoute = HubsRouteImport.update({
@@ -143,6 +158,51 @@ const ConteudoIdRoute = ConteudoIdRouteImport.update({
   id: '/conteudo/$id',
   path: '/conteudo/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceIndexRoute = GovernanceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceAgentsRoute = GovernanceAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceCostRoute = GovernanceCostRouteImport.update({
+  id: '/cost',
+  path: '/cost',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceDecisionsRoute = GovernanceDecisionsRouteImport.update({
+  id: '/decisions',
+  path: '/decisions',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceEvaluationRoute = GovernanceEvaluationRouteImport.update({
+  id: '/evaluation',
+  path: '/evaluation',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceOverviewRoute = GovernanceOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceRagRoute = GovernanceRagRouteImport.update({
+  id: '/rag',
+  path: '/rag',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceRunsRoute = GovernanceRunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
+  getParentRoute: () => GovernanceRoute,
+} as any)
+const GovernanceSafetyRoute = GovernanceSafetyRouteImport.update({
+  id: '/safety',
+  path: '/safety',
+  getParentRoute: () => GovernanceRoute,
 } as any)
 const HubsSlugRoute = HubsSlugRouteImport.update({
   id: '/$slug',
@@ -225,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
   '/entrar': typeof EntrarRoute
+  '/governance': typeof GovernanceRouteWithChildren
   '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
@@ -236,6 +297,14 @@ export interface FileRoutesByFullPath {
   '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/conteudo/$id': typeof ConteudoIdRoute
+  '/governance/agents': typeof GovernanceAgentsRoute
+  '/governance/cost': typeof GovernanceCostRoute
+  '/governance/decisions': typeof GovernanceDecisionsRoute
+  '/governance/evaluation': typeof GovernanceEvaluationRoute
+  '/governance/overview': typeof GovernanceOverviewRoute
+  '/governance/rag': typeof GovernanceRagRoute
+  '/governance/runs': typeof GovernanceRunsRoute
+  '/governance/safety': typeof GovernanceSafetyRoute
   '/hubs/$slug': typeof HubsSlugRoute
   '/progresso/corpo': typeof ProgressoCorpoRoute
   '/progresso/resumo': typeof ProgressoResumoRoute
@@ -243,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/social/seguidores': typeof SocialSeguidoresRoute
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo/': typeof ConteudoIndexRoute
+  '/governance/': typeof GovernanceIndexRoute
   '/progresso/': typeof ProgressoIndexRoute
   '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
@@ -270,6 +340,14 @@ export interface FileRoutesByTo {
   '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/conteudo/$id': typeof ConteudoIdRoute
+  '/governance/agents': typeof GovernanceAgentsRoute
+  '/governance/cost': typeof GovernanceCostRoute
+  '/governance/decisions': typeof GovernanceDecisionsRoute
+  '/governance/evaluation': typeof GovernanceEvaluationRoute
+  '/governance/overview': typeof GovernanceOverviewRoute
+  '/governance/rag': typeof GovernanceRagRoute
+  '/governance/runs': typeof GovernanceRunsRoute
+  '/governance/safety': typeof GovernanceSafetyRoute
   '/hubs/$slug': typeof HubsSlugRoute
   '/progresso/corpo': typeof ProgressoCorpoRoute
   '/progresso/resumo': typeof ProgressoResumoRoute
@@ -277,6 +355,7 @@ export interface FileRoutesByTo {
   '/social/seguidores': typeof SocialSeguidoresRoute
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo': typeof ConteudoIndexRoute
+  '/governance': typeof GovernanceIndexRoute
   '/progresso': typeof ProgressoIndexRoute
   '/social': typeof SocialIndexRoute
   '/treino': typeof TreinoIndexRoute
@@ -296,6 +375,7 @@ export interface FileRoutesById {
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
   '/entrar': typeof EntrarRoute
+  '/governance': typeof GovernanceRouteWithChildren
   '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
@@ -307,6 +387,14 @@ export interface FileRoutesById {
   '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/conteudo/$id': typeof ConteudoIdRoute
+  '/governance/agents': typeof GovernanceAgentsRoute
+  '/governance/cost': typeof GovernanceCostRoute
+  '/governance/decisions': typeof GovernanceDecisionsRoute
+  '/governance/evaluation': typeof GovernanceEvaluationRoute
+  '/governance/overview': typeof GovernanceOverviewRoute
+  '/governance/rag': typeof GovernanceRagRoute
+  '/governance/runs': typeof GovernanceRunsRoute
+  '/governance/safety': typeof GovernanceSafetyRoute
   '/hubs/$slug': typeof HubsSlugRoute
   '/progresso/corpo': typeof ProgressoCorpoRoute
   '/progresso/resumo': typeof ProgressoResumoRoute
@@ -314,6 +402,7 @@ export interface FileRoutesById {
   '/social/seguidores': typeof SocialSeguidoresRoute
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo/': typeof ConteudoIndexRoute
+  '/governance/': typeof GovernanceIndexRoute
   '/progresso/': typeof ProgressoIndexRoute
   '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
@@ -334,6 +423,7 @@ export interface FileRouteTypes {
     | '/coach'
     | '/desafios'
     | '/entrar'
+    | '/governance'
     | '/hubs'
     | '/nutricao'
     | '/onboarding'
@@ -345,6 +435,14 @@ export interface FileRouteTypes {
     | '/termos'
     | '/welcome'
     | '/conteudo/$id'
+    | '/governance/agents'
+    | '/governance/cost'
+    | '/governance/decisions'
+    | '/governance/evaluation'
+    | '/governance/overview'
+    | '/governance/rag'
+    | '/governance/runs'
+    | '/governance/safety'
     | '/hubs/$slug'
     | '/progresso/corpo'
     | '/progresso/resumo'
@@ -352,6 +450,7 @@ export interface FileRouteTypes {
     | '/social/seguidores'
     | '/wearables/callback'
     | '/conteudo/'
+    | '/governance/'
     | '/progresso/'
     | '/social/'
     | '/treino/'
@@ -379,6 +478,14 @@ export interface FileRouteTypes {
     | '/termos'
     | '/welcome'
     | '/conteudo/$id'
+    | '/governance/agents'
+    | '/governance/cost'
+    | '/governance/decisions'
+    | '/governance/evaluation'
+    | '/governance/overview'
+    | '/governance/rag'
+    | '/governance/runs'
+    | '/governance/safety'
     | '/hubs/$slug'
     | '/progresso/corpo'
     | '/progresso/resumo'
@@ -386,6 +493,7 @@ export interface FileRouteTypes {
     | '/social/seguidores'
     | '/wearables/callback'
     | '/conteudo'
+    | '/governance'
     | '/progresso'
     | '/social'
     | '/treino'
@@ -404,6 +512,7 @@ export interface FileRouteTypes {
     | '/coach'
     | '/desafios'
     | '/entrar'
+    | '/governance'
     | '/hubs'
     | '/nutricao'
     | '/onboarding'
@@ -415,6 +524,14 @@ export interface FileRouteTypes {
     | '/termos'
     | '/welcome'
     | '/conteudo/$id'
+    | '/governance/agents'
+    | '/governance/cost'
+    | '/governance/decisions'
+    | '/governance/evaluation'
+    | '/governance/overview'
+    | '/governance/rag'
+    | '/governance/runs'
+    | '/governance/safety'
     | '/hubs/$slug'
     | '/progresso/corpo'
     | '/progresso/resumo'
@@ -422,6 +539,7 @@ export interface FileRouteTypes {
     | '/social/seguidores'
     | '/wearables/callback'
     | '/conteudo/'
+    | '/governance/'
     | '/progresso/'
     | '/social/'
     | '/treino/'
@@ -441,6 +559,7 @@ export interface RootRouteChildren {
   CoachRoute: typeof CoachRoute
   DesafiosRoute: typeof DesafiosRoute
   EntrarRoute: typeof EntrarRoute
+  GovernanceRoute: typeof GovernanceRouteWithChildren
   HubsRoute: typeof HubsRouteWithChildren
   NutricaoRoute: typeof NutricaoRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -518,6 +637,13 @@ declare module '@tanstack/react-router' {
       path: '/entrar'
       fullPath: '/entrar'
       preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance': {
+      id: '/governance'
+      path: '/governance'
+      fullPath: '/governance'
+      preLoaderRoute: typeof GovernanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hubs': {
@@ -603,6 +729,69 @@ declare module '@tanstack/react-router' {
       fullPath: '/conteudo/$id'
       preLoaderRoute: typeof ConteudoIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/governance/': {
+      id: '/governance/'
+      path: '/'
+      fullPath: '/governance/'
+      preLoaderRoute: typeof GovernanceIndexRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/agents': {
+      id: '/governance/agents'
+      path: '/agents'
+      fullPath: '/governance/agents'
+      preLoaderRoute: typeof GovernanceAgentsRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/cost': {
+      id: '/governance/cost'
+      path: '/cost'
+      fullPath: '/governance/cost'
+      preLoaderRoute: typeof GovernanceCostRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/decisions': {
+      id: '/governance/decisions'
+      path: '/decisions'
+      fullPath: '/governance/decisions'
+      preLoaderRoute: typeof GovernanceDecisionsRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/evaluation': {
+      id: '/governance/evaluation'
+      path: '/evaluation'
+      fullPath: '/governance/evaluation'
+      preLoaderRoute: typeof GovernanceEvaluationRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/overview': {
+      id: '/governance/overview'
+      path: '/overview'
+      fullPath: '/governance/overview'
+      preLoaderRoute: typeof GovernanceOverviewRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/rag': {
+      id: '/governance/rag'
+      path: '/rag'
+      fullPath: '/governance/rag'
+      preLoaderRoute: typeof GovernanceRagRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/runs': {
+      id: '/governance/runs'
+      path: '/runs'
+      fullPath: '/governance/runs'
+      preLoaderRoute: typeof GovernanceRunsRouteImport
+      parentRoute: typeof GovernanceRoute
+    }
+    '/governance/safety': {
+      id: '/governance/safety'
+      path: '/safety'
+      fullPath: '/governance/safety'
+      preLoaderRoute: typeof GovernanceSafetyRouteImport
+      parentRoute: typeof GovernanceRoute
     }
     '/hubs/$slug': {
       id: '/hubs/$slug'
@@ -705,6 +894,34 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface GovernanceRouteChildren {
+  GovernanceAgentsRoute: typeof GovernanceAgentsRoute
+  GovernanceCostRoute: typeof GovernanceCostRoute
+  GovernanceDecisionsRoute: typeof GovernanceDecisionsRoute
+  GovernanceEvaluationRoute: typeof GovernanceEvaluationRoute
+  GovernanceOverviewRoute: typeof GovernanceOverviewRoute
+  GovernanceRagRoute: typeof GovernanceRagRoute
+  GovernanceRunsRoute: typeof GovernanceRunsRoute
+  GovernanceSafetyRoute: typeof GovernanceSafetyRoute
+  GovernanceIndexRoute: typeof GovernanceIndexRoute
+}
+
+const GovernanceRouteChildren: GovernanceRouteChildren = {
+  GovernanceAgentsRoute: GovernanceAgentsRoute,
+  GovernanceCostRoute: GovernanceCostRoute,
+  GovernanceDecisionsRoute: GovernanceDecisionsRoute,
+  GovernanceEvaluationRoute: GovernanceEvaluationRoute,
+  GovernanceOverviewRoute: GovernanceOverviewRoute,
+  GovernanceRagRoute: GovernanceRagRoute,
+  GovernanceRunsRoute: GovernanceRunsRoute,
+  GovernanceSafetyRoute: GovernanceSafetyRoute,
+  GovernanceIndexRoute: GovernanceIndexRoute,
+}
+
+const GovernanceRouteWithChildren = GovernanceRoute._addFileChildren(
+  GovernanceRouteChildren,
+)
+
 interface HubsRouteChildren {
   HubsSlugRoute: typeof HubsSlugRoute
 }
@@ -755,6 +972,7 @@ const rootRouteChildren: RootRouteChildren = {
   CoachRoute: CoachRoute,
   DesafiosRoute: DesafiosRoute,
   EntrarRoute: EntrarRoute,
+  GovernanceRoute: GovernanceRouteWithChildren,
   HubsRoute: HubsRouteWithChildren,
   NutricaoRoute: NutricaoRoute,
   OnboardingRoute: OnboardingRoute,
@@ -778,13 +996,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

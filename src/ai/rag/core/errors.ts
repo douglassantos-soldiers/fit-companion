@@ -9,6 +9,7 @@ export const RAG_ERROR = {
   EMPTY_QUERY: "empty_query",
   INGEST_FAILED: "ingest_failed",
   UNKNOWN_DOMAIN: "unknown_domain",
+  TIMEOUT: "retrieval_timeout",
 } as const;
 
 export type RagErrorCode = (typeof RAG_ERROR)[keyof typeof RAG_ERROR];

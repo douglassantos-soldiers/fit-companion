@@ -76,22 +76,28 @@ export function classifyIntent(intent: string): IntentClass {
   if (training) {
     agents.push(SPECIALIST_TRAINING_ID);
     knowledgeDomains.push("exercise", "performance");
-    skillHints.push("analyze_training", "adjust_training_load");
+    skillHints.push(
+      "analyze_training",
+      "adjust_training_load",
+      "progression",
+      "regression",
+      "select_exercise",
+    );
     toolHints.push("get_training_history", "get_current_plan", "get_recovery");
     labels.push("training");
   }
   if (nutrition) {
     agents.push(SPECIALIST_NUTRITION_ID);
     knowledgeDomains.push("nutrition");
-    skillHints.push("analyze_nutrition", "adjust_macros");
+    skillHints.push("analyze_nutrition", "adjust_macros", "meal_substitution");
     toolHints.push("get_nutrition", "get_user_goal");
     labels.push("nutrition");
   }
   if (behavior) {
     agents.push(SPECIALIST_BEHAVIOR_ID);
     knowledgeDomains.push("behavior");
-    skillHints.push("analyze_adherence", "detect_friction");
-    toolHints.push("get_recent_outcomes", "get_training_history");
+    skillHints.push("analyze_adherence", "detect_friction", "habit_intervention");
+    toolHints.push("get_recent_outcomes", "get_training_history", "get_nutrition");
     labels.push("behavior");
   }
 
