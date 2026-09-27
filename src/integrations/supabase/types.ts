@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -107,6 +107,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "activity_comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "activity_comments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -186,6 +193,13 @@ export type Database = {
             referencedRelation: "activity_events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activity_kudos_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       activity_reactions: {
@@ -216,6 +230,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "activity_reactions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "activity_reactions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -228,25 +249,516 @@ export type Database = {
         Row: {
           action: string
           actor: string
+          actor_id: string | null
           created_at: string
           id: string
+          metadata: Json
+          resource_id: string | null
+          resource_type: string | null
           target: Json
+          user_id: string | null
         }
         Insert: {
           action: string
           actor?: string
+          actor_id?: string | null
           created_at?: string
           id?: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
           target?: Json
+          user_id?: string | null
         }
         Update: {
           action?: string
           actor?: string
+          actor_id?: string | null
           created_at?: string
           id?: string
+          metadata?: Json
+          resource_id?: string | null
+          resource_type?: string | null
           target?: Json
+          user_id?: string | null
         }
         Relationships: []
+      }
+      ai_audit_events: {
+        Row: {
+          agent_id: string | null
+          agent_version: string | null
+          audit_id: string
+          context_fingerprint: string | null
+          contract_version: number
+          created_at: string
+          decision_id: string | null
+          estimated_cost: number | null
+          governance_version: string
+          kind: string
+          latency_ms: number | null
+          learning_event_id: string | null
+          metadata: Json | null
+          model: string | null
+          outcome_id: string | null
+          parent_run_id: string | null
+          retrieval_id: string | null
+          role: string | null
+          run_id: string | null
+          session_id: string | null
+          skill_id: string | null
+          status: string | null
+          subject_id: string
+          summary: string | null
+          token_usage: Json | null
+          tool_id: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_version?: string | null
+          audit_id: string
+          context_fingerprint?: string | null
+          contract_version?: number
+          created_at?: string
+          decision_id?: string | null
+          estimated_cost?: number | null
+          governance_version?: string
+          kind: string
+          latency_ms?: number | null
+          learning_event_id?: string | null
+          metadata?: Json | null
+          model?: string | null
+          outcome_id?: string | null
+          parent_run_id?: string | null
+          retrieval_id?: string | null
+          role?: string | null
+          run_id?: string | null
+          session_id?: string | null
+          skill_id?: string | null
+          status?: string | null
+          subject_id: string
+          summary?: string | null
+          token_usage?: Json | null
+          tool_id?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          agent_version?: string | null
+          audit_id?: string
+          context_fingerprint?: string | null
+          contract_version?: number
+          created_at?: string
+          decision_id?: string | null
+          estimated_cost?: number | null
+          governance_version?: string
+          kind?: string
+          latency_ms?: number | null
+          learning_event_id?: string | null
+          metadata?: Json | null
+          model?: string | null
+          outcome_id?: string | null
+          parent_run_id?: string | null
+          retrieval_id?: string | null
+          role?: string | null
+          run_id?: string | null
+          session_id?: string | null
+          skill_id?: string | null
+          status?: string | null
+          subject_id?: string
+          summary?: string | null
+          token_usage?: Json | null
+          tool_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_audit_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_decision_memory: {
+        Row: {
+          confidence: number
+          created_at: string
+          data: Json
+          expires_at: string | null
+          id: string
+          key: string | null
+          low_confidence: boolean
+          source: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id: string
+          key?: string | null
+          low_confidence?: boolean
+          source: string
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id?: string
+          key?: string | null
+          low_confidence?: boolean
+          source?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_decision_memory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_knowledge_chunks: {
+        Row: {
+          chunk_id: string
+          content: string
+          created_at: string
+          document_id: string
+          document_version: string
+          embedding: string | null
+          embedding_provider: string
+          embedding_ref: string | null
+          metadata: Json
+          ordinal: number
+          source_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          chunk_id: string
+          content: string
+          created_at?: string
+          document_id: string
+          document_version?: string
+          embedding?: string | null
+          embedding_provider?: string
+          embedding_ref?: string | null
+          metadata?: Json
+          ordinal?: number
+          source_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          chunk_id?: string
+          content?: string
+          created_at?: string
+          document_id?: string
+          document_version?: string
+          embedding?: string | null
+          embedding_provider?: string
+          embedding_ref?: string | null
+          metadata?: Json
+          ordinal?: number
+          source_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_chunks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "ai_knowledge_documents"
+            referencedColumns: ["document_id"]
+          },
+        ]
+      }
+      ai_knowledge_documents: {
+        Row: {
+          content: string
+          created_at: string
+          document_id: string
+          domain: string
+          effective_date: string | null
+          expiration_date: string | null
+          language: string
+          metadata: Json
+          source_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          document_id: string
+          domain: string
+          effective_date?: string | null
+          expiration_date?: string | null
+          language?: string
+          metadata?: Json
+          source_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          document_id?: string
+          domain?: string
+          effective_date?: string | null
+          expiration_date?: string | null
+          language?: string
+          metadata?: Json
+          source_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_documents_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "ai_knowledge_sources"
+            referencedColumns: ["source_id"]
+          },
+        ]
+      }
+      ai_knowledge_sources: {
+        Row: {
+          created_at: string
+          domain: string
+          effective_date: string | null
+          expiration_date: string | null
+          license: string
+          metadata: Json
+          name: string
+          publisher: string
+          reference: string | null
+          source_id: string
+          status: string
+          trust_level: string
+          type: string
+          updated_at: string
+          url: string | null
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          effective_date?: string | null
+          expiration_date?: string | null
+          license?: string
+          metadata?: Json
+          name: string
+          publisher?: string
+          reference?: string | null
+          source_id: string
+          status?: string
+          trust_level?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+          version?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          effective_date?: string | null
+          expiration_date?: string | null
+          license?: string
+          metadata?: Json
+          name?: string
+          publisher?: string
+          reference?: string | null
+          source_id?: string
+          status?: string
+          trust_level?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
+      ai_learning_events: {
+        Row: {
+          confidence: number
+          created_at: string
+          data: Json
+          expires_at: string | null
+          id: string
+          key: string | null
+          low_confidence: boolean
+          source: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id: string
+          key?: string | null
+          low_confidence?: boolean
+          source: string
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id?: string
+          key?: string | null
+          low_confidence?: boolean
+          source?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_learning_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_outcome_memory: {
+        Row: {
+          confidence: number
+          created_at: string
+          data: Json
+          expires_at: string | null
+          id: string
+          key: string | null
+          low_confidence: boolean
+          source: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id: string
+          key?: string | null
+          low_confidence?: boolean
+          source: string
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id?: string
+          key?: string | null
+          low_confidence?: boolean
+          source?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_outcome_memory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_user_memory: {
+        Row: {
+          confidence: number
+          created_at: string
+          data: Json
+          expires_at: string | null
+          id: string
+          key: string | null
+          low_confidence: boolean
+          source: string
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id: string
+          key?: string | null
+          low_confidence?: boolean
+          source: string
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          data?: Json
+          expires_at?: string | null
+          id?: string
+          key?: string | null
+          low_confidence?: boolean
+          source?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_user_memory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       app_entitlement_emails: {
         Row: {
@@ -912,40 +1424,49 @@ export type Database = {
           baseline_value: number
           challenge_id: string
           device_id: string
+          eligible_value: number | null
           fraud_flags: Json
           pct_value: number | null
           personal_target: number | null
           proof_source: string
           proof_status: string
+          recorded_value: number | null
           updated_at: string
           user_id: string | null
           value: number
+          verification_status: string | null
         }
         Insert: {
           baseline_value?: number
           challenge_id: string
           device_id: string
+          eligible_value?: number | null
           fraud_flags?: Json
           pct_value?: number | null
           personal_target?: number | null
           proof_source?: string
           proof_status?: string
+          recorded_value?: number | null
           updated_at?: string
           user_id?: string | null
           value?: number
+          verification_status?: string | null
         }
         Update: {
           baseline_value?: number
           challenge_id?: string
           device_id?: string
+          eligible_value?: number | null
           fraud_flags?: Json
           pct_value?: number | null
           personal_target?: number | null
           proof_source?: string
           proof_status?: string
+          recorded_value?: number | null
           updated_at?: string
           user_id?: string | null
           value?: number
+          verification_status?: string | null
         }
         Relationships: [
           {
@@ -3856,7 +4377,47 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      activity_events_public: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          hidden_at: string | null
+          id: string | null
+          kind: string | null
+          kudos_count: number | null
+          payload: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          hidden_at?: string | null
+          id?: string | null
+          kind?: string | null
+          kudos_count?: number | null
+          payload?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          hidden_at?: string | null
+          id?: string | null
+          kind?: string | null
+          kudos_count?: number | null
+          payload?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never
