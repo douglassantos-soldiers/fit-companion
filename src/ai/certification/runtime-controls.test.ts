@@ -62,12 +62,12 @@ describe("FASE 21 flags + rollback + rate + cost", () => {
     expect(f.rag_enabled).toBe(true);
   });
 
-  it("rate limit eventually trips for same user key", () => {
+  it("rate limit eventually trips for same user key", async () => {
     process.env["AI_RL_USER_RPM"] = "2";
     const userId = `rl_user_${Date.now()}`;
-    expect(checkAiRateLimits({ userId }).ok).toBe(true);
-    expect(checkAiRateLimits({ userId }).ok).toBe(true);
-    expect(checkAiRateLimits({ userId }).ok).toBe(false);
+    expect((await checkAiRateLimits({ userId })).ok).toBe(true);
+    expect((await checkAiRateLimits({ userId })).ok).toBe(true);
+    expect((await checkAiRateLimits({ userId })).ok).toBe(false);
     expect(getAiRateLimitDefaults().user_rpm).toBe(2);
   });
 

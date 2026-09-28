@@ -1,6 +1,6 @@
 /**
  * Retrieval — hybrid semantic + keyword + metadata + rerank + evidence quality.
- * RAG never invents evidence on failure.
+ * RAG never invents evidence on failure. FASE 22.2 — explicit availability.
  */
 
 import type { KnowledgeCitation } from "@/ai/contracts/knowledge-citation";
@@ -8,11 +8,12 @@ import type {
   KnowledgeRetrieval,
   KnowledgeRetrievalHit,
   KnowledgeRetrievalMode,
+  RagAvailability,
   RagRuntimeStatus,
 } from "@/ai/contracts/knowledge-retrieval";
 import { RAG_ERROR, RagError } from "@/ai/rag/core/errors";
 import type { RetrieveKnowledgeOptions, RetrieveKnowledgeResult } from "@/ai/rag/core/types";
-import { getVectorStore } from "@/ai/rag/core/vector-store";
+import { ensureVectorStore } from "@/ai/rag/core/vector-store";
 import { cosineSimilarity, getEmbeddingProvider, tokenize } from "@/ai/rag/embeddings";
 import { evaluateEvidenceQuality } from "@/ai/rag/evidence/quality";
 import { rerankHits } from "@/ai/rag/reranking";
@@ -71,7 +72,53 @@ function buildCitation(
 }
 
 export function getCitationsFromRetrieval(retrieval: KnowledgeRetrieval): KnowledgeCitation[] {
+  if (retrieval.citations?.length) return retrieval.citations;
   return retrieval.hits.map((h) => h.citation ?? buildCitation(h, retrieval.retrieval_id));
+}
+
+export function deriveRagAvailability(
+  status: RagRuntimeStatus,
+  evidenceAdequate: boolean,
+  hitCount: number,
+): { availability: RagAvailability; error_code?: string } {
+  if (status === "error" || status === "timeout" || status === "skipped") {
+    return { availability: "RAG_UNAVAILABLE", error_code: RAG_ERROR.UNAVAILABLE };
+  }
+  if (status === "empty" || hitCount === 0) {
+    return { availability: "RAG_DEGRADED", error_code: RAG_ERROR.EMPTY };
+  }
+  if (!evidenceAdequate) {
+    return { availability: "RAG_DEGRADED", error_code: RAG_ERROR.LOW_CONFIDENCE };
+  }
+  return { availability: "RAG_AVAILABLE" };
+}
+
+function enrichRetrieval(retrieval: KnowledgeRetrieval): KnowledgeRetrieval {
+  const citations = getCitationsFromRetrieval(retrieval);
+  const sources = [
+    ...new Set(
+      retrieval.hits
+        .map((h) => h.source_id)
+        .filter((s): s is string => typeof s === "string" && s.length > 0),
+    ),
+  ];
+  for (const h of retrieval.hits) {
+    if (h.similarity == null) h.similarity = h.semantic_score;
+  }
+  const derived = deriveRagAvailability(
+    retrieval.rag_status ?? "empty",
+    Boolean(retrieval.evidence_available),
+    retrieval.hits.length,
+  );
+  return {
+    ...retrieval,
+    citations,
+    sources,
+    rag_availability: derived.availability,
+    ...(derived.error_code && derived.availability !== "RAG_AVAILABLE"
+      ? { error_code: derived.error_code }
+      : {}),
+  };
 }
 
 export type RetrieveKnowledgeOptionsExt = RetrieveKnowledgeOptions & {
@@ -114,7 +161,7 @@ async function retrieveKnowledgeInner(
   const provider = getEmbeddingProvider();
   const queryEmbedding = await provider.embed(query);
   const queryTokens = tokenize(query);
-  const store = getVectorStore();
+  const store = await ensureVectorStore();
 
   const candidates = await store.listByFilter({
     ...(opts.domains ? { domains: opts.domains } : {}),
@@ -143,6 +190,7 @@ async function retrieveKnowledgeInner(
       score: 0,
       semantic_score: semantic,
       keyword_score: keyword,
+      similarity: semantic,
       title: document.title,
       excerpt: excerpt(chunk.content),
       content: chunk.content,
@@ -169,6 +217,7 @@ async function retrieveKnowledgeInner(
         score: 0,
         semantic_score: 0,
         keyword_score: keyword,
+        similarity: 0,
         title: document.title,
         excerpt: excerpt(chunk.content),
         content: chunk.content,
@@ -201,9 +250,8 @@ async function retrieveKnowledgeInner(
 
   let rag_status: RagRuntimeStatus = "ok";
   if (ranked.length === 0) rag_status = "empty";
-  else if (!quality.evidence_adequate) rag_status = "ok"; // hits exist but quality low — still ok path with flag
 
-  const retrieval: KnowledgeRetrieval = {
+  let retrieval: KnowledgeRetrieval = {
     retrieval_id,
     query,
     mode,
@@ -217,6 +265,7 @@ async function retrieveKnowledgeInner(
   };
   if (opts.domains) retrieval.domain_filter = opts.domains;
   if (opts.metadata) retrieval.metadata_filter = opts.metadata;
+  retrieval = enrichRetrieval(retrieval);
 
   const { recordRagRetrieval } = await import("@/ai/governance/rag-retrieval-log");
   recordRagRetrieval(retrieval, {
@@ -227,7 +276,7 @@ async function retrieveKnowledgeInner(
 
   return {
     retrieval,
-    citations: getCitationsFromRetrieval(retrieval),
+    citations: retrieval.citations ?? [],
     evidence_quality: quality,
   };
 }
@@ -238,7 +287,7 @@ export async function retrieveKnowledge(
   const { isRagEnabled } = await import("@/ai/runtime/feature-flags");
   if (!isRagEnabled()) {
     const retrieval_id = newRetrievalId();
-    const retrieval: KnowledgeRetrieval = {
+    let retrieval: KnowledgeRetrieval = {
       retrieval_id,
       query: opts.query?.trim() ?? "",
       mode: opts.mode ?? "hybrid",
@@ -249,16 +298,44 @@ export async function retrieveKnowledge(
       retrieval_status: "skipped",
       evidence_available: false,
     };
+    retrieval = enrichRetrieval(retrieval);
     return {
       retrieval,
       citations: [],
       evidence_quality: evaluateEvidenceQuality([]),
     };
   }
+
+  const ragUser = opts.audit?.userId;
+  if (ragUser) {
+    const { checkAiRateLimits } = await import("@/ai/runtime/rate-limit");
+    const rl = await checkAiRateLimits({ ragUserId: ragUser, userId: ragUser });
+    if (!rl.ok) {
+      const retrieval_id = newRetrievalId();
+      let retrieval: KnowledgeRetrieval = {
+        retrieval_id,
+        query: opts.query?.trim() ?? "",
+        mode: opts.mode ?? "hybrid",
+        hits: [],
+        latency_ms: 0,
+        created_at: new Date().toISOString(),
+        rag_status: "error",
+        retrieval_status: "error",
+        evidence_available: false,
+      };
+      retrieval = enrichRetrieval(retrieval);
+      return {
+        retrieval,
+        citations: [],
+        evidence_quality: evaluateEvidenceQuality([]),
+      };
+    }
+  }
+
   const timeoutMs = opts.timeoutMs ?? 8_000;
   if (timeoutMs <= 0) {
     const retrieval_id = newRetrievalId();
-    const retrieval: KnowledgeRetrieval = {
+    let retrieval: KnowledgeRetrieval = {
       retrieval_id,
       query: opts.query?.trim() ?? "",
       mode: opts.mode ?? "hybrid",
@@ -269,6 +346,7 @@ export async function retrieveKnowledge(
       retrieval_status: "timeout",
       evidence_available: false,
     };
+    retrieval = enrichRetrieval(retrieval);
     return {
       retrieval,
       citations: [],
@@ -278,11 +356,16 @@ export async function retrieveKnowledge(
   try {
     return await withTimeout(retrieveKnowledgeInner(opts), timeoutMs);
   } catch (e) {
+    if (e instanceof RagError && e.code === RAG_ERROR.EMPTY_QUERY) throw e;
     const msg = e instanceof Error ? e.message : String(e);
     const isTimeout = msg.includes("timeout");
+    const isUnavailable =
+      e instanceof RagError && e.code === RAG_ERROR.UNAVAILABLE
+        ? true
+        : msg.includes("RAG_UNAVAILABLE") || msg.includes("admin_db");
     const retrieval_id = newRetrievalId();
     const status: RagRuntimeStatus = isTimeout ? "timeout" : "error";
-    const retrieval: KnowledgeRetrieval = {
+    let retrieval: KnowledgeRetrieval = {
       retrieval_id,
       query: opts.query?.trim() ?? "",
       mode: opts.mode ?? "hybrid",
@@ -292,6 +375,14 @@ export async function retrieveKnowledge(
       rag_status: status,
       retrieval_status: status,
       evidence_available: false,
+      error_code: isUnavailable
+        ? RAG_ERROR.UNAVAILABLE
+        : isTimeout
+          ? RAG_ERROR.TIMEOUT
+          : RAG_ERROR.UNAVAILABLE,
+      rag_availability: "RAG_UNAVAILABLE",
+      citations: [],
+      sources: [],
     };
     try {
       const { recordRagRetrieval } = await import("@/ai/governance/rag-retrieval-log");
@@ -303,7 +394,6 @@ export async function retrieveKnowledge(
     } catch {
       /* ignore */
     }
-    if (e instanceof RagError && e.message === "query_required") throw e;
     return {
       retrieval,
       citations: [],
@@ -345,9 +435,13 @@ export async function resolveKnowledgeRefs(
   }
   const quality = evaluateEvidenceQuality(ranked);
   const status: RagRuntimeStatus =
-    ranked.length === 0 ? "empty" : lastStatus === "error" || lastStatus === "timeout" ? lastStatus : "ok";
+    ranked.length === 0
+      ? "empty"
+      : lastStatus === "error" || lastStatus === "timeout"
+        ? lastStatus
+        : "ok";
 
-  const retrieval: KnowledgeRetrieval = {
+  let retrieval: KnowledgeRetrieval = {
     retrieval_id,
     query: kbRefs.join(","),
     mode: "hybrid",
@@ -358,10 +452,11 @@ export async function resolveKnowledgeRefs(
     retrieval_status: status,
     evidence_available: ranked.length > 0 && quality.evidence_adequate,
   };
+  retrieval = enrichRetrieval(retrieval);
 
   return {
     retrieval,
-    citations: getCitationsFromRetrieval(retrieval),
+    citations: retrieval.citations ?? [],
     evidence_quality: quality,
   };
 }

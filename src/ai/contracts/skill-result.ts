@@ -31,6 +31,8 @@ export type SkillResult = {
   /** FASE 16 — RAG status when skill declared required_knowledge */
   rag_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
   retrieval_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  /** FASE 22.2 */
+  rag_availability?: "RAG_AVAILABLE" | "RAG_DEGRADED" | "RAG_UNAVAILABLE";
   evidence_available?: boolean;
   citations?: Array<{
     citation_id: string;

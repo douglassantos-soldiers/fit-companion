@@ -15,7 +15,8 @@ export type AiPipelineErrorCode =
   | "safety_rejection"
   | "decision_error"
   | "persistence_error"
-  | "evaluation_error";
+  | "evaluation_error"
+  | "AUDIT_PERSISTENCE_FAILED";
 
 export type PipelineStage =
   | "identity"

@@ -1,0 +1,86 @@
+{
+  "report_version": "fase22_11_v1",
+  "checked_at": "2026-09-28T02:44:18.045Z",
+  "environment": "test",
+  "verdict": "PASS",
+  "checks": [
+    {
+      "object": "server_authoritative",
+      "expected": "ok",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "client_flags_rejected",
+      "expected": "throw",
+      "actual": "thrown",
+      "status": "pass"
+    },
+    {
+      "object": "defaults_safe",
+      "expected": "ai_on_components_on",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_AI_GLOBAL_ENABLED",
+      "expected": "off_deterministic",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_RAG_ENABLED",
+      "expected": "off",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_MEMORY_ENABLED",
+      "expected": "off",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_SPECIALISTS_ENABLED",
+      "expected": "off",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_LEARNING_ENABLED",
+      "expected": "off",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "force_deterministic",
+      "expected": "deterministic",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "alias_LLM_ENABLED",
+      "expected": "off",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "rollback_procedure",
+      "expected": "4_steps",
+      "actual": "4",
+      "status": "pass"
+    },
+    {
+      "object": "engine_isolation",
+      "expected": "no_feature_flags_except_learning",
+      "actual": "ok",
+      "status": "pass"
+    },
+    {
+      "object": "docs",
+      "expected": "AI_KILL_SWITCH.md",
+      "actual": "present",
+      "status": "pass"
+    }
+  ]
+}

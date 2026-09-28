@@ -1,6 +1,6 @@
 /**
  * OpenAI provider — fetch-based Chat Completions (server-only).
- * No SDK dependency; Agents never import this module directly.
+ * FASE 22.4 — cached_tokens + actual_cost when available.
  */
 
 import { makeAIError } from "@/ai/providers/errors";
@@ -106,15 +106,24 @@ export class OpenAIProvider implements AIProvider {
       const json = (await res.json()) as {
         id?: string;
         choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-        usage?: { prompt_tokens?: number; completion_tokens?: number };
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          prompt_tokens_details?: { cached_tokens?: number };
+        };
       };
       const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-      const input_tokens = json.usage?.prompt_tokens ?? roughTokens(req.messages.map((m) => m.content).join(""));
+      const input_tokens =
+        json.usage?.prompt_tokens ?? roughTokens(req.messages.map((m) => m.content).join(""));
       const output_tokens = json.usage?.completion_tokens ?? roughTokens(text);
+      const cached = json.usage?.prompt_tokens_details?.cached_tokens;
+      const estimated = this.estimateCost({ input_tokens, output_tokens }, model);
       const usage: AIUsage = {
         input_tokens,
         output_tokens,
-        estimated_cost: this.estimateCost({ input_tokens, output_tokens }, model),
+        ...(typeof cached === "number" ? { cached_tokens: cached } : {}),
+        estimated_cost: estimated,
+        actual_cost: null,
       };
 
       if (req.max_cost != null && (usage.estimated_cost ?? 0) > req.max_cost) {

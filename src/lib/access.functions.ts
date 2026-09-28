@@ -11,11 +11,9 @@ import {
   setAdminSessionCookie,
   readAdminSession,
   readAppAccessSession,
-  rateLimitKey,
   authenticateAdminWithRole,
 } from "@/lib/access-session.server";
-import {
-  parseEstablishAccessInput,
+import { parseEstablishAccessInput,
   parseAdminLogin,
   parseCompleteAccountInput,
 } from "@/lib/access-parse";
@@ -321,8 +319,18 @@ export const completeAccountAccess = createServerFn({ method: "POST" })
 export const loginAdmin = createServerFn({ method: "POST" })
   .inputValidator(parseAdminLogin)
   .handler(async ({ data }) => {
-    if (!rateLimitKey(`admin:${data.email}`, 8, 15 * 60_000)) {
-      return { ok: false as const, reason: "rate_limited" as const };
+    const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+    const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+    if (!isAiRateLimitDisabled()) {
+      const store = await resolveAiRateLimitStore();
+      const burst = await store.consume({
+        key: `ai:admin:${data.email.toLowerCase()}`,
+        limit: 8,
+        windowMs: 15 * 60_000,
+      });
+      if (!burst.allowed) {
+        return { ok: false as const, reason: "rate_limited" as const };
+      }
     }
     const result = await authenticateAdminWithRole(data.email, data.password);
     if (result.ok) {

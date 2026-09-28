@@ -1,9 +1,15 @@
 /**
  * Per-agent / skill AI model config (gateway-owned).
+ * FASE 22.4 — no mock fallback by default; production forbids mock.
  */
 
 import type { AIProviderId } from "@/ai/providers/types";
 import { getAiRuntimeMode, type AiRuntimeMode } from "@/ai/gateway/runtime-mode";
+import {
+  resolveFallbackProvider,
+  resolveLlmEnvironment,
+  resolvePrimaryProvider,
+} from "@/ai/gateway/runtime/env";
 
 export type AgentAIConfig = {
   provider: AIProviderId;
@@ -19,7 +25,6 @@ export type AgentAIConfig = {
 
 const DEFAULTS: AgentAIConfig = {
   provider: "openai",
-  fallback_provider: "mock",
   model: "gpt-4o-mini",
   temperature: 0.2,
   max_tokens: 800,
@@ -32,7 +37,6 @@ const DEFAULTS: AgentAIConfig = {
 const AGENT_CONFIG: Record<string, Partial<AgentAIConfig>> = {
   specialist_training: {
     provider: "openai",
-    fallback_provider: "mock",
     model: "gpt-4o-mini",
     temperature: 0.2,
     max_tokens: 900,
@@ -43,44 +47,34 @@ const AGENT_CONFIG: Record<string, Partial<AgentAIConfig>> = {
   },
 };
 
-function resolvePrimaryProvider(): AIProviderId {
-  const env = (process.env["AI_PRIMARY_PROVIDER"] ?? "").trim().toLowerCase();
-  if (env === "mock" || env === "openai" || env === "anthropic" || env === "google") {
-    return env;
-  }
-  return DEFAULTS.provider;
-}
-
-function resolveFallbackProvider(): AIProviderId | undefined {
-  const env = (process.env["AI_FALLBACK_PROVIDER"] ?? "").trim().toLowerCase();
-  if (env === "mock" || env === "openai" || env === "anthropic" || env === "google") {
-    return env;
-  }
-  return DEFAULTS.fallback_provider;
-}
-
 export function getAgentAIConfig(agentId: string): AgentAIConfig {
   const override = AGENT_CONFIG[agentId] ?? {};
-  const primary = resolvePrimaryProvider();
-  const fallback = resolveFallbackProvider();
+  const env = resolveLlmEnvironment();
+  const primary = resolvePrimaryProvider(env);
+  const fallback = resolveFallbackProvider(env);
+
+  const { fallback_provider: _ignored, ...overrideRest } = override;
   return {
     ...DEFAULTS,
-    ...override,
+    ...overrideRest,
     provider: primary,
-    ...(fallback ? { fallback_provider: fallback } : {}),
+    ...(fallback && fallback !== primary ? { fallback_provider: fallback } : {}),
   };
 }
 
 export function getGatewayRuntimeSnapshot(): {
   mode: AiRuntimeMode;
+  environment: ReturnType<typeof resolveLlmEnvironment>;
   primary: AIProviderId;
   fallback?: AIProviderId;
 } {
   const mode = getAiRuntimeMode();
-  const primary = resolvePrimaryProvider();
-  const fallback = resolveFallbackProvider();
+  const environment = resolveLlmEnvironment();
+  const primary = resolvePrimaryProvider(environment);
+  const fallback = resolveFallbackProvider(environment);
   return {
     mode,
+    environment,
     primary,
     ...(fallback ? { fallback } : {}),
   };

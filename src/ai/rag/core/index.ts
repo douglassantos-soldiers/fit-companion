@@ -23,8 +23,10 @@ export {
 } from "@/ai/rag/core/store";
 export {
   getVectorStore,
+  getActiveVectorStore,
   resetVectorStore,
   resolveVectorStoreFromEnv,
+  ensureVectorStore,
   setVectorStore,
 } from "@/ai/rag/core/vector-store";
 export type { VectorStore, VectorQueryOpts, StoredVectorHit } from "@/ai/rag/core/vector-store";

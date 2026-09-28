@@ -1,5 +1,6 @@
 /**
  * Provider error helpers — recoverable vs non-recoverable.
+ * FASE 22.5 — ProductionMockProviderError hard-blocks mock in production.
  */
 
 import type { AIError, AIErrorCode } from "@/ai/providers/types";
@@ -38,4 +39,17 @@ export function makeAIError(
   if (extra?.usage) err.usage = extra.usage;
   if (extra?.retryable != null) err.retryable = extra.retryable;
   return err;
+}
+
+/** Thrown when production code attempts to use the Mock LLM provider. */
+export class ProductionMockProviderError extends Error {
+  readonly code = "PRODUCTION_MOCK_FORBIDDEN" as const;
+  constructor(message = "production && provider === mock") {
+    super(message);
+    this.name = "ProductionMockProviderError";
+  }
+}
+
+export function isProductionMockProviderError(e: unknown): e is ProductionMockProviderError {
+  return e instanceof ProductionMockProviderError;
 }

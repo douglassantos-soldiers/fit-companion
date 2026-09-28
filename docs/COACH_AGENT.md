@@ -1,16 +1,17 @@
 # Coach Agent — Performance OS
 
-O Coach **não** é um chatbot isolado. É a interface que orquestra o pipeline AI.
+O Coach **não** é um chatbot isolado. É a **CANONICAL_FACADE** sobre [`runProductionAiRuntime`](./AI_CANONICAL_RUNTIME.md).
 
 ```
 USER
   → COACH AGENT (runCoachAgent)
-  → ORCHESTRATOR (createExecutionPlan)
-  → SPECIALIST AGENTS (runSpecialistAgent)
-  → Context / RAG / Memory / MCP (via skills/tools)
-  → Safety + Decision facts (SoT)
-  → Coach Response (determinística)
+  → runProductionAiRuntime (CANONICAL; com DecisionContextSnapshot)
+      → ORCHESTRATOR → SPECIALISTS → Skills/Tools/RAG/Memory
+      → DecisionProposal → merge → Safety → Decision Engine bridge
+  → Coach Response (FactPack determinístico)
 ```
+
+Sem snapshot: path **LEGACY** soft (informacional; não inventa Decision).
 
 ## Responsabilidades
 
@@ -43,7 +44,7 @@ const out = await runCoachAgent({
 // out.text / out.structured — fatos apenas
 ```
 
-Produto: [`askAiCoach`](../src/lib/coach.functions.ts) chama `runCoachAgent` (sem UI change).
+Produto: [`askAiCoach`](../src/lib/coach.functions.ts) chama `runCoachAgent` com `snapshot` quando disponível; o bridge autoritativo roda **dentro** do runtime canônico (sem segunda chamada paralela).
 
 ## WHY
 

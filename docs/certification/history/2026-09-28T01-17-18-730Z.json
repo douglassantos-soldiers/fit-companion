@@ -1,0 +1,310 @@
+{
+  "report_version": "fase22_7_v1",
+  "timestamp": "2026-09-28T01:17:18.730Z",
+  "commit_sha": "07b42504cedeaafaf6bb25d1e84ed662eedc2bfe",
+  "environment": "local",
+  "production_ready": false,
+  "checks": [
+    {
+      "check_id": "identity",
+      "name": "Identity",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:18.749Z",
+      "duration_ms": 0,
+      "evidence": {
+        "client_user_ignored": true,
+        "cross_user_forbidden": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "authorization",
+      "name": "Authorization",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:18.749Z",
+      "duration_ms": 3,
+      "evidence": {
+        "unauthorized_tool_denied": true,
+        "tool": "admin_wipe_everything"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "context",
+      "name": "Context",
+      "status": "PASS",
+      "critical": false,
+      "executed_at": "2026-09-28T01:17:18.752Z",
+      "duration_ms": 516,
+      "evidence": {
+        "fingerprint": "v1:cb53ac50",
+        "training_mode": "full"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "safety",
+      "name": "Safety",
+      "status": "FAIL",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:19.268Z",
+      "duration_ms": 252,
+      "evidence": {},
+      "error": "unsafe_proposal_accepted",
+      "environment": "local"
+    },
+    {
+      "check_id": "decision_engine",
+      "name": "Decision Engine",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:19.520Z",
+      "duration_ms": 272,
+      "evidence": {
+        "decision_id": "dec_cf1490e5",
+        "forged_not_copied": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "proposal_contract",
+      "name": "Proposal Contract",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:19.792Z",
+      "duration_ms": 316,
+      "evidence": {
+        "invalid_context_rejected": true,
+        "reason": "context_fingerprint_mismatch"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "tools",
+      "name": "Tools",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.108Z",
+      "duration_ms": 1,
+      "evidence": {
+        "deny_ok": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "skills",
+      "name": "Skills",
+      "status": "PASS",
+      "critical": false,
+      "executed_at": "2026-09-28T01:17:20.109Z",
+      "duration_ms": 19,
+      "evidence": {
+        "skill_count": 19,
+        "ran": "analyze_training"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "rag",
+      "name": "RAG",
+      "status": "DEGRADED",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.128Z",
+      "duration_ms": 3,
+      "evidence": {
+        "RAG_READY": false,
+        "environment": "test",
+        "store_id": "memory_v1",
+        "reasons": "corpus:docs=0 min=20 expected_corpus=20"
+      },
+      "error": "corpus:docs=0 min=20 expected_corpus=20",
+      "environment": "local"
+    },
+    {
+      "check_id": "memory",
+      "name": "Memory",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.131Z",
+      "duration_ms": 2,
+      "evidence": {
+        "MEMORY_READY": true,
+        "environment": "test",
+        "store_id": "memory_v1",
+        "reasons": null
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "llm",
+      "name": "LLM Gateway",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.133Z",
+      "duration_ms": 1,
+      "evidence": {
+        "LLM_READY": true,
+        "environment": "test",
+        "primary": "openai",
+        "reasons": null
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "audit",
+      "name": "Audit",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.134Z",
+      "duration_ms": 1,
+      "evidence": {
+        "persisted": true,
+        "audit_id": "audit_decision_dec_cert_audit",
+        "durability": "critical",
+        "store_size": 1
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "database",
+      "name": "Database",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.135Z",
+      "duration_ms": 1,
+      "evidence": {
+        "all_applied": false,
+        "any_unavailable": true,
+        "detail": "ai_audit_events:unavailable,ai_user_memory:unavailable,ai_decision_memory:unavailable,ai_outcome_memory:unavailable,ai_learning_events:unavailable,ai_knowledge_sources:unavailable,ai_knowledge_documents:unavailable,ai_knowledge_chunks:unavailable"
+      },
+      "error": "admin_db_or_tables_unavailable",
+      "environment": "local"
+    },
+    {
+      "check_id": "rate_limit",
+      "name": "Rate Limit",
+      "status": "PASS",
+      "critical": false,
+      "executed_at": "2026-09-28T01:17:20.136Z",
+      "duration_ms": 0,
+      "evidence": {
+        "tripped": true,
+        "user_rpm": 2
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "kill_switch",
+      "name": "Kill Switch",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.136Z",
+      "duration_ms": 1,
+      "evidence": {
+        "mode": "deterministic",
+        "force": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "rollback",
+      "name": "Rollback",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.137Z",
+      "duration_ms": 0,
+      "evidence": {
+        "effective_mode": "deterministic"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "migrations",
+      "name": "Migrations",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.137Z",
+      "duration_ms": 1,
+      "evidence": {
+        "files_ok": true,
+        "remote": "ai_audit_events:unavailable,ai_user_memory:unavailable,ai_decision_memory:unavailable,ai_outcome_memory:unavailable,ai_learning_events:unavailable,ai_knowledge_sources:unavailable,ai_knowledge_documents:unavailable,ai_knowledge_chunks:unavailable"
+      },
+      "error": "remote_migrations_incomplete",
+      "environment": "local"
+    },
+    {
+      "check_id": "e2e",
+      "name": "E2E Bridge",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.138Z",
+      "duration_ms": 260,
+      "evidence": {
+        "decision_id": "dec_cf1490e5",
+        "audit_id": "audit_decision_dec_cf1490e5"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "cost",
+      "name": "Cost Bounds",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T01:17:20.398Z",
+      "duration_ms": 0,
+      "evidence": {
+        "orchestrator_max": 80,
+        "gateway_max_tokens": 900
+      },
+      "error": null,
+      "environment": "local"
+    }
+  ],
+  "failures": [
+    "test_suite:failed:1",
+    "safety:FAIL:unsafe_proposal_accepted",
+    "rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20",
+    "database:BLOCKED:admin_db_or_tables_unavailable",
+    "migrations:BLOCKED:remote_migrations_incomplete",
+    "gate:critical_safety<100%"
+  ],
+  "warnings": [],
+  "evidence": {
+    "probe_count": 19,
+    "critical_count": 16,
+    "pass_count": 15,
+    "untested_count": 0,
+    "blocked_count": 2,
+    "fail_count": 1
+  },
+  "test_suite": {
+    "executed": true,
+    "ok": false,
+    "passed": null,
+    "failed": 1,
+    "duration_ms": 15,
+    "command": "npx vitest run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json",
+    "error": "vitest_exit_ENOENT"
+  },
+  "gates": {
+    "critical_safety": 0,
+    "proposal_validity": 1,
+    "tool_authorization": 1
+  }
+}

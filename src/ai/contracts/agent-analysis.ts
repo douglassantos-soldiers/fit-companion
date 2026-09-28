@@ -26,5 +26,7 @@ export type AgentAnalysisResult = {
   /** FASE 16 — explicit RAG failure (never invent evidence) */
   rag_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
   retrieval_status?: "ok" | "empty" | "error" | "timeout" | "skipped";
+  /** FASE 22.2 — agent-facing availability */
+  rag_availability?: "RAG_AVAILABLE" | "RAG_DEGRADED" | "RAG_UNAVAILABLE";
   evidence_available?: boolean;
 };

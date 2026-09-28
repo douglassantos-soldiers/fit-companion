@@ -13,8 +13,8 @@ import { generateWithFallback } from "@/ai/gateway/fallback";
 import {
   getMockAIProvider,
   resetMockAIProvider,
-  type AIRequest,
-} from "@/ai/providers";
+} from "@/ai/providers/mock";
+import type { AIRequest } from "@/ai/providers/types";
 import { clearAgentRunLog, runSpecialistAgent } from "@/ai/agents";
 import { createExecutionPlan } from "@/ai/orchestrator";
 import { registerDefaultAgents, clearAgentRegistry } from "@/ai/agents";
@@ -65,6 +65,8 @@ beforeEach(() => {
   delete process.env["AI_RUNTIME_MODE"];
   delete process.env["AI_PRIMARY_PROVIDER"];
   delete process.env["AI_FALLBACK_PROVIDER"];
+  delete process.env["AI_LLM_ENV"];
+  process.env["VITEST"] = "true";
 });
 
 describe("AI Gateway structured validate", () => {
@@ -303,7 +305,9 @@ describe("specialist_training gateway wiring", () => {
     expect(result.status).toBe("completed");
     expect(agent_run.metadata?.["runtime_mode"]).toBe("deterministic");
     expect(agent_run.metadata?.["deterministic_runtime"]).toBe(true);
-    expect(agent_run.metadata?.["provider"]).toBeUndefined();
+    expect(agent_run.metadata?.["provider"]).toBe("none");
+    expect(agent_run.metadata?.["execution_mode"]).toBe("deterministic");
+    expect(agent_run.metadata?.["status"]).toBeTruthy();
   });
 
   it("hybrid training: proposal ainda é DecisionProposal candidata", async () => {

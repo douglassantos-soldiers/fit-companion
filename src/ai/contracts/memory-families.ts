@@ -82,6 +82,7 @@ export function userMemoryToRecord(input: {
     created_at: input.created_at,
     updated_at: input.updated_at,
     key: input.key,
+    version: 1,
   };
   if (input.expires_at) out.expires_at = input.expires_at;
   return out;

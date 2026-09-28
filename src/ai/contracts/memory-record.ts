@@ -27,4 +27,6 @@ export type MemoryRecord = {
   key?: string;
   /** Soft flag when confidence < LOW_CONFIDENCE_THRESHOLD at write time */
   low_confidence?: boolean;
+  /** Monotonic version — 1 on create; +1 on update / supersede invalidate */
+  version: number;
 };

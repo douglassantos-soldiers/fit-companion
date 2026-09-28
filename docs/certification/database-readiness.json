@@ -1,0 +1,74 @@
+{
+  "report_version": "fase22_9_v1",
+  "checked_at": "2026-09-28T02:44:18.037Z",
+  "environment": "test",
+  "verdict": "BLOCKED",
+  "error_code": "MIGRATION_VERIFICATION_BLOCKED",
+  "checks": [
+    {
+      "migration": "20261018120000_fase9_ai_memory.sql",
+      "object": "migration_file",
+      "expected": "20261018120000_fase9_ai_memory.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261025120000_fase11_ai_audit_events.sql",
+      "object": "migration_file",
+      "expected": "20261025120000_fase11_ai_audit_events.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261027120000_fase16_ai_knowledge.sql",
+      "object": "migration_file",
+      "expected": "20261027120000_fase16_ai_knowledge.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261028120000_fase19_ai_audit_kinds.sql",
+      "object": "migration_file",
+      "expected": "20261028120000_fase19_ai_audit_kinds.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261029120000_fase22_3_memory_version.sql",
+      "object": "migration_file",
+      "expected": "20261029120000_fase22_3_memory_version.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261030120000_fase22_6_ai_audit_durability.sql",
+      "object": "migration_file",
+      "expected": "20261030120000_fase22_6_ai_audit_durability.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "migration": "20261031120000_fase22_9_ai_schema_verify.sql",
+      "object": "migration_file",
+      "expected": "20261031120000_fase22_9_ai_schema_verify.sql",
+      "actual": "present",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "service_role",
+      "expected": "SUPABASE_SERVICE_ROLE_KEY + select",
+      "actual": "unavailable",
+      "status": "blocked",
+      "detail": "admin_db_unavailable",
+      "environment": "test"
+    }
+  ],
+  "critical_drift": []
+}

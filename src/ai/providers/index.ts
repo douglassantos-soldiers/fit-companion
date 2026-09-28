@@ -1,6 +1,6 @@
 /**
- * AI Providers barrel — FASE 17.
- * Prefer @/ai/gateway from Agents; do not call providers from UI.
+ * AI Providers barrel — product code should prefer @/ai/gateway.
+ * FASE 22.5 — Mock helpers are NOT re-exported here; import from @/ai/providers/mock in tests only.
  */
 
 export type {
@@ -14,9 +14,18 @@ export type {
   AIResult,
   AIUsage,
 } from "@/ai/providers/types";
-export { isRetryableAIError, makeAIError } from "@/ai/providers/errors";
-export { getProvider, listProviderIds } from "@/ai/providers/registry";
-export { MockAIProvider, getMockAIProvider, resetMockAIProvider } from "@/ai/providers/mock";
+export {
+  isRetryableAIError,
+  makeAIError,
+  ProductionMockProviderError,
+  isProductionMockProviderError,
+} from "@/ai/providers/errors";
+export {
+  getProvider,
+  listProviderIds,
+  resetProviderRegistry,
+  setProviderForTests,
+} from "@/ai/providers/registry";
 export { OpenAIProvider } from "@/ai/providers/openai";
 export { AnthropicProvider } from "@/ai/providers/anthropic";
 export { GoogleProvider } from "@/ai/providers/google";

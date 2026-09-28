@@ -1,6 +1,6 @@
 /**
- * Persist AiAuditEvent to Postgres (service_role). Best-effort — never throws to callers.
- * FASE 11 — dual-write alongside in-memory ring buffer.
+ * Persist AiAuditEvent to Postgres (service_role).
+ * FASE 11 dual-write + FASE 22.6 durable CRITICAL path.
  */
 import type { AiAuditEvent } from "@/ai/governance/audit";
 import { auditEventToRow, rowToAuditEvent, type AiAuditEventRow } from "@/ai/governance/serialize";
@@ -9,8 +9,32 @@ import { logEngineError } from "@/lib/engine/observability";
 
 const TABLE = "ai_audit_events";
 
+export const AUDIT_PERSISTENCE_FAILED = "AUDIT_PERSISTENCE_FAILED" as const;
+
 export type PersistAiAuditResult =
-  { ok: true; skipped?: boolean; reason?: string } | { ok: false; error: string };
+  | { ok: true; skipped?: boolean; reason?: string }
+  | { ok: false; error: string };
+
+/** FASE 22.6 — awaited CRITICAL persist confirmation. */
+export type PersistCriticalAiAuditResult =
+  | { ok: true; persisted: true; audit_id: string }
+  | {
+      ok: true;
+      persisted: false;
+      skipped: true;
+      reason: string;
+      audit_id: string;
+    }
+  | {
+      ok: false;
+      persisted: false;
+      audit_id: string;
+      error_code: typeof AUDIT_PERSISTENCE_FAILED;
+      error: string;
+    };
+
+const CRITICAL_MAX_ATTEMPTS = 3;
+const CRITICAL_BACKOFF_MS = [50, 100] as const;
 
 /** Test DI — when set, used instead of adminDbLoose. */
 let persistDbOverride: (() => Promise<{ from: (t: string) => unknown } | null>) | null = null;
@@ -24,6 +48,26 @@ export function setAiAuditPersistDbForTests(
 async function getDb() {
   if (persistDbOverride) return persistDbOverride();
   return adminDbLoose();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientPersistError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("timeout") ||
+    m.includes("temporar") ||
+    m.includes("unavailable") ||
+    m.includes("econnreset") ||
+    m.includes("econnrefused") ||
+    m.includes("503") ||
+    m.includes("502") ||
+    m.includes("429") ||
+    m.includes("fetch failed") ||
+    m.includes("network")
+  );
 }
 
 export async function persistAiAuditEvent(event: AiAuditEvent): Promise<PersistAiAuditResult> {
@@ -63,6 +107,91 @@ export async function persistAiAuditEvent(event: AiAuditEvent): Promise<PersistA
     });
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * CRITICAL persist — awaited, retry controlado, falha explícita.
+ * Never treats admin_db_unavailable as success for critical events.
+ */
+export async function persistCriticalAiAudit(
+  event: AiAuditEvent,
+): Promise<PersistCriticalAiAuditResult> {
+  const audit_id = event.audit_id;
+
+  if (typeof window !== "undefined") {
+    return { ok: true, persisted: false, skipped: true, reason: "client", audit_id };
+  }
+  if (process.env["AI_AUDIT_PERSIST"] === "0") {
+    return { ok: true, persisted: false, skipped: true, reason: "disabled", audit_id };
+  }
+
+  const row = auditEventToRow(event);
+  if (!row) {
+    // Cannot upsert into UUID FK — harness / non-persistable identity (not a DB failure).
+    return {
+      ok: true,
+      persisted: false,
+      skipped: true,
+      reason: "non_uuid_user",
+      audit_id,
+    };
+  }
+
+  let lastError = "unknown";
+
+  for (let attempt = 0; attempt < CRITICAL_MAX_ATTEMPTS; attempt++) {
+    try {
+      const db = await getDb();
+      if (!db) {
+        lastError = "admin_db_unavailable";
+        if (attempt < CRITICAL_MAX_ATTEMPTS - 1) {
+          await sleep(CRITICAL_BACKOFF_MS[Math.min(attempt, CRITICAL_BACKOFF_MS.length - 1)]!);
+          continue;
+        }
+        break;
+      }
+
+      const { error } = await db.from(TABLE).upsert(row as AiAuditEventRow, {
+        onConflict: "audit_id",
+      });
+
+      if (!error) {
+        return { ok: true, persisted: true, audit_id };
+      }
+
+      lastError = String(error.message ?? error);
+      const retry = attempt < CRITICAL_MAX_ATTEMPTS - 1 && isTransientPersistError(lastError);
+      if (retry) {
+        await sleep(CRITICAL_BACKOFF_MS[Math.min(attempt, CRITICAL_BACKOFF_MS.length - 1)]!);
+        continue;
+      }
+      break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      const retry = attempt < CRITICAL_MAX_ATTEMPTS - 1 && isTransientPersistError(lastError);
+      if (retry) {
+        await sleep(CRITICAL_BACKOFF_MS[Math.min(attempt, CRITICAL_BACKOFF_MS.length - 1)]!);
+        continue;
+      }
+      break;
+    }
+  }
+
+  logEngineError({
+    userId: event.user_id,
+    engine: "ai_governance",
+    operation: "persist_critical_audit",
+    errorCode: AUDIT_PERSISTENCE_FAILED,
+    message: lastError,
+  });
+
+  return {
+    ok: false,
+    persisted: false,
+    audit_id,
+    error_code: AUDIT_PERSISTENCE_FAILED,
+    error: lastError,
+  };
 }
 
 export async function loadAuditsByRunId(userId: string, runId: string): Promise<AiAuditEvent[]> {
@@ -136,6 +265,18 @@ export async function loadAuditsForUser(
       message: e instanceof Error ? e.message : String(e),
     });
     return [];
+  }
+}
+
+export async function loadAuditById(auditId: string): Promise<AiAuditEvent | null> {
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const { data, error } = await db.from(TABLE).select("*").eq("audit_id", auditId).maybeSingle();
+    if (error || !data) return null;
+    return rowToAuditEvent(data as Record<string, unknown>);
+  } catch {
+    return null;
   }
 }
 
@@ -216,33 +357,11 @@ export function schedulePersistAiAudit(event: AiAuditEvent): void {
 }
 
 /**
- * CRITICAL audit persist — await + one retry. Still never throws to product callers
- * when used via schedule path; returns result for certification / ops.
+ * Route by durability for legacy recordAudit callers.
+ * CRITICAL must use recordCriticalAudit in product paths; this only fire-and-forgets
+ * observational events. Critical events from legacy callers still attempt persist without
+ * blocking (best-effort safety net) — Decision gate uses awaited recordCriticalAudit.
  */
-export async function persistCriticalAiAudit(event: AiAuditEvent): Promise<PersistAiAuditResult> {
-  if (typeof window !== "undefined") {
-    return { ok: true, skipped: true, reason: "client" };
-  }
-  if (process.env["AI_AUDIT_PERSIST"] === "0") {
-    return { ok: true, skipped: true, reason: "disabled" };
-  }
-  let result = await persistAiAuditEvent(event);
-  if (!result.ok) {
-    result = await persistAiAuditEvent(event);
-    if (!result.ok) {
-      logEngineError({
-        userId: event.user_id,
-        engine: "ai_governance",
-        operation: "persist_critical_audit",
-        errorCode: "critical_persist_failed",
-        message: result.error,
-      });
-    }
-  }
-  return result;
-}
-
-/** Route by durability: critical awaits; observational fire-and-forget. */
 export function schedulePersistAiAuditByDurability(
   event: AiAuditEvent,
   durability: "critical" | "observational",
@@ -250,6 +369,7 @@ export function schedulePersistAiAuditByDurability(
   if (typeof window !== "undefined") return;
   if (process.env["AI_AUDIT_PERSIST"] === "0") return;
   if (durability === "critical") {
+    // Legacy safety net only — product Decision/Outcome/Learning use await recordCriticalAudit.
     void persistCriticalAiAudit(event);
     return;
   }

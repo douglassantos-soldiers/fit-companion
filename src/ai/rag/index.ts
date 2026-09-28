@@ -20,6 +20,7 @@ export type {
   KnowledgeTrustTier,
   KnowledgeTrustLevel,
   RagRuntimeStatus,
+  RagAvailability,
 } from "@/ai/contracts";
 export { KNOWLEDGE_DOMAINS, expandDomainFilter } from "@/ai/contracts";
 
@@ -32,6 +33,8 @@ export {
   getKnowledgeEntry,
   getSourceAdapter,
   getVectorStore,
+  getActiveVectorStore,
+  ensureVectorStore,
   hasKnowledgeDocument,
   InMemoryVectorStore,
   knowledgeStoreSize,
@@ -70,11 +73,15 @@ export {
   ingestKnowledgeBatch,
   ingestKnowledgeDocument,
   seedProductionCorpus,
+  ensureCorpusSeeded,
+  expectedCorpusDocumentMin,
 } from "@/ai/rag/ingestion";
+export type { SeedCorpusReport } from "@/ai/rag/ingestion";
 export {
   getCitationsFromRetrieval,
   resolveKnowledgeRefs,
   retrieveKnowledge,
+  deriveRagAvailability,
 } from "@/ai/rag/retrieval";
 export { rerankHits } from "@/ai/rag/reranking";
 export { evaluateEvidenceQuality } from "@/ai/rag/evidence/quality";
@@ -91,6 +98,9 @@ export {
   evalRetrievalRelevance,
   evalSourceQuality,
   evalWrongDomainRetrieval,
+  evalCitationCorrectness,
+  evalIrrelevantCitation,
+  evalStaleDocument,
   runRagEvaluation,
   seedEvalFixtures,
 } from "@/ai/rag/evaluation";
@@ -98,6 +108,14 @@ export type { EvalCaseResult } from "@/ai/rag/evaluation";
 export { DOMAIN_EVAL_DATASET, runDomainEvalDataset } from "@/ai/rag/evaluation/dataset";
 export type { DomainEvalQuestion } from "@/ai/rag/evaluation/dataset";
 export { registerRagInfrastructure } from "@/ai/rag/register";
+export { checkRagHealth, getRagReadiness } from "@/ai/rag/health";
+export type { RagHealthReport, RagReadinessResult } from "@/ai/rag/health";
+export {
+  resolveRagEnvironment,
+  resolveRagStoreMode,
+  isRagProduction,
+} from "@/ai/rag/runtime/env";
+export type { RagEnvironment, RagStoreMode } from "@/ai/rag/runtime/env";
 
 import { registerRagInfrastructure } from "@/ai/rag/register";
 

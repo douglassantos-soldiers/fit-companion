@@ -26,19 +26,20 @@ Todo agent produz `AgentAnalysisResult`:
 ## Fluxo
 
 ```
-createExecutionPlan → AgentExecutionPlan
+runProductionAiRuntime (CANONICAL)  // ver AI_CANONICAL_RUNTIME.md
+  → createExecutionPlan → AgentExecutionPlan
   → runSpecialistAgent(agentId, plan)  // Context + MCP + Skills + RAG + Memory
   → [specialist_training + hybrid|llm] AI Gateway → validate → proposal candidata
-  → mergeSpecialistProposals (collect → conflict → priority)  // nunca max-confidence arbitrário
-  → AgentAnalysisResult (± proposal)
-  → (caller) Safety → Decision Engine → Living Plan (referencia assemble)
+  → mergeSpecialistProposals (collect → conflict → priority)
+  → Safety → Decision Engine bridge → Living Plan (referencia assemble)
 ```
 
 Handoffs `context_engine` / `safety_engine` / `decision_engine` no plano são **marcadores** — o specialist **não** os executa.
 
 `AI_RUNTIME_MODE` (default `deterministic`): ver [`AI_GATEWAY.md`](./AI_GATEWAY.md). Em `deterministic`, o gateway não é chamado.
 
-Merge multi-specialist: ver [`DECISION_PIPELINE.md`](./DECISION_PIPELINE.md).
+Merge multi-specialist: ver [`DECISION_PIPELINE.md`](./DECISION_PIPELINE.md).  
+Runtime canônico: [`AI_CANONICAL_RUNTIME.md`](./AI_CANONICAL_RUNTIME.md).
 
 ## API
 
@@ -61,4 +62,4 @@ const { result } = await runSpecialistAgent({
 - Sem WRITE tools / mutação de Living Plan
 - LLM não é autoridade (default `deterministic`; hybrid/llm só proposal candidata via Gateway)
 
-Produto: [`runCoachAgent`](./COACH_AGENT.md) orquestra specialists. Coach Agent = interface; Decision Engine = autoridade.
+Produto: [`runCoachAgent`](./COACH_AGENT.md) é facade sobre `runProductionAiRuntime`. Coach Agent = interface; Decision Engine = autoridade.

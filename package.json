@@ -14,8 +14,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:eval": "vitest run src/ai/governance/evaluation.test.ts src/ai/governance/eval-v2.test.ts",
-    "cert:ai": "vitest run src/ai/certification",
-    "cert:migrations": "npx vitest run src/ai/certification/performance.bench.test.ts -t \"readiness\"",
+    "test:ai-unit": "vitest run src/ai/governance/evaluation.test.ts src/ai/certification/certification-integrity.test.ts src/ai/certification/runtime-controls.test.ts",
+    "test:ai-integration": "vitest run src/ai/e2e/e2e-pipeline.test.ts src/ai/governance/audit-durability.test.ts src/ai/rag/rag-hardening.test.ts src/ai/memory/memory-hardening.test.ts src/ai/gateway/llm-hardening.test.ts",
+    "test:ai-security": "vitest run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/gateway/production_mock_guard.test.ts",
+    "test:ai-regression": "vitest run src/ai/ci/ai-regression-suite.test.ts",
+    "guard:ai-mock": "node scripts/ai-production-mock-guard.mjs",
+    "cert:ai": "npx vitest run src/ai/certification/run-production-certification.cli.test.ts --reporter=verbose",
+    "cert:migrations": "npx vitest run src/ai/certification/performance.bench.test.ts -t \"defaults are UNTESTED\"",
+    "ai:certification": "npx vitest run src/ai/certification/run-production-certification.cli.test.ts --reporter=verbose",
+    "ai:ci-verdict": "node scripts/ai-ci-gate-verdict.mjs",
+    "ai:db-readiness": "npx vitest run src/ai/certification/database-readiness.test.ts --reporter=verbose",
+    "ai:rate-limit": "npx vitest run src/ai/runtime/rate-limit.distributed.test.ts src/ai/certification/runtime-controls.test.ts --reporter=verbose",
+    "ai:kill-switch": "npx vitest run src/ai/runtime/kill-switch.test.ts src/ai/certification/runtime-controls.test.ts --reporter=verbose",
+    "ai:prod-e2e": "npx vitest run src/ai/e2e/production-e2e.test.ts --reporter=verbose",
+    "ai:certification:final": "npx vitest run src/ai/certification/run-final-production-certification.cli.test.ts --reporter=verbose",
     "media:validate": "node scripts/soldiers-media/validate-manifest.mjs",
     "media:queue": "node scripts/soldiers-media/build-motion-queue.mjs",
     "media:prompts": "node scripts/soldiers-media/render-prompts.mjs",
@@ -29,7 +41,8 @@
     "catalog:validate": "node scripts/exercise-catalog/validate.mjs",
     "food:validate": "node scripts/nutrition/validate-catalog.mjs",
     "taco:xlsx-to-json": "node scripts/taco-xlsx-to-json.mjs",
-    "taco:import-sql": "node scripts/import-taco.mjs"
+    "taco:import-sql": "node scripts/import-taco.mjs",
+    "rag:seed": "npx tsx scripts/seed-rag-corpus.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"

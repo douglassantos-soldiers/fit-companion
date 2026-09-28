@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   assertSecurityConfiguration,
-  rateLimitWindows,
   readAccessSession,
 } from "@/lib/access-session.server";
+import { checkAiRateLimits } from "@/ai/runtime/rate-limit";
 import {
   buildStructuredCoachReply,
   detectCoachIntent,
@@ -22,7 +22,6 @@ import {
 import {
   actionsForProposal,
   proposalFromDecisions,
-  toDecisionProposal,
   validateCoachProposalAgainstSnapshot,
   validateProposalAgainstDecisionEngine,
 } from "@/lib/coach/proposals";
@@ -89,12 +88,54 @@ export const askAiCoach = createServerFn({ method: "POST" })
     }
 
     const limits = coachRateLimits();
-    const rl = rateLimitWindows(`coach:${session.email}`, [
-      { suffix: "min", limit: limits.rpm, windowMs: 60_000 },
-      { suffix: "day", limit: limits.rpd, windowMs: 24 * 60 * 60_000 },
-    ]);
+    // Preserve COACH_RPM/COACH_RPD via env while using distributed store (api + session).
+    const prevApi = process.env["AI_RL_API_RPM"];
+    const prevSession = process.env["AI_RL_SESSION_RPM"];
+    process.env["AI_RL_API_RPM"] = String(limits.rpm);
+    process.env["AI_RL_SESSION_RPM"] = String(limits.rpm);
+    let rl;
+    try {
+      rl = await checkAiRateLimits({
+        apiKey: session.userId ?? session.email,
+        sessionId: session.email,
+        ...(session.userId ? { userId: session.userId } : {}),
+      });
+      // Daily coach budget (separate key / 24h window via api key day suffix handled by extra consume)
+      if (rl.ok) {
+        const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+        const store = await resolveAiRateLimitStore();
+        const day = await store.consume({
+          key: `ai:api:coach-day:${session.email}`,
+          limit: limits.rpd,
+          windowMs: 24 * 60 * 60_000,
+        });
+        if (!day.allowed) {
+          rl = {
+            ok: false as const,
+            scope: "api",
+            window: "day",
+            headers: {
+              "Retry-After": String(day.retry_after_sec),
+              "X-RateLimit-Limit": String(day.limit),
+              "X-RateLimit-Remaining": String(day.remaining),
+              "X-RateLimit-Reset": String(Math.ceil(day.reset_at_ms / 1000)),
+            },
+          };
+        }
+      }
+    } finally {
+      if (prevApi === undefined) delete process.env["AI_RL_API_RPM"];
+      else process.env["AI_RL_API_RPM"] = prevApi;
+      if (prevSession === undefined) delete process.env["AI_RL_SESSION_RPM"];
+      else process.env["AI_RL_SESSION_RPM"] = prevSession;
+    }
     if (!rl.ok) {
-      return { text: "", error: "rate_limited" as const, status: 429 as const };
+      return {
+        text: "",
+        error: "rate_limited" as const,
+        status: 429 as const,
+        rate_limit_headers: rl.headers,
+      };
     }
 
     const deviceId = data.deviceId?.trim() || "";
@@ -124,7 +165,7 @@ export const askAiCoach = createServerFn({ method: "POST" })
     const builtDecisions = snap?.decisions ?? null;
     const safety = snap?.safety ?? evaluateSafetyForDate(ctx.state, day);
 
-    // Coach Agent path (Orchestrator → Specialists → FactPack) — default, no LLM authority
+    // Coach Agent → CANONICAL runtime (with snapshot) or LEGACY soft (without)
     const { runCoachAgent } = await import("@/ai/agents/coach");
     const contextAvailable = Boolean(snap) || Boolean(ctx.livingSummary);
     const coachOut = await runCoachAgent({
@@ -134,6 +175,7 @@ export const askAiCoach = createServerFn({ method: "POST" })
       ...(builtDecisions ? { decisions: builtDecisions } : {}),
       safety,
       forceSafetyBlock: Boolean(safety.escalateCare && turnKind === "actionable"),
+      ...(snap ? { snapshot: snap } : {}),
     });
 
     let proposal = null as CoachProposal | null;
@@ -179,49 +221,28 @@ export const askAiCoach = createServerFn({ method: "POST" })
       );
     }
 
-    // Prefer full snapshot path: CoachProposal → Decision Engine (authoritative bridge).
-    // Agents never write Living Plan; Outcome/Learning wait for real follow-through.
-    if (proposal && snap) {
-      const snapValidated = validateCoachProposalAgainstSnapshot(proposal, snap);
-      proposal = snapValidated.proposal;
-      if (proposal && snapValidated.ok) {
-        const { runAuthoritativeBridge } = await import("@/ai/e2e/authoritative-bridge");
-        const bridgeRunId =
-          coachOut.agent_runs[0]?.parent_run_id ??
-          coachOut.agent_runs[0]?.run_id ??
-          `coach_bridge_${Date.now().toString(36)}`;
-        const decisionProposal =
-          coachOut.factPack?.proposal && coachOut.factPack.proposalStatus === "accepted"
-            ? {
-                ...coachOut.factPack.proposal,
-                user_id: identity.userId,
-                context_id: snap.inputFingerprint,
-              }
-            : toDecisionProposal(proposal, {
-                userId: identity.userId,
-                contextId: snap.inputFingerprint,
-              });
-        const bridge = runAuthoritativeBridge({
-          proposal: decisionProposal,
-          snapshot: snap,
-          runId: bridgeRunId,
-          emitOutcomeAndLearning: false,
-        });
-        bridgeMeta = {
-          ok: bridge.ok,
-          degraded: bridge.degraded,
-          ...(bridge.reason ? { reason: bridge.reason } : {}),
-          ...(bridge.decision?.decision_id
-            ? { decision_id: bridge.decision.decision_id }
+    // CANONICAL: bridge already ran inside runCoachAgent → runProductionAiRuntime
+    if (snap && coachOut.bridge) {
+      const bridge = coachOut.bridge;
+      bridgeMeta = {
+        ok: bridge.ok,
+        degraded: bridge.degraded,
+        ...(bridge.reason ? { reason: bridge.reason } : {}),
+        ...(bridge.decision?.decision_id
+          ? { decision_id: bridge.decision.decision_id }
+          : coachOut.decision?.decision_id
+            ? { decision_id: coachOut.decision.decision_id }
             : {}),
-          ...(bridge.living_plan?.workout?.mode
-            ? { living_plan_mode: bridge.living_plan.workout.mode }
-            : {}),
-        };
-        if (!bridge.ok) {
-          // Fail-safe: do not surface a rejected proposal as actionable
-          proposal = null;
-        } else {
+        ...(bridge.living_plan?.workout?.mode
+          ? { living_plan_mode: bridge.living_plan.workout.mode }
+          : {}),
+      };
+      if (!bridge.ok) {
+        proposal = null;
+      } else if (proposal) {
+        const snapValidated = validateCoachProposalAgainstSnapshot(proposal, snap);
+        proposal = snapValidated.proposal;
+        if (proposal && snapValidated.ok) {
           void persistCoachProposal({
             userId: identity.userId,
             date: day,
@@ -232,7 +253,33 @@ export const askAiCoach = createServerFn({ method: "POST" })
             evidence: proposal.evidence,
             confidence: proposal.confidence,
           });
+        } else {
+          proposal = null;
+          if (!snapValidated.ok) {
+            bridgeMeta = {
+              ...bridgeMeta,
+              ok: false,
+              degraded: true,
+              reason: snapValidated.reason,
+            };
+          }
         }
+      }
+    } else if (proposal && snap) {
+      // Snapshot present but bridge skipped (e.g. no agent proposal) — validate only
+      const snapValidated = validateCoachProposalAgainstSnapshot(proposal, snap);
+      proposal = snapValidated.proposal;
+      if (proposal && snapValidated.ok) {
+        void persistCoachProposal({
+          userId: identity.userId,
+          date: day,
+          type: proposal.type,
+          action: proposal.action,
+          value: proposal.value,
+          reasonCodes: proposal.reasonCodes,
+          evidence: proposal.evidence,
+          confidence: proposal.confidence,
+        });
       } else if (!snapValidated.ok) {
         proposal = null;
         bridgeMeta = {
@@ -242,7 +289,7 @@ export const askAiCoach = createServerFn({ method: "POST" })
         };
       }
     } else if (proposal) {
-      // No snapshot — soft validate only (legacy / offline); never invent Decision
+      // LEGACY — soft validate only (no snapshot); never invent Decision
       const validated = validateProposalAgainstDecisionEngine(proposal, builtDecisions, safety);
       proposal = validated.proposal;
       if (proposal) {
@@ -325,6 +372,25 @@ export const askAiCoach = createServerFn({ method: "POST" })
         value: { text: lastUser.slice(0, 240) },
         confidence: 0.4,
       });
+      // Canonical AI Memory (User) — best-effort when store is available; legacy remains for Coach prompt
+      void (async () => {
+        try {
+          const { ensureMemoryStore, createMemory } = await import("@/ai/memory");
+          await ensureMemoryStore();
+          await createMemory({
+            trustedUserId: identity.userId,
+            family: "user",
+            type: "coach_notes",
+            key: `note-${day}`,
+            data: { text: lastUser.slice(0, 240) },
+            source: "coach",
+            confidence: 0.4,
+            supersede: true,
+          });
+        } catch {
+          /* best-effort — do not fail coach turn */
+        }
+      })();
     }
 
     const latencyMs = Date.now() - started;
@@ -342,6 +408,9 @@ export const askAiCoach = createServerFn({ method: "POST" })
       structured,
       coachAgent: true as const,
       status: coachOut.status,
+      execution_mode: "deterministic" as const,
+      provider: "coach_deterministic" as const,
+      model: "deterministic_runtime" as const,
       ...(bridgeMeta ? { authoritativeBridge: bridgeMeta } : {}),
     };
   });

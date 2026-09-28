@@ -1,5 +1,5 @@
 /**
- * runCoachAgent — Coach Agent facade (not an isolated chatbot).
+ * runCoachAgent — CANONICAL_FACADE over runProductionAiRuntime.
  * USER → Coach → Orchestrator → Specialists → Context/RAG/Memory/MCP → Safety/Decision facts → response
  * Never invents data, never applies Living Plan, never owns Decision.
  */
@@ -18,6 +18,11 @@ import { registerDefaultAgents } from "@/ai/orchestrator/agents/registry";
 import { validateProposalAgainstDecisionEngine } from "@/lib/coach/proposals";
 import type { DecisionBundle } from "@/lib/engine/decision";
 import type { SafetyVerdict } from "@/lib/engine/safety";
+import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
+import type { Decision } from "@/lib/engine/decision-contract";
+import type { AuthoritativeBridgeResult } from "@/ai/runtime/authoritative-bridge";
+import { runProductionAiRuntime } from "@/ai/runtime/production-runtime";
+import { AI_PATH_LABEL, AI_PATH_LABEL_META_KEY } from "@/ai/runtime/path-labels";
 import { COACH_AGENT_ERROR } from "@/ai/agents/coach/errors";
 import {
   buildFactPack,
@@ -46,11 +51,16 @@ export type RunCoachAgentInput = {
   contextAvailable?: boolean;
   callTool?: SkillCallTool;
   skipKnowledge?: boolean;
-  /** Optional live bundle for soft proposal validation (tests / server). */
+  /** Optional live bundle for soft proposal validation (LEGACY / tests). */
   decisions?: DecisionBundle | null;
   safety?: SafetyVerdict | null;
   /** Force escalate / safety block in tests */
   forceSafetyBlock?: boolean;
+  /**
+   * When provided, Coach uses the CANONICAL production runtime (bridge included).
+   * Without snapshot → LEGACY soft path (no Decision invented).
+   */
+  snapshot?: DecisionContextSnapshot | null;
 };
 
 export type RunCoachAgentResult = {
@@ -63,6 +73,10 @@ export type RunCoachAgentResult = {
   factPack?: CoachFactPack;
   intentKind: CoachAgentIntentKind;
   error_code?: string;
+  /** Present when CANONICAL path ran the authoritative bridge. */
+  decision?: Decision | null;
+  bridge?: AuthoritativeBridgeResult | null;
+  path_label?: typeof AI_PATH_LABEL.CANONICAL_FACADE | typeof AI_PATH_LABEL.LEGACY;
 };
 
 function extractWhyFromSpecialists(
@@ -128,6 +142,11 @@ function extractWhyFromSpecialists(
   return why;
 }
 
+/**
+ * Coach Agent facade — product interface over the canonical AI runtime.
+ *
+ * @classification CANONICAL_FACADE (with snapshot) | LEGACY (soft, no snapshot)
+ */
 export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoachAgentResult> {
   registerDefaultAgents();
 
@@ -146,6 +165,7 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       agent_runs,
       intentKind,
       error_code: COACH_AGENT_ERROR.ANONYMOUS_DENIED,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
     };
   }
 
@@ -162,6 +182,7 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       agent_runs,
       intentKind,
       error_code: COACH_AGENT_ERROR.INVALID_TRUSTED_USER,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
     };
   }
 
@@ -175,6 +196,7 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       agent_runs,
       intentKind,
       error_code: COACH_AGENT_ERROR.EMPTY_MESSAGE,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
     };
   }
 
@@ -189,15 +211,256 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       agent_runs,
       intentKind,
       error_code: COACH_AGENT_ERROR.INSUFFICIENT_CONTEXT,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
     };
   }
 
   const orchIntent = intentForOrchestrator(message, intentKind);
+  const coachRunId = `coach_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+  // --- CANONICAL path: snapshot → production runtime ---
+  if (input.snapshot?.inputFingerprint) {
+    return runCoachViaCanonical({
+      userId,
+      message,
+      orchIntent,
+      intentKind,
+      coachRunId,
+      snapshot: input.snapshot,
+      callTool: input.callTool,
+      skipKnowledge: input.skipKnowledge,
+      forceSafetyBlock: input.forceSafetyBlock,
+    });
+  }
+
+  // --- LEGACY soft path: no snapshot (informational proposals only) ---
+  return runCoachLegacySoft({
+    userId,
+    message,
+    orchIntent,
+    intentKind,
+    coachRunId,
+    callTool: input.callTool,
+    skipKnowledge: input.skipKnowledge,
+    decisions: input.decisions,
+    safety: input.safety,
+    forceSafetyBlock: input.forceSafetyBlock,
+  });
+}
+
+async function runCoachViaCanonical(opts: {
+  userId: string;
+  message: string;
+  orchIntent: string;
+  intentKind: CoachAgentIntentKind;
+  coachRunId: string;
+  snapshot: DecisionContextSnapshot;
+  callTool?: SkillCallTool;
+  skipKnowledge?: boolean;
+  forceSafetyBlock?: boolean;
+}): Promise<RunCoachAgentResult> {
   const { ok: planOk, plan } = createExecutionPlan({
-    trustedUserId: userId,
-    intent: orchIntent,
+    trustedUserId: opts.userId,
+    intent: opts.orchIntent,
     contextAvailable: true,
-    ...(intentKind === "why_plan_changed"
+    ...(opts.intentKind === "why_plan_changed"
+      ? {
+          overrides: {
+            forceSkills: ["explain_decision", "analyze_outcome", "analyze_performance"],
+            forceAgents: planAgentsForWhy(),
+          },
+        }
+      : {}),
+  });
+
+  if (!planOk || plan.status === "rejected") {
+    const rejected = buildRejectedPlanResponse(
+      plan.rejection_reason ?? COACH_AGENT_ERROR.PLAN_REJECTED,
+    );
+    return {
+      ok: false,
+      text: rejected.text,
+      structured: rejected.structured,
+      status: rejected.status,
+      plan_id: plan.plan_id,
+      agent_runs: [],
+      intentKind: opts.intentKind,
+      error_code: COACH_AGENT_ERROR.PLAN_REJECTED,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
+    };
+  }
+
+  if (plan.status === "insufficient_context") {
+    const insuff = buildInsufficientContextResponse(opts.message);
+    return {
+      ok: false,
+      text: insuff.text,
+      structured: insuff.structured,
+      status: insuff.status,
+      plan_id: plan.plan_id,
+      agent_runs: [],
+      intentKind: opts.intentKind,
+      error_code: COACH_AGENT_ERROR.INSUFFICIENT_CONTEXT,
+      path_label: AI_PATH_LABEL.CANONICAL_FACADE,
+    };
+  }
+
+  const runtime = await runProductionAiRuntime({
+    trustedUserId: opts.userId,
+    intent: opts.message,
+    snapshot: opts.snapshot,
+    plan,
+    parentRunId: opts.coachRunId,
+    ...(opts.callTool ? { callTool: opts.callTool } : {}),
+    ...(opts.skipKnowledge !== undefined ? { skipKnowledge: opts.skipKnowledge } : {}),
+    emitOutcomeAndLearning: false,
+    runtimeMode: "deterministic",
+  });
+
+  const agent_runs = runtime.agent_runs;
+  const specialistResults = runtime.specialist_results;
+
+  let explainResult: unknown = null;
+  let outcomeResult: unknown = null;
+  if (opts.intentKind === "why_plan_changed" && opts.callTool) {
+    const explain = await runSkill({
+      skillId: "explain_decision",
+      trustedUserId: opts.userId,
+      agentId: COACH_AGENT_ID,
+      callTool: opts.callTool,
+    });
+    if (explain.ok && explain.data) explainResult = explain.data.result;
+    const outcome = await runSkill({
+      skillId: "analyze_outcome",
+      trustedUserId: opts.userId,
+      agentId: COACH_AGENT_ID,
+      callTool: opts.callTool,
+    });
+    if (outcome.ok && outcome.data) outcomeResult = outcome.data.result;
+  }
+
+  const why =
+    opts.intentKind === "why_plan_changed"
+      ? extractWhyFromSpecialists(specialistResults, explainResult, outcomeResult)
+      : null;
+
+  if (why) {
+    for (const e of why.evidence_items) {
+      if (e.signal === "trainingMode" && e.value != null) {
+        why.training_mode = String(e.value);
+      }
+    }
+  }
+
+  let proposal: DecisionProposal | null = runtime.proposal;
+  let proposalStatus: CoachFactPack["proposalStatus"] = "none";
+  let proposalRejectReason: string | undefined;
+
+  if (opts.forceSafetyBlock && proposal) {
+    proposalStatus = "safety_blocked";
+    proposalRejectReason = COACH_AGENT_ERROR.SAFETY_REJECTION;
+    proposal = null;
+  } else if (runtime.bridge && !runtime.bridge.ok) {
+    proposalStatus =
+      runtime.bridge.error_code === "safety_rejection" ? "safety_blocked" : "rejected";
+    proposalRejectReason = runtime.bridge.reason ?? COACH_AGENT_ERROR.INVALID_PROPOSAL;
+    proposal = null;
+  } else if (proposal && runtime.ok) {
+    proposalStatus = "accepted";
+  } else if (runtime.merge.discarded.some((d) => d.discarded_reason === "missing_evidence")) {
+    proposalStatus = "none";
+    proposalRejectReason = "missing_evidence";
+  } else if (runtime.merge.discarded.some((d) => d.discarded_reason === "low_confidence")) {
+    proposalStatus = "none";
+    proposalRejectReason = "low_confidence";
+  }
+
+  const factPack = buildFactPack({
+    intentKind: opts.intentKind,
+    message: opts.message,
+    specialistResults,
+    why,
+    proposal,
+    proposalStatus,
+    ...(proposalRejectReason ? { proposalRejectReason } : {}),
+  });
+
+  const built = buildCoachResponse(factPack);
+  const finishedAt = new Date().toISOString();
+  recordAgentRun({
+    run_id: opts.coachRunId,
+    agent_id: COACH_AGENT_ID,
+    user_id: opts.userId,
+    status:
+      built.status === "ok" || built.status === "partial"
+        ? "completed"
+        : built.status === "blocked"
+          ? "blocked_by_safety"
+          : "failed",
+    created_at: finishedAt,
+    started_at: finishedAt,
+    finished_at: finishedAt,
+    context_fingerprint: opts.snapshot.inputFingerprint,
+    metadata: {
+      agent_version: "1.0.0",
+      model: "runCoachAgent",
+      estimated_cost: agent_runs.length + 1,
+      latency_ms: 0,
+      specialist_count: agent_runs.length,
+      intent_kind: opts.intentKind,
+      merge_conflicts: runtime.merge.conflicts.length,
+      ...(runtime.merge.resolution_reason
+        ? { merge_reason: runtime.merge.resolution_reason }
+        : {}),
+      [AI_PATH_LABEL_META_KEY]: AI_PATH_LABEL.CANONICAL_FACADE,
+      canonical_run_id: runtime.correlation.run_id,
+      decision_id: runtime.decision?.decision_id ?? null,
+    },
+  });
+
+  return {
+    ok: built.status === "ok" || built.status === "partial",
+    text: built.text,
+    structured: built.structured,
+    status: built.status,
+    plan_id: plan.plan_id,
+    agent_runs,
+    factPack,
+    intentKind: opts.intentKind,
+    decision: runtime.decision,
+    bridge: runtime.bridge,
+    path_label: AI_PATH_LABEL.CANONICAL_FACADE,
+    ...(built.status === "insufficient_evidence"
+      ? { error_code: COACH_AGENT_ERROR.INSUFFICIENT_EVIDENCE }
+      : {}),
+  };
+}
+
+/**
+ * LEGACY soft path — specialists + merge without authoritative bridge.
+ * Does not invent Decision / Living Plan.
+ *
+ * @classification LEGACY
+ */
+async function runCoachLegacySoft(opts: {
+  userId: string;
+  message: string;
+  orchIntent: string;
+  intentKind: CoachAgentIntentKind;
+  coachRunId: string;
+  callTool?: SkillCallTool;
+  skipKnowledge?: boolean;
+  decisions?: DecisionBundle | null;
+  safety?: SafetyVerdict | null;
+  forceSafetyBlock?: boolean;
+}): Promise<RunCoachAgentResult> {
+  const agent_runs: AgentRun[] = [];
+
+  const { ok: planOk, plan } = createExecutionPlan({
+    trustedUserId: opts.userId,
+    intent: opts.orchIntent,
+    contextAvailable: true,
+    ...(opts.intentKind === "why_plan_changed"
       ? {
           overrides: {
             forceSkills: ["explain_decision", "analyze_outcome", "analyze_performance"],
@@ -218,13 +481,14 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       status: rejected.status,
       plan_id: plan.plan_id,
       agent_runs,
-      intentKind,
+      intentKind: opts.intentKind,
       error_code: COACH_AGENT_ERROR.PLAN_REJECTED,
+      path_label: AI_PATH_LABEL.LEGACY,
     };
   }
 
   if (plan.status === "insufficient_context") {
-    const insuff = buildInsufficientContextResponse(message);
+    const insuff = buildInsufficientContextResponse(opts.message);
     return {
       ok: false,
       text: insuff.text,
@@ -232,56 +496,54 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       status: insuff.status,
       plan_id: plan.plan_id,
       agent_runs,
-      intentKind,
+      intentKind: opts.intentKind,
       error_code: COACH_AGENT_ERROR.INSUFFICIENT_CONTEXT,
+      path_label: AI_PATH_LABEL.LEGACY,
     };
   }
 
   const specialistResults: AgentAnalysisResult[] = [];
   const workerAgents = plan.agents.filter((id) => id !== COACH_AGENT_ID);
   const agentsToRun = workerAgents.length ? workerAgents : plan.agents;
-  const coachRunId = `coach_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
   for (const agentId of agentsToRun) {
     const out = await runSpecialistAgent({
-      trustedUserId: userId,
+      trustedUserId: opts.userId,
       agentId,
       plan,
-      intent: message,
-      parentRunId: coachRunId,
-      ...(input.callTool ? { callTool: input.callTool } : {}),
-      ...(input.skipKnowledge !== undefined ? { skipKnowledge: input.skipKnowledge } : {}),
+      intent: opts.message,
+      parentRunId: opts.coachRunId,
+      ...(opts.callTool ? { callTool: opts.callTool } : {}),
+      ...(opts.skipKnowledge !== undefined ? { skipKnowledge: opts.skipKnowledge } : {}),
     });
     agent_runs.push(out.agent_run);
     specialistResults.push(out.result);
   }
 
-  // Extra WHY skills if specialists didn't cover explain_decision
   let explainResult: unknown = null;
   let outcomeResult: unknown = null;
-  if (intentKind === "why_plan_changed" && input.callTool) {
+  if (opts.intentKind === "why_plan_changed" && opts.callTool) {
     const explain = await runSkill({
       skillId: "explain_decision",
-      trustedUserId: userId,
+      trustedUserId: opts.userId,
       agentId: COACH_AGENT_ID,
-      callTool: input.callTool,
+      callTool: opts.callTool,
     });
     if (explain.ok && explain.data) explainResult = explain.data.result;
     const outcome = await runSkill({
       skillId: "analyze_outcome",
-      trustedUserId: userId,
+      trustedUserId: opts.userId,
       agentId: COACH_AGENT_ID,
-      callTool: input.callTool,
+      callTool: opts.callTool,
     });
     if (outcome.ok && outcome.data) outcomeResult = outcome.data.result;
   }
 
   const why =
-    intentKind === "why_plan_changed"
+    opts.intentKind === "why_plan_changed"
       ? extractWhyFromSpecialists(specialistResults, explainResult, outcomeResult)
       : null;
 
-  // Enrich training_mode from tool-backed specialist evidence if present
   if (why) {
     for (const e of why.evidence_items) {
       if (e.signal === "trainingMode" && e.value != null) {
@@ -298,20 +560,19 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
 
   const merge = mergeSpecialistProposals({
     specialistResults,
-    safety: input.safety ?? null,
-    userId,
-    runId: coachRunId,
+    safety: opts.safety ?? null,
+    userId: opts.userId,
+    runId: opts.coachRunId,
   });
   proposal = merge.selected;
   mergeConflicts = merge.conflicts.length;
   mergeReason = merge.resolution_reason;
 
-  if (input.forceSafetyBlock && proposal) {
+  if (opts.forceSafetyBlock && proposal) {
     proposalStatus = "safety_blocked";
     proposalRejectReason = COACH_AGENT_ERROR.SAFETY_REJECTION;
     proposal = null;
-  } else if (proposal && input.decisions && input.safety) {
-    // Soft validate using coach proposal bridge shape
+  } else if (proposal && opts.decisions && opts.safety) {
     const soft = validateProposalAgainstDecisionEngine(
       {
         type: mapProposedType(proposal.proposed_type),
@@ -321,8 +582,8 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
         evidence: {},
         confidence: proposal.confidence,
       },
-      input.decisions,
-      input.safety,
+      opts.decisions,
+      opts.safety,
     );
     if (!soft.ok || !soft.proposal) {
       proposalStatus = "rejected";
@@ -332,7 +593,7 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       proposalStatus = "accepted";
     }
   } else if (proposal) {
-    // No live snapshot in this call — keep proposal as informational only (not applied)
+    // LEGACY: no live snapshot — informational only (not applied)
     proposalStatus = "accepted";
   } else if (merge.discarded.some((d) => d.discarded_reason === "missing_evidence")) {
     proposalStatus = "none";
@@ -343,8 +604,8 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
   }
 
   const factPack = buildFactPack({
-    intentKind,
-    message,
+    intentKind: opts.intentKind,
+    message: opts.message,
     specialistResults,
     why,
     proposal,
@@ -355,9 +616,9 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
   const built = buildCoachResponse(factPack);
   const finishedAt = new Date().toISOString();
   recordAgentRun({
-    run_id: coachRunId,
+    run_id: opts.coachRunId,
     agent_id: COACH_AGENT_ID,
-    user_id: userId,
+    user_id: opts.userId,
     status:
       built.status === "ok" || built.status === "partial"
         ? "completed"
@@ -374,9 +635,11 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
       estimated_cost: agent_runs.length + 1,
       latency_ms: 0,
       specialist_count: agent_runs.length,
-      intent_kind: intentKind,
+      intent_kind: opts.intentKind,
       merge_conflicts: mergeConflicts,
       ...(mergeReason ? { merge_reason: mergeReason } : {}),
+      [AI_PATH_LABEL_META_KEY]: AI_PATH_LABEL.LEGACY,
+      path: "legacy_soft_no_snapshot",
     },
   });
 
@@ -388,7 +651,8 @@ export async function runCoachAgent(input: RunCoachAgentInput): Promise<RunCoach
     plan_id: plan.plan_id,
     agent_runs,
     factPack,
-    intentKind,
+    intentKind: opts.intentKind,
+    path_label: AI_PATH_LABEL.LEGACY,
     ...(built.status === "insufficient_evidence"
       ? { error_code: COACH_AGENT_ERROR.INSUFFICIENT_EVIDENCE }
       : {}),

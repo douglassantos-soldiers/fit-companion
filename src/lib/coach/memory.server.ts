@@ -1,11 +1,16 @@
 /**
- * Coach memory — facts/preferences/patterns/notes only (not full chat dump).
+ * Coach memory — LEGACY path (`coach_memories`).
+ *
+ * NOT the Source of Truth for AI Memory Layer (see `src/ai/memory` + `ai_*` tables).
+ * Kept for Coach UI prompt context until a future migration.
+ * path_label: LEGACY
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import type { CoachMemoryEntry, CoachMemoryKind } from "@/lib/coach/types";
 
 const CAP_PER_KIND = 20;
 
+/** LEGACY — load from `coach_memories` (not AI Memory SoT). */
 export async function loadCoachMemory(userId: string): Promise<CoachMemoryEntry[]> {
   try {
     const db = await adminDbLoose();
@@ -29,6 +34,7 @@ export async function loadCoachMemory(userId: string): Promise<CoachMemoryEntry[
   }
 }
 
+/** LEGACY — upsert into `coach_memories` (not AI Memory SoT). */
 export async function upsertCoachMemory(opts: {
   userId: string;
   kind: CoachMemoryKind;

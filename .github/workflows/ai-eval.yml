@@ -1,31 +1,144 @@
-# AI Evaluation gate — no deploy
-name: ai-eval
+# AI CI/CD Safety Gate — no deploy
+# FASE 22.8 — lint → typecheck → unit → integration → eval → security → regression → cert → build
+name: AI CI/CD Safety Gate
 
 on:
   push:
     paths:
       - "src/ai/**"
+      - "src/lib/engine/**"
+      - "src/lib/coach/**"
+      - "supabase/migrations/**"
+      - "scripts/ai-*.mjs"
+      - "scripts/ai-*.ts"
+      - "scripts/*cert*"
+      - "scripts/ai-production-mock-guard.mjs"
+      - "scripts/ai-ci-gate-verdict.mjs"
+      - "docs/AI_*.md"
       - "docs/AI_EVALUATION.md"
+      - "docs/AI_CI_CD_GATES.md"
       - "package.json"
       - "package-lock.json"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/ai-eval.yml"
   pull_request:
     paths:
       - "src/ai/**"
+      - "src/lib/engine/**"
+      - "src/lib/coach/**"
+      - "supabase/migrations/**"
+      - "scripts/ai-*.mjs"
+      - "scripts/ai-*.ts"
+      - "scripts/*cert*"
+      - "scripts/ai-production-mock-guard.mjs"
+      - "scripts/ai-ci-gate-verdict.mjs"
+      - "docs/AI_*.md"
       - "docs/AI_EVALUATION.md"
+      - "docs/AI_CI_CD_GATES.md"
       - "package.json"
       - "package-lock.json"
+      - "vitest.config.ts"
+      - "tsconfig.json"
+      - ".github/workflows/ai-eval.yml"
   workflow_dispatch:
 
 jobs:
-  eval:
+  ai-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
+    env:
+      # Certification report-only: still executes probes; verdict script decides FAIL vs BLOCKED
+      CERT_REPORT_ONLY: "1"
+      # Optional: set repo secrets to require production_ready=true
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
-      - name: Run AI evaluation suites (v1 + v2)
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests (AI)
+        run: npm run test:ai-unit
+
+      - name: Integration tests (AI)
+        run: npm run test:ai-integration
+
+      - name: AI Evaluation (blocking)
         run: npm run test:eval
+
+      - name: Guard — no Mock LLM in production AI paths
+        run: npm run guard:ai-mock
+
+      - name: Security tests
+        run: npm run test:ai-security
+
+      - name: Regression suite (blocking)
+        run: npm run test:ai-regression
+
+      - name: Database readiness (FASE 22.9)
+        run: npm run ai:db-readiness
+        continue-on-error: false
+
+      - name: Rate limit distributed (FASE 22.10)
+        run: npm run ai:rate-limit
+        continue-on-error: false
+
+      - name: Kill switch & rollback (FASE 22.11)
+        run: npm run ai:kill-switch
+        continue-on-error: false
+
+      - name: Production E2E (FASE 22.12)
+        run: npm run ai:prod-e2e
+        continue-on-error: false
+
+      - name: Production certification (probes + suite)
+        run: npm run ai:certification
+        env:
+          CERT_REPORT_ONLY: "1"
+        continue-on-error: false
+
+      - name: Final production certification (FASE 22.13)
+        run: npm run ai:certification:final
+        continue-on-error: false
+
+      - name: AI CI gate verdict (PASS / FAIL / BLOCKED)
+        run: node scripts/ai-ci-gate-verdict.mjs
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload certification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-certification-${{ github.sha }}
+          path: |
+            docs/certification/latest.json
+            docs/certification/vitest-suite.json
+            docs/certification/database-readiness.json
+            docs/certification/rate-limit-readiness.json
+            docs/certification/kill-switch-readiness.json
+            docs/certification/production-e2e.json
+            docs/certification/final.json
+            docs/AI_PRODUCTION_READINESS_REPORT.md
+            docs/AI_PRODUCTION_CERTIFICATION_FINAL.md
+            docs/AI_DATABASE_READINESS.md
+            docs/AI_RATE_LIMITING.md
+            docs/AI_KILL_SWITCH.md
+            docs/AI_PRODUCTION_E2E.md
+          if-no-files-found: warn
+          retention-days: 30

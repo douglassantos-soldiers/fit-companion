@@ -1,25 +1,33 @@
 /**
- * In-memory MemoryStore (unit tests + default DI).
+ * In-memory MemoryStore (unit tests + default DI for test/dev).
  */
 
 import type { MemoryRecord } from "@/ai/contracts/memory-record";
 import type { MemoryStore, MemoryStoreListFilter } from "@/ai/memory/store/types";
 
 export class InMemoryMemoryStore implements MemoryStore {
+  readonly id = "memory_v1";
   private readonly byId = new Map<string, MemoryRecord>();
 
   clear(): void {
     this.byId.clear();
   }
 
-  async insert(record: MemoryRecord): Promise<MemoryRecord> {
-    this.byId.set(record.memory_id, structuredClone(record));
-    return structuredClone(record);
+  async ping(): Promise<boolean> {
+    return true;
   }
 
-  async getById(memoryId: string): Promise<MemoryRecord | null> {
+  async insert(record: MemoryRecord): Promise<MemoryRecord> {
+    const withVersion = { ...record, version: record.version ?? 1 };
+    this.byId.set(withVersion.memory_id, structuredClone(withVersion));
+    return structuredClone(withVersion);
+  }
+
+  async getById(memoryId: string, opts?: { userId?: string }): Promise<MemoryRecord | null> {
     const r = this.byId.get(memoryId);
-    return r ? structuredClone(r) : null;
+    if (!r) return null;
+    if (opts?.userId && r.user_id !== opts.userId) return null;
+    return structuredClone(r);
   }
 
   async list(filter: MemoryStoreListFilter): Promise<MemoryRecord[]> {

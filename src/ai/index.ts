@@ -38,11 +38,24 @@ export type {
   AgentRunDiagnosticView,
 } from "./governance";
 
-/** FASE 15 — E2E harness (tests / hardening; not Coach product path). */
+/** FASE 22.1 — CANONICAL production AI runtime */
+export {
+  runProductionAiRuntime,
+  runAuthoritativeBridge,
+  AI_PATH_LABEL,
+} from "./runtime";
+export type {
+  RunProductionAiRuntimeResult,
+  RunProductionAiRuntimeInput,
+  AuthoritativeBridgeInput,
+  AuthoritativeBridgeResult,
+  ProductionAiCorrelation,
+} from "./runtime";
+
+/** FASE 15 — E2E harness (TEST ONLY; not Coach product path). */
 export {
   runAiE2EPipeline,
   buildAiExecutionTrace,
-  runAuthoritativeBridge,
   mapLayerErrorToPipeline,
 } from "./e2e";
 export type {
@@ -53,7 +66,7 @@ export type {
   PipelineStageResult,
 } from "./e2e";
 
-/** FASE 18 — specialist proposal merge → Decision Engine */
+/** FASE 18 — specialist proposal merge → Decision Engine (CANONICAL_WRAPPER) */
 export {
   runSpecialistsDecisionPipeline,
   mergeSpecialistProposals,

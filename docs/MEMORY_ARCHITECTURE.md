@@ -24,7 +24,10 @@ Camada de **histórico e contexto por usuário**. Separada de RAG.
 
 Ledger (`recommendation_decisions` / `decision_outcomes`) permanece **SoT** de Decision. Memory é projeção/contexto.
 
-`coach_memories` é legado do Coach — **sem dual-write** nesta fase.
+`coach_memories` é **LEGACY** do Coach (prompt UI) — **não é SoT** de AI Memory.  
+Product wire (FASE 22.3): `askAiCoach` mantém legacy **e** espelha `coach_notes` em `ai_user_memory` via `createMemory` quando o store está disponível. Sem dual-write do Decision Engine.
+
+Docs produção: [`AI_MEMORY_PRODUCTION.md`](./AI_MEMORY_PRODUCTION.md).
 
 ## Pipeline de escrita
 
@@ -32,9 +35,10 @@ Ledger (`recommendation_decisions` / `decision_outcomes`) permanece **SoT** de D
 Caller → TrustedUserId (deny anônimo)
       → validateMemoryWrite (source, schema, sensitive keys, confidence)
       → create | update | invalidate
-      → MemoryStore (InMemory | Supabase service_role)
+      → ensureMemoryStore → MemoryStore (InMemory test/dev | Supabase production)
 ```
 
+Production **nunca** faz fallback silencioso para InMemory.
 ## API
 
 ```ts
@@ -70,6 +74,7 @@ Conflito no mesmo `(user, family, type, key)` ativo → `CONFLICTING_MEMORY` (ou
 
 ## Testes
 
-`src/ai/memory/memory.test.ts` — anonymous, isolation, expiration, update, invalidation, conflict, low confidence.
+`src/ai/memory/memory.test.ts` — anonymous, isolation, expiration, update, invalidation, conflict, low confidence.  
+`src/ai/memory/memory-hardening.test.ts` — no-fallback production, restart/persistence, health/`MEMORY_READY`, concurrency, TTL, sensitive keys.
 
-Ver [RAG_ARCHITECTURE.md](./RAG_ARCHITECTURE.md), [AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md), [DECISION_ENGINE.md](./DECISION_ENGINE.md).
+Ver [AI_MEMORY_PRODUCTION.md](./AI_MEMORY_PRODUCTION.md), [RAG_ARCHITECTURE.md](./RAG_ARCHITECTURE.md), [AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md), [DECISION_ENGINE.md](./DECISION_ENGINE.md).

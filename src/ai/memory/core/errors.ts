@@ -12,6 +12,8 @@ export const MEMORY_ERROR = {
   NOT_FOUND: "memory_not_found",
   USER_MISMATCH: "user_mismatch",
   STORE_ERROR: "store_error",
+  UNAVAILABLE: "MEMORY_UNAVAILABLE",
+  DISABLED: "memory_disabled",
 } as const;
 
 export type MemoryErrorCode = (typeof MEMORY_ERROR)[keyof typeof MEMORY_ERROR];

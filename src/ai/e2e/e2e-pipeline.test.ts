@@ -25,6 +25,7 @@ beforeEach(() => {
   registerDefaultAgents();
   registerAllSkills();
   registerAllMcpTools();
+  process.env["AI_AUDIT_PERSIST"] = "0";
 });
 
 describe("tool-call-log skill_id vs skill_run_id", () => {
@@ -201,7 +202,7 @@ describe("runAuthoritativeBridge product mode", () => {
       created_at,
     };
 
-    const bridge = runAuthoritativeBridge({
+    const bridge = await runAuthoritativeBridge({
       proposal,
       snapshot: snap!,
       runId: "coach_prod_test_1",

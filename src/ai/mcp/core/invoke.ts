@@ -99,6 +99,26 @@ export async function invokeTool(req: ToolInvokeRequest): Promise<ToolInvokeResu
     });
   }
 
+  const { checkAiRateLimits } = await import("@/ai/runtime/rate-limit");
+  const rl = await checkAiRateLimits({
+    ...(authz.userId ? { userId: authz.userId } : {}),
+    toolId: req.toolId,
+    agentId: agent_id,
+    ...(req.runId ? { runId: req.runId } : {}),
+  });
+  if (!rl.ok) {
+    return finish({
+      ok: false,
+      status: "denied",
+      error_code: TOOL_ERROR.UNAUTHORIZED_TOOL,
+      error_message: `rate_limited:${rl.scope}:${rl.window}`,
+      tool_call: {
+        user_id: authz.userId,
+        denied_reason: "rate_limited",
+      },
+    });
+  }
+
   const registered = tool!;
   const validated = validateToolInput(req.input ?? {}, registered.input_schema);
   if (!validated.ok) {

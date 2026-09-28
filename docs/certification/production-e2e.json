@@ -1,0 +1,98 @@
+{
+  "report_version": "fase22_12_v1",
+  "checked_at": "2026-09-28T02:44:18.062Z",
+  "environment": "test",
+  "verdict": "BLOCKED",
+  "error_code": "PRODUCTION_E2E_BLOCKED",
+  "path_label": "PRODUCTION_E2E",
+  "stores": {
+    "db": "unavailable",
+    "rag": "unknown",
+    "memory": "unknown",
+    "audit": "persist_off",
+    "gateway": "deterministic"
+  },
+  "happy": null,
+  "failures": [
+    {
+      "id": "unauthorized_tool",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "unauthorized_tool"
+    },
+    {
+      "id": "tool_failure",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "tool_error"
+    },
+    {
+      "id": "rag_failure",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "rag_error"
+    },
+    {
+      "id": "memory_failure",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "memory_error"
+    },
+    {
+      "id": "llm_failure_or_rollback",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "effective_mode=deterministic"
+    },
+    {
+      "id": "safety_rejection",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "safety_rejection"
+    },
+    {
+      "id": "invalid_proposal",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "proposal_error"
+    },
+    {
+      "id": "database_failure",
+      "ok": true,
+      "expected_fail": true,
+      "detail": "admin_db_unavailable_observed"
+    },
+    {
+      "id": "rag_no_invented_citations",
+      "ok": true,
+      "expected_fail": false,
+      "detail": "empty"
+    }
+  ],
+  "correlation": {
+    "run_id": null,
+    "decision_id": null,
+    "outcome_id": null,
+    "learning_event_id": null,
+    "proposal_id": null
+  },
+  "idempotency": {
+    "id": "idempotency",
+    "ok": true,
+    "detail": "prod_g643ki"
+  },
+  "isolation": {
+    "id": "isolation",
+    "ok": true,
+    "detail": "deferred_to_remote_or_failures"
+  },
+  "kill_switch": {
+    "id": "kill_switch_rollback",
+    "ok": true,
+    "detail": "force_and_global_ok"
+  },
+  "notes": [
+    "db_readiness:BLOCKED",
+    "admin_db_unavailable"
+  ]
+}

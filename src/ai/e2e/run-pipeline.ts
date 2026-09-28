@@ -1,13 +1,15 @@
 /**
- * FASE 15 — End-to-end AI pipeline harness (deterministic runtime).
- * Wires existing layers; does not replace Decision Engine or Coach product path.
+ * FASE 15 / 22.1 — End-to-end AI pipeline harness.
  *
- * Identity → Context → Orchestrator → Agent → Skill/Tool/RAG/Memory
- * → Proposal → Safety → Decision Engine → Living Plan → Outcome → Learning
- * → Audit → Evaluation
+ * @classification TEST_ONLY — not a production entrypoint.
+ * Product path: askAiCoach → runCoachAgent → runProductionAiRuntime.
+ * FASE 22.12: Real production E2E is `runProductionE2E` (DB/RAG/Memory/Audit remote).
+ * This harness uses QA + mocks and must NOT be treated as production PASS.
+ *
+ * Identity → Context → (inject probes) → runProductionAiRuntime (CANONICAL)
+ * → optional synthetic proposal (TEST ONLY) → Audit → Evaluation
  */
 import { asTrustedUserId } from "@/ai/contracts/trusted-user-id";
-import type { AgentAnalysisResult } from "@/ai/contracts/agent-analysis";
 import type { DecisionProposal } from "@/lib/engine/decision-proposal";
 import { buildProposalId } from "@/lib/engine/decision-proposal";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
@@ -19,7 +21,6 @@ import { emptyState, type AppState } from "@/lib/types";
 import { buildQaScenario, type QaScenarioId } from "@/lib/qa/scenarios";
 import { createExecutionPlan } from "@/ai/orchestrator/plan";
 import { registerDefaultAgents } from "@/ai/orchestrator/agents/registry";
-import { runSpecialistAgent } from "@/ai/agents/runtime/run-specialist";
 import { registerAllSkills } from "@/ai/skills/register";
 import { registerAllMcpTools } from "@/ai/mcp/register";
 import { invokeTool } from "@/ai/mcp/core/invoke";
@@ -40,8 +41,9 @@ import {
   type PipelineStageResult,
 } from "@/ai/e2e/errors";
 import { buildAiExecutionTrace, type AiExecutionTrace } from "@/ai/e2e/trace";
-import { runAuthoritativeBridge } from "@/ai/e2e/authoritative-bridge";
-import { mergeSpecialistProposals } from "@/ai/decision-pipeline/merge";
+import { runAuthoritativeBridge } from "@/ai/runtime/authoritative-bridge";
+import { runProductionAiRuntime } from "@/ai/runtime/production-runtime";
+import { AI_PATH_LABEL } from "@/ai/runtime/path-labels";
 
 const FIXED_DATE = "2026-03-11";
 
@@ -209,8 +211,10 @@ function finishDegraded(
 }
 
 /**
- * Execute a full deterministic AI journey for tests / hardening.
+ * TEST ONLY — full deterministic AI journey for tests / hardening.
  * Failures degrade safely and never invent Decision / Living Plan.
+ *
+ * @classification TEST_ONLY
  */
 export async function runAiE2EPipeline(
   input: RunAiE2EPipelineInput,
@@ -467,106 +471,45 @@ export async function runAiE2EPipeline(
     }
   }
 
-  const specialistResults: AgentAnalysisResult[] = [];
-  const agentRuns: Array<{ run_id: string; agent_id: string; status: string }> = [];
-  let lastAgentRunId = runId;
-
-  for (const agentId of forceAgents) {
-    const agentOut = await runSpecialistAgent({
-      trustedUserId: userId,
-      agentId,
-      plan,
-      intent,
-      parentRunId: runId,
-      skipKnowledge: input.skipKnowledge ?? !inject.ragFailure,
-      callTool: defaultCallTool,
-      runtimeMode: "deterministic",
-    });
-    specialistResults.push(agentOut.result);
-    agentRuns.push({
-      run_id: agentOut.agent_run.run_id,
-      agent_id: agentOut.agent_run.agent_id,
-      status: agentOut.agent_run.status,
-    });
-    lastAgentRunId = agentOut.agent_run.run_id;
-  }
-
-  stages.push(
-    stageOk("agent", {
-      agent_count: agentRuns.length,
-      agents: agentRuns.map((a) => a.agent_id).join(","),
-      agent_run_id: lastAgentRunId,
-      status: agentRuns.map((a) => a.status).join(","),
-    }, lastAgentRunId),
-  );
-
-  const skillRunCount = specialistResults.reduce(
-    (n, r) => n + (r.skill_run_ids?.length ?? 0),
-    0,
-  );
-  const skillFailed = specialistResults.some((r) =>
-    (r.warnings ?? []).some((w) => w.includes("skill_failed")),
-  );
-  if (skillRunCount === 0 && skillFailed) {
-    stages.push(stageFail("skill", "skill_error", "skill_failed", lastAgentRunId));
-  } else {
-    stages.push(
-      stageOk("skill", { skill_run_count: skillRunCount }, lastAgentRunId),
-    );
-  }
-
-  if (!inject.toolFailure && !inject.unauthorizedTool) {
-    const toolCount = specialistResults.reduce(
-      (n, r) => n + (r.tool_call_ids?.length ?? 0),
-      0,
-    );
-    stages.push(stageOk("tool", { tool_call_count: toolCount }, lastAgentRunId));
-  }
-
-  if (!inject.ragFailure) {
-    stages.push(
-      stageOk("rag", {
-        skipped: Boolean(input.skipKnowledge ?? true),
-        citation_count: specialistResults.reduce(
-          (n, r) => n + (r.citations?.length ?? 0),
-          0,
-        ),
-      }, lastAgentRunId),
-    );
-  }
-
-  if (!inject.memoryFailure) {
-    const memWarn = specialistResults.some((r) =>
-      (r.warnings ?? []).some((w) => w.includes("memory")),
-    );
-    if (memWarn) {
-      stages.push(
-        stageFail("memory", "memory_error", "memory_unavailable", lastAgentRunId),
-      );
-    } else {
-      stages.push(
-        stageOk("memory", {
-          memory_count: specialistResults.reduce(
-            (n, r) => n + (r.memory_ids?.length ?? 0),
-            0,
-          ),
-        }, lastAgentRunId),
-      );
-    }
-  }
-
-  // --- 9–15. Proposal merge → bridge ---
-  const merge = mergeSpecialistProposals({
-    specialistResults,
+  // --- 4–9. CANONICAL production runtime (merge only; harness owns inject + bridge) ---
+  const canon = await runProductionAiRuntime({
+    trustedUserId: userId,
+    intent,
     snapshot,
-    safety: snapshot.safety,
-    userId,
-    runId,
+    plan,
+    forceAgents,
+    parentRunId: runId,
+    skipKnowledge: input.skipKnowledge ?? !inject.ragFailure,
+    callTool: defaultCallTool,
+    runtimeMode: "deterministic",
+    emitOutcomeAndLearning: false,
+    skipBridge: true,
+    idempotencyKey: `e2e_${runId}`,
   });
 
-  let proposal: DecisionProposal | null = merge.selected
+  for (const s of canon.stage_results) {
+    if (
+      s.stage === "identity" ||
+      s.stage === "context" ||
+      s.stage === "orchestrator" ||
+      s.stage === "audit"
+    ) {
+      continue;
+    }
+    stages.push(s);
+  }
+
+  const agentRuns = canon.agent_runs.map((a) => ({
+    run_id: a.run_id,
+    agent_id: a.agent_id,
+    status: a.status,
+  }));
+  const lastAgentRunId = agentRuns[agentRuns.length - 1]?.run_id ?? runId;
+  const merge = canon.merge;
+
+  let proposal: DecisionProposal | null = canon.proposal
     ? {
-        ...merge.selected,
+        ...canon.proposal,
         user_id: userId,
         context_id: snapshot.inputFingerprint,
       }
@@ -584,7 +527,7 @@ export async function runAiE2EPipeline(
   } else if (inject.safetyRejection) {
     proposal = buildUnsafeProposal(snapshot, userId);
   } else if (!proposal) {
-    // Synthetic aligned only when inject path needs a proposal and specialists emitted none
+    // TEST ONLY: synthetic aligned when specialists emitted none
     proposal = buildAlignedProposal(snapshot, userId);
   }
 
@@ -594,13 +537,15 @@ export async function runAiE2EPipeline(
       conflict_count: merge.conflicts.length,
       candidate_count: merge.candidates.length,
       proposal_id: proposal?.proposal_id ?? null,
+      path_label: AI_PATH_LABEL.TEST_ONLY,
     }, runId),
   );
 
-  const bridge = runAuthoritativeBridge({
+  const bridge = await runAuthoritativeBridge({
     proposal,
     snapshot,
     runId,
+    emitOutcomeAndLearning: true,
   });
   stages.push(...bridge.stages);
 
@@ -715,6 +660,8 @@ export async function runAiE2EPipeline(
       child_agent_run: lastAgentRunId,
       agent_count: agentRuns.length,
       merge_reason: merge.resolution_reason,
+      path_label: AI_PATH_LABEL.TEST_ONLY,
+      canonical_run_id: canon.correlation.run_id,
     },
   });
 

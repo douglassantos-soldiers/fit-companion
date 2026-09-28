@@ -1,0 +1,715 @@
+{
+  "report_version": "fase22_13_v1",
+  "timestamp": "2026-09-28T02:44:05.716Z",
+  "commit_sha": "07b42504cedeaafaf6bb25d1e84ed662eedc2bfe",
+  "environment": "local",
+  "runtime_version": "CANONICAL",
+  "governance_version": "governance_v1",
+  "contract_version": 1,
+  "production_ready": false,
+  "checks": [
+    {
+      "check_id": "identity",
+      "name": "Identity",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:14.302Z",
+      "duration_ms": 1,
+      "evidence": {
+        "client_user_ignored": true,
+        "cross_user_forbidden": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "authorization",
+      "name": "Authorization",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:14.303Z",
+      "duration_ms": 4,
+      "evidence": {
+        "unauthorized_tool_denied": true,
+        "tool": "admin_wipe_everything"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "context",
+      "name": "Context",
+      "status": "PASS",
+      "critical": false,
+      "executed_at": "2026-09-28T02:44:14.308Z",
+      "duration_ms": 537,
+      "evidence": {
+        "fingerprint": "v1:cb53ac50",
+        "training_mode": "full"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "safety",
+      "name": "Safety",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:14.845Z",
+      "duration_ms": 316,
+      "evidence": {
+        "rejected": true,
+        "reason": "escalate_requires_rest_aligned"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "decision_engine",
+      "name": "Decision Engine",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.162Z",
+      "duration_ms": 448,
+      "evidence": {
+        "decision_id": "dec_cf1490e5",
+        "forged_not_copied": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "proposal_contract",
+      "name": "Proposal Contract",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.610Z",
+      "duration_ms": 287,
+      "evidence": {
+        "invalid_context_rejected": true,
+        "reason": "context_fingerprint_mismatch"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "tools",
+      "name": "Tools",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.897Z",
+      "duration_ms": 1,
+      "evidence": {
+        "deny_ok": true
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "skills",
+      "name": "Skills",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.898Z",
+      "duration_ms": 28,
+      "evidence": {
+        "skill_count": 19,
+        "ran": "analyze_training"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "rag",
+      "name": "RAG",
+      "status": "DEGRADED",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.926Z",
+      "duration_ms": 1,
+      "evidence": {
+        "RAG_READY": false,
+        "environment": "test",
+        "store_id": "memory_v1",
+        "reasons": "corpus:docs=0 min=20 expected_corpus=20"
+      },
+      "error": "corpus:docs=0 min=20 expected_corpus=20",
+      "environment": "local"
+    },
+    {
+      "check_id": "memory",
+      "name": "Memory",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.928Z",
+      "duration_ms": 1,
+      "evidence": {
+        "MEMORY_READY": true,
+        "environment": "test",
+        "store_id": "memory_v1",
+        "reasons": null
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "llm",
+      "name": "LLM Gateway",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.929Z",
+      "duration_ms": 0,
+      "evidence": {
+        "LLM_READY": true,
+        "environment": "test",
+        "primary": "openai",
+        "reasons": null
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "audit",
+      "name": "Audit",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.929Z",
+      "duration_ms": 1,
+      "evidence": {
+        "persisted": true,
+        "audit_id": "audit_decision_dec_cert_audit",
+        "durability": "critical",
+        "store_size": 1
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "database",
+      "name": "Database",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.930Z",
+      "duration_ms": 1,
+      "evidence": {
+        "verdict": "BLOCKED",
+        "critical_drift": "",
+        "sample": "service_role:SUPABASE_SERVICE_ROLE_KEY + select:blocked"
+      },
+      "error": "MIGRATION_VERIFICATION_BLOCKED",
+      "environment": "local"
+    },
+    {
+      "check_id": "rate_limit",
+      "name": "Rate Limit",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.931Z",
+      "duration_ms": 2,
+      "evidence": {
+        "tripped": true,
+        "user_rpm": 2,
+        "readiness": "BLOCKED",
+        "error_code": "RATE_LIMIT_VERIFICATION_BLOCKED"
+      },
+      "error": "RATE_LIMIT_VERIFICATION_BLOCKED",
+      "environment": "local"
+    },
+    {
+      "check_id": "kill_switch",
+      "name": "Kill Switch",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:15.933Z",
+      "duration_ms": 81,
+      "evidence": {
+        "mode": "deterministic",
+        "force": true,
+        "global_alias": true,
+        "rag_alias": true,
+        "readiness": "PASS"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "rollback",
+      "name": "Rollback",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:16.014Z",
+      "duration_ms": 1,
+      "evidence": {
+        "effective_mode": "deterministic"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "migrations",
+      "name": "Migrations",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:16.015Z",
+      "duration_ms": 1,
+      "evidence": {
+        "files_ok": true,
+        "remote_verdict": "BLOCKED",
+        "critical_drift": ""
+      },
+      "error": "MIGRATION_VERIFICATION_BLOCKED",
+      "environment": "local"
+    },
+    {
+      "check_id": "e2e",
+      "name": "E2E Bridge",
+      "status": "BLOCKED",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:16.016Z",
+      "duration_ms": 2015,
+      "evidence": {
+        "production_e2e": "BLOCKED",
+        "local_bridge_decision": "dec_cf1490e5",
+        "note": "remote_stores_blocked_local_engine_ok"
+      },
+      "error": "PRODUCTION_E2E_BLOCKED",
+      "environment": "local"
+    },
+    {
+      "check_id": "cost",
+      "name": "Cost Bounds",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:18.031Z",
+      "duration_ms": 0,
+      "evidence": {
+        "orchestrator_max": 80,
+        "gateway_max_tokens": 900
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "canonical_runtime",
+      "name": "Canonical Runtime",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:19.798Z",
+      "duration_ms": 262,
+      "evidence": {
+        "coach_uses_runtime": true,
+        "coach_facade_label": true,
+        "runtime_path_canonical": true,
+        "no_parallel_decision_writer": true,
+        "runtime_path_label": "CANONICAL",
+        "runtime_ok": true,
+        "has_decision": true,
+        "decision_id": "dec_80e8ca6f",
+        "reason": null,
+        "runtime_version": "CANONICAL"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "agents",
+      "name": "Agents",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:20.060Z",
+      "duration_ms": 13,
+      "evidence": {
+        "registered": 6,
+        "specialist_id": "specialist_training",
+        "specialist_ok": true,
+        "no_decision_authority": true,
+        "has_proposal": false,
+        "status": "completed"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "evaluation",
+      "name": "Evaluation",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:20.075Z",
+      "duration_ms": 6100,
+      "evidence": {
+        "suite": "test:eval",
+        "files": "src/ai/governance/evaluation.test.ts,src/ai/governance/eval-v2.test.ts",
+        "duration_ms": 6100,
+        "golden": "golden_v1",
+        "eval_version": "eval_v2"
+      },
+      "error": null,
+      "environment": "local"
+    },
+    {
+      "check_id": "ci_cd",
+      "name": "CI/CD Safety Gate",
+      "status": "PASS",
+      "critical": true,
+      "executed_at": "2026-09-28T02:44:26.175Z",
+      "duration_ms": 245,
+      "evidence": {
+        "workflow": true,
+        "script": true,
+        "latest": true,
+        "gate_stdout_class": "BLOCKED",
+        "gate_exit": 0,
+        "workflow_has_gates": true
+      },
+      "error": null,
+      "environment": "local"
+    }
+  ],
+  "components": [
+    {
+      "component": "runtime",
+      "check": "canonical_runtime",
+      "status": "PASS",
+      "evidence": "{\"coach_uses_runtime\":true,\"coach_facade_label\":true,\"runtime_path_canonical\":true,\"no_parallel_decision_writer\":true,\"runtime_path_label\":\"CANONICAL\",\"runtime_ok\":true,\"has_decision\":true,\"decision_id\":\"dec_80e8ca6f\",\"reason\":null,\"runtime_version\":\"CANONICAL\"}",
+      "timestamp": "2026-09-28T02:44:19.798Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "runtime",
+      "check": "kill_switch",
+      "status": "PASS",
+      "evidence": "{\"mode\":\"deterministic\",\"force\":true,\"global_alias\":true,\"rag_alias\":true,\"readiness\":\"PASS\"}",
+      "timestamp": "2026-09-28T02:44:15.933Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "runtime",
+      "check": "rollback",
+      "status": "PASS",
+      "evidence": "{\"effective_mode\":\"deterministic\"}",
+      "timestamp": "2026-09-28T02:44:16.014Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "decision",
+      "check": "decision_engine",
+      "status": "PASS",
+      "evidence": "{\"decision_id\":\"dec_cf1490e5\",\"forged_not_copied\":true}",
+      "timestamp": "2026-09-28T02:44:15.162Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "decision",
+      "check": "proposal_contract",
+      "status": "PASS",
+      "evidence": "{\"invalid_context_rejected\":true,\"reason\":\"context_fingerprint_mismatch\"}",
+      "timestamp": "2026-09-28T02:44:15.610Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "decision",
+      "check": "safety",
+      "status": "PASS",
+      "evidence": "{\"rejected\":true,\"reason\":\"escalate_requires_rest_aligned\"}",
+      "timestamp": "2026-09-28T02:44:14.845Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "security",
+      "check": "identity",
+      "status": "PASS",
+      "evidence": "{\"client_user_ignored\":true,\"cross_user_forbidden\":true}",
+      "timestamp": "2026-09-28T02:44:14.302Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "security",
+      "check": "authorization",
+      "status": "PASS",
+      "evidence": "{\"unauthorized_tool_denied\":true,\"tool\":\"admin_wipe_everything\"}",
+      "timestamp": "2026-09-28T02:44:14.303Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "security",
+      "check": "tools",
+      "status": "PASS",
+      "evidence": "{\"deny_ok\":true}",
+      "timestamp": "2026-09-28T02:44:15.897Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "agents",
+      "check": "agents",
+      "status": "PASS",
+      "evidence": "{\"registered\":6,\"specialist_id\":\"specialist_training\",\"specialist_ok\":true,\"no_decision_authority\":true,\"has_proposal\":false,\"status\":\"completed\"}",
+      "timestamp": "2026-09-28T02:44:20.060Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "skills",
+      "check": "skills",
+      "status": "PASS",
+      "evidence": "{\"skill_count\":19,\"ran\":\"analyze_training\"}",
+      "timestamp": "2026-09-28T02:44:15.898Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "tools",
+      "check": "tools",
+      "status": "PASS",
+      "evidence": "{\"deny_ok\":true}",
+      "timestamp": "2026-09-28T02:44:15.897Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "rag",
+      "check": "rag",
+      "status": "DEGRADED",
+      "evidence": "{\"RAG_READY\":false,\"environment\":\"test\",\"store_id\":\"memory_v1\",\"reasons\":\"corpus:docs=0 min=20 expected_corpus=20\"}",
+      "timestamp": "2026-09-28T02:44:15.926Z",
+      "error": "corpus:docs=0 min=20 expected_corpus=20",
+      "environment": "local",
+      "critical": true,
+      "blocking": true
+    },
+    {
+      "component": "memory",
+      "check": "memory",
+      "status": "PASS",
+      "evidence": "{\"MEMORY_READY\":true,\"environment\":\"test\",\"store_id\":\"memory_v1\",\"reasons\":null}",
+      "timestamp": "2026-09-28T02:44:15.928Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "llm",
+      "check": "llm",
+      "status": "PASS",
+      "evidence": "{\"LLM_READY\":true,\"environment\":\"test\",\"primary\":\"openai\",\"reasons\":null}",
+      "timestamp": "2026-09-28T02:44:15.929Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "llm",
+      "check": "cost",
+      "status": "PASS",
+      "evidence": "{\"orchestrator_max\":80,\"gateway_max_tokens\":900}",
+      "timestamp": "2026-09-28T02:44:18.031Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "audit",
+      "check": "audit",
+      "status": "PASS",
+      "evidence": "{\"persisted\":true,\"audit_id\":\"audit_decision_dec_cert_audit\",\"durability\":\"critical\",\"store_size\":1}",
+      "timestamp": "2026-09-28T02:44:15.929Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "evaluation",
+      "check": "evaluation",
+      "status": "PASS",
+      "evidence": "{\"suite\":\"test:eval\",\"files\":\"src/ai/governance/evaluation.test.ts,src/ai/governance/eval-v2.test.ts\",\"duration_ms\":6100,\"golden\":\"golden_v1\",\"eval_version\":\"eval_v2\"}",
+      "timestamp": "2026-09-28T02:44:20.075Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "ci_cd",
+      "check": "ci_cd",
+      "status": "PASS",
+      "evidence": "{\"workflow\":true,\"script\":true,\"latest\":true,\"gate_stdout_class\":\"BLOCKED\",\"gate_exit\":0,\"workflow_has_gates\":true}",
+      "timestamp": "2026-09-28T02:44:26.175Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "database",
+      "check": "database",
+      "status": "BLOCKED",
+      "evidence": "{\"verdict\":\"BLOCKED\",\"critical_drift\":\"\",\"sample\":\"service_role:SUPABASE_SERVICE_ROLE_KEY + select:blocked\"}",
+      "timestamp": "2026-09-28T02:44:15.930Z",
+      "error": "MIGRATION_VERIFICATION_BLOCKED",
+      "environment": "local",
+      "critical": true,
+      "blocking": true
+    },
+    {
+      "component": "database",
+      "check": "migrations",
+      "status": "BLOCKED",
+      "evidence": "{\"files_ok\":true,\"remote_verdict\":\"BLOCKED\",\"critical_drift\":\"\"}",
+      "timestamp": "2026-09-28T02:44:16.015Z",
+      "error": "MIGRATION_VERIFICATION_BLOCKED",
+      "environment": "local",
+      "critical": true,
+      "blocking": true
+    },
+    {
+      "component": "rate_limiting",
+      "check": "rate_limit",
+      "status": "BLOCKED",
+      "evidence": "{\"tripped\":true,\"user_rpm\":2,\"readiness\":\"BLOCKED\",\"error_code\":\"RATE_LIMIT_VERIFICATION_BLOCKED\"}",
+      "timestamp": "2026-09-28T02:44:15.931Z",
+      "error": "RATE_LIMIT_VERIFICATION_BLOCKED",
+      "environment": "local",
+      "critical": true,
+      "blocking": true
+    },
+    {
+      "component": "kill_switch",
+      "check": "kill_switch",
+      "status": "PASS",
+      "evidence": "{\"mode\":\"deterministic\",\"force\":true,\"global_alias\":true,\"rag_alias\":true,\"readiness\":\"PASS\"}",
+      "timestamp": "2026-09-28T02:44:15.933Z",
+      "error": null,
+      "environment": "local",
+      "critical": true,
+      "blocking": false
+    },
+    {
+      "component": "e2e",
+      "check": "e2e",
+      "status": "BLOCKED",
+      "evidence": "{\"production_e2e\":\"BLOCKED\",\"local_bridge_decision\":\"dec_cf1490e5\",\"note\":\"remote_stores_blocked_local_engine_ok\"}",
+      "timestamp": "2026-09-28T02:44:16.016Z",
+      "error": "PRODUCTION_E2E_BLOCKED",
+      "environment": "local",
+      "critical": true,
+      "blocking": true
+    }
+  ],
+  "failed_checks": [],
+  "blocked_checks": [
+    "rag",
+    "database",
+    "rate_limit",
+    "migrations",
+    "e2e"
+  ],
+  "untested_checks": [],
+  "warnings": [],
+  "failures": [
+    "rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20",
+    "database:BLOCKED:MIGRATION_VERIFICATION_BLOCKED",
+    "rate_limit:BLOCKED:RATE_LIMIT_VERIFICATION_BLOCKED",
+    "migrations:BLOCKED:MIGRATION_VERIFICATION_BLOCKED",
+    "e2e:BLOCKED:PRODUCTION_E2E_BLOCKED"
+  ],
+  "evidence": {
+    "probe_count": 19,
+    "critical_count": 16,
+    "pass_count": 14,
+    "untested_count": 0,
+    "blocked_count": 4,
+    "fail_count": 0,
+    "final_report_version": "fase22_13_v1",
+    "supplemental_count": 4,
+    "side_artifact_count": 4,
+    "project_id": "47f1291e-fde8-441f-8f56-5f389fe16da0"
+  },
+  "test_suite": {
+    "executed": true,
+    "ok": true,
+    "passed": 28,
+    "failed": 0,
+    "duration_ms": 8386,
+    "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
+    "error": null
+  },
+  "gates": {
+    "critical_safety": 1,
+    "proposal_validity": 1,
+    "tool_authorization": 1
+  },
+  "side_artifacts": [
+    {
+      "id": "database-readiness",
+      "path": "docs/certification/database-readiness.json",
+      "verdict": "BLOCKED",
+      "error_code": "MIGRATION_VERIFICATION_BLOCKED"
+    },
+    {
+      "id": "rate-limit-readiness",
+      "path": "docs/certification/rate-limit-readiness.json",
+      "verdict": "BLOCKED",
+      "error_code": "RATE_LIMIT_VERIFICATION_BLOCKED"
+    },
+    {
+      "id": "kill-switch-readiness",
+      "path": "docs/certification/kill-switch-readiness.json",
+      "verdict": "PASS",
+      "error_code": null
+    },
+    {
+      "id": "production-e2e",
+      "path": "docs/certification/production-e2e.json",
+      "verdict": "BLOCKED",
+      "error_code": "PRODUCTION_E2E_BLOCKED"
+    }
+  ],
+  "providers": "PASS:{LLM_READY,environment,primary,reasons}",
+  "migrations_status": "migrations=BLOCKED:MIGRATION_VERIFICATION_BLOCKED; database=BLOCKED:MIGRATION_VERIFICATION_BLOCKED; side=BLOCKED",
+  "rag_status": "DEGRADED:{RAG_READY,environment,store_id,reasons}",
+  "memory_status": "PASS:{MEMORY_READY,environment,store_id,reasons}",
+  "audit_status": "PASS:{persisted,audit_id,durability,store_size}",
+  "e2e_status": "BLOCKED:{production_e2e,local_bridge_decision,note}",
+  "files_changed_note": "FASE 22.13 certification aggregator only — see final.json / this markdown; no product feature commits implied",
+  "tests_executed": [
+    "certification vitest suite (security/data/failure/runtime/integrity)",
+    "runAllProbes (FASE 22.7)",
+    "verifyAiDatabaseReadiness / rate-limit / kill-switch / production-e2e",
+    "final probes: canonical_runtime, agents, evaluation, ci_cd"
+  ]
+}

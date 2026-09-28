@@ -2,7 +2,7 @@
  * Serialize / deserialize AiAuditEvent ↔ ai_audit_events row (pure, testable).
  */
 import type { AiAuditEvent, AiAuditKind, AiTokenUsage } from "@/ai/governance/audit";
-import { redactMetadata } from "@/ai/governance/redact";
+import { redactMetadata, redactSummary } from "@/ai/governance/redact";
 import { AI_GOVERNANCE_CONTRACT_VERSION, AI_GOVERNANCE_VERSION } from "@/ai/governance/version";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -66,7 +66,7 @@ export function auditEventToRow(event: AiAuditEvent): AiAuditEventRow | null {
     latency_ms: event.latency_ms ?? null,
     model: event.model ?? null,
     estimated_cost: event.estimated_cost ?? null,
-    summary: event.summary ?? null,
+    summary: redactSummary(event.summary) ?? null,
     token_usage: event.token_usage ?? null,
     metadata: meta,
     session_id: event.session_id ?? null,

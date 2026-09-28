@@ -75,9 +75,9 @@ Ao alterar **Agent / Skill / Prompt / RAG / Provider / Model**, executar:
 npm run test:eval
 ```
 
-CI: [`.github/workflows/ai-eval.yml`](../.github/workflows/ai-eval.yml) (sem deploy).
+CI: [`.github/workflows/ai-eval.yml`](../.github/workflows/ai-eval.yml) — **FASE 22.8 Safety Gate** (lint→build). Ver [AI_CI_CD_GATES.md](./AI_CI_CD_GATES.md).
 
-Certificação de produção (FASE 21): `npm run cert:ai` — ver [AI_PRODUCTION_READINESS_REPORT.md](./AI_PRODUCTION_READINESS_REPORT.md).
+Certificação de produção: `npm run ai:certification` — ver [AI_PRODUCTION_CERTIFICATION.md](./AI_PRODUCTION_CERTIFICATION.md).
 
 Human review: campo `review_status` no golden case (contrato; UI completa fora de escopo).
 

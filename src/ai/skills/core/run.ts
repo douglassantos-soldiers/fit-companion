@@ -161,6 +161,7 @@ export async function runSkill(req: SkillInvokeRequest): Promise<SkillInvokeResu
         const rag = await resolveKnowledgeRefs(kbRefs, { topKPerRef: 2 });
         normalized.rag_status = rag.retrieval.rag_status ?? "empty";
         normalized.retrieval_status = rag.retrieval.retrieval_status ?? normalized.rag_status;
+        normalized.rag_availability = rag.retrieval.rag_availability;
         normalized.evidence_available = Boolean(rag.retrieval.evidence_available);
         normalized.citations = rag.citations.map((c) => ({
           citation_id: c.citation_id,
@@ -173,6 +174,7 @@ export async function runSkill(req: SkillInvokeRequest): Promise<SkillInvokeResu
           ...(c.retrieval_id ? { retrieval_id: c.retrieval_id } : {}),
         }));
         for (const c of rag.citations.slice(0, 4)) {
+          if (normalized.rag_availability === "RAG_UNAVAILABLE") break;
           normalized.evidence.push({
             signal: `kb:${c.document_id}`,
             value: c.excerpt.slice(0, 120),
@@ -181,16 +183,22 @@ export async function runSkill(req: SkillInvokeRequest): Promise<SkillInvokeResu
         }
         if (!normalized.evidence_available) {
           normalized.warnings.push(`rag_${normalized.rag_status ?? "empty"}`);
+          if (normalized.rag_availability) {
+            normalized.warnings.push(normalized.rag_availability);
+          }
         }
       } catch {
         normalized.rag_status = "error";
         normalized.retrieval_status = "error";
+        normalized.rag_availability = "RAG_UNAVAILABLE";
         normalized.evidence_available = false;
         normalized.warnings.push("rag_error");
+        normalized.warnings.push("RAG_UNAVAILABLE");
       }
     } else {
       normalized.rag_status = "skipped";
       normalized.retrieval_status = "skipped";
+      normalized.rag_availability = "RAG_UNAVAILABLE";
       normalized.evidence_available = false;
     }
 

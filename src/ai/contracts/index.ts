@@ -123,6 +123,7 @@ export type {
   KnowledgeRetrievalHit,
   KnowledgeRetrievalMode,
   RagRuntimeStatus,
+  RagAvailability,
 } from "./knowledge-retrieval";
 export type { KnowledgeCitation } from "./knowledge-citation";
 export type {

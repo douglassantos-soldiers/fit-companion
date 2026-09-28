@@ -159,6 +159,88 @@ export async function evalDuplicateDocuments(): Promise<EvalCaseResult> {
   };
 }
 
+export async function evalCitationCorrectness(): Promise<EvalCaseResult> {
+  await seedEvalFixtures();
+  const { retrieval, citations } = await retrieveKnowledge({
+    query: "exercise catalog muscle_group substitute",
+    domains: ["exercise"],
+    topK: 3,
+    mode: "hybrid",
+  });
+  const hitIds = new Set(retrieval.hits.map((h) => h.chunk_id));
+  const allMatch =
+    citations.length > 0 &&
+    citations.every(
+      (c) =>
+        hitIds.has(c.chunk_id) &&
+        retrieval.hits.some(
+          (h) => h.chunk_id === c.chunk_id && h.document_id === c.document_id,
+        ),
+    );
+  return {
+    name: "citation_correctness",
+    passed: allMatch,
+    detail: `citations=${citations.length} hits=${retrieval.hits.length}`,
+  };
+}
+
+export async function evalIrrelevantCitation(): Promise<EvalCaseResult> {
+  await seedEvalFixtures();
+  const { retrieval, citations } = await retrieveKnowledge({
+    query: "exercise catalog muscle_group",
+    domains: ["exercise"],
+    topK: 3,
+    mode: "hybrid",
+  });
+  const nutritionLeak = citations.some(
+    (c) =>
+      retrieval.hits.find((h) => h.chunk_id === c.chunk_id)?.domain === "nutrition",
+  );
+  return {
+    name: "irrelevant_citation",
+    passed: !nutritionLeak && (retrieval.hits.length === 0 || citations.length > 0),
+    detail: nutritionLeak ? "nutrition citation on exercise query" : "ok",
+  };
+}
+
+export async function evalStaleDocument(): Promise<EvalCaseResult> {
+  await seedEvalFixtures();
+  const stale: KnowledgeDocument = {
+    document_id: "fix_stale_sleep",
+    title: "Stale sleep doc",
+    domain: "sleep",
+    source: "internal_docs",
+    source_type: "fixture",
+    version: "0.0.1",
+    language: "en",
+    content: "Expired sleep schema for asOf filtering tests.",
+    metadata: {
+      kb_ref: "kb:sleep.stale",
+      source_id: "src_sleep_checkin",
+    },
+    created_at: "2020-01-01T00:00:00.000Z",
+    updated_at: "2020-01-01T00:00:00.000Z",
+    effective_date: "2020-01-01",
+    expiration_date: "2020-06-01",
+    status: "active",
+    tags: ["fixture"],
+  };
+  await ingestKnowledgeDocument(stale, { onDuplicate: "upsert" });
+  const { retrieval } = await retrieveKnowledge({
+    query: "sleep schema hours quality",
+    domains: ["sleep"],
+    topK: 5,
+    mode: "hybrid",
+    asOf: "2026-01-01T00:00:00.000Z",
+  });
+  const leaked = retrieval.hits.some((h) => h.document_id === "fix_stale_sleep");
+  return {
+    name: "stale_document",
+    passed: !leaked,
+    detail: leaked ? "expired doc returned" : "expired excluded",
+  };
+}
+
 export async function runRagEvaluation(): Promise<EvalCaseResult[]> {
   return [
     await evalRetrievalRelevance(),
@@ -166,5 +248,8 @@ export async function runRagEvaluation(): Promise<EvalCaseResult[]> {
     await evalEmptyRetrieval(),
     await evalWrongDomainRetrieval(),
     await evalDuplicateDocuments(),
+    await evalCitationCorrectness(),
+    await evalIrrelevantCitation(),
+    await evalStaleDocument(),
   ];
 }

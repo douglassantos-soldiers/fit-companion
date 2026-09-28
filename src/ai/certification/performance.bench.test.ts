@@ -2,8 +2,6 @@
  * FASE 21 — Observability trace + performance bench + readiness report.
  */
 import { describe, expect, it, beforeEach } from "vitest";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { clearAgentRunLog } from "@/ai/agents/runtime/agent-run-log";
 import { clearAuditLog } from "@/ai/governance/audit";
 import { clearRagRetrievalLog } from "@/ai/governance/rag-retrieval-log";
@@ -20,7 +18,6 @@ import {
   CERT_TRACE_REQUIRED_IDS,
   buildProductionReadinessReport,
   formatReadinessMarkdown,
-  runAiCertification,
 } from "@/ai/certification";
 
 const USER = "user-cert-obs-aaaa";
@@ -84,13 +81,12 @@ describe("FASE 21 performance bench", () => {
 });
 
 describe("FASE 21 readiness report", () => {
-  it("builds report and refuses ready when migrations pending", async () => {
-    const { report, markdown } = await runAiCertification({ skipMigrations: true });
-    expect(report.report_version).toBe("fase21_v1");
-    expect(markdown).toContain("AI Production Readiness Report");
-    // Without remote probe, production_migrations is pending → not ready
+  it("defaults are UNTESTED and refuse production_ready without real cert", () => {
+    const report = buildProductionReadinessReport();
     expect(report.production_ready).toBe(false);
-    expect(report.pending.length + report.failed_critical.length).toBeGreaterThan(0);
+    expect(report.pending.length).toBeGreaterThan(0);
+    const identity = report.checklist.find((c) => c.id === "identity");
+    expect(identity?.status).toBe("pending"); // legacy mapping of UNTESTED
 
     const withFail = buildProductionReadinessReport({
       overrides: { authorization: "fail" },
@@ -98,8 +94,9 @@ describe("FASE 21 readiness report", () => {
     expect(withFail.production_ready).toBe(false);
     expect(withFail.failed_critical).toContain("Authorization");
 
-    const docsDir = join(process.cwd(), "docs");
-    mkdirSync(docsDir, { recursive: true });
-    writeFileSync(join(docsDir, "AI_PRODUCTION_READINESS_REPORT.md"), formatReadinessMarkdown(report), "utf8");
+    // test_suite_ok:true must NOT unlock readiness
+    const fakeSuite = buildProductionReadinessReport({ test_suite_ok: true });
+    expect(fakeSuite.production_ready).toBe(false);
+    expect(formatReadinessMarkdown(fakeSuite)).toContain("production_ready: false");
   });
 });

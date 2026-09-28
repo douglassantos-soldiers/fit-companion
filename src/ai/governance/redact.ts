@@ -54,3 +54,14 @@ export function redactMetadata(
   }
   return out;
 }
+
+/** Strip secret-shaped tokens from free-text audit summaries (FASE 22.6). */
+export function redactSummary(summary: string | undefined | null): string | undefined {
+  if (summary == null || summary === "") return undefined;
+  let s = String(summary).slice(0, MAX_STRING);
+  s = s.replace(/\b(Bearer\s+)\S+/gi, "$1[REDACTED]");
+  s = s.replace(/\b(sk-[A-Za-z0-9_-]{8,})\b/g, "[REDACTED]");
+  s = s.replace(/\b(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/g, "[REDACTED]");
+  s = s.replace(/\b(service_role|access_token|api_key|password)\s*[:=]\s*\S+/gi, "$1=[REDACTED]");
+  return s;
+}

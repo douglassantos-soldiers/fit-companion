@@ -99,6 +99,46 @@ export async function runSpecialistAgent(
     };
   }
 
+  const { checkAiRateLimits } = await import("@/ai/runtime/rate-limit");
+  const rl = await checkAiRateLimits({
+    ...(input.trustedUserId ? { userId: input.trustedUserId } : {}),
+    agentId,
+    runId: run_id,
+  });
+  if (!rl.ok) {
+    const agent_run: AgentRun = {
+      run_id,
+      agent_id: agentId,
+      user_id: input.trustedUserId ?? "",
+      status: "failed",
+      created_at,
+      completed_at: new Date().toISOString(),
+      metadata: {
+        error_code: "rate_limited",
+        model: "deterministic_runtime",
+        scope: rl.scope,
+        window: rl.window,
+      },
+      ...(input.parentRunId ? { parent_run_id: input.parentRunId } : {}),
+    };
+    recordAgentRun(agent_run);
+    return {
+      ok: false,
+      result: {
+        agent_id: agentId,
+        run_id,
+        user_id: input.trustedUserId ?? "",
+        analysis: { reason: "rate_limited" },
+        evidence: [],
+        confidence: 0,
+        proposal: null,
+        warnings: [`rate_limited:${rl.scope}:${rl.window}`],
+        status: "failed",
+      },
+      agent_run,
+    };
+  }
+
   const baseRun = (): AgentRun => ({
     run_id,
     agent_id: agentId,
@@ -124,6 +164,14 @@ export async function runSpecialistAgent(
         : 1,
       latency_ms,
       runtime_mode,
+      execution_mode: runtime_mode,
+      provider: "none",
+      status:
+        partial.result.status === "completed"
+          ? "ok"
+          : partial.result.status === "blocked"
+            ? "error"
+            : "error",
       deterministic_runtime: runtime_mode === "deterministic",
     };
     const existingMeta = partial.agent_run?.metadata;
@@ -248,8 +296,10 @@ export async function runSpecialistAgent(
           source: "memory",
         });
       }
-    } catch {
-      warnings.push("memory_unavailable");
+    } catch (e) {
+      const code =
+        e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
+      warnings.push(code === "MEMORY_UNAVAILABLE" ? "MEMORY_UNAVAILABLE" : "memory_unavailable");
     }
 
     if (Date.now() > deadline) {
@@ -259,6 +309,7 @@ export async function runSpecialistAgent(
     // RAG — never invent citations on failure
     const retrievalIds: string[] = [];
     let rag_status: AgentAnalysisResult["rag_status"] = "skipped";
+    let rag_availability: AgentAnalysisResult["rag_availability"] = undefined;
     let evidence_available = false;
     if (!input.skipKnowledge && knowledgeDomains.length > 0 && intent) {
       try {
@@ -275,20 +326,29 @@ export async function runSpecialistAgent(
           },
         });
         rag_status = retrieval.rag_status ?? (cites.length > 0 ? "ok" : "empty");
+        rag_availability = retrieval.rag_availability;
         evidence_available = Boolean(retrieval.evidence_available);
-        if (cites.length > 0) {
+        if (cites.length > 0 && rag_availability === "RAG_AVAILABLE") {
           citations.push(...cites);
-        } else {
+        } else if (cites.length > 0 && rag_availability === "RAG_DEGRADED") {
+          // Low confidence — keep citations but warn; do not treat as solid knowledge
+          citations.push(...cites);
+          warnings.push(`rag_${rag_availability}`);
           warnings.push(`rag_${rag_status}`);
+        } else {
+          warnings.push(`rag_${rag_availability ?? rag_status}`);
         }
         if (retrieval?.retrieval_id) retrievalIds.push(retrieval.retrieval_id);
       } catch {
         rag_status = "error";
+        rag_availability = "RAG_UNAVAILABLE";
         evidence_available = false;
         warnings.push("rag_error");
+        warnings.push("RAG_UNAVAILABLE");
       }
     } else if (input.skipKnowledge) {
       rag_status = "skipped";
+      rag_availability = "RAG_UNAVAILABLE";
     }
 
     // Tools (MCP) — optional direct; skills also call tools
@@ -373,6 +433,10 @@ export async function runSpecialistAgent(
     let proposal = agg.proposal;
     const gatewayMeta: Record<string, string | number | boolean | null> = {
       runtime_mode,
+      execution_mode: runtime_mode,
+      provider: "none",
+      model: "deterministic_runtime",
+      status: "ok",
       deterministic_runtime: runtime_mode === "deterministic",
     };
 
@@ -420,6 +484,8 @@ export async function runSpecialistAgent(
       if (ai.ok) {
         gatewayMeta["provider"] = ai.provider;
         gatewayMeta["model"] = ai.model;
+        gatewayMeta["execution_mode"] = ai.execution_mode;
+        gatewayMeta["status"] = ai.status;
         gatewayMeta["prompt_version"] = ai.prompt_version;
         gatewayMeta["input_tokens"] = ai.usage.input_tokens;
         gatewayMeta["output_tokens"] = ai.usage.output_tokens;
@@ -466,6 +532,10 @@ export async function runSpecialistAgent(
         }
       } else {
         gatewayMeta["gateway_error"] = ai.error.code;
+        gatewayMeta["execution_mode"] = ai.execution_mode;
+        gatewayMeta["status"] = runtime_mode === "hybrid" ? "degraded" : ai.status;
+        if (ai.provider) gatewayMeta["provider"] = ai.provider;
+        if (ai.model) gatewayMeta["model"] = ai.model;
         if (runtime_mode === "llm") {
           // llm-only: fail observable — do not invent proposal
           warnings.push(`llm_failed:${ai.error.code}`);
@@ -482,6 +552,7 @@ export async function runSpecialistAgent(
               status: "failed",
               rag_status,
               retrieval_status: rag_status,
+              ...(rag_availability ? { rag_availability } : {}),
               evidence_available,
             },
             agent_run: {
@@ -494,6 +565,8 @@ export async function runSpecialistAgent(
         }
         // hybrid: degrade to deterministic aggregation
         warnings.push(`gateway_degraded:${ai.error.code}`);
+        gatewayMeta["provider"] = "none";
+        gatewayMeta["model"] = "deterministic_runtime";
       }
     }
 
@@ -510,6 +583,7 @@ export async function runSpecialistAgent(
       retrieval_status: rag_status,
       evidence_available,
     };
+    if (rag_availability) result.rag_availability = rag_availability;
     if (proposal) result.proposal = proposal;
     if (citations.length) result.citations = citations;
     if (memoryIds.length) result.memory_ids = memoryIds;

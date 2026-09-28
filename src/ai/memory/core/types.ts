@@ -54,11 +54,19 @@ export type InvalidateMemoryInput = {
   reason?: string;
 };
 
-export type MemoryWriteResult = {
-  ok: true;
-  record: MemoryRecord;
-  warnings: string[];
-};
+export type MemoryWriteResult =
+  | {
+      ok: true;
+      skipped?: false;
+      record: MemoryRecord;
+      warnings: string[];
+    }
+  | {
+      ok: true;
+      skipped: true;
+      record: null;
+      warnings: string[];
+    };
 
 export type MemoryRetrieveResult = {
   ok: true;

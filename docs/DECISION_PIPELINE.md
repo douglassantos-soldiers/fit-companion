@@ -1,22 +1,21 @@
-# Decision Pipeline — FASE 18
+# Decision Pipeline — FASE 18 / 22.1
 
 Integra Specialist Agents ao **Decision Engine existente** via coleta, conflito e prioridade explícitos.  
 Não cria novo Decision Engine. Agents **nunca** escrevem Living Plan.
+
+**FASE 22.1:** `runSpecialistsDecisionPipeline` é **CANONICAL_WRAPPER** de [`runProductionAiRuntime`](./AI_CANONICAL_RUNTIME.md). Merge helpers (`mergeSpecialistProposals`, collect/conflict/priority) permanecem neste módulo.
 
 ## Fluxo
 
 ```
 Context (assembleDecisionContext)
-  → Orchestrator (createExecutionPlan)
-  → Specialist Agents (Skills / Tools / RAG / Memory)
-  → DecisionProposal(s)
-  → collect → conflict detection → priority resolution
-  → Proposal Validation → Safety
-  → resolveProposalAgainstEngine (Decision autoritativa)
+  → runProductionAiRuntime (CANONICAL)
+      → Orchestrator → Specialists → merge → Safety → Bridge
   → Living Plan = snapshot.livingPlan (já materializado no assemble)
 ```
 
-API: `runSpecialistsDecisionPipeline` / `mergeSpecialistProposals` em [`src/ai/decision-pipeline/`](../src/ai/decision-pipeline/).
+API: `runSpecialistsDecisionPipeline` / `mergeSpecialistProposals` em [`src/ai/decision-pipeline/`](../src/ai/decision-pipeline/).  
+Entrypoint canônico: [`src/ai/runtime/production-runtime.ts`](../src/ai/runtime/production-runtime.ts).
 
 ## Prioridade (determinística)
 

@@ -23,16 +23,18 @@ SoT: [`src/ai/governance/`](../src/ai/governance/). Não é um segundo Decision 
 | Serialize | `serialize.ts` (UUID user_id only; skip non-uuid) |
 | Server fns | [`src/lib/ai-governance.functions.ts`](../src/lib/ai-governance.functions.ts) |
 
-Fluxo: `recordAudit` → ring buffer **e** dual-write Postgres (se server + `AI_AUDIT_PERSIST≠0` + admin DB + UUID). Falha DB **não** derruba Coach/Agent.
+Fluxo observational: `recordAudit` → ring buffer **e** dual-write best-effort (se server + `AI_AUDIT_PERSIST≠0` + admin DB + UUID).
 
-### Durabilidade (FASE 21)
+Fluxo **CRITICAL (FASE 22.6):** `await recordCriticalAudit` / `persistCriticalAiAudit` → confirmação `{ persisted, audit_id }`. Falha → `AUDIT_PERSISTENCE_FAILED` (não esconder). Decision no bridge **não** é fully complete sem audit persistido (ou skip explícito quando persist desligado).
+
+### Durabilidade (FASE 21 + 22.6)
 
 | Tier | Exemplos | Persistência |
 |------|----------|--------------|
-| **CRITICAL** | `decision`, safety block, unauthorized tool, invalid critical proposal | `persistCriticalAiAudit` — await + 1 retry |
-| **OBSERVATIONAL** | diagnostics, latency, info RAG | fire-and-forget (best-effort) |
+| **CRITICAL** | `decision`, `outcome`, `learning_event`, safety, unauthorized/security, RAG-for-decision | **await** `persistCriticalAiAudit` — até 3 retries; fail-closed no Decision bridge |
+| **OBSERVATIONAL** | diagnostics, latency, gateway ok | fire-and-forget (fail-open) |
 
-Classificação: [`durability.ts`](../src/ai/governance/durability.ts). Residual: sem outbox distribuído.
+Classificação: [`durability.ts`](../src/ai/governance/durability.ts). Doc: [`AI_AUDIT_DURABILITY.md`](./AI_AUDIT_DURABILITY.md). Residual: sem outbox distribuído multi-instance.
 
 APIs (sem UI):
 
@@ -40,7 +42,7 @@ APIs (sem UI):
 - `getAgentRunDiagnostic` — 12Q com `extraAudits` do DB
 - `getAiGovernanceMetrics` — `computeAiMetrics({ source: "db" })`
 
-RLS: service_role only (mesmo padrão Memory FASE 9). Apply remoto exige credenciais Fit Companion.
+RLS: service_role only (mesmo padrão Memory FASE 9). Indexes: `user+created`, `run_id`, `kind+created`, `decision_id`, `parent_run_id`. Apply remoto exige credenciais Fit Companion.
 
 ## O que auditar
 
@@ -133,6 +135,7 @@ Respostas `known` | `unknown` | `insufficient` — **nunca inventa**. Vista téc
 - [AI_EVALUATION.md](./AI_EVALUATION.md)
 - [AI_PRODUCTION_RUNBOOK.md](./AI_PRODUCTION_RUNBOOK.md) · [AI_ROLLBACK.md](./AI_ROLLBACK.md) · [AI_INCIDENT_RESPONSE.md](./AI_INCIDENT_RESPONSE.md)
 - [AI_PRODUCTION_READINESS_REPORT.md](./AI_PRODUCTION_READINESS_REPORT.md)
+- [AI_PRODUCTION_CERTIFICATION.md](./AI_PRODUCTION_CERTIFICATION.md) — FASE 22.7 real cert
 - [AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md)
 - [AI_ARCHITECTURE_FINAL.md](./AI_ARCHITECTURE_FINAL.md) — seção **End-to-End Runtime Flow**
 - [LEARNING_ENGINE.md](./LEARNING_ENGINE.md)

@@ -2,6 +2,8 @@
 
 Como voltar ao path determinístico sem Decision Engine inventado / sem LLM.
 
+**Kill switch completo (flags, aliases, produto core):** [AI_KILL_SWITCH.md](./AI_KILL_SWITCH.md) (FASE 22.11).
+
 ## Quando rollback
 
 - Provider LLM falhou ou timeout em cascata
@@ -24,25 +26,27 @@ Efetivo via [`resolveEffectiveRuntimeMode`](../src/ai/runtime/rollback.ts) — `
 
 ```bash
 AI_LLM_ENABLED=0
+# alias: LLM_ENABLED=0
 AI_RUNTIME_MODE=deterministic
 ```
 
 ### 3. Desligar componentes
 
-| Flag | Efeito |
-|------|--------|
-| `AI_SPECIALISTS_ENABLED=0` | specialists cancelados |
-| `AI_RAG_ENABLED=0` | retrieval skipped |
-| `AI_MEMORY_ENABLED=0` | memory vazio |
-| `AI_LEARNING_ENABLED=0` | learning noop |
-| `AI_ENABLED=0` | AI paths off |
+| Flag | Alias | Efeito |
+|------|-------|--------|
+| `AI_SPECIALISTS_ENABLED=0` | `SPECIALISTS_ENABLED` | specialists cancelados |
+| `AI_RAG_ENABLED=0` | `RAG_ENABLED` | retrieval skipped |
+| `AI_MEMORY_ENABLED=0` | `MEMORY_ENABLED` | memory vazio + writes skipped |
+| `AI_LEARNING_ENABLED=0` | `LEARNING_ENABLED` | learning noop |
+| `AI_ENABLED=0` | `AI_GLOBAL_ENABLED` | AI paths off |
 
 ## Verificação pós-rollback
 
 1. Coach / specialists respondem sem provider
 2. Audits mostram `runtime_mode=deterministic` / `deterministic_runtime=true`
 3. Nenhuma Decision inventada por Agent/LLM
-4. `npm run test:eval` e `npm run cert:ai` verdes no que for local
+4. Identity / Context / Safety / Decision / Living Plan intactos
+5. `npm run ai:kill-switch` e `npm run test:eval` / `npm run cert:ai` verdes no que for local
 
 ## Reabilitação (só após)
 

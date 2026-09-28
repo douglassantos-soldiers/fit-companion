@@ -6,27 +6,35 @@ export {
   GOLDEN_DATASET_VERSION,
 } from "@/ai/governance/version";
 export {
-  redactForAudit,
-  redactMetadata,
-  redactString,
-  isSensitiveKey,
-} from "@/ai/governance/redact";
-export {
   recordAudit,
+  recordCriticalAudit,
   listAudits,
   listAuditsByRunId,
   clearAuditLog,
   auditFromIdentity,
   recordDecisionAudit,
+  recordDecisionAuditCritical,
   recordOutcomeAudit,
+  recordOutcomeAuditCritical,
   recordLearningEventAudit,
+  recordLearningEventAuditCritical,
   auditLearningCycleResult,
+  auditLearningCycleResultCritical,
+  stableCriticalAuditId,
   type AiAuditKind,
   type AiAuditEvent,
   type AiTokenUsage,
   type GovernanceAuditKind,
   type GovernanceAuditRecord,
+  type RecordCriticalAuditResult,
 } from "@/ai/governance/audit";
+export {
+  redactForAudit,
+  redactMetadata,
+  redactString,
+  redactSummary,
+  isSensitiveKey,
+} from "@/ai/governance/redact";
 export {
   recordRagRetrieval,
   listRagRetrievals,

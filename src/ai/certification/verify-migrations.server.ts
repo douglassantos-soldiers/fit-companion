@@ -1,17 +1,19 @@
 /**
- * Canonical AI tables that must exist for production (FASE 21).
+ * Canonical AI migration table probe (FASE 21) + re-exports FASE 22.9 deep readiness.
  * Never assume Git migration == applied remotely.
  */
-export const AI_REQUIRED_TABLES = [
-  "ai_audit_events",
-  "ai_user_memory",
-  "ai_decision_memory",
-  "ai_outcome_memory",
-  "ai_learning_events",
-  "ai_knowledge_sources",
-  "ai_knowledge_documents",
-  "ai_knowledge_chunks",
-] as const;
+import { AI_REQUIRED_TABLES } from "@/ai/certification/ai-schema-inventory";
+
+export { AI_REQUIRED_TABLES };
+export type { AiRequiredTable } from "@/ai/certification/ai-schema-inventory";
+export {
+  verifyAiDatabaseReadiness,
+  evaluateCatalogAgainstInventory,
+  type DatabaseReadinessReport,
+  type SchemaCheckRow,
+  type DatabaseReadinessDeps,
+  type CatalogProbePayload,
+} from "@/ai/certification/verify-database-readiness.server";
 
 export type MigrationTableStatus = "applied" | "missing" | "unavailable";
 
@@ -46,7 +48,8 @@ async function probeTable(
       return { table, status: "missing", detail: msg };
     }
     if (/permission|rls|policy|JWT/i.test(msg)) {
-      return { table, status: "applied", detail: msg };
+      // Inaccessible ≠ applied (FASE 22.7)
+      return { table, status: "unavailable", detail: msg };
     }
     return { table, status: "unavailable", detail: msg };
   } catch (e) {

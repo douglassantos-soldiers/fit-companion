@@ -1,6 +1,6 @@
 # AI Architecture — Relatório Final (Performance OS)
 
-Relatório consolidado da camada AI-native do Soldiers Fit Companion / Performance OS após as fases Context → Decision → MCP → Skills → RAG → Memory → Orchestrator → Specialists → Coach Agent → Learning → Governance/Eval → FASE 15 (E2E) → FASE 16 (Production RAG) → FASE 17 (AI Gateway) → FASE 18 (Specialists → Decision) → FASE 19 (AI Governance Console) → FASE 20 (Evaluation 2.0) → **FASE 21 (Production Certification)**.
+Relatório consolidado da camada AI-native do Soldiers Fit Companion / Performance OS após as fases Context → Decision → MCP → Skills → RAG → Memory → Orchestrator → Specialists → Coach Agent → Learning → Governance/Eval → FASE 15 (E2E) → FASE 16 (Production RAG) → FASE 17 (AI Gateway) → FASE 18 (Specialists → Decision) → FASE 19 (AI Governance Console) → FASE 20 (Evaluation 2.0) → FASE 21 (Production Certification) → FASE 22.1 (Canonical AI Runtime) → FASE 22.2 (Production RAG Hardening) → FASE 22.3 (Production Memory Persistence) → FASE 22.4 (Production LLM Runtime) → FASE 22.5 (Remove Mock from Production) → FASE 22.6 (Durable Critical AI Audit) → FASE 22.7 (Real Production Certification) → FASE 22.8 (AI CI/CD Safety Gate) → FASE 22.9 (Database Migration Verification) → FASE 22.10 (Production Distributed Rate Limiting) → FASE 22.11 (AI Kill Switch & Rollback) → FASE 22.12 (Real Production E2E) → **FASE 22.13 (Final Production Certification)**.
 
 ## 1. Arquitetura
 
@@ -19,32 +19,19 @@ USER
 
 **Regra inegociável:** Agents/Coach emitem `DecisionProposal`. Somente o Decision Engine emite `Decision`. Learning produz sinais. Governance observa — não decide. Agents/Skills/Tools/RAG/Memory **não** escrevem Living Plan. LLM **nunca** tem autoridade de Decision (ver [`AI_GATEWAY.md`](./AI_GATEWAY.md)).
 
-### End-to-End Runtime Flow
+### End-to-End Runtime Flow (FASE 22.1)
 
-Dois caminhos coexistentes (FASE 15):
+**Único runtime canônico de produção:** [`runProductionAiRuntime`](../src/ai/runtime/production-runtime.ts) — ver [`AI_CANONICAL_RUNTIME.md`](./AI_CANONICAL_RUNTIME.md).
 
-| Path | Entrada | Fecha Proposal→Decision→Living Plan? | Uso |
-|------|---------|--------------------------------------|-----|
-| **Coach produto** | `askAiCoach` → `runCoachAgent` → `runAuthoritativeBridge` (quando há snapshot) | Sim (Decision + Living Plan de referência; **sem** Outcome/Learning sintético) | UI / chat |
-| **Harness E2E** | `runAiE2EPipeline` em [`src/ai/e2e/`](../src/ai/e2e/) | Sim, via `runAuthoritativeBridge` com Outcome + Learning de fixture | Testes / hardening |
+| Path | Entrada | Label | Uso |
+|------|---------|-------|-----|
+| **CANONICAL** | `runProductionAiRuntime` | CANONICAL | Produção (núcleo) |
+| **Coach produto** | `askAiCoach` → `runCoachAgent` → `runProductionAiRuntime` (com snapshot) | CANONICAL_FACADE | UI / chat |
+| **Specialists API** | `runSpecialistsDecisionPipeline` | CANONICAL_WRAPPER | Compat / testes FASE 18 |
+| **Harness E2E** | `runAiE2EPipeline` | TEST_ONLY | Testes / hardening |
+| Soft sem snapshot | Coach sem `DecisionContextSnapshot` | LEGACY | Offline / informacional |
 
-No path produto (`coach.functions.ts`): com `DecisionContextSnapshot` disponível, a proposal passa por `validateCoachProposalAgainstSnapshot` + `runAuthoritativeBridge({ emitOutcomeAndLearning: false })`. Outcome/Learning só após follow-through real do usuário. Sem snapshot, permanece soft-validate legado (sem inventar Decision).
-
-Fluxo real do harness (runtime determinístico, sem LLM):
-
-```
-trustedUserId
-  → assembleDecisionContext / toPerformanceContext
-  → createExecutionPlan
-  → runSpecialistAgent (Skills / Tools / RAG / Memory)
-  → DecisionProposal
-  → validateProposalAgainstSafety
-  → resolveProposalAgainstEngine  (Decision Engine = autoridade)
-  → Living Plan (snapshot.engine — path autorizado)
-  → Outcome + runLearningCycle
-  → AiAuditEvent + runAiEvaluation
-  → buildAiExecutionTrace(run_id)
-```
+Produto: `emitOutcomeAndLearning: false`. Outcome/Learning só após follow-through real. Bridge autoritativo em [`src/ai/runtime/authoritative-bridge.ts`](../src/ai/runtime/authoritative-bridge.ts).
 
 Correlação: `run_id` / `parent_run_id` / `agent_id` / `agent_version` / `skill_id` + `skill_run_id` / `tool_id` + `tool_call_id` / `retrieval_id` / `decision_id` / `outcome_id` / `learning_event_id` / `context_fingerprint`.
 
@@ -76,9 +63,9 @@ Docs: [MCP_ARCHITECTURE.md](./MCP_ARCHITECTURE.md).
 
 ## 5. RAG
 
-**FASE 16 — Production Knowledge Base:** corpus curado, VectorStore (`memory` | `supabase`+pgvector), hybrid retrieve, evidence quality, `rag_status` explícito. Skills resolvem `kb:*`.
+**FASE 16 + 22.2 — Production Knowledge Base:** corpus curado, VectorStore (`memory` em test/dev | `supabase`+pgvector **obrigatório em production**), hybrid retrieve, evidence quality, `rag_status` + `rag_availability`, health/`RAG_READY`. Skills resolvem `kb:*`. Sem fallback silencioso para memória em prod. Docs: [`AI_RAG_PRODUCTION.md`](./AI_RAG_PRODUCTION.md) · [RAG_ARCHITECTURE.md](./RAG_ARCHITECTURE.md).
 
-**FASE 17 — AI Gateway:** `invokeAI` com providers Mock + OpenAI (Anthropic/Google stubs), structured output fail-closed, `AI_RUNTIME_MODE=deterministic|llm|hybrid` (default deterministic), wiring em `specialist_training`. Docs: [`AI_GATEWAY.md`](./AI_GATEWAY.md).
+**FASE 17 + 22.4 + 22.5 — AI Gateway:** `invokeAI` com OpenAI (primary) + Anthropic (fallback real); mock **proibido em production** (`ProductionMockProviderError` + CI `guard:ai-mock`); cost limits; circuit breaker; `LLM_READY`. Docs: [`AI_GATEWAY.md`](./AI_GATEWAY.md) · [`AI_LLM_PRODUCTION.md`](./AI_LLM_PRODUCTION.md) · [`AI_MOCK_POLICY.md`](./AI_MOCK_POLICY.md).
 
 **FASE 18 — Specialists → Decision:** `runSpecialistsDecisionPipeline` + merge (collect/conflict/priority) → Safety → Decision Engine existente; Living Plan só via assemble. Docs: [`DECISION_PIPELINE.md`](./DECISION_PIPELINE.md).  
 Docs: [RAG_ARCHITECTURE.md](./RAG_ARCHITECTURE.md).
@@ -87,7 +74,8 @@ Docs: [RAG_ARCHITECTURE.md](./RAG_ARCHITECTURE.md).
 
 Quatro famílias: User / Decision / Outcome / Learning (`ai_*` tables, service_role).  
 Writers validam; LLM não escreve memória diretamente.  
-Docs: [MEMORY_ARCHITECTURE.md](./MEMORY_ARCHITECTURE.md).
+**FASE 22.3:** `ensureMemoryStore` — production = `SupabaseMemoryStore` obrigatório (sem fallback InMemory); health/`MEMORY_READY`; `version` nas tabelas; legacy `coach_memories` marcado LEGACY (não SoT); wire product `coach_notes` via `createMemory` em `askAiCoach`.  
+Docs: [MEMORY_ARCHITECTURE.md](./MEMORY_ARCHITECTURE.md) · [`AI_MEMORY_PRODUCTION.md`](./AI_MEMORY_PRODUCTION.md).
 
 ## 7. Context
 
@@ -121,13 +109,13 @@ Docs: [LEARNING_ENGINE.md](./LEARNING_ENGINE.md).
 |-------|------|
 | AgentRun / SkillRun / ToolCall | ring buffers + `AiAuditEvent` |
 | RAG retrieval | `recordRagRetrieval` |
-| Decision / Outcome / Learning | helpers de audit |
+| Decision / Outcome / Learning | helpers de audit **CRITICAL awaited** (FASE 22.6) |
 | Diagnóstico 12Q | `diagnoseAgentRun` |
 | Métricas | `computeAiMetrics` (+ `safety_rejection_rate`, `rag_failure_rate`, cost breakdown) |
 | Engine console | `logEngineDecision` / `logCoachUsage` |
 | **Governance Console (FASE 19)** | `/governance/*` — admin/analyst read-only |
 
-Docs: [AI_GOVERNANCE.md](./AI_GOVERNANCE.md) · [GOVERNANCE_CONSOLE.md](./GOVERNANCE_CONSOLE.md).
+Docs: [AI_GOVERNANCE.md](./AI_GOVERNANCE.md) · [AI_AUDIT_DURABILITY.md](./AI_AUDIT_DURABILITY.md) · [GOVERNANCE_CONSOLE.md](./GOVERNANCE_CONSOLE.md).
 
 ### FASE 19 — AI Governance Console
 
@@ -143,14 +131,59 @@ Docs: [AI_GOVERNANCE.md](./AI_GOVERNANCE.md) · [GOVERNANCE_CONSOLE.md](./GOVERN
 - `compareEvalArtifacts` offline; `npm run test:eval` + `.github/workflows/ai-eval.yml`
 - Evaluator **não** altera Decision / produção; sem LLM-as-judge
 
-### FASE 21 — Production Certification
+### FASE 21 / 22.7 — Production Certification
 
-- Suites em `src/ai/certification/` (security, integrity, failure modes, perf, readiness)
+- **FASE 22.7:** `runProductionCertification()` — probes reais, Vitest executado, UNTESTED≠PASS
+- Suites em `src/ai/certification/` + meta-teste `certification-integrity.test.ts`
 - Feature flags / kill-switches + `AI_FORCE_DETERMINISTIC` rollback
-- Audit CRITICAL vs OBSERVATIONAL; rate limits AI in-process; cost bounds asserts
-- Migration probe (`verifyAiMigrations`) — **nunca** assume Git == remoto
-- Docs: [AI_PRODUCTION_RUNBOOK.md](./AI_PRODUCTION_RUNBOOK.md) · [AI_INCIDENT_RESPONSE.md](./AI_INCIDENT_RESPONSE.md) · [AI_ROLLBACK.md](./AI_ROLLBACK.md) · [AI_PRODUCTION_READINESS_REPORT.md](./AI_PRODUCTION_READINESS_REPORT.md)
-- `production_ready` só com críticos verdes **e** migrations aplicadas verificadas
+- Audit CRITICAL vs OBSERVATIONAL; rate limits AI **distributed** (FASE 22.10); cost bounds asserts
+- Migration probe (`verifyAiMigrations` + FASE 22.9 deep readiness) — permission/RLS = BLOCKED, não applied
+- Docs: [AI_PRODUCTION_CERTIFICATION.md](./AI_PRODUCTION_CERTIFICATION.md) · [AI_PRODUCTION_RUNBOOK.md](./AI_PRODUCTION_RUNBOOK.md) · [AI_PRODUCTION_READINESS_REPORT.md](./AI_PRODUCTION_READINESS_REPORT.md)
+- `production_ready` só com critical EXECUTED+PASS, suite real ok, gates 100%
+
+### FASE 22.8 — AI CI/CD Safety Gate
+
+- Workflow expandido: lint → typecheck → unit → integration → eval → security → regression → db-readiness → cert → verdict → build
+- Paths: `src/ai`, engine, coach, migrations, scripts AI
+- Veredicto explícito PASS/FAIL/BLOCKED ([`AI_CI_CD_GATES.md`](./AI_CI_CD_GATES.md))
+- Artifact: `docs/certification/latest.json`
+
+### FASE 22.9 — Database Migration Verification
+
+- Inventário canônico + `verifyAiDatabaseReadiness` (tables / indexes / RLS / pgvector / service_role)
+- Sem `adminDb` → `MIGRATION_VERIFICATION_BLOCKED` (nunca inventar applied)
+- RPC `ai_schema_inventory_probe` (migration `20261031120000_fase22_9_ai_schema_verify.sql`)
+- Doc: [AI_DATABASE_READINESS.md](./AI_DATABASE_READINESS.md) · artifact `docs/certification/database-readiness.json`
+
+### FASE 22.10 — Production Distributed Rate Limiting
+
+- Store Supabase (`ai_rate_limit_buckets` + RPC atômica + TTL) — sem Redis
+- Scopes: user / ip / session / agent / tool / llm / rag / api / admin + cost budgets
+- Wire: gateway, MCP tools, agent runs, RAG, coach, admin
+- Kill switch `AI_RL_DISABLED`; fail-closed sem admin DB em produção
+- Doc: [AI_RATE_LIMITING.md](./AI_RATE_LIMITING.md) · `docs/certification/rate-limit-readiness.json`
+
+### FASE 22.11 — AI Kill Switch & Rollback
+
+- Aliases: `AI_GLOBAL_ENABLED`, `RAG_ENABLED`, `MEMORY_ENABLED`, `SPECIALISTS_ENABLED`, `LEARNING_ENABLED` (+ canônicos `AI_*`)
+- Fallbacks seguros; Memory writes skipped; production-runtime soft-guard
+- Server-authoritative; Identity/Context/Safety/Decision/LP não gated
+- Doc: [AI_KILL_SWITCH.md](./AI_KILL_SWITCH.md) · [AI_ROLLBACK.md](./AI_ROLLBACK.md) · `kill-switch-readiness.json`
+
+### FASE 22.12 — Real Production E2E
+
+- `runProductionE2E` — PASS só com DB/pgvector/Memory/Audit reais; mock/InMemory → FAIL
+- Sem `SUPABASE_SERVICE_ROLE_KEY` / DB readiness → **BLOCKED** (`PRODUCTION_E2E_BLOCKED`)
+- Failure paths + correlation + idempotency + cross-user + kill/rollback
+- Harness `runAiE2EPipeline` permanece **TEST_ONLY**
+- Doc: [AI_PRODUCTION_E2E.md](./AI_PRODUCTION_E2E.md) · `production-e2e.json`
+
+### FASE 22.13 — Final Production Certification
+
+- Agregador AUDIT/VERIFY/TEST/CERTIFY — sem features novas
+- Reusa probes 22.7 + readiness 22.9–22.12 + probes `canonical_runtime` / `agents` / `evaluation` / `ci_cd`
+- `production_ready` só com critical EXECUTED+PASS; UNTESTED/BLOCKED/DEGRADED ≠ PASS
+- Artefato: [AI_PRODUCTION_CERTIFICATION_FINAL.md](./AI_PRODUCTION_CERTIFICATION_FINAL.md) · `docs/certification/final.json`
 
 ## 12. Custos
 
@@ -181,10 +214,20 @@ Docs: [AI_GOVERNANCE.md](./AI_GOVERNANCE.md) · [GOVERNANCE_CONSOLE.md](./GOVERN
 5. Token/cost reais quando houver provider LLM no path Coach
 6. Dual-write Memory ↔ Learning signals (opcional, cuidadoso)
 7. Deprecar workflows LLM legados do Coach quando estáveis
-8. Apply migrations FASE 11 + FASE 19 (`ai_audit_events` kinds) no projeto remoto Fit Companion
+8. Apply migrations FASE 11 + FASE 19 + FASE 22.6 + FASE 22.9 (`ai_schema_inventory_probe`) no projeto remoto Fit Companion
 9. Wire Outcome/Learning no produto após follow-through real (attribution / accept proposal)
 ## 15. Docs relacionados
 
+- [AI_CANONICAL_RUNTIME.md](./AI_CANONICAL_RUNTIME.md) — **FASE 22.1 entrypoint canônico**
+- [AI_RAG_PRODUCTION.md](./AI_RAG_PRODUCTION.md) — **FASE 22.2 RAG production**
+- [AI_AUDIT_DURABILITY.md](./AI_AUDIT_DURABILITY.md) — **FASE 22.6 durable critical audit**
+- [AI_PRODUCTION_CERTIFICATION.md](./AI_PRODUCTION_CERTIFICATION.md) — **FASE 22.7 real certification**
+- [AI_CI_CD_GATES.md](./AI_CI_CD_GATES.md) — **FASE 22.8 CI/CD Safety Gate**
+- [AI_DATABASE_READINESS.md](./AI_DATABASE_READINESS.md) — **FASE 22.9 database migration verification**
+- [AI_RATE_LIMITING.md](./AI_RATE_LIMITING.md) — **FASE 22.10 distributed rate limiting**
+- [AI_KILL_SWITCH.md](./AI_KILL_SWITCH.md) — **FASE 22.11 kill switch & rollback**
+- [AI_PRODUCTION_E2E.md](./AI_PRODUCTION_E2E.md) — **FASE 22.12 real production E2E**
+- [AI_PRODUCTION_CERTIFICATION_FINAL.md](./AI_PRODUCTION_CERTIFICATION_FINAL.md) — **FASE 22.13 final certification**
 - [AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md) — foundation
 - [AI_GOVERNANCE.md](./AI_GOVERNANCE.md) / [AI_EVALUATION.md](./AI_EVALUATION.md) / [GOVERNANCE_CONSOLE.md](./GOVERNANCE_CONSOLE.md)
 - [AGENTS_ARCHITECTURE.md](./AGENTS_ARCHITECTURE.md) · [COACH_AGENT.md](./COACH_AGENT.md)

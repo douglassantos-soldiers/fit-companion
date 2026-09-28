@@ -15,7 +15,7 @@ import type {
   UpdateMemoryInput,
 } from "@/ai/memory/core/types";
 import { validateMemoryWrite } from "@/ai/memory/core/validate-write";
-import { getMemoryStore } from "@/ai/memory/store/types";
+import { ensureMemoryStore } from "@/ai/memory/store/types";
 
 function dataEqual(a: MemoryRecord["data"], b: MemoryRecord["data"]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -34,9 +34,13 @@ function withExpiryStatus(record: MemoryRecord, now = Date.now()): MemoryRecord 
 }
 
 export async function createMemory(input: CreateMemoryInput): Promise<MemoryWriteResult> {
+  const { isMemoryEnabled } = await import("@/ai/runtime/feature-flags");
+  if (!isMemoryEnabled()) {
+    return { ok: true, skipped: true, record: null, warnings: ["memory_disabled"] };
+  }
   const userId = requireTrustedMemoryUser(input.trustedUserId);
   const validated = validateMemoryWrite(input);
-  const store = getMemoryStore();
+  const store = await ensureMemoryStore();
 
   if (validated.key) {
     const existing = await store.findActiveByKey({
@@ -60,6 +64,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryWrit
         ...existing,
         status: "invalidated",
         updated_at: now,
+        version: (existing.version ?? 1) + 1,
       });
     }
   }
@@ -80,6 +85,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryWrit
     status: "active",
     created_at: now,
     updated_at: now,
+    version: 1,
   };
   if (validated.key) record.key = validated.key;
   if (validated.expiresAt) record.expires_at = validated.expiresAt;
@@ -95,7 +101,7 @@ export async function retrieveMemory(input: RetrieveMemoryInput): Promise<Memory
     return { ok: true, records: [] };
   }
   const userId = requireTrustedMemoryUser(input.trustedUserId);
-  const store = getMemoryStore();
+  const store = await ensureMemoryStore();
   const now = Date.now();
 
   const listed = await store.list({
@@ -130,8 +136,12 @@ export async function retrieveMemory(input: RetrieveMemoryInput): Promise<Memory
 }
 
 export async function updateMemory(input: UpdateMemoryInput): Promise<MemoryWriteResult> {
+  const { isMemoryEnabled } = await import("@/ai/runtime/feature-flags");
+  if (!isMemoryEnabled()) {
+    return { ok: true, skipped: true, record: null, warnings: ["memory_disabled"] };
+  }
   const userId = requireTrustedMemoryUser(input.trustedUserId);
-  const store = getMemoryStore();
+  const store = await ensureMemoryStore();
   const existing = await store.getById(input.memoryId);
   if (!existing) {
     throw new MemoryError(MEMORY_ERROR.NOT_FOUND, "memory_not_found");
@@ -170,6 +180,7 @@ export async function updateMemory(input: UpdateMemoryInput): Promise<MemoryWrit
     confidence: validated.confidence,
     updated_at: now,
     status: existing.status === "invalidated" ? "invalidated" : "active",
+    version: (existing.version ?? 1) + 1,
   };
   if (validated.key) updated.key = validated.key;
   else delete updated.key;
@@ -183,8 +194,12 @@ export async function updateMemory(input: UpdateMemoryInput): Promise<MemoryWrit
 }
 
 export async function invalidateMemory(input: InvalidateMemoryInput): Promise<MemoryWriteResult> {
+  const { isMemoryEnabled } = await import("@/ai/runtime/feature-flags");
+  if (!isMemoryEnabled()) {
+    return { ok: true, skipped: true, record: null, warnings: ["memory_disabled"] };
+  }
   const userId = requireTrustedMemoryUser(input.trustedUserId);
-  const store = getMemoryStore();
+  const store = await ensureMemoryStore();
   const existing = await store.getById(input.memoryId);
   if (!existing) {
     throw new MemoryError(MEMORY_ERROR.NOT_FOUND, "memory_not_found");
@@ -198,6 +213,7 @@ export async function invalidateMemory(input: InvalidateMemoryInput): Promise<Me
     ...existing,
     status: "invalidated",
     updated_at: now,
+    version: (existing.version ?? 1) + 1,
     data: {
       ...existing.data,
       ...(input.reason ? { invalidate_reason: input.reason.slice(0, 200) } : {}),

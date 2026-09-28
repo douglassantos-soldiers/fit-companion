@@ -15,7 +15,7 @@ const FORBIDDEN = [
   "mutateLivingPlan",
 ];
 
-const SCOPES = ["agents", "gateway", "skills"];
+const SCOPES = ["agents", "gateway", "skills", "runtime"];
 
 function walk(dir: string, acc: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -26,8 +26,8 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-describe("FASE 21 data integrity", () => {
-  it("agents/gateway/skills do not call Living Plan / Decision persist writers", () => {
+describe("FASE 21 / 22.1 data integrity", () => {
+  it("agents/gateway/skills/runtime do not call Living Plan / Decision persist writers", () => {
     const hits: string[] = [];
     for (const scope of SCOPES) {
       const dir = join(ROOT, scope);
@@ -41,9 +41,17 @@ describe("FASE 21 data integrity", () => {
     expect(hits).toEqual([]);
   });
 
-  it("decision-pipeline is the authorized bridge path (exists)", () => {
+  it("canonical runtime exists and decision-pipeline wraps it", () => {
+    const canon = join(ROOT, "runtime", "production-runtime.ts");
+    const canonSrc = readFileSync(canon, "utf8");
+    expect(canonSrc).toMatch(/runProductionAiRuntime/);
+    expect(canonSrc).toMatch(/CANONICAL/);
+    expect(canonSrc).not.toMatch(/computeDecisions\s*\(/);
+    expect(canonSrc).not.toMatch(/materializeLivingPlan\s*\(/);
+
     const bridge = join(ROOT, "decision-pipeline", "run-pipeline.ts");
     const src = readFileSync(bridge, "utf8");
+    expect(src).toMatch(/runProductionAiRuntime/);
     expect(src).toMatch(/emitOutcomeAndLearning/);
     expect(src).toMatch(/DecisionProposal|proposal/i);
   });

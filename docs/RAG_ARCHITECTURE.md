@@ -40,10 +40,19 @@ Seed: `seedProductionCorpus()` / `ingestFromSource(sourceId)`.
 |------|----------------|
 | EmbeddingProvider | `LocalLexicalEmbeddingProvider` (`local_lexical_v1`, dim 256) |
 | API | `generateEmbedding` / `generateEmbeddings` / `similarity` (+ `embed`) |
-| VectorStore | `InMemoryVectorStore` (default) · `SupabasePgvectorStore` (`AI_RAG_STORE=supabase`) |
+| VectorStore | `InMemoryVectorStore` (test/dev) · `SupabasePgvectorStore` (**obrigatório em production**) |
+| Resolução | `ensureVectorStore()` — **sem fallback silencioso** para memory em prod / quando `AI_RAG_STORE=supabase` |
 | Migration | `supabase/migrations/20261027120000_fase16_ai_knowledge.sql` |
 
 Swap de embedding/store **não** exige mudar Agents/Skills.
+
+Ver hardening: [`AI_RAG_PRODUCTION.md`](./AI_RAG_PRODUCTION.md) (FASE 22.2). Seed: `npm run rag:seed`.
+
+### Availability (agents)
+
+`rag_availability`: `RAG_AVAILABLE` | `RAG_DEGRADED` | `RAG_UNAVAILABLE`  
+Códigos: `RAG_UNAVAILABLE`, `RAG_EMPTY`, `RAG_LOW_CONFIDENCE`, `RAG_SOURCE_INVALID`.  
+Health: `checkRagHealth()` / `getRagReadiness()` → `RAG_READY`.
 
 ## 4. Fluxo de retrieval
 

@@ -1,11 +1,13 @@
 /**
  * Unified AI audit ring buffer — AgentRun → LearningEvent.
- * In-memory only (FASE 10). Never stores secrets.
+ * FASE 10 in-memory + FASE 22.6 awaited CRITICAL durable path.
+ * Never stores secrets.
  */
 import { asTrustedUserId, type TrustedUserId } from "@/ai/contracts/trusted-user-id";
-import { redactMetadata } from "@/ai/governance/redact";
+import { redactMetadata, redactSummary } from "@/ai/governance/redact";
 import { AI_GOVERNANCE_CONTRACT_VERSION, AI_GOVERNANCE_VERSION } from "@/ai/governance/version";
 import { toTrustedUserId, type TrustedIdentity } from "@/lib/session-identity.server";
+import type { PersistCriticalAiAuditResult } from "@/ai/governance/persist.server";
 
 export type AiAuditKind =
   | "agent_run"
@@ -59,11 +61,23 @@ export type AiAuditEvent = {
 /** Legacy alias used by earlier stub. */
 export type GovernanceAuditRecord = AiAuditEvent;
 
+export type RecordCriticalAuditResult = PersistCriticalAiAuditResult & {
+  event: AiAuditEvent;
+};
+
 const MAX = 1000;
 const buffer: AiAuditEvent[] = [];
 
 function newAuditId(kind: AiAuditKind): string {
   return `audit_${kind}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Stable idempotent ids for critical reconstructability (FASE 22.6). */
+export function stableCriticalAuditId(
+  kind: "decision" | "outcome" | "learning_event" | "safety" | "rag_retrieval" | string,
+  subjectId: string,
+): string {
+  return `audit_${kind}_${subjectId}`;
 }
 
 export function clearAuditLog(): void {
@@ -78,16 +92,17 @@ export function listAuditsByRunId(runId: string): AiAuditEvent[] {
   return buffer.filter((a) => a.run_id === runId || a.parent_run_id === runId);
 }
 
-export function recordAudit(
-  partial: Omit<
-    AiAuditEvent,
-    "audit_id" | "governance_version" | "contract_version" | "created_at"
-  > & {
-    created_at?: string;
-    audit_id?: string;
-  },
-): AiAuditEvent {
+type AuditPartial = Omit<
+  AiAuditEvent,
+  "audit_id" | "governance_version" | "contract_version" | "created_at"
+> & {
+  created_at?: string;
+  audit_id?: string;
+};
+
+function buildAuditEvent(partial: AuditPartial): AiAuditEvent {
   const meta = redactMetadata(partial.metadata);
+  const summary = redactSummary(partial.summary);
   const event: AiAuditEvent = {
     audit_id: partial.audit_id ?? newAuditId(partial.kind),
     kind: partial.kind,
@@ -113,15 +128,23 @@ export function recordAudit(
   if (partial.model !== undefined) event.model = partial.model;
   if (partial.token_usage !== undefined) event.token_usage = partial.token_usage;
   if (partial.estimated_cost !== undefined) event.estimated_cost = partial.estimated_cost;
-  if (partial.summary) event.summary = partial.summary.slice(0, 240);
+  if (summary) event.summary = summary;
   if (meta) event.metadata = meta;
   if (partial.session_id !== undefined) event.session_id = partial.session_id;
   if (partial.role) event.role = partial.role;
+  return event;
+}
 
+function pushBuffer(event: AiAuditEvent): void {
   buffer.push(event);
   if (buffer.length > MAX) buffer.splice(0, buffer.length - MAX);
+}
 
-  // FASE 11/21 — dual-write: CRITICAL awaits retry path; observational best-effort
+export function recordAudit(partial: AuditPartial): AiAuditEvent {
+  const event = buildAuditEvent(partial);
+  pushBuffer(event);
+
+  // Observational / legacy dual-write — CRITICAL product paths use recordCriticalAudit.
   if (typeof window === "undefined" && process.env["AI_AUDIT_PERSIST"] !== "0") {
     void import("@/ai/governance/durability")
       .then(async ({ classifyAuditDurability }) => {
@@ -133,6 +156,32 @@ export function recordAudit(
   }
 
   return event;
+}
+
+/**
+ * Awaited CRITICAL audit — ring buffer + durable persist with confirmation.
+ * Callers MUST await; Decision is not fully complete without persisted:true (or explicit skip).
+ */
+export async function recordCriticalAudit(
+  partial: AuditPartial,
+): Promise<RecordCriticalAuditResult> {
+  const event = buildAuditEvent(partial);
+  pushBuffer(event);
+
+  if (typeof window !== "undefined") {
+    return {
+      ok: true,
+      persisted: false,
+      skipped: true,
+      reason: "client",
+      audit_id: event.audit_id,
+      event,
+    };
+  }
+
+  const { persistCriticalAiAudit } = await import("@/ai/governance/persist.server");
+  const result = await persistCriticalAiAudit(event);
+  return { ...result, event };
 }
 
 /**
@@ -178,10 +227,36 @@ export function recordDecisionAudit(opts: {
 }): AiAuditEvent {
   return recordAudit({
     kind: "decision",
+    audit_id: stableCriticalAuditId("decision", opts.decisionId),
     user_id: opts.userId,
     subject_id: opts.decisionId,
     decision_id: opts.decisionId,
     ...(opts.runId ? { run_id: opts.runId } : {}),
+    ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.summary ? { summary: opts.summary } : {}),
+    ...(opts.contextFingerprint ? { context_fingerprint: opts.contextFingerprint } : {}),
+    ...(opts.metadata ? { metadata: opts.metadata } : {}),
+  });
+}
+
+export async function recordDecisionAuditCritical(opts: {
+  userId: string;
+  decisionId: string;
+  runId?: string;
+  parentRunId?: string;
+  status?: string;
+  summary?: string;
+  contextFingerprint?: string;
+  metadata?: Record<string, string | number | boolean | null>;
+}): Promise<RecordCriticalAuditResult> {
+  return recordCriticalAudit({
+    kind: "decision",
+    audit_id: stableCriticalAuditId("decision", opts.decisionId),
+    user_id: opts.userId,
+    subject_id: opts.decisionId,
+    decision_id: opts.decisionId,
+    ...(opts.runId ? { run_id: opts.runId } : {}),
+    ...(opts.parentRunId ? { parent_run_id: opts.parentRunId } : {}),
     ...(opts.status ? { status: opts.status } : {}),
     ...(opts.summary ? { summary: opts.summary } : {}),
     ...(opts.contextFingerprint ? { context_fingerprint: opts.contextFingerprint } : {}),
@@ -203,6 +278,33 @@ export function recordOutcomeAudit(opts: {
   if (opts.adherence != null) meta["adherence"] = opts.adherence;
   return recordAudit({
     kind: "outcome",
+    audit_id: stableCriticalAuditId("outcome", opts.outcomeId),
+    user_id: opts.userId,
+    subject_id: opts.outcomeId,
+    outcome_id: opts.outcomeId,
+    ...(opts.decisionId ? { decision_id: opts.decisionId } : {}),
+    ...(opts.runId ? { run_id: opts.runId } : {}),
+    ...(opts.quality ? { status: opts.quality } : {}),
+    ...(opts.summary ? { summary: opts.summary } : {}),
+    ...(Object.keys(meta).length ? { metadata: meta } : {}),
+  });
+}
+
+export async function recordOutcomeAuditCritical(opts: {
+  userId: string;
+  outcomeId: string;
+  decisionId?: string;
+  runId?: string;
+  quality?: string;
+  adherence?: number | null;
+  summary?: string;
+}): Promise<RecordCriticalAuditResult> {
+  const meta: Record<string, string | number | boolean | null> = {};
+  if (opts.quality) meta["quality"] = opts.quality;
+  if (opts.adherence != null) meta["adherence"] = opts.adherence;
+  return recordCriticalAudit({
+    kind: "outcome",
+    audit_id: stableCriticalAuditId("outcome", opts.outcomeId),
     user_id: opts.userId,
     subject_id: opts.outcomeId,
     outcome_id: opts.outcomeId,
@@ -231,6 +333,36 @@ export function recordLearningEventAudit(opts: {
   if (opts.blocked != null) meta["blocked_by_guardrail"] = opts.blocked;
   return recordAudit({
     kind: "learning_event",
+    audit_id: stableCriticalAuditId("learning_event", opts.eventId),
+    user_id: opts.userId,
+    subject_id: opts.eventId,
+    learning_event_id: opts.eventId,
+    ...(opts.decisionId ? { decision_id: opts.decisionId } : {}),
+    ...(opts.outcomeId ? { outcome_id: opts.outcomeId } : {}),
+    ...(opts.runId ? { run_id: opts.runId } : {}),
+    ...(opts.summary ? { summary: opts.summary } : {}),
+    ...(Object.keys(meta).length ? { metadata: meta } : {}),
+  });
+}
+
+export async function recordLearningEventAuditCritical(opts: {
+  userId: string;
+  eventId: string;
+  decisionId?: string;
+  outcomeId?: string;
+  runId?: string;
+  kind?: string;
+  confidence?: number;
+  blocked?: boolean;
+  summary?: string;
+}): Promise<RecordCriticalAuditResult> {
+  const meta: Record<string, string | number | boolean | null> = {};
+  if (opts.kind) meta["learning_kind"] = opts.kind;
+  if (opts.confidence != null) meta["confidence"] = opts.confidence;
+  if (opts.blocked != null) meta["blocked_by_guardrail"] = opts.blocked;
+  return recordCriticalAudit({
+    kind: "learning_event",
+    audit_id: stableCriticalAuditId("learning_event", opts.eventId),
     user_id: opts.userId,
     subject_id: opts.eventId,
     learning_event_id: opts.eventId,
@@ -260,6 +392,39 @@ export function auditLearningCycleResult(opts: {
   for (const e of opts.events) {
     out.push(
       recordLearningEventAudit({
+        userId: opts.userId,
+        eventId: e.event_id,
+        ...(e.decision_id ? { decisionId: e.decision_id } : {}),
+        ...(e.outcome_id ? { outcomeId: e.outcome_id } : {}),
+        ...(opts.runId ? { runId: opts.runId } : {}),
+        kind: e.kind,
+        confidence: e.confidence,
+        blocked: Boolean(e.blocked_by_guardrail),
+        ...(opts.signals?.[0]?.narrative ? { summary: opts.signals[0].narrative } : {}),
+      }),
+    );
+  }
+  return out;
+}
+
+/** Awaited Learning cycle audits (FASE 22.6). */
+export async function auditLearningCycleResultCritical(opts: {
+  userId: string;
+  runId?: string;
+  events: Array<{
+    event_id: string;
+    kind: string;
+    decision_id?: string;
+    outcome_id?: string;
+    confidence: number;
+    blocked_by_guardrail?: boolean;
+  }>;
+  signals?: Array<{ signalId: string; narrative: string; confidence: number }>;
+}): Promise<RecordCriticalAuditResult[]> {
+  const out: RecordCriticalAuditResult[] = [];
+  for (const e of opts.events) {
+    out.push(
+      await recordLearningEventAuditCritical({
         userId: opts.userId,
         eventId: e.event_id,
         ...(e.decision_id ? { decisionId: e.decision_id } : {}),

@@ -76,4 +76,8 @@ export class InMemoryVectorStore implements VectorStore {
   async size(): Promise<number> {
     return knowledgeStoreSize();
   }
+
+  async ping(): Promise<boolean> {
+    return true;
+  }
 }

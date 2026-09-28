@@ -1,72 +1,77 @@
 # AI Production Readiness Report
 
-Generated: 2026-09-27T20:25:54.625Z
-Report version: fase21_v1
-**production_ready: true (migrations verified)**
+Generated: 2026-09-28T02:44:05.915Z
+Report version: fase22_7_v1
+Commit: `07b42504cedeaafaf6bb25d1e84ed662eedc2bfe`
+Environment: **local**
+**production_ready: false**
 
-## Migrations probe (remote Fit Companion `zphtvrsxlhfgltwgbreu`)
-
-| Table | Status |
-|-------|--------|
-| `ai_audit_events` | **applied** |
-| `ai_user_memory` | **applied** |
-| `ai_decision_memory` | **applied** |
-| `ai_outcome_memory` | **applied** |
-| `ai_learning_events` | **applied** |
-| `ai_knowledge_sources` | **applied** |
-| `ai_knowledge_documents` | **applied** |
-| `ai_knowledge_chunks` | **applied** |
+## Test suite
 
 ```json
 {
-  "checked_at": "2026-09-27T20:25:54.625Z",
-  "tables": [
-    {
-      "table": "ai_audit_events",
-      "status": "applied"
-    },
-    {
-      "table": "ai_user_memory",
-      "status": "applied"
-    },
-    {
-      "table": "ai_decision_memory",
-      "status": "applied"
-    },
-    {
-      "table": "ai_outcome_memory",
-      "status": "applied"
-    },
-    {
-      "table": "ai_learning_events",
-      "status": "applied"
-    },
-    {
-      "table": "ai_knowledge_sources",
-      "status": "applied"
-    },
-    {
-      "table": "ai_knowledge_documents",
-      "status": "applied"
-    },
-    {
-      "table": "ai_knowledge_chunks",
-      "status": "applied"
-    }
-  ],
-  "all_applied": true,
-  "any_unavailable": false
+  "executed": true,
+  "ok": true,
+  "passed": 28,
+  "failed": 0,
+  "duration_ms": 8386,
+  "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
+  "error": null
 }
 ```
 
-## Deploy notes (2026-09-27)
+## Critical gates
 
-- FASE 9 memory + FASE 11 `ai_audit_events` — already present
-- FASE 16 `ai_knowledge_*` + `vector` — **applied** via SQL Editor
-- FASE 19 `ai_audit_events_kind_check` (+ `ai_gateway`, `proposal_merge`) — **applied** via SQL Editor
+```json
+{
+  "critical_safety": 1,
+  "proposal_validity": 1,
+  "tool_authorization": 1
+}
+```
 
-## Checklist (code certification)
+## Checks
 
-Run `npm run cert:ai` for local suites. Critical security/authz/integrity suites remain in `src/ai/certification/`.
+- [x] Identity (`identity`) — **PASS** (critical)
+- [x] Authorization (`authorization`) — **PASS** (critical)
+- [x] Context (`context`) — **PASS**
+- [x] Safety (`safety`) — **PASS** (critical)
+- [x] Decision Engine (`decision_engine`) — **PASS** (critical)
+- [x] Proposal Contract (`proposal_contract`) — **PASS** (critical)
+- [x] Tools (`tools`) — **PASS** (critical)
+- [x] Skills (`skills`) — **PASS**
+- [ ] RAG (`rag`) — **DEGRADED** (critical) — corpus:docs=0 min=20 expected_corpus=20
+- [x] Memory (`memory`) — **PASS** (critical)
+- [x] LLM Gateway (`llm`) — **PASS** (critical)
+- [x] Audit (`audit`) — **PASS** (critical)
+- [ ] Database (`database`) — **BLOCKED** (critical) — MIGRATION_VERIFICATION_BLOCKED
+- [ ] Rate Limit (`rate_limit`) — **BLOCKED** — RATE_LIMIT_VERIFICATION_BLOCKED
+- [x] Kill Switch (`kill_switch`) — **PASS** (critical)
+- [x] Rollback (`rollback`) — **PASS** (critical)
+- [ ] Migrations (`migrations`) — **BLOCKED** (critical) — MIGRATION_VERIFICATION_BLOCKED
+- [ ] E2E Bridge (`e2e`) — **BLOCKED** (critical) — PRODUCTION_E2E_BLOCKED
+- [x] Cost Bounds (`cost`) — **PASS** (critical)
 
-> Migrations remotas verificadas via service_role REST probe (HTTP 200 = applied).
+## Failures
+- rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20
+- database:BLOCKED:MIGRATION_VERIFICATION_BLOCKED
+- migrations:BLOCKED:MIGRATION_VERIFICATION_BLOCKED
+- e2e:BLOCKED:PRODUCTION_E2E_BLOCKED
+
+## Warnings
+- rate_limit:BLOCKED
+
+## Evidence
+
+```json
+{
+  "probe_count": 19,
+  "critical_count": 16,
+  "pass_count": 14,
+  "untested_count": 0,
+  "blocked_count": 4,
+  "fail_count": 0
+}
+```
+
+> UNTESTED ≠ PASS. SKIPPED ≠ PASS. Only EXECUTED + PASS satisfies a gate. Do not declare production-ready without a real certification run.
