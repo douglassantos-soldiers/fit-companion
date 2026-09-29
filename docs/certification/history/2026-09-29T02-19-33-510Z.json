@@ -1,8 +1,8 @@
 {
   "report_version": "fase23_10_v1",
-  "timestamp": "2026-09-29T02:19:57.859Z",
+  "timestamp": "2026-09-29T02:19:33.510Z",
   "commit_sha": "75be7d63ce41503cf7a94bd962b035c203d450cf",
-  "environment": "local",
+  "environment": "LOCAL_TEST",
   "production_ready": true,
   "checks": [
     {
@@ -10,119 +10,119 @@
       "name": "Identity",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:04.155Z",
+      "executed_at": "2026-09-29T02:19:41.108Z",
       "duration_ms": 1,
       "evidence": {
         "client_user_ignored": true,
         "cross_user_forbidden": true
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "authorization",
       "name": "Authorization",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:04.156Z",
-      "duration_ms": 3,
+      "executed_at": "2026-09-29T02:19:41.109Z",
+      "duration_ms": 4,
       "evidence": {
         "unauthorized_tool_denied": true,
         "tool": "admin_wipe_everything"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "context",
       "name": "Context",
       "status": "PASS",
       "critical": false,
-      "executed_at": "2026-09-29T02:20:04.159Z",
-      "duration_ms": 288,
+      "executed_at": "2026-09-29T02:19:41.113Z",
+      "duration_ms": 319,
       "evidence": {
         "fingerprint": "v1:cb53ac50",
         "training_mode": "full"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "safety",
       "name": "Safety",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:04.447Z",
-      "duration_ms": 226,
+      "executed_at": "2026-09-29T02:19:41.433Z",
+      "duration_ms": 275,
       "evidence": {
         "rejected": true,
         "reason": "escalate_requires_rest_aligned"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "decision_engine",
       "name": "Decision Engine",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:04.674Z",
-      "duration_ms": 218,
+      "executed_at": "2026-09-29T02:19:41.709Z",
+      "duration_ms": 216,
       "evidence": {
         "decision_id": "dec_cf1490e5",
         "forged_not_copied": true
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "proposal_contract",
       "name": "Proposal Contract",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:04.892Z",
-      "duration_ms": 402,
+      "executed_at": "2026-09-29T02:19:41.925Z",
+      "duration_ms": 216,
       "evidence": {
         "invalid_context_rejected": true,
         "reason": "context_fingerprint_mismatch"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "tools",
       "name": "Tools",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:05.294Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T02:19:42.141Z",
+      "duration_ms": 0,
       "evidence": {
         "deny_ok": true
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "skills",
       "name": "Skills",
       "status": "PASS",
       "critical": false,
-      "executed_at": "2026-09-29T02:20:05.295Z",
-      "duration_ms": 556,
+      "executed_at": "2026-09-29T02:19:42.142Z",
+      "duration_ms": 844,
       "evidence": {
         "skill_count": 19,
         "ran": "analyze_training"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "rag",
       "name": "RAG",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:05.851Z",
-      "duration_ms": 311,
+      "executed_at": "2026-09-29T02:19:42.986Z",
+      "duration_ms": 395,
       "evidence": {
         "RAG_READY": true,
         "environment": "production",
@@ -130,15 +130,15 @@
         "reasons": null
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "memory",
       "name": "Memory",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.163Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T02:19:43.381Z",
+      "duration_ms": 4,
       "evidence": {
         "MEMORY_READY": true,
         "environment": "test",
@@ -146,15 +146,15 @@
         "reasons": null
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "llm",
       "name": "LLM Gateway",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.164Z",
-      "duration_ms": 0,
+      "executed_at": "2026-09-29T02:19:43.385Z",
+      "duration_ms": 2,
       "evidence": {
         "LLM_READY": true,
         "environment": "test",
@@ -162,15 +162,15 @@
         "reasons": null
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "audit",
       "name": "Audit",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.164Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T02:19:43.387Z",
+      "duration_ms": 2,
       "evidence": {
         "persisted": true,
         "audit_id": "audit_decision_dec_cert_audit",
@@ -178,45 +178,45 @@
         "store_size": 1
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "database",
       "name": "Database",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.165Z",
-      "duration_ms": 653,
+      "executed_at": "2026-09-29T02:19:43.389Z",
+      "duration_ms": 509,
       "evidence": {
         "verdict": "PASS",
         "check_count": 60,
         "critical_drift": "none"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "rate_limit",
       "name": "Rate Limit",
       "status": "PASS",
       "critical": false,
-      "executed_at": "2026-09-29T02:20:06.818Z",
-      "duration_ms": 43,
+      "executed_at": "2026-09-29T02:19:43.898Z",
+      "duration_ms": 88,
       "evidence": {
         "tripped": true,
         "user_rpm": 2,
         "readiness": "PASS"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "kill_switch",
       "name": "Kill Switch",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.862Z",
-      "duration_ms": 20,
+      "executed_at": "2026-09-29T02:19:43.986Z",
+      "duration_ms": 180,
       "evidence": {
         "mode": "deterministic",
         "force": true,
@@ -225,64 +225,64 @@
         "readiness": "PASS"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "rollback",
       "name": "Rollback",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.882Z",
+      "executed_at": "2026-09-29T02:19:44.166Z",
       "duration_ms": 0,
       "evidence": {
         "effective_mode": "deterministic"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "migrations",
       "name": "Migrations",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:06.882Z",
-      "duration_ms": 439,
+      "executed_at": "2026-09-29T02:19:44.166Z",
+      "duration_ms": 427,
       "evidence": {
         "file_count": 54,
         "remote_verdict": "PASS",
         "check_count": 60
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "e2e",
       "name": "E2E Bridge",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:07.321Z",
-      "duration_ms": 3567,
+      "executed_at": "2026-09-29T02:19:44.593Z",
+      "duration_ms": 4458,
       "evidence": {
         "production_e2e": "PASS",
         "decision_id": "dec_32533c85",
         "run_id": "prod_17yejue"
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     },
     {
       "check_id": "cost",
       "name": "Cost Bounds",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T02:20:10.888Z",
-      "duration_ms": 0,
+      "executed_at": "2026-09-29T02:19:49.051Z",
+      "duration_ms": 1,
       "evidence": {
         "orchestrator_max": 80,
         "gateway_max_tokens": 900
       },
       "error": null,
-      "environment": "local"
+      "environment": "LOCAL_TEST"
     }
   ],
   "failures": [],
@@ -300,7 +300,7 @@
     "ok": true,
     "passed": 28,
     "failed": 0,
-    "duration_ms": 6296,
+    "duration_ms": 7596,
     "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
     "error": null
   },
