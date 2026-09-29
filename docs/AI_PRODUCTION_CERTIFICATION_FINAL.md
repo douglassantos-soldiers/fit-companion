@@ -1,8 +1,8 @@
 # AI Production Certification FINAL (FASE 22.13)
 
-Generated: 2026-09-29T02:19:57.173Z
+Generated: 2026-09-29T02:33:22.145Z
 Report version: `fase22_13_v1`
-Commit: `75be7d63ce41503cf7a94bd962b035c203d450cf`
+Commit: `b28bd6cb73460816f6f3db3545d4fd23ccf58eaa`
 Environment: **local**
 Runtime: `CANONICAL`
 Governance: `governance_v1` / contract `1`
@@ -14,8 +14,8 @@ Governance: `governance_v1` / contract `1`
 
 1. **O que foi testado?** Probes de certificação (FASE 22.7), readiness DB/RL/KS/E2E (22.9–22.12), runtime canônico, agents, evaluation suite, CI gate.
 2. **Onde foi testado?** `local` (projeto Lovable/Fit Companion `47f1291e-…` quando secrets presentes).
-3. **Quando foi testado?** `2026-09-29T02:19:57.173Z`
-4. **Qual commit?** `75be7d63ce41503cf7a94bd962b035c203d450cf`
+3. **Quando foi testado?** `2026-09-29T02:33:22.145Z`
+4. **Qual commit?** `b28bd6cb73460816f6f3db3545d4fd23ccf58eaa`
 5. **Qual environment?** `local`
 6. **Qual runtime?** `CANONICAL`
 7. **Quais providers?** PASS:{LLM_READY,environment,primary,reasons}
@@ -146,7 +146,7 @@ Derivado **exclusivamente** de checks executados (critical EXECUTED+PASS + suite
   "ok": true,
   "passed": 28,
   "failed": 0,
-  "duration_ms": 6296,
+  "duration_ms": 6213,
   "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
   "error": null
 }
