@@ -10,7 +10,7 @@ export type ProbeContext = {
 
 export type ProbeOutcome = {
   status: CertStatus;
-  evidence?: Record<string, string | number | boolean | null>;
+  evidence?: Record<string, string | number | boolean | null | undefined>;
   error?: string | null;
 };
 
