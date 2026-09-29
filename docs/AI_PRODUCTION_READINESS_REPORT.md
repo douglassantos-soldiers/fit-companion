@@ -1,10 +1,10 @@
 # AI Production Readiness Report
 
-Generated: 2026-09-29T02:33:22.307Z
+Generated: 2026-09-29T22:16:29.450Z
 Report version: fase23_10_v1
-Commit: `b28bd6cb73460816f6f3db3545d4fd23ccf58eaa`
-Environment: **local**
-**production_ready: true**
+Commit: `1a1449b75a9c01de49c98f5a56f20bf6a9d5cfeb`
+Environment: **LOCAL_TEST**
+**production_ready: false**
 
 ## Test suite
 
@@ -14,8 +14,8 @@ Environment: **local**
   "ok": true,
   "passed": 28,
   "failed": 0,
-  "duration_ms": 6213,
-  "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
+  "duration_ms": 7702,
+  "command": "node /dev-server/node_modules/vitest/vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=/dev-server/docs/certification/vitest-suite.json",
   "error": null
 }
 ```
@@ -40,7 +40,7 @@ Environment: **local**
 - [x] Proposal Contract (`proposal_contract`) — **PASS** (critical)
 - [x] Tools (`tools`) — **PASS** (critical)
 - [x] Skills (`skills`) — **PASS**
-- [x] RAG (`rag`) — **PASS** (critical)
+- [ ] RAG (`rag`) — **DEGRADED** (critical) — corpus:docs=0 min=20 expected_corpus=20
 - [x] Memory (`memory`) — **PASS** (critical)
 - [x] LLM Gateway (`llm`) — **PASS** (critical)
 - [x] Audit (`audit`) — **PASS** (critical)
@@ -53,7 +53,7 @@ Environment: **local**
 - [x] Cost Bounds (`cost`) — **PASS** (critical)
 
 ## Failures
-- (none)
+- rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20
 
 ## Warnings
 - (none)
@@ -64,7 +64,7 @@ Environment: **local**
 {
   "probe_count": 19,
   "critical_count": 16,
-  "pass_count": 19,
+  "pass_count": 18,
   "untested_count": 0,
   "blocked_count": 0,
   "fail_count": 0

@@ -1,12 +1,12 @@
 # AI Production Certification FINAL (FASE 22.13)
 
-Generated: 2026-09-29T02:33:22.145Z
+Generated: 2026-09-29T22:16:28.439Z
 Report version: `fase22_13_v1`
-Commit: `b28bd6cb73460816f6f3db3545d4fd23ccf58eaa`
+Commit: `1a1449b75a9c01de49c98f5a56f20bf6a9d5cfeb`
 Environment: **local**
 Runtime: `CANONICAL`
 Governance: `governance_v1` / contract `1`
-**production_ready: true**
+**production_ready: false**
 
 > UNTESTED ≠ PASS. BLOCKED ≠ PASS. DEGRADED ≠ PASS. Sem score geral. Evidência só de execução.
 
@@ -14,17 +14,17 @@ Governance: `governance_v1` / contract `1`
 
 1. **O que foi testado?** Probes de certificação (FASE 22.7), readiness DB/RL/KS/E2E (22.9–22.12), runtime canônico, agents, evaluation suite, CI gate.
 2. **Onde foi testado?** `local` (projeto Lovable/Fit Companion `47f1291e-…` quando secrets presentes).
-3. **Quando foi testado?** `2026-09-29T02:33:22.145Z`
-4. **Qual commit?** `b28bd6cb73460816f6f3db3545d4fd23ccf58eaa`
+3. **Quando foi testado?** `2026-09-29T22:16:28.439Z`
+4. **Qual commit?** `1a1449b75a9c01de49c98f5a56f20bf6a9d5cfeb`
 5. **Qual environment?** `local`
 6. **Qual runtime?** `CANONICAL`
 7. **Quais providers?** PASS:{LLM_READY,environment,primary,reasons}
 8. **Quais bancos?** Status DB/migrations: migrations=PASS; database=PASS; side=PASS / database check: ver matriz.
 9. **Quais migrations?** Ver side artifact `database-readiness` + check `migrations` — migrations=PASS; database=PASS; side=PASS
-10. **Quais riscos?** Critical não-PASS: (nenhum listado — ainda assim production_ready só se todos PASS)
-11. **Componentes degradados?** (nenhum)
-12. **Testes que falharam?** (nenhum)
-13. **Não executados / bloqueados?** UNTESTED: (nenhum); BLOCKED/DEGRADED: (nenhum)
+10. **Quais riscos?** Critical não-PASS: rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20; ci_cd:FAIL:ci_gate_exit_1
+11. **Componentes degradados?** rag
+12. **Testes que falharam?** ci_cd
+13. **Não executados / bloqueados?** UNTESTED: (nenhum); BLOCKED/DEGRADED: rag
 14. **Evidência de cada PASS?** Coluna Evidence da matriz + `evidence` JSON no final deste doc.
 
 ## 2. Production Readiness Matrix
@@ -43,13 +43,13 @@ Governance: `governance_v1` / contract `1`
 | agents | `agents` | **PASS** | {"registered":6,"specialist_id":"specialist_training","specialist_ok":true,"n... | yes | no |
 | skills | `skills` | **PASS** | {"skill_count":19,"ran":"analyze_training"} | yes | no |
 | tools | `tools` | **PASS** | {"deny_ok":true} | yes | no |
-| rag | `rag` | **PASS** | {"RAG_READY":true,"environment":"production","store_id":"supabase_pgvector_v1... | yes | no |
+| rag | `rag` | **DEGRADED** | {"RAG_READY":false,"environment":"test","store_id":"memory_v1","reasons":"cor... | yes | yes |
 | memory | `memory` | **PASS** | {"MEMORY_READY":true,"environment":"test","store_id":"memory_v1","reasons":null} | yes | no |
 | llm | `llm` | **PASS** | {"LLM_READY":true,"environment":"test","primary":"openai","reasons":null} | yes | no |
 | llm | `cost` | **PASS** | {"orchestrator_max":80,"gateway_max_tokens":900} | yes | no |
 | audit | `audit` | **PASS** | {"persisted":true,"audit_id":"audit_decision_dec_cert_audit","durability":"cr... | yes | no |
 | evaluation | `evaluation` | **PASS** | {"suite":"test:eval","files":"src/ai/governance/evaluation.test.ts,src/ai/gov... | yes | no |
-| ci_cd | `ci_cd` | **PASS** | {"workflow":true,"script":true,"latest":true,"gate_stdout_class":"PASS","gate... | yes | no |
+| ci_cd | `ci_cd` | **FAIL** | {"workflow_has_gates":true,"gate_stdout_class":"FAIL","gate_exit":1} | yes | yes |
 | database | `database` | **PASS** | {"verdict":"PASS","check_count":60,"critical_drift":"none"} | yes | no |
 | database | `migrations` | **PASS** | {"file_count":54,"remote_verdict":"PASS","check_count":60} | yes | no |
 | rate_limiting | `rate_limit` | **PASS** | {"tripped":true,"user_rpm":2,"readiness":"PASS"} | yes | no |
@@ -58,11 +58,11 @@ Governance: `governance_v1` / contract `1`
 
 ## 3. Failed Checks
 
-- (none)
+- `ci_cd` — ci_gate_exit_1
 
 ## 4. Blocked / Degraded Checks
 
-- (none)
+- `rag` — **DEGRADED** corpus:docs=0 min=20 expected_corpus=20
 
 ## 5. Untested Checks
 
@@ -74,7 +74,8 @@ Governance: `governance_v1` / contract `1`
 
 ## 7. Failures (gate list)
 
-- (none)
+- rag:DEGRADED:corpus:docs=0 min=20 expected_corpus=20
+- ci_cd:FAIL:ci_gate_exit_1
 
 ## 8. Evidence
 
@@ -82,7 +83,7 @@ Governance: `governance_v1` / contract `1`
 {
   "probe_count": 19,
   "critical_count": 16,
-  "pass_count": 19,
+  "pass_count": 18,
   "untested_count": 0,
   "blocked_count": 0,
   "fail_count": 0,
@@ -118,7 +119,7 @@ PASS:{LLM_READY,environment,primary,reasons}
 
 ## 13. RAG status
 
-PASS:{RAG_READY,environment,store_id,reasons}
+DEGRADED:{RAG_READY,environment,store_id,reasons}
 
 ## 14. Memory status
 
@@ -134,7 +135,7 @@ PASS:{production_e2e,decision_id,run_id}
 
 ## 17. Final production_ready
 
-`true`
+`false`
 
 Derivado **exclusivamente** de checks executados (critical EXECUTED+PASS + suite ok + gates 100%).
 
@@ -146,8 +147,8 @@ Derivado **exclusivamente** de checks executados (critical EXECUTED+PASS + suite
   "ok": true,
   "passed": 28,
   "failed": 0,
-  "duration_ms": 6213,
-  "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
+  "duration_ms": 8355,
+  "command": "node /dev-server/node_modules/vitest/vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=/dev-server/docs/certification/vitest-suite.json",
   "error": null
 }
 ```
