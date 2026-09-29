@@ -1,91 +1,130 @@
-# Auditoria técnica — Fases 15–21 (somente leitura)
+# Auditoria técnica — FASES 22.1–22.13 + Supabase (somente leitura)
 
-O HEAD atual é `01f52bb "Work in progress"`, que vem depois de `07b42504` (esse commit existe no histórico). Nenhum arquivo do projeto foi alterado. Esta é uma auditoria por amostragem das partes críticas, não uma leitura linha a linha.
+Nenhum arquivo, migration, configuração ou dado foi alterado. Consultas no banco remoto `zphtvrsxlhfgltwgbreu` foram feitas só com SELECT, e todas funcionaram.
 
-## Veredito geral
-A arquitetura está bem desenhada e tem contratos claros, mas boa parte dela só funciona dentro dos testes. No produto, o único caminho vivo é **Coach → runCoachAgent → authoritative bridge**. O fluxo Specialists → merge → Decision Engine, o RAG persistente e a Memory persistente não estão ligados a nenhuma rota. O relatório de certificação marca "pass" por padrão.
+## 1. Commit vs relatórios — FAIL
+- HEAD = `5ae6e72` ("Work in progress"), e o commit anterior é `88d237f` ("Ship AI FASE 22.1-22.13").
+- `docs/certification/latest.json` e `AI_PRODUCTION_READINESS_REPORT.md` apontam para `07b42504…`, que não aparece nos 3 últimos commits. O relatório é de outro commit e de `environment: local`, rodado numa máquina Windows (`C:\Users\Douglas…`).
 
-## Achados por fase
+## 2. Canonical runtime — WARN
+- `askAiCoach` (`src/lib/coach.functions.ts:224`) passa por `runCoachAgent → runProductionAiRuntime`. Isso é PASS.
+- Existem caminhos paralelos que chamam LLM direto, fora do runtime:
+  - `src/lib/meal-ai.functions.ts` (fetch direto, `gpt-4o`, linhas 61/102);
+  - `src/lib/coach/provider.ts` (`callCoachProvider`, fetch direto para OpenAI/Anthropic, exportado em `src/lib/coach/index.ts`).
+- `runAiE2EPipeline` (harness de teste) também é exportado por `src/ai/index.ts`.
 
-### FASE 15 — E2E
-- **ALTO**: `runAiE2EPipeline` (`src/ai/e2e/run-pipeline.ts`, 737 linhas) só é importado por `src/ai/index.ts`, `src/ai/e2e/*` e testes. Nenhuma rota, `lib/*.functions.ts` ou página o chama. A cadeia completa fecha no harness, não em produção.
-- **MÉDIO**: no produto, o Coach (`src/lib/coach.functions.ts`) passa por identity → context → runCoachAgent → bridge. Tracking, `touchCoachSession` e `upsertCoachMemory` rodam como `void` (best-effort), então Memory/Outcome não são garantidos por requisição.
+## 3. Decision Engine como única autoridade — BLOCKED/UNVERIFIED
+- Não foi revisto linha a linha nesta rodada.
+- `meal-ai` produz saída de IA sem passar pelo Decision Engine. Isso é WARN para esse fluxo.
 
-### FASE 16 — RAG
-- **CRÍTICO**: `resolveVectorStoreFromEnv()` (`src/ai/rag/core/vector-store.ts:52-70`) usa `memory` por padrão. Com `AI_RAG_STORE=supabase`, qualquer exceção ou `store == null` cai **silenciosamente** para `InMemoryVectorStore`, sem log nem audit.
-- **ALTO**: `getVectorStore()` cria um store em memória vazio quando nada foi registrado. `register.ts` / `resolveVectorStoreFromEnv` não são chamados fora de `src/ai/rag/*`, então o seed do corpus não acontece no runtime do produto. Em Worker, a memória também não sobrevive entre instâncias.
-- **MÉDIO**: `src/ai/memory/register.ts` registra só `InMemoryMemoryStore`. O adapter Supabase existe (`store/supabase.ts`), mas não é selecionado.
+## 4. Identity / authz / RLS — WARN
+- `askAiCoach` exige `readAccessSession()` e `assertSecurityConfiguration()`. PASS.
+- Remoto: as 9 tabelas `ai_*` têm RLS ligada, **0 policies** e nenhum SELECT para anon/authenticated. Isso é deny-by-default, correto para acesso só via service_role.
+- `profiles`, `app_state` e `sessions` têm 4 policies e SELECT só para authenticated. Não há mais acesso anon, o que diverge do modo "device_id sem login" criado antes: é preciso confirmar se o app ainda consegue sincronizar.
 
-### FASE 17 — Gateway
-- **POSITIVO**: não achei chamada direta a `api.openai.com` / `api.anthropic.com` em `src/`; o `askAiCoach` legado com fetch direto foi removido.
-- **ALTO**: `run-specialist.ts:369-413` chama `invokeAI` só se `AI_RUNTIME_MODE` for `hybrid` ou `llm`. O padrão é `deterministic` (`runtime-mode.ts`). Os Specialists não rodam no produto, então o LLM real não é exercido de ponta a ponta.
-- **MÉDIO**: token e custo são registrados como estimativa (o próprio relatório diz "LLM cost is proxy/estimated"). O Coach registra `provider:"coach_agent", model:"runCoachAgent"`, não o modelo/request_id real (`coach.functions.ts:331-335`).
-- **MÉDIO**: `dependencies` pede `OPENAI_API_KEY`. As chaves configuradas antes foram recusadas pelos provedores. Não há verificação de chave válida na certificação.
+## 5. Agents / Skills / Tools / MCP — BLOCKED/UNVERIFIED
+- Só há evidência de testes locais (probes `tools`/`authorization` PASS em ambiente local).
+- Não há prova de produção.
 
-### FASE 18 — Specialists → Proposal → Decision
-- **ALTO**: `runSpecialistsDecisionPipeline` não aparece em `src/lib`, `src/routes` nem `src/features`. A integração só existe no harness e nos testes (`decision-pipeline.test.ts`).
+## 6. RAG — FAIL
+- Remoto: extensão `vector` instalada. As tabelas `ai_knowledge_sources`, `ai_knowledge_documents` e `ai_knowledge_chunks` existem, mas as contagens são **0 / 0 / 0**, com **0 embeddings**.
+- O corpus nunca foi semeado (`scripts/seed-rag-corpus.ts` não rodou contra o remoto).
+- O relatório já marca DEGRADED, o que é consistente.
 
-### FASE 19 — Governance Console
-- **POSITIVO**: o acesso passa por `requireAdminSession(GOV_CONSOLE_ROLES)` (`governance-console-auth.ts`). A paginação usa cursor quando a fonte é o banco.
-- **MÉDIO**: no fallback em memória, `next_cursor` é sempre `null` e o limite é 200 (`governance-console.functions.ts:84-89`). Algumas consultas pedem `limit: 500`, o que é inconsistente com esse teto. O console pode mostrar dados parciais sem avisar.
-- **BAIXO**: o gate do console roda no cliente, com `useEffect`. Os dados são protegidos no servidor, mas o shell aparece antes da checagem.
+## 7. Memory — WARN
+- As tabelas existem com RLS. `ai_user_memory` tem 0 linhas.
+- A persistência após restart não pode ser provada: não há nenhuma escrita real.
+- `registerMemoryInfrastructure` em produção faz o bootstrap assíncrono sem `await`. Uma primeira requisição pode chegar antes do store estar pronto.
 
-### FASE 20 — Evaluation / CI
-- **ALTO**: `.github/workflows/ai-eval.yml` roda só `test:eval` (2 arquivos). Não roda `cert:ai`, typecheck, lint, a suíte completa nem build. O próprio audit registra typecheck quebrado desde antes.
-- **MÉDIO**: o gatilho só dispara com mudanças em `src/ai/**`. Mudanças em `src/lib/engine/*` (Decision Engine / Living Plan) ou em `coach.functions.ts` não acionam o gate.
-- **MÉDIO**: o golden dataset é pequeno (o teste exige `>= 9` casos) e roda em modo determinístico. Ele não mede regressão de saída do LLM.
+## 8. LLM Gateway — WARN
+- `OPENAI_API_KEY` e `ANTHROPIC_API_KEY` existem, mas já foram recusadas antes (valores inválidos). Status atual não verificado.
+- `AI_RUNTIME_MODE` não está definido em lugar nenhum. O padrão é `deterministic`, então em produção o LLM fica desligado.
+- Mock é proibido em produção (`registry.ts`, `env.ts`). PASS.
+- Existe timeout (`gateway.ts:237`). Retry e custo têm limites em `cost-bounds.ts`.
+- Os modelos estão fixos (`gpt-4o-mini`, `claude-sonnet-4-20250514`).
 
-### FASE 21 — Certificação
-- **CRÍTICO**: em `readiness.ts:75-120`, 19 dos 20 itens do checklist usam `o[id] ?? "pass"`. Eles não sondam nada: identity, safety, tools, audit e rollback aparecem como aprovados por padrão.
-- **CRÍTICO**: `run-certification.ts:13` fixa `test_suite_ok: true`. A falha de testes nunca rebaixa o relatório.
-- **ALTO**: se as tabelas remotas existirem, `production_ready` fica `true`, mesmo com RAG em memória, Specialists desligados, rate limit em processo único e sem outbox. Esses pontos aparecem em `risks`, mas não bloqueiam.
-- **ALTO**: o audit crítico é `void persistCriticalAiAudit(event)` (`persist.server.ts:253`). O comentário diz "critical awaits", mas o código não aguarda. Não há outbox durável e o evento pode se perder quando o Worker termina.
-- **MÉDIO**: o rate limit é em memória por instância (reconhecido no próprio relatório). O kill-switch `AI_FORCE_DETERMINISTIC` depende de env e não foi testado em deploy.
+## 9. Audit crítico — WARN
+- `persist.server.ts` trata `critical` e não considera "DB indisponível" como sucesso. PASS no código.
+- Remoto: `ai_audit_events` tem **0 linhas**. Nunca houve auditoria real gravada.
 
-### Item 8 — Inconsistências documentais
-- Alguns docs descrevem RAG, Memory e Specialists como camadas de produção, mas o runtime usa memória ou harness.
-- `docs/security-audit-identity-ai.md` diz que o projeto "não estava no MCP" e que as migrations devem ser aplicadas via CLI. Não há prova de que foram aplicadas.
-- `supabase/DEPLOY_*.sql` ainda reabrem `USING(true)`. Rodar esses arquivos por engano desfaz o hardening.
+## 10. Rate limit distribuído — WARN
+- A RPC `ai_rate_limit_consume` existe no remoto, é SECURITY DEFINER e anon não pode executá-la. PASS.
+- `ai_rate_limit_buckets` tem 0 linhas, então nunca foi exercitada.
+- `askAiCoach` muda `process.env` em runtime (`AI_RL_API_RPM`) para passar parâmetros. Com requisições simultâneas, uma pode sobrescrever a outra (condição de corrida).
 
-### Item 9 — Data integrity
-- **POSITIVO**: `data-integrity.test.ts` bloqueia nomes proibidos em `agents/gateway/skills`. Memory bloqueia `source=llm`.
-- **MÉDIO**: a checagem é por string (`src.includes`). Um alias, um import indireto ou escrita via `supabase.from("...")` passam sem ser pegos. O teste não cobre `src/ai/mcp`, `src/ai/orchestrator` nem `src/lib/coach/tools.ts`.
+## 11. Kill switch / rollback — PASS (local) / UNVERIFIED (produção)
+- Os probes passam localmente. Não há flag real configurada no ambiente publicado.
 
-### Item 10 — Falso positivo de production_ready
-Sim, é possível: migrations aplicadas + `cost.ok` já dão `production_ready: true`, com RAG vazio, Specialists desligados, audit não durável e CI parcial.
+## 12. Certification runner — PASS com ressalva
+- UNTESTED, BLOCKED e DEGRADED não viram PASS (`certification-integrity.test.ts`). `production_ready: false` está correto.
+- Ressalva: o relatório não é do HEAD atual (ver item 1).
 
-## O que está realmente pronto
-- A identidade confiável (`resolveTrustedIdentity`) e a autorização por `user_id`.
-- O Coach passando pelo agent + bridge, sem fetch direto a provedores.
-- Os contratos, as proposals, o merge e a safety, validados em testes.
-- O gate admin do Governance Console no servidor.
-- O kill-switch por env e o modo determinístico como padrão.
+## 13. CI/CD gate — WARN
+- `ai-ci-gate-verdict.mjs`: um BLOCKED remoto sem service role sai com **exit 0** (linhas 7, 32–33, 149). O resultado é marcado "BLOCKED", mas o job não falha.
+- Um release que dependa apenas do exit code pode ser liberado com o banco não verificado.
 
-## O que está apenas arquitetado
-- O pipeline E2E completo.
-- Specialists → Decision no produto.
-- O RAG pgvector com seed.
-- A Memory persistente.
-- O LLM real nos Specialists.
-- O audit crítico durável.
-- O rate limit distribuído.
-- Uma certificação que sonde de verdade.
+## 14. Production E2E — BLOCKED
+- O relatório mostra `PRODUCTION_E2E_BLOCKED`. Não há evidência de execução em produção.
+- O app não está publicado.
 
-## 5 principais riscos
-1. A certificação dá `production_ready: true` por padrão (`"pass"` + `test_suite_ok: true`).
-2. O fallback silencioso de Supabase para memória no RAG, sem corpus semeado em produção.
-3. O audit crítico é fire-and-forget e não tem outbox.
-4. O CI parcial não cobre o Decision Engine, o Coach nem a certificação.
-5. Specialists → Decision e o LLM real não estão ligados no produto; os testes validam um caminho que o usuário não percorre.
+## 15. Migrations local vs remoto — PASS
+- Local: 54 arquivos, sendo o último `20261101120000_fase22_10_ai_rate_limits`.
+- Remoto: 54 versões aplicadas, máximo `20261101120000`. Os números batem.
+- O relatório diz "MIGRATION_VERIFICATION_BLOCKED" só porque rodou sem acesso ao banco. Divergência documental.
+- Existem arquivos SQL soltos fora das migrations (`supabase/DEPLOY_PENDING_FASE22.sql`, `DEPLOY_PENDING_HUBS.sql`, `DEPLOY_HARDEN_20260919.sql`). Não foi verificado se já estão cobertos pelas migrations.
 
-## Ordem técnica recomendada
-1. Certificação honesta: trocar os padrões `"pass"` por sondas reais (ou `"pending"`) e passar o `test_suite_ok` real.
-2. RAG: tornar o fallback explícito (erro em produção + audit), chamar o register/seed no boot do servidor e sondar o tamanho do corpus na certificação.
-3. Audit crítico: aguardar de fato (`await`) e criar uma tabela outbox com reprocessamento.
-4. CI: incluir `cert:ai`, a suíte completa, typecheck dos módulos AI e os paths `src/lib/engine/**` e `src/lib/coach*`.
-5. Ampliar o teste de data integrity (AST/imports, mais diretórios, `supabase.from` em tabelas de Decision/Living Plan).
-6. Ligar Specialists → Decision atrás de feature flag, com LLM real e registro de token/request_id do provedor.
-7. Rate limit distribuído (banco ou KV) e Memory Supabase selecionada por env com fallback explícito.
-8. Alinhar os docs ao runtime real e aposentar os `DEPLOY_*.sql`.
+## 16. Documentação vs código vs banco — WARN
+- Docs citam o commit `07b4250`, mas o HEAD é `5ae6e72`.
+- O relatório diz que as migrations estão BLOCKED, mas no remoto estão aplicadas.
+- Docs dão o RAG como pronto após o seed, mas o banco está vazio.
+- A doc da FASE 1 fala em "sem auth/device_id", mas as policies atuais exigem authenticated.
 
-Se aprovar, a implementação segue esta ordem.
+---
+
+## A) Matriz de readiness
+```text
+Item                 Status
+Commit/relatórios    FAIL
+Canonical runtime    WARN (caminhos paralelos)
+Decision authority   UNVERIFIED
+Identity/RLS         WARN
+Agents/Tools/MCP     UNVERIFIED
+RAG                  FAIL (corpus 0)
+Memory               WARN (0 escritas)
+LLM Gateway          WARN (modo deterministic, chaves duvidosas)
+Audit                WARN (0 eventos)
+Rate limit           WARN (corrida em process.env)
+Kill switch          PASS local
+Certification        PASS lógica / relatório desatualizado
+CI gate              WARN (BLOCKED = exit 0)
+Production E2E       BLOCKED
+Migrations           PASS (54 = 54)
+Docs x banco         WARN
+```
+
+## B) Prioridades
+- **P0:** semear o RAG no remoto. Validar as chaves de LLM e definir `AI_RUNTIME_MODE`. Fazer o CI falhar com BLOCKED crítico em branches de release. Rodar a certificação no HEAD com acesso ao banco.
+- **P1:** levar `meal-ai` e `callCoachProvider` para o runtime canônico, ou remover. Tirar a mutação de `process.env` do `askAiCoach`. Fazer `await` no bootstrap da Memory. Rodar o E2E de produção após publicar.
+- **P2:** reconciliar os `.sql` soltos. Atualizar os docs. Remover a exportação do harness E2E no barrel público. Revisar o conflito entre sync por device_id e as policies só-authenticated.
+
+## C) O que corrigir (lista exata)
+1. `scripts/seed-rag-corpus.ts` contra o remoto: meta de ≥20 docs com embeddings.
+2. Definir `AI_RUNTIME_MODE` e revalidar `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
+3. `scripts/ai-ci-gate-verdict.mjs`: BLOCKED crítico deve dar exit ≠ 0 em release.
+4. `src/lib/meal-ai.functions.ts` e `src/lib/coach/provider.ts`: passar pelo gateway/runtime.
+5. `src/lib/coach.functions.ts`: passar os limites como parâmetro, sem mexer em `process.env`.
+6. `src/ai/memory/register.ts`: garantir que o store esteja pronto antes de usar.
+7. Regenerar `docs/certification/*` no HEAD com acesso remoto.
+8. Conferir o sync do app contra as policies atuais de `profiles`, `app_state` e `sessions`.
+
+## D) Já pode ser considerado encerrado
+- Migrations aplicadas no remoto (54/54).
+- pgvector instalado.
+- Tabelas `ai_*` com RLS deny-by-default.
+- RPC de rate limit protegida.
+- Mock proibido em produção.
+- Lógica do runner (UNTESTED ≠ PASS).
+- Audit crítico sem falso sucesso no código.
+
+## E) Veredito
+**Não está production-ready.** A arquitetura está bem desenhada e o banco está provisionado. Mas não há nenhum dado operacional: RAG, audit, memory e rate limit estão todos vazios. O LLM está desligado por padrão, existem caminhos de IA paralelos e o CI deixa passar um BLOCKED. Por fim, a certificação não corresponde ao commit atual.
