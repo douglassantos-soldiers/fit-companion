@@ -17,7 +17,7 @@ export type MuscleGroup =
   | "core"
   | "cardio";
 
-export type Joint = "joelho" | "ombro" | "lombar" | "punho";
+export type Joint = "joelho" | "ombro" | "lombar" | "punho" | "tornozelo" | "cotovelo" | "quadril";
 
 export interface Exercise {
   id: string;
