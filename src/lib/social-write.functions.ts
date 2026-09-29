@@ -10,13 +10,15 @@ function parseOp(input: unknown): SocialWriteOp {
 const create = createServerFn({ method: "POST" }).inputValidator(parseOp);
 
 // Large SocialWriteOp union breaks TanStack Start ServerFn generic inference (pre-existing pattern).
+type SocialWriteCaller = (opts: { data: SocialWriteOp }) => Promise<Record<string, unknown>>;
+
 export const socialWriteFn = (
   create as unknown as {
     handler: (
       fn: (ctx: { data: SocialWriteOp }) => Promise<Record<string, unknown>>,
-    ) => typeof create;
+    ) => unknown;
   }
 ).handler(async ({ data }) => {
   const { executeSocialWrite } = await import("@/lib/social-write.server");
-  return executeSocialWrite(data);
-}) as typeof create;
+  return executeSocialWrite(data) as Promise<Record<string, unknown>>;
+}) as SocialWriteCaller;
