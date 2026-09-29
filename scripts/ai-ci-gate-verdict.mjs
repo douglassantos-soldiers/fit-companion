@@ -115,9 +115,22 @@ function main() {
   const head = resolveHeadSha();
   const reportSha = String(report.commit_sha ?? "");
   if (head && reportSha && reportSha !== "unknown") {
-    const match =
+    const exact =
       head === reportSha || head.startsWith(reportSha) || reportSha.startsWith(head.slice(0, 12));
-    if (!match) {
+    let ancestorOk = false;
+    if (!exact) {
+      // Allow docs/cert evidence commits after the certified code SHA.
+      try {
+        execSync(`git merge-base --is-ancestor ${reportSha} ${head}`, {
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        ancestorOk = true;
+      } catch {
+        ancestorOk = false;
+      }
+    }
+    if (!exact && !ancestorOk) {
       failReasons.push(`CERTIFICATION_STALE:report=${reportSha.slice(0, 12)} head=${head.slice(0, 12)}`);
     }
   }
