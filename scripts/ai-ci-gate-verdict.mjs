@@ -143,7 +143,8 @@ function main() {
               f === "docs/AI_CI_CD_GATES.md" ||
               f === "docs/AI_PRODUCTION_RUNBOOK.md" ||
               f === "docs/FASE_23_FINAL_STATUS.md" ||
-              f === "docs/FASE_23_READINESS_MATRIX.md",
+              f === "docs/FASE_23_READINESS_MATRIX.md" ||
+              f === "docs/FASE_23_SQL_RECONCILIATION.md",
           );
       } catch {
         evidenceOnlyOk = false;
