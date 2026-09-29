@@ -326,6 +326,8 @@ export async function runProductionE2E(
     idempotency = await runIdempotencyRemote();
 
     if (mode === "happy" || mode === "full") {
+      // Failures + isolation burn shared agent/tool RL buckets — clear again before happy.
+      resetAiRateLimitStoreForTests();
       happy = await runHappyPath(correlation);
     }
 
