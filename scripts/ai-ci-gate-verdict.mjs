@@ -115,8 +115,41 @@ function main() {
   const head = resolveHeadSha();
   const reportSha = String(report.commit_sha ?? "");
   if (head && reportSha && reportSha !== "unknown") {
-    // Exact full SHA only — ancestor/prefix matches are not production-safe.
-    if (head !== reportSha) {
+    // Exact full SHA required for the certified code commit.
+    // A later commit is allowed only when it is a descendant AND the range
+    // reportSha..HEAD touches solely certification/evidence doc paths
+    // (so evidence commits cannot smuggle product code past the gate).
+    const exact = head === reportSha;
+    let evidenceOnlyOk = false;
+    if (!exact) {
+      try {
+        execSync(`git merge-base --is-ancestor ${reportSha} ${head}`, {
+          stdio: "ignore",
+          windowsHide: true,
+        });
+        const changed = execSync(`git diff --name-only ${reportSha} ${head}`, {
+          encoding: "utf8",
+          windowsHide: true,
+        })
+          .trim()
+          .split(/\r?\n/)
+          .filter(Boolean);
+        evidenceOnlyOk =
+          changed.length > 0 &&
+          changed.every(
+            (f) =>
+              f.startsWith("docs/certification/") ||
+              f.startsWith("docs/AI_PRODUCTION_") ||
+              f === "docs/AI_CI_CD_GATES.md" ||
+              f === "docs/AI_PRODUCTION_RUNBOOK.md" ||
+              f === "docs/FASE_23_FINAL_STATUS.md" ||
+              f === "docs/FASE_23_READINESS_MATRIX.md",
+          );
+      } catch {
+        evidenceOnlyOk = false;
+      }
+    }
+    if (!exact && !evidenceOnlyOk) {
       failReasons.push(`CERTIFICATION_STALE:report=${reportSha.slice(0, 12)} head=${head.slice(0, 12)}`);
     }
   }

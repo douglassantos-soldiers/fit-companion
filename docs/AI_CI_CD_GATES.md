@@ -51,7 +51,7 @@ Script: [`scripts/ai-ci-gate-verdict.mjs`](../scripts/ai-ci-gate-verdict.mjs)
 | **BLOCKED** | Probes remotas BLOCKED/DEGRADED (DB/migrations/RAG sem secret) sem FAIL local | 0 |
 | **PASS** | `production_ready: true` e nenhum blocker | 0 |
 
-**SHA:** `commit_sha` do report deve ser **igual** ao `git rev-parse HEAD` (SHA completo). Ancestor ou prefix match **não** contam — re-certifique no HEAD atual após qualquer commit de evidência.
+**SHA:** `commit_sha` do report deve ser o SHA completo do commit de código certificado (`head === reportSha`). Commits posteriores só são aceitos se forem descendentes **e** o diff `reportSha..HEAD` tocar **apenas** paths de evidência (`docs/certification/**`, reports `docs/AI_PRODUCTION_*`, matriz/status FASE 23). Qualquer mudança de produto/código → `CERTIFICATION_STALE`.
 
 Com secret `SUPABASE_SERVICE_ROLE_KEY` no repo: exige `production_ready === true` (senão FAIL).
 
