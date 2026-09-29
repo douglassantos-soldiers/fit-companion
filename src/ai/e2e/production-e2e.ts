@@ -11,6 +11,7 @@ import { adminDbLoose } from "@/lib/db-admin";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
 import { buildQaScenario } from "@/lib/qa/scenarios";
 import { runProductionAiRuntime } from "@/ai/runtime/production-runtime";
+import { resetAiRateLimitStoreForTests } from "@/ai/runtime/rate-limit-store";
 import type { DomainContextLoader } from "@/ai/mcp/core/types";
 import { toPerformanceContext } from "@/lib/engine/performance-context";
 import { asTrustedUserId } from "@/ai/contracts/trusted-user-id";
@@ -115,6 +116,9 @@ function classifyMemoryStoreId(id: string | undefined): ProductionE2EStoreStatus
 export async function runProductionE2E(
   opts: RunProductionE2EOpts = {},
 ): Promise<ProductionE2EReport> {
+  // Cert suites share the in-process RL store; clear so happy path is not starved.
+  resetAiRateLimitStoreForTests();
+
   const mode = opts.mode ?? "full";
   const checked_at = new Date().toISOString();
   const notes: string[] = [];
