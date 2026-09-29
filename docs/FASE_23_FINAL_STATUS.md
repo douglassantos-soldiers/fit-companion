@@ -46,7 +46,7 @@
 - Production E2E: **PASS** (`natural_path`)
 - Certification: **PASS** (`fase23_10_v1`) — re-cert after commit updates SHA in `latest.json`
 - Live LLM: **BLOCKED** (no `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; probe disabled) — does not block deterministic readiness
-- Current commit: see `docs/certification/latest.json` `commit_sha`
+- Current commit: `c189e8645ecf19046c6e0c68b2f7e8b17cd6eb32` (see also `docs/certification/latest.json`)
 - **production_ready: true** (evidência em `docs/certification/latest.json`)
 
 Matriz objetiva: [FASE_23_READINESS_MATRIX.md](./FASE_23_READINESS_MATRIX.md)

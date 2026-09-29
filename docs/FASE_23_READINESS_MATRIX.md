@@ -1,12 +1,12 @@
 # FASE 23 — Production Readiness Matrix
 
-**Commit:** _(updated after re-cert on post-FASE-23 HEAD — see `docs/certification/latest.json`)_  
+**Commit:** `c189e8645ecf19046c6e0c68b2f7e8b17cd6eb32`  
 **Environment:** `LOCAL_TEST` (remote Supabase with service_role)  
 **Certified at:** see `docs/certification/latest.json` timestamp  
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| Current Commit | PASS | Cert SHA == git HEAD after re-cert |
+| Current Commit | PASS | Matches HEAD `c189e86` |
 | Supabase | PASS | database-readiness PASS |
 | Migrations | PASS | remote verification PASS |
 | RAG | PASS | seed 25 docs; retrieval READY |

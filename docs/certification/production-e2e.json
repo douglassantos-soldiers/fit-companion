@@ -1,6 +1,6 @@
 {
   "report_version": "fase22_12_v1",
-  "checked_at": "2026-09-29T01:13:30.780Z",
+  "checked_at": "2026-09-29T01:27:58.952Z",
   "environment": "test",
   "verdict": "PASS",
   "path_label": "PRODUCTION_E2E",
@@ -75,14 +75,14 @@
   "correlation": {
     "run_id": "prod_17yejue",
     "decision_id": "dec_32533c85",
-    "outcome_id": "out_dec_32533c85_mulzgbeq",
-    "learning_event_id": "le_1a93fefd",
-    "proposal_id": "sp_d33df322"
+    "outcome_id": "out_dec_32533c85_mulzyvgn",
+    "learning_event_id": "le_339bcd05",
+    "proposal_id": "sp_2d77c40d"
   },
   "idempotency": {
     "id": "idempotency",
     "ok": true,
-    "detail": "prod_rgn8mx"
+    "detail": "prod_zx1nse"
   },
   "isolation": {
     "id": "isolation",
