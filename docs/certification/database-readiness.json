@@ -1,7 +1,7 @@
 {
   "report_version": "fase22_9_v1",
-  "checked_at": "2026-09-29T02:33:35.312Z",
-  "environment": "production",
+  "checked_at": "2026-09-29T22:17:51.794Z",
+  "environment": "local",
   "verdict": "PASS",
   "checks": [
     {
@@ -10,7 +10,7 @@
       "expected": "20261018120000_fase9_ai_memory.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261025120000_fase11_ai_audit_events.sql",
@@ -18,7 +18,7 @@
       "expected": "20261025120000_fase11_ai_audit_events.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261027120000_fase16_ai_knowledge.sql",
@@ -26,7 +26,7 @@
       "expected": "20261027120000_fase16_ai_knowledge.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261028120000_fase19_ai_audit_kinds.sql",
@@ -34,7 +34,7 @@
       "expected": "20261028120000_fase19_ai_audit_kinds.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261029120000_fase22_3_memory_version.sql",
@@ -42,7 +42,7 @@
       "expected": "20261029120000_fase22_3_memory_version.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261030120000_fase22_6_ai_audit_durability.sql",
@@ -50,7 +50,7 @@
       "expected": "20261030120000_fase22_6_ai_audit_durability.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "migration": "20261031120000_fase22_9_ai_schema_verify.sql",
@@ -58,7 +58,7 @@
       "expected": "20261031120000_fase22_9_ai_schema_verify.sql",
       "actual": "present",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "service_role",
@@ -66,7 +66,7 @@
       "actual": "available",
       "status": "pass",
       "detail": "service_role_client_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -74,7 +74,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -82,7 +82,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -90,7 +90,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -98,7 +98,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -106,7 +106,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -114,7 +114,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -122,7 +122,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_select",
@@ -130,7 +130,7 @@
       "actual": "pass",
       "status": "pass",
       "detail": "select_ok",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "extension",
@@ -138,119 +138,119 @@
       "actual": "vector",
       "status": "pass",
       "detail": "pgvector",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_audit_events",
       "actual": "ai_audit_events",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_audit_events",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_user_memory",
       "actual": "ai_user_memory",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_user_memory",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_decision_memory",
       "actual": "ai_decision_memory",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_decision_memory",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_outcome_memory",
       "actual": "ai_outcome_memory",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_outcome_memory",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_learning_events",
       "actual": "ai_learning_events",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_learning_events",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_knowledge_sources",
       "actual": "ai_knowledge_sources",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_knowledge_sources",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_knowledge_documents",
       "actual": "ai_knowledge_documents",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_knowledge_documents",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table",
       "expected": "ai_knowledge_chunks",
       "actual": "ai_knowledge_chunks",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "rls",
       "expected": "ENABLE on ai_knowledge_chunks",
       "actual": "enabled",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_adjacent",
@@ -258,7 +258,7 @@
       "actual": "recommendation_decisions",
       "status": "observed",
       "detail": "non_blocking_for_ai_pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_adjacent",
@@ -266,7 +266,7 @@
       "actual": "decision_context_snapshots",
       "status": "observed",
       "detail": "non_blocking_for_ai_pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "table_adjacent",
@@ -274,161 +274,161 @@
       "actual": "decision_actions",
       "status": "observed",
       "detail": "non_blocking_for_ai_pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_audit_events_user_created_idx",
       "actual": "ai_audit_events_user_created_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_audit_events_run_idx",
       "actual": "ai_audit_events_run_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_audit_events_kind_created_idx",
       "actual": "ai_audit_events_kind_created_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_audit_events_decision_id_idx",
       "actual": "ai_audit_events_decision_id_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_audit_events_parent_run_idx",
       "actual": "ai_audit_events_parent_run_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_user_memory_active_key_uidx",
       "actual": "ai_user_memory_active_key_uidx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_user_memory_user_idx",
       "actual": "ai_user_memory_user_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_decision_memory_active_key_uidx",
       "actual": "ai_decision_memory_active_key_uidx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_decision_memory_user_idx",
       "actual": "ai_decision_memory_user_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_outcome_memory_active_key_uidx",
       "actual": "ai_outcome_memory_active_key_uidx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_outcome_memory_user_idx",
       "actual": "ai_outcome_memory_user_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_learning_events_active_key_uidx",
       "actual": "ai_learning_events_active_key_uidx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_learning_events_user_idx",
       "actual": "ai_learning_events_user_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_knowledge_documents_domain_idx",
       "actual": "ai_knowledge_documents_domain_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_knowledge_documents_source_idx",
       "actual": "ai_knowledge_documents_source_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_knowledge_chunks_document_idx",
       "actual": "ai_knowledge_chunks_document_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "index",
       "expected": "ai_knowledge_chunks_source_idx",
       "actual": "ai_knowledge_chunks_source_idx",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "column",
       "expected": "ai_user_memory.version",
       "actual": "ai_user_memory.version",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "column",
       "expected": "ai_decision_memory.version",
       "actual": "ai_decision_memory.version",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "column",
       "expected": "ai_outcome_memory.version",
       "actual": "ai_outcome_memory.version",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "column",
       "expected": "ai_learning_events.version",
       "actual": "ai_learning_events.version",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "column",
       "expected": "ai_knowledge_chunks.embedding",
       "actual": "ai_knowledge_chunks.embedding",
       "status": "pass",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "grant_policy",
@@ -436,7 +436,7 @@
       "actual": "0",
       "status": "pass",
       "detail": "service_role_only",
-      "environment": "production"
+      "environment": "local"
     },
     {
       "object": "function",
@@ -444,7 +444,7 @@
       "actual": "present",
       "status": "pass",
       "migration": "20261031120000_fase22_9_ai_schema_verify.sql",
-      "environment": "production"
+      "environment": "local"
     }
   ],
   "critical_drift": []

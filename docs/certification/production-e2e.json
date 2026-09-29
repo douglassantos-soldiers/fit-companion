@@ -1,7 +1,7 @@
 {
   "report_version": "fase22_12_v1",
-  "checked_at": "2026-09-29T02:33:35.860Z",
-  "environment": "production",
+  "checked_at": "2026-09-29T22:16:52.634Z",
+  "environment": "test",
   "verdict": "PASS",
   "path_label": "PRODUCTION_E2E",
   "stores": {
@@ -14,7 +14,7 @@
   "happy": {
     "id": "happy",
     "ok": true,
-    "detail": "decision=dec_32533c85;natural_path;proposal=sp_10f37a0f"
+    "detail": "decision=dec_32533c85;natural_path;proposal=sp_9f049ad4"
   },
   "failures": [
     {
@@ -75,14 +75,14 @@
   "correlation": {
     "run_id": "prod_17yejue",
     "decision_id": "dec_32533c85",
-    "outcome_id": "out_dec_32533c85_mum2b89b",
-    "learning_event_id": "le_8e16f24f",
-    "proposal_id": "sp_10f37a0f"
+    "outcome_id": "out_dec_32533c85_mun8l1ea",
+    "learning_event_id": "le_4b9c7004",
+    "proposal_id": "sp_9f049ad4"
   },
   "idempotency": {
     "id": "idempotency",
     "ok": true,
-    "detail": "prod_158lkot"
+    "detail": "prod_qpbmcg"
   },
   "isolation": {
     "id": "isolation",
