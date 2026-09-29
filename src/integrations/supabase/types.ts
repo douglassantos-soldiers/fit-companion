@@ -396,6 +396,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           confidence?: number
@@ -410,6 +411,7 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
           confidence?: number
@@ -424,6 +426,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -615,6 +618,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           confidence?: number
@@ -629,6 +633,7 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
           confidence?: number
@@ -643,6 +648,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -668,6 +674,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           confidence?: number
@@ -682,6 +689,7 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
           confidence?: number
@@ -696,6 +704,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -706,6 +715,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_rate_limit_buckets: {
+        Row: {
+          bucket_key: string
+          count: number
+          expires_at: string
+          window_started_at: string
+        }
+        Insert: {
+          bucket_key: string
+          count?: number
+          expires_at: string
+          window_started_at?: string
+        }
+        Update: {
+          bucket_key?: string
+          count?: number
+          expires_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       ai_user_memory: {
         Row: {
@@ -721,6 +751,7 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           confidence?: number
@@ -735,6 +766,7 @@ export type Database = {
           type: string
           updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
           confidence?: number
@@ -749,6 +781,7 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -4420,7 +4453,17 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      ai_rate_limit_consume: {
+        Args: {
+          p_amount?: number
+          p_key: string
+          p_limit: number
+          p_peek?: boolean
+          p_window_ms: number
+        }
+        Returns: Json
+      }
+      ai_schema_inventory_probe: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
