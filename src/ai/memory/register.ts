@@ -1,12 +1,12 @@
 /**
  * Bootstrap MemoryStore.
- * FASE 22.3 — production uses ensureMemoryStore (Supabase); InMemory only test/dev.
+ * FASE 23.4 — production does NOT fire-and-forget ensureMemoryStore.
+ * Call initializeAIInfrastructure() / ensureMemoryStore() before critical ops.
  */
 
 import { InMemoryMemoryStore } from "@/ai/memory/store/in-memory";
 import {
   clearMemoryStoreRegistration,
-  ensureMemoryStore,
   getActiveMemoryStore,
   getMemoryStore,
   setMemoryStore,
@@ -17,7 +17,7 @@ let bootstrapped = false;
 
 /**
  * Sync register for tests / explicit DI.
- * Production: does NOT create InMemory — kicks off async ensureMemoryStore.
+ * Production: registers nothing sync — awaits happen in initializeAIInfrastructure.
  */
 export function registerMemoryInfrastructure(opts?: {
   force?: boolean;
@@ -29,21 +29,8 @@ export function registerMemoryInfrastructure(opts?: {
       clearMemoryStoreRegistration();
       bootstrapped = false;
     }
-    if (!bootstrapped) {
-      bootstrapped = true;
-      if (typeof window === "undefined") {
-        void (async () => {
-          try {
-            await ensureMemoryStore();
-          } catch (e) {
-            console.error(
-              "[memory] production bootstrap error:",
-              e instanceof Error ? e.message : String(e),
-            );
-          }
-        })();
-      }
-    }
+    // Mark intent only — no async void bootstrap
+    bootstrapped = true;
     return null;
   }
 
@@ -64,7 +51,6 @@ export function resetMemoryInfrastructure(): void {
   if (active && typeof active.clear === "function") active.clear();
   clearMemoryStoreRegistration();
   bootstrapped = false;
-  // Tests / dev: re-register InMemory
   if (resolveMemoryEnvironment() !== "production") {
     registerMemoryInfrastructure({ force: true });
   }

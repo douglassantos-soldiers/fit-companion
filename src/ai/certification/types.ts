@@ -24,7 +24,15 @@ export const NON_PASS_ALIASES = [
   "skip",
 ] as const;
 
-export type CertEnvironment = "local" | "ci" | "production-probe" | string;
+export type CertEnvironment =
+  | "local"
+  | "LOCAL_TEST"
+  | "ci"
+  | "CI"
+  | "STAGING"
+  | "PRODUCTION"
+  | "production-probe"
+  | string;
 
 export type CertCheck = {
   check_id: string;

@@ -26,8 +26,9 @@ export type RunProductionCertificationOpts = {
 
 function resolveEnvironment(override?: CertEnvironment): CertEnvironment {
   if (override) return override;
-  if (process.env["CI"] === "true" || process.env["CI"] === "1") return "ci";
-  return "local";
+  if (process.env["AI_CERT_ENV"]?.trim()) return process.env["AI_CERT_ENV"].trim();
+  if (process.env["CI"] === "true" || process.env["CI"] === "1") return "CI";
+  return "LOCAL_TEST";
 }
 
 export async function resolveCommitSha(): Promise<string> {
@@ -195,6 +196,7 @@ export async function runProductionCertification(
     test_suite,
     timestamp,
     commit_sha,
+    expected_commit_sha: commit_sha,
     environment,
     evidence: {
       probe_count: checks.length,

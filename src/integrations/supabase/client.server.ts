@@ -62,8 +62,13 @@ let _supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | undefined;
 // Load inside server handlers: const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 // Top-level import is safe only in other .server.ts modules - route files and *.functions.ts ship to the client bundle.
 export const supabaseAdmin = new Proxy({} as ReturnType<typeof createSupabaseAdminClient>, {
-  get(_, prop, receiver) {
+  get(_, prop) {
     if (!_supabaseAdmin) _supabaseAdmin = createSupabaseAdminClient();
-    return Reflect.get(_supabaseAdmin, prop, receiver);
+    const value = Reflect.get(_supabaseAdmin, prop, _supabaseAdmin);
+    // Bind methods so `this.rest` / client internals resolve (FASE 23 — Proxy receiver bug).
+    if (typeof value === "function") {
+      return value.bind(_supabaseAdmin);
+    }
+    return value;
   },
 });

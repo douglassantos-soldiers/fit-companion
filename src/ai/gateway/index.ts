@@ -26,6 +26,14 @@ export type {
   LlmReadinessResult,
 } from "@/ai/gateway/health";
 export {
+  invokeMealTextViaGateway,
+  invokeMealOpenAiHttp,
+} from "@/ai/gateway/meal-invoke";
+export type {
+  MealGatewayTextResult,
+  MealGatewayMediaResult,
+} from "@/ai/gateway/meal-invoke";
+export {
   resolveLlmEnvironment,
   resolvePrimaryProvider,
   resolveFallbackProvider,

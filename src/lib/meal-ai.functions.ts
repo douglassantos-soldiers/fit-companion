@@ -10,6 +10,11 @@ import {
   type MealAiSuggestion,
 } from "@/lib/meal-ai-contract";
 import { parseVoiceFoodText } from "@/lib/nutrition/voice-parse";
+import {
+  invokeMealOpenAiHttp,
+  invokeMealTextViaGateway,
+} from "@/ai/gateway/meal-invoke";
+import { getAgentAIConfig } from "@/ai/gateway/config";
 
 export type { MealAiSuggestion, MealAiError };
 export { parseMealAiInput, parseMealAiSuggestion, mealAiSystemPrompt };
@@ -26,7 +31,7 @@ function enrichWithCatalog(text: string, suggestion: MealAiSuggestion): MealAiSu
 async function estimateFromText(
   text: string,
   slot: ReturnType<typeof parseMealAiInput>["slot"],
-  key: string,
+  userId?: string,
 ) {
   // Deterministic catalog parse first — high confidence can skip inventing quantities
   const voice = parseVoiceFoodText(text);
@@ -54,23 +59,14 @@ async function estimateFromText(
     return fromVoice;
   }
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      max_tokens: 500,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: mealAiSystemPrompt(slot) },
-        { role: "user", content: `Descrição da refeição: ${text}` },
-      ],
-    }),
+  const gw = await invokeMealTextViaGateway({
+    system: mealAiSystemPrompt(slot),
+    userContent: `Descrição da refeição: ${text}`,
+    ...(userId ? { userId } : {}),
+    maxTokens: 500,
   });
-  if (!res.ok) {
-    const detail = await res.text();
-    console.error("OpenAI meal text error", res.status, detail.slice(0, 200));
-    // Fallback to deterministic parse if LLM fails
+  if (!gw.ok) {
+    console.error("meal-ai gateway text", gw.code, gw.error.slice(0, 200));
     if (voice.items.length) {
       return enrichWithCatalog(text, {
         label: text.slice(0, 80),
@@ -83,9 +79,7 @@ async function estimateFromText(
     }
     return null;
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content ?? "";
-  const suggestion = parseMealAiSuggestion(content);
+  const suggestion = parseMealAiSuggestion(gw.text);
   return enrichWithCatalog(text, suggestion);
 }
 
@@ -93,44 +87,46 @@ async function estimateFromPhoto(
   base64: string,
   mimeType: string,
   slot: ReturnType<typeof parseMealAiInput>["slot"],
-  key: string,
+  userId?: string,
 ) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      max_tokens: 300,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: mealAiSystemPrompt(slot) },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Estime macros desta foto de refeição." },
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64}`, detail: "low" },
-            },
-          ],
-        },
-      ],
-    }),
+  const config = getAgentAIConfig("meal_ai");
+  const model = process.env["AI_OPENAI_MODEL"]?.trim() || config.model || "gpt-4o";
+  const body = JSON.stringify({
+    model,
+    max_tokens: 300,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: mealAiSystemPrompt(slot) },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Estime macros desta foto de refeição." },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${base64}`, detail: "low" },
+          },
+        ],
+      },
+    ],
   });
-  if (!res.ok) {
-    const detail = await res.text();
-    console.error("OpenAI meal vision error", res.status, detail.slice(0, 200));
+  const gw = await invokeMealOpenAiHttp({
+    kind: "vision",
+    ...(userId ? { userId } : {}),
+    url: "https://api.openai.com/v1/chat/completions",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (!gw.ok) {
+    console.error("meal-ai gateway vision", gw.code, gw.error.slice(0, 200));
     return null;
   }
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content ?? "";
-  return parseMealAiSuggestion(content);
+  return parseMealAiSuggestion(gw.text);
 }
 
 async function transcribeVoice(
   base64: string,
   mimeType: string,
-  key: string,
+  userId?: string,
 ): Promise<string | null> {
   const binary = Buffer.from(base64, "base64");
   const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
@@ -139,22 +135,22 @@ async function transcribeVoice(
   form.append("model", "whisper-1");
   form.append("language", "pt");
 
-  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
+  const gw = await invokeMealOpenAiHttp({
+    kind: "whisper",
+    ...(userId ? { userId } : {}),
+    url: "https://api.openai.com/v1/audio/transcriptions",
     body: form,
   });
-  if (!res.ok) {
-    const detail = await res.text();
-    console.error("OpenAI whisper error", res.status, detail.slice(0, 200));
+  if (!gw.ok) {
+    console.error("meal-ai gateway whisper", gw.code, gw.error.slice(0, 200));
     return null;
   }
-  const json = (await res.json()) as { text?: string };
-  return json.text?.trim() || null;
+  return gw.text || null;
 }
 
 /**
- * Meal AI — vision / Whisper / text → structured macros.
+ * Meal AI — vision / Whisper / text → structured macros (suggestion only).
+ * FASE 23.3 — all provider calls via AI Gateway controls (no Decision Engine).
  * Requires resolveTrustedIdentity (access cookie + device bind). Rate-limited per user.
  */
 export const analyzeMealAi = createServerFn({ method: "POST" })
@@ -170,12 +166,11 @@ export const analyzeMealAi = createServerFn({ method: "POST" })
       return { error: "rate_limited" };
     }
 
-    const key = process.env["OPENAI_API_KEY"];
-    if (!key) return { error: "not_configured" };
+    const userId = identity.userId ?? identity.email;
 
     try {
       if (data.mode === "text") {
-        const suggestion = await estimateFromText(data.text!, data.slot, key);
+        const suggestion = await estimateFromText(data.text!, data.slot, userId);
         if (!suggestion) return { error: "upstream" };
         return { suggestion };
       }
@@ -185,7 +180,7 @@ export const analyzeMealAi = createServerFn({ method: "POST" })
           data.mediaBase64!,
           data.mimeType ?? "image/jpeg",
           data.slot,
-          key,
+          userId,
         );
         if (!suggestion) return { error: "upstream" };
         return { suggestion };
@@ -195,10 +190,10 @@ export const analyzeMealAi = createServerFn({ method: "POST" })
       const transcript = await transcribeVoice(
         data.mediaBase64!,
         data.mimeType ?? "audio/webm",
-        key,
+        userId,
       );
       if (!transcript) return { error: "upstream" };
-      const suggestion = await estimateFromText(transcript, data.slot, key);
+      const suggestion = await estimateFromText(transcript, data.slot, userId);
       if (!suggestion) return { error: "upstream", transcript };
       return { suggestion, transcript };
     } catch (e) {

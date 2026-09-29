@@ -1,6 +1,6 @@
 /**
- * Register RAG sources and optionally seed curated corpus into VectorStore.
- * FASE 22.2 — production bootstrap may auto-seed; errors are explicit (not swallowed).
+ * Register RAG sources. FASE 23.4 — production seed is NOT fire-and-forget.
+ * Use initializeAIInfrastructure({ seedRag: true }) or `npm run rag:seed`.
  */
 
 import { registerAllKnowledgeSources } from "@/ai/rag/sources";
@@ -8,42 +8,29 @@ import { resolveRagEnvironment } from "@/ai/rag/runtime/env";
 
 export type RegisterRagResult = {
   registered: true;
+  /** True only when seed was started via explicit await path (legacy flag kept for callers). */
   seed_started?: boolean;
   seed_error?: string;
+  deferred_to_initializer?: boolean;
 };
 
 export function registerRagInfrastructure(opts?: {
   force?: boolean;
-  /** When true, ingest all production curated sources. */
+  /** When true, ingest curated corpus synchronously (awaited by caller via ensure path). */
   seedCorpus?: boolean;
 }): RegisterRagResult {
   registerAllKnowledgeSources(opts);
   const env = resolveRagEnvironment();
-  const shouldSeed =
-    opts?.seedCorpus === true ||
-    (opts?.seedCorpus !== false && env === "production" && typeof window === "undefined");
 
-  if (!shouldSeed) {
-    return { registered: true };
+  // FASE 23: never fire-and-forget seed in production.
+  // Sources are registered sync; corpus seed goes through initializeAIInfrastructure / rag:seed.
+  if (opts?.seedCorpus === true) {
+    return { registered: true, seed_started: false, deferred_to_initializer: true };
   }
 
-  // Fire-and-forget but log failure explicitly (no silent swallow of empty catch)
-  void (async () => {
-    try {
-      const { ensureVectorStore } = await import("@/ai/rag/core/vector-store");
-      await ensureVectorStore();
-      const { ensureCorpusSeeded } = await import("@/ai/rag/ingestion");
-      const report = await ensureCorpusSeeded();
-      if (report && !report.ok) {
-        console.error("[rag] corpus seed failed:", report.error ?? "unknown");
-      }
-    } catch (e) {
-      console.error(
-        "[rag] production bootstrap seed error:",
-        e instanceof Error ? e.message : String(e),
-      );
-    }
-  })();
+  if (env === "production" && typeof window === "undefined") {
+    return { registered: true, deferred_to_initializer: true };
+  }
 
-  return { registered: true, seed_started: true };
+  return { registered: true };
 }

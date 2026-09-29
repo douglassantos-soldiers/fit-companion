@@ -43,6 +43,9 @@ export {
   runProductionAiRuntime,
   runAuthoritativeBridge,
   AI_PATH_LABEL,
+  initializeAIInfrastructure,
+  ensureAIInfrastructureReady,
+  getAIInfrastructureReport,
 } from "./runtime";
 export type {
   RunProductionAiRuntimeResult,
@@ -50,21 +53,11 @@ export type {
   AuthoritativeBridgeInput,
   AuthoritativeBridgeResult,
   ProductionAiCorrelation,
+  AiInfrastructureReport,
+  AiInfrastructureStatus,
 } from "./runtime";
 
-/** FASE 15 — E2E harness (TEST ONLY; not Coach product path). */
-export {
-  runAiE2EPipeline,
-  buildAiExecutionTrace,
-  mapLayerErrorToPipeline,
-} from "./e2e";
-export type {
-  RunAiE2EPipelineResult,
-  AiExecutionTrace,
-  AiPipelineError,
-  AiPipelineErrorCode,
-  PipelineStageResult,
-} from "./e2e";
+/** FASE 15 — E2E harness: import from `@/ai/e2e` only (TEST_ONLY; not public product surface). */
 
 /** FASE 18 — specialist proposal merge → Decision Engine (CANONICAL_WRAPPER) */
 export {

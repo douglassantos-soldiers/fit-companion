@@ -1,9 +1,8 @@
 {
   "report_version": "fase22_10_v1",
-  "checked_at": "2026-09-28T02:44:18.044Z",
+  "checked_at": "2026-09-29T01:00:37.445Z",
   "environment": "test",
-  "verdict": "BLOCKED",
-  "error_code": "RATE_LIMIT_VERIFICATION_BLOCKED",
+  "verdict": "PASS",
   "checks": [
     {
       "object": "migration_file",
@@ -20,9 +19,14 @@
     {
       "object": "service_role",
       "expected": "admin_db",
-      "actual": "unavailable",
-      "status": "blocked",
-      "detail": "admin_db_unavailable"
+      "actual": "available",
+      "status": "pass"
+    },
+    {
+      "object": "rpc",
+      "expected": "ai_rate_limit_consume",
+      "actual": "ok",
+      "status": "pass"
     }
   ]
 }

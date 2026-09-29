@@ -42,6 +42,13 @@ export type LlmLiveProbeResult = {
   detail?: string;
   latency_ms?: number;
   provider?: string;
+  model?: string;
+  request_id?: string;
+  status?: "ok" | "error" | "skipped";
+  input_tokens?: number;
+  output_tokens?: number;
+  estimated_cost?: number;
+  error_category?: string;
 };
 
 export type LlmReadinessResult = {
@@ -149,13 +156,14 @@ export async function checkLlmHealth(): Promise<LlmHealthReport> {
 
 /**
  * Optional live generate probe when AI_LLM_LIVE_PROBE=1 and keys present.
+ * Never logs API keys or prompt content.
  */
 export async function checkLlmLiveProbe(): Promise<LlmLiveProbeResult> {
   const enabled =
     process.env["AI_LLM_LIVE_PROBE"] === "1" ||
     process.env["AI_LLM_LIVE_PROBE"] === "true";
   if (!enabled) {
-    return { ok: false, detail: "live_probe_disabled" };
+    return { ok: false, detail: "live_probe_disabled", status: "skipped" };
   }
 
   const env = resolveLlmEnvironment();
@@ -163,17 +171,31 @@ export async function checkLlmLiveProbe(): Promise<LlmLiveProbeResult> {
   try {
     primary = resolvePrimaryProvider(env);
   } catch (e) {
-    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+    return {
+      ok: false,
+      detail: e instanceof Error ? e.message : String(e),
+      status: "error",
+      error_category: "config",
+    };
   }
   if (primary === "mock") {
-    return { ok: false, detail: "mock_not_valid_live_probe" };
+    return {
+      ok: false,
+      detail: "mock_not_valid_live_probe",
+      status: "error",
+      error_category: "mock_forbidden",
+    };
   }
 
   const provider = getProvider(primary);
+  const model =
+    primary === "anthropic"
+      ? process.env["AI_ANTHROPIC_MODEL"]?.trim() || "claude-3-5-haiku-latest"
+      : process.env["AI_OPENAI_MODEL"]?.trim() || "gpt-4o-mini";
   const started = Date.now();
   const result = await provider.generate({
     provider: primary,
-    model: process.env["AI_OPENAI_MODEL"]?.trim() || "gpt-4o-mini",
+    model,
     messages: [
       { role: "system", content: "Reply with JSON only." },
       {
@@ -198,6 +220,9 @@ export async function checkLlmLiveProbe(): Promise<LlmLiveProbeResult> {
       detail: `${result.code}:${result.message}`,
       latency_ms: Date.now() - started,
       provider: primary,
+      model,
+      status: "error",
+      error_category: result.code === "unauthorized" ? "LLM_PROVIDER_UNAVAILABLE" : result.code,
     };
   }
   return {
@@ -205,6 +230,14 @@ export async function checkLlmLiveProbe(): Promise<LlmLiveProbeResult> {
     detail: "live_ok",
     latency_ms: result.latency_ms,
     provider: result.provider,
+    model: result.model,
+    status: "ok",
+    ...(result.request_id ? { request_id: result.request_id } : {}),
+    input_tokens: result.usage.input_tokens,
+    output_tokens: result.usage.output_tokens,
+    ...(result.usage.estimated_cost != null
+      ? { estimated_cost: result.usage.estimated_cost }
+      : {}),
   };
 }
 

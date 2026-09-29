@@ -1,9 +1,8 @@
 {
   "report_version": "fase22_9_v1",
-  "checked_at": "2026-09-28T02:44:18.037Z",
+  "checked_at": "2026-09-29T01:00:37.057Z",
   "environment": "test",
-  "verdict": "BLOCKED",
-  "error_code": "MIGRATION_VERIFICATION_BLOCKED",
+  "verdict": "PASS",
   "checks": [
     {
       "migration": "20261018120000_fase9_ai_memory.sql",
@@ -63,10 +62,388 @@
     },
     {
       "object": "service_role",
-      "expected": "SUPABASE_SERVICE_ROLE_KEY + select",
-      "actual": "unavailable",
-      "status": "blocked",
-      "detail": "admin_db_unavailable",
+      "expected": "admin client",
+      "actual": "available",
+      "status": "pass",
+      "detail": "service_role_client_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_audit_events",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_user_memory",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_decision_memory",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_outcome_memory",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_learning_events",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_knowledge_sources",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_knowledge_documents",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "table_select",
+      "expected": "ai_knowledge_chunks",
+      "actual": "pass",
+      "status": "pass",
+      "detail": "select_ok",
+      "environment": "test"
+    },
+    {
+      "object": "extension",
+      "expected": "vector",
+      "actual": "vector",
+      "status": "pass",
+      "detail": "pgvector",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_audit_events",
+      "actual": "ai_audit_events",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_audit_events",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_user_memory",
+      "actual": "ai_user_memory",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_user_memory",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_decision_memory",
+      "actual": "ai_decision_memory",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_decision_memory",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_outcome_memory",
+      "actual": "ai_outcome_memory",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_outcome_memory",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_learning_events",
+      "actual": "ai_learning_events",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_learning_events",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_knowledge_sources",
+      "actual": "ai_knowledge_sources",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_knowledge_sources",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_knowledge_documents",
+      "actual": "ai_knowledge_documents",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_knowledge_documents",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table",
+      "expected": "ai_knowledge_chunks",
+      "actual": "ai_knowledge_chunks",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "rls",
+      "expected": "ENABLE on ai_knowledge_chunks",
+      "actual": "enabled",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "table_adjacent",
+      "expected": "recommendation_decisions",
+      "actual": "recommendation_decisions",
+      "status": "observed",
+      "detail": "non_blocking_for_ai_pass",
+      "environment": "test"
+    },
+    {
+      "object": "table_adjacent",
+      "expected": "decision_context_snapshots",
+      "actual": "decision_context_snapshots",
+      "status": "observed",
+      "detail": "non_blocking_for_ai_pass",
+      "environment": "test"
+    },
+    {
+      "object": "table_adjacent",
+      "expected": "decision_actions",
+      "actual": "decision_actions",
+      "status": "observed",
+      "detail": "non_blocking_for_ai_pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_audit_events_user_created_idx",
+      "actual": "ai_audit_events_user_created_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_audit_events_run_idx",
+      "actual": "ai_audit_events_run_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_audit_events_kind_created_idx",
+      "actual": "ai_audit_events_kind_created_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_audit_events_decision_id_idx",
+      "actual": "ai_audit_events_decision_id_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_audit_events_parent_run_idx",
+      "actual": "ai_audit_events_parent_run_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_user_memory_active_key_uidx",
+      "actual": "ai_user_memory_active_key_uidx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_user_memory_user_idx",
+      "actual": "ai_user_memory_user_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_decision_memory_active_key_uidx",
+      "actual": "ai_decision_memory_active_key_uidx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_decision_memory_user_idx",
+      "actual": "ai_decision_memory_user_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_outcome_memory_active_key_uidx",
+      "actual": "ai_outcome_memory_active_key_uidx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_outcome_memory_user_idx",
+      "actual": "ai_outcome_memory_user_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_learning_events_active_key_uidx",
+      "actual": "ai_learning_events_active_key_uidx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_learning_events_user_idx",
+      "actual": "ai_learning_events_user_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_knowledge_documents_domain_idx",
+      "actual": "ai_knowledge_documents_domain_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_knowledge_documents_source_idx",
+      "actual": "ai_knowledge_documents_source_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_knowledge_chunks_document_idx",
+      "actual": "ai_knowledge_chunks_document_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "index",
+      "expected": "ai_knowledge_chunks_source_idx",
+      "actual": "ai_knowledge_chunks_source_idx",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "column",
+      "expected": "ai_user_memory.version",
+      "actual": "ai_user_memory.version",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "column",
+      "expected": "ai_decision_memory.version",
+      "actual": "ai_decision_memory.version",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "column",
+      "expected": "ai_outcome_memory.version",
+      "actual": "ai_outcome_memory.version",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "column",
+      "expected": "ai_learning_events.version",
+      "actual": "ai_learning_events.version",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "column",
+      "expected": "ai_knowledge_chunks.embedding",
+      "actual": "ai_knowledge_chunks.embedding",
+      "status": "pass",
+      "environment": "test"
+    },
+    {
+      "object": "grant_policy",
+      "expected": "0 anon/authenticated policies on AI tables",
+      "actual": "0",
+      "status": "pass",
+      "detail": "service_role_only",
+      "environment": "test"
+    },
+    {
+      "object": "function",
+      "expected": "ai_schema_inventory_probe",
+      "actual": "present",
+      "status": "pass",
+      "migration": "20261031120000_fase22_9_ai_schema_verify.sql",
       "environment": "test"
     }
   ],

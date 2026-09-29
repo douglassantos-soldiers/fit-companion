@@ -204,12 +204,14 @@ export class SupabaseMemoryStore implements MemoryStore {
 export async function createSupabaseMemoryStore(): Promise<MemoryStore | null> {
   try {
     const { adminDbLoose } = await import("@/lib/db-admin");
-    return new SupabaseMemoryStore(async () => {
-      try {
-        return await adminDbLoose();
-      } catch {
-        return null;
-      }
+    return new SupabaseMemoryStore({
+      getDb: async () => {
+        try {
+          return await adminDbLoose();
+        } catch {
+          return null;
+        }
+      },
     });
   } catch {
     return null;

@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 /**
- * FASE 22.8 — AI CI gate verdict from certification latest.json
+ * FASE 22.8 / 23.11 — AI CI STRUCTURAL gate verdict from certification latest.json
  *
- * Exit 1 (FAIL): missing report, suite not executed, critical FAIL/UNTESTED,
- *   or production_ready required but false when SUPABASE_SERVICE_ROLE_KEY is set.
- * Exit 0 + BLOCKED: only remote BLOCKED (no FAIL/UNTESTED critical).
- * Exit 0 + PASS: production_ready true and no blockers.
+ * STRUCTURAL (default):
+ *   Exit 1 (FAIL): missing report, suite not executed, critical FAIL/UNTESTED.
+ *   Exit 0 + BLOCKED: remote BLOCKED without secrets (explicit — not production-ready).
+ *   Exit 0 + PASS: production_ready true and no blockers.
  *
- * Never treats UNTESTED as PASS.
+ * PRODUCTION RELEASE (AI_RELEASE_GATE=1):
+ *   Exit != 0 for any critical BLOCKED/FAIL/UNKNOWN/STALE/DEGRADED,
+ *   production_ready !== true, or commit mismatch vs HEAD.
+ *
+ * Never treats UNTESTED / BLOCKED / DEGRADED as PASS.
  */
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 
 const REPORT_PATH = join(process.cwd(), "docs", "certification", "latest.json");
+
+const RELEASE_GATE =
+  process.env["AI_RELEASE_GATE"] === "1" ||
+  process.env["AI_RELEASE_GATE"] === "true" ||
+  process.argv.includes("--release");
 
 /** Critical checks that must not be FAIL/UNTESTED in CI (architecture/security). */
 const LOCAL_CRITICAL = new Set([
@@ -29,7 +39,7 @@ const LOCAL_CRITICAL = new Set([
   "cost",
 ]);
 
-/** Remote/infra probes — BLOCKED without secrets is allowed as CI BLOCKED (not FAIL). */
+/** Remote/infra probes — BLOCKED without secrets is allowed as CI STRUCTURAL BLOCKED (not FAIL). */
 const REMOTE_ALLOW_BLOCKED = new Set([
   "database",
   "migrations",
@@ -40,15 +50,24 @@ const REMOTE_ALLOW_BLOCKED = new Set([
   "rate_limit",
 ]);
 
+function resolveHeadSha() {
+  try {
+    return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    return null;
+  }
+}
+
 function main() {
   const lines = [];
   const failReasons = [];
   const blocked = [];
   const failed = [];
   const untested = [];
+  const gateKind = RELEASE_GATE ? "PRODUCTION_RELEASE" : "CI_STRUCTURAL";
 
   if (!existsSync(REPORT_PATH)) {
-    console.error("AI_CI_GATE: FAIL");
+    console.error(`AI_CI_GATE: FAIL (${gateKind})`);
     console.error("reason: certification_report_missing", REPORT_PATH);
     console.error("UNTESTED / missing report cannot be green.");
     process.exit(1);
@@ -58,7 +77,7 @@ function main() {
   try {
     report = JSON.parse(readFileSync(REPORT_PATH, "utf8"));
   } catch (e) {
-    console.error("AI_CI_GATE: FAIL");
+    console.error(`AI_CI_GATE: FAIL (${gateKind})`);
     console.error("reason: certification_report_invalid", e instanceof Error ? e.message : e);
     process.exit(1);
   }
@@ -77,17 +96,29 @@ function main() {
     const status = String(c.status ?? "UNTESTED");
     const critical = Boolean(c.critical) || LOCAL_CRITICAL.has(id);
 
-    if (status === "UNTESTED") {
+    if (status === "UNTESTED" || status === "UNKNOWN") {
       untested.push(id);
-      if (critical) failReasons.push(`${id}:UNTESTED`);
+      if (critical) failReasons.push(`${id}:${status}`);
     } else if (status === "FAIL") {
       failed.push(id);
       if (critical || LOCAL_CRITICAL.has(id)) failReasons.push(`${id}:FAIL`);
     } else if (status === "BLOCKED" || status === "DEGRADED") {
       blocked.push(id);
-      if (critical && !REMOTE_ALLOW_BLOCKED.has(id) && LOCAL_CRITICAL.has(id)) {
+      if (RELEASE_GATE && critical) {
+        failReasons.push(`${id}:${status}`);
+      } else if (critical && !REMOTE_ALLOW_BLOCKED.has(id) && LOCAL_CRITICAL.has(id)) {
         failReasons.push(`${id}:${status}`);
       }
+    }
+  }
+
+  const head = resolveHeadSha();
+  const reportSha = String(report.commit_sha ?? "");
+  if (head && reportSha && reportSha !== "unknown") {
+    const match =
+      head === reportSha || head.startsWith(reportSha) || reportSha.startsWith(head.slice(0, 12));
+    if (!match) {
+      failReasons.push(`CERTIFICATION_STALE:report=${reportSha.slice(0, 12)} head=${head.slice(0, 12)}`);
     }
   }
 
@@ -96,7 +127,19 @@ function main() {
       String(process.env["SUPABASE_SERVICE_ROLE_KEY"]).trim().length > 0,
   );
 
-  if (hasServiceRole && report.production_ready !== true) {
+  if (RELEASE_GATE) {
+    if (report.production_ready !== true) {
+      failReasons.push("production_ready:required_for_release");
+    }
+    if (blocked.length > 0) {
+      // already added critical blocked above; ensure any remaining remote blocked fail release
+      for (const id of blocked) {
+        if (!failReasons.some((r) => r.startsWith(`${id}:`))) {
+          failReasons.push(`${id}:BLOCKED_release`);
+        }
+      }
+    }
+  } else if (hasServiceRole && report.production_ready !== true) {
     failReasons.push("production_ready:required_with_service_role");
   }
 
@@ -111,41 +154,43 @@ function main() {
     gate = "PASS";
   }
 
-  lines.push(`## AI CI/CD Safety Gate`);
+  lines.push(`## AI CI/CD Safety Gate (${gateKind})`);
   lines.push("");
   lines.push(`**AI_CI_GATE: ${gate}**`);
   lines.push("");
+  lines.push(`- gate_kind: \`${gateKind}\``);
   lines.push(`- production_ready: \`${report.production_ready}\``);
   lines.push(`- commit_sha: \`${report.commit_sha ?? "unknown"}\``);
+  lines.push(`- head_sha: \`${head ?? "unknown"}\``);
   lines.push(`- environment: \`${report.environment ?? "unknown"}\``);
-  lines.push(`- test_suite.executed: \`${testSuite.executed}\` ok: \`${testSuite.ok}\``);
-  lines.push(`- FAIL/critical reasons: ${uniqFail.length ? uniqFail.join(", ") : "(none)"}`);
-  lines.push(`- blocked/degraded: ${blocked.length ? blocked.join(", ") : "(none)"}`);
-  lines.push(`- untested: ${untested.length ? untested.join(", ") : "(none)"}`);
+  if (blocked.length) lines.push(`- blocked: ${blocked.join(", ")}`);
+  if (failed.length) lines.push(`- failed: ${failed.join(", ")}`);
+  if (untested.length) lines.push(`- untested: ${untested.join(", ")}`);
+  if (uniqFail.length) {
+    lines.push(`- fail_reasons:`);
+    for (const r of uniqFail) lines.push(`  - ${r}`);
+  }
   lines.push("");
-  lines.push(
-    "> UNTESTED ≠ PASS. Only EXECUTED checks count. Remote BLOCKED without service role → BLOCKED (not green production_ready).",
-  );
+  if (gateKind === "CI_STRUCTURAL" && gate === "BLOCKED") {
+    lines.push(
+      "_Structural gate: remote BLOCKED is exit 0 (not production-ready). Use `AI_RELEASE_GATE=1` / `npm run ai:release-verdict` for release._",
+    );
+  }
 
-  console.log(`AI_CI_GATE: ${gate}`);
-  console.log(`production_ready: ${report.production_ready}`);
-  console.log(`failures: ${uniqFail.join(" | ") || "(none)"}`);
-  console.log(`blocked: ${blocked.join(", ") || "(none)"}`);
-  console.log(`untested: ${untested.join(", ") || "(none)"}`);
-  console.log(`test_suite: executed=${testSuite.executed} ok=${testSuite.ok}`);
+  const body = lines.join("\n");
+  console.log(body);
 
   const summaryPath = process.env["GITHUB_STEP_SUMMARY"];
   if (summaryPath) {
     try {
-      appendFileSync(summaryPath, lines.join("\n") + "\n");
+      appendFileSync(summaryPath, body + "\n");
     } catch {
       /* ignore */
     }
   }
 
-  if (gate === "FAIL") {
-    process.exit(1);
-  }
+  if (gate === "FAIL") process.exit(1);
+  // STRUCTURAL: BLOCKED → exit 0. RELEASE: BLOCKED already folded into FAIL above.
   process.exit(0);
 }
 

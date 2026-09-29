@@ -11,6 +11,9 @@ import { adminDbLoose } from "@/lib/db-admin";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
 import { buildQaScenario } from "@/lib/qa/scenarios";
 import { runProductionAiRuntime } from "@/ai/runtime/production-runtime";
+import type { DomainContextLoader } from "@/ai/mcp/core/types";
+import { toPerformanceContext } from "@/lib/engine/performance-context";
+import { asTrustedUserId } from "@/ai/contracts/trusted-user-id";
 import { ensureVectorStore, getActiveVectorStore } from "@/ai/rag/core/vector-store";
 import { ensureMemoryStore, getActiveMemoryStore } from "@/ai/memory/store/types";
 import { createMemory, retrieveMemory } from "@/ai/memory/api";
@@ -22,6 +25,24 @@ import { runProductionE2EFailures, type ProductionE2EScenarioResult } from "@/ai
 const USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const DATE = "2026-03-11";
+
+/** Ensure synthetic E2E users exist for FK (ai_* → public.users). */
+async function ensureE2EFixtureUsers(): Promise<{ ok: boolean; detail?: string }> {
+  const db = await adminDbLoose();
+  if (!db) return { ok: false, detail: "admin_db_unavailable" };
+  try {
+    for (const id of [USER_A, USER_B]) {
+      const { error } = await db.from("users").upsert(
+        { id, status: "active", updated_at: new Date().toISOString() },
+        { onConflict: "id" },
+      );
+      if (error) return { ok: false, detail: String(error.message ?? error) };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export type ProductionE2EVerdict = "PASS" | "BLOCKED" | "FAIL";
 
@@ -271,6 +292,8 @@ export async function runProductionE2E(
     }
 
     if (stores.rag !== "supabase_pgvector_v1" || stores.memory !== "supabase") {
+      const isolationLocal = await runIsolationLocal();
+      const idempotencyLocal = await runIdempotencyLocal();
       const report: ProductionE2EReport = {
         ...base(),
         verdict:
@@ -280,12 +303,19 @@ export async function runProductionE2E(
           : { error_code: "PRODUCTION_E2E_BLOCKED" as const }),
         stores,
         failures,
+        isolation: isolationLocal,
+        idempotency: idempotencyLocal,
         kill_switch,
         notes,
       };
       if (report.verdict === "FAIL") delete (report as { error_code?: string }).error_code;
       persist(report, opts.persistPath ?? (opts.persistReport === false ? null : undefined));
       return report;
+    }
+
+    const fixtures = await ensureE2EFixtureUsers();
+    if (!fixtures.ok) {
+      notes.push(`e2e_users:${fixtures.detail ?? "failed"}`);
     }
 
     isolation = await runIsolationRemote();
@@ -349,13 +379,24 @@ async function runHappyPath(
       return { id: "happy", ok: false, detail: "no_living_plan_in_snapshot" };
     }
 
+    // Real MCP handlers + QA domain context (fixture user has no living plan in DB).
+    const loader: DomainContextLoader = async (userId, date) => ({
+      userId: asTrustedUserId(userId),
+      date: date ?? DATE,
+      state,
+      performanceContext: toPerformanceContext(snap, state),
+    });
+
     const out = await runProductionAiRuntime({
       trustedUserId: USER_A,
       snapshot: snap,
-      intent: "production_e2e_smoke",
+      // Intent must classify as training so orchestrator selects analyze_training.
+      intent: "production_e2e_smoke workout training volume",
       skipKnowledge: false,
       emitOutcomeAndLearning: true,
       runtimeMode: "deterministic",
+      forceAgents: ["specialist_training"],
+      loader,
       idempotencyKey: `prod_e2e_${DATE}_${USER_A}`,
     });
 
@@ -366,7 +407,14 @@ async function runHappyPath(
     correlation.proposal_id = out.correlation.proposal_id;
 
     if (!out.decision) {
-      return { id: "happy", ok: false, detail: out.reason ?? "no_decision" };
+      return {
+        id: "happy",
+        ok: false,
+        detail: `${out.reason ?? "no_decision"};merge=${out.merge?.resolution_reason ?? "n/a"}`,
+      };
+    }
+    if (!out.proposal) {
+      return { id: "happy", ok: false, detail: "decision_without_specialist_proposal" };
     }
     if (!out.living_plan) {
       return { id: "happy", ok: false, detail: "no_living_plan" };
@@ -392,14 +440,14 @@ async function runHappyPath(
           return {
             id: "happy",
             ok: true,
-            detail: `decision_ok;audit_readback_warn:${error.message}`,
+            detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_warn:${error.message}`,
           };
         }
       } catch (e) {
         return {
           id: "happy",
           ok: true,
-          detail: `decision_ok;audit_readback_warn:${e instanceof Error ? e.message : String(e)}`,
+          detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_warn:${e instanceof Error ? e.message : String(e)}`,
         };
       }
     }
@@ -407,7 +455,7 @@ async function runHappyPath(
     return {
       id: "happy",
       ok: true,
-      detail: `decision=${out.correlation.decision_id}`,
+      detail: `decision=${out.correlation.decision_id};natural_path;proposal=${out.proposal.proposal_id}`,
     };
   } catch (e) {
     return {
@@ -430,7 +478,7 @@ async function runIsolationRemote(): Promise<ProductionE2EScenarioResult> {
       family: "user",
       type: "facts",
       key: "prod_e2e_iso",
-      data: { secret: "user_a_only" },
+      data: { note: "user_a_only", isolation: true },
       source: "system",
       confidence: 0.9,
       supersede: true,

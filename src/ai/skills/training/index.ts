@@ -26,10 +26,57 @@ export function registerTrainingSkills(): void {
       const sessions = (asRecord(hist.ok ? hist.data : {})["sessions"] as unknown[]) ?? [];
       const planData = asRecord(plan.ok ? plan.data : {});
       const decisions = asRecord(planData["decisions"]);
+      const planInfo = asRecord(planData["plan"]);
+      const trainingMode = decisions["trainingMode"] ?? planInfo["workoutMode"];
+      const mode =
+        typeof trainingMode === "string" &&
+        ["full", "express", "rest", "deload"].includes(trainingMode)
+          ? trainingMode
+          : null;
+      // Always emit an engine-aligned mode proposal so deterministic specialists
+      // produce DecisionProposal candidates (FASE 23 natural E2E path).
+      const proposal =
+        mode === "full"
+          ? makeSkillProposal({
+              skillId: ctx.skillId,
+              userId: ctx.userId,
+              proposedType: "FULL_WORKOUT",
+              proposedValue: "full",
+              reasonCodes: ["plan_mode_confirm", "analyze_training"],
+              confidence: warnings.length ? 0.6 : 0.78,
+            })
+          : mode === "express"
+            ? makeSkillProposal({
+                skillId: ctx.skillId,
+                userId: ctx.userId,
+                proposedType: "EXPRESS_WORKOUT",
+                proposedValue: "express",
+                reasonCodes: ["plan_mode_confirm", "analyze_training"],
+                confidence: warnings.length ? 0.6 : 0.78,
+              })
+            : mode === "rest"
+              ? makeSkillProposal({
+                  skillId: ctx.skillId,
+                  userId: ctx.userId,
+                  proposedType: "REST",
+                  proposedValue: "rest",
+                  reasonCodes: ["plan_mode_confirm", "analyze_training"],
+                  confidence: warnings.length ? 0.6 : 0.78,
+                })
+              : mode === "deload"
+                ? makeSkillProposal({
+                    skillId: ctx.skillId,
+                    userId: ctx.userId,
+                    proposedType: "DELOAD",
+                    proposedValue: 0.55,
+                    reasonCodes: ["plan_mode_confirm", "analyze_training"],
+                    confidence: warnings.length ? 0.6 : 0.78,
+                  })
+                : null;
       return skillOk(
         {
           sessionCount: sessions.length,
-          trainingMode: decisions["trainingMode"] ?? null,
+          trainingMode: mode,
           trainingVolume: decisions["trainingVolume"] ?? null,
           plan: planData["plan"] ?? null,
         },
@@ -37,12 +84,13 @@ export function registerTrainingSkills(): void {
           { signal: "sessionCount", value: sessions.length, source: "get_training_history" },
           {
             signal: "trainingMode",
-            value: (decisions["trainingMode"] as string) ?? null,
+            value: mode,
             source: "get_current_plan",
           },
         ],
         warnings.length ? 0.55 : 0.8,
         warnings,
+        proposal,
       );
     },
   });

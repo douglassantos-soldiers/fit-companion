@@ -21,12 +21,24 @@ import {
 } from "@/ai/governance";
 
 describe("FASE 20 golden dataset", () => {
-  it("has active cases for all six domains", () => {
+  it("has active cases for core and FASE 23 domains", () => {
     const domains = new Set(getActiveGoldenCases().map((c) => c.domain));
-    for (const d of ["training", "nutrition", "recovery", "sleep", "behavior", "performance"]) {
+    for (const d of [
+      "training",
+      "nutrition",
+      "recovery",
+      "sleep",
+      "behavior",
+      "performance",
+      "exercise_selection",
+      "exercise_substitution",
+      "progression",
+      "fatigue",
+      "goal_adaptation",
+    ]) {
       expect(domains.has(d as never)).toBe(true);
     }
-    expect(GOLDEN_DATASET.length).toBeGreaterThanOrEqual(9);
+    expect(GOLDEN_DATASET.length).toBeGreaterThanOrEqual(14);
     expect(GOLDEN_DATASET_VERSION).toBe("golden_v1");
   });
 });

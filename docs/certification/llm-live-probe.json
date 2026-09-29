@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-09-29T01:14:24.794Z",
+  "keys": {
+    "OPENAI_API_KEY": false,
+    "ANTHROPIC_API_KEY": false,
+    "AI_LLM_LIVE_PROBE": null
+  },
+  "health_ok": true,
+  "health_primary": "openai",
+  "live_probe": {
+    "ok": false,
+    "detail": "live_probe_disabled",
+    "status": "skipped"
+  },
+  "verdict": "BLOCKED",
+  "reason": "no_provider_api_keys_and_live_probe_disabled",
+  "note": "Deterministic coach remains production default; secret-exists != operational."
+}

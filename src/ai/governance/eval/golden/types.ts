@@ -9,7 +9,12 @@ export type GoldenDomain =
   | "recovery"
   | "sleep"
   | "behavior"
-  | "performance";
+  | "performance"
+  | "exercise_selection"
+  | "exercise_substitution"
+  | "progression"
+  | "fatigue"
+  | "goal_adaptation";
 
 export type GoldenReviewStatus = "pending" | "approved" | "rejected";
 

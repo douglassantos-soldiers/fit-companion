@@ -24,6 +24,7 @@ import {
 import { createExecutionPlan } from "@/ai/orchestrator/plan";
 import { registerDefaultAgents } from "@/ai/orchestrator/agents/registry";
 import type { SkillCallTool } from "@/ai/skills/core/types";
+import type { DomainContextLoader } from "@/ai/mcp/core/types";
 import type { DecisionContextSnapshot } from "@/lib/engine/decision-context-snapshot";
 import type { DecisionProposal } from "@/lib/engine/decision-proposal";
 import type { Decision } from "@/lib/engine/decision-contract";
@@ -59,6 +60,8 @@ export type RunProductionAiRuntimeInput = {
   plan?: AgentExecutionPlan;
   forceAgents?: string[];
   callTool?: SkillCallTool;
+  /** MCP domain context (QA / E2E fixtures); tools stay real handlers. */
+  loader?: DomainContextLoader;
   skipKnowledge?: boolean;
   parentRunId?: string;
   /**
@@ -453,6 +456,7 @@ export async function runProductionAiRuntime(
       intent: input.intent ?? plan.intent,
       parentRunId: effectiveParent,
       ...(input.callTool ? { callTool: input.callTool } : {}),
+      ...(input.loader ? { loader: input.loader } : {}),
       ...(input.skipKnowledge !== undefined ? { skipKnowledge: input.skipKnowledge } : {}),
       runtimeMode: input.runtimeMode ?? "deterministic",
     });

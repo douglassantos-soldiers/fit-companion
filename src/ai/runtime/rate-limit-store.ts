@@ -99,12 +99,14 @@ export class SupabaseRateLimitStore implements RateLimitStore {
     if (!db || typeof (db as { rpc?: unknown }).rpc !== "function") {
       return deniedStore(opts.limit, "admin_db_unavailable");
     }
-    const rpc = (db as {
-      rpc: (
-        fn: string,
-        args?: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
-    }).rpc;
+    const rpc = (
+      db as unknown as {
+        rpc: (
+          fn: string,
+          args?: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+      }
+    ).rpc;
     const { data, error } = await rpc("ai_rate_limit_consume", {
       p_key: opts.key,
       p_limit: opts.limit,
@@ -176,6 +178,15 @@ export async function resolveAiRateLimitStore(): Promise<RateLimitStore> {
   const backend = (process.env["AI_RL_BACKEND"] ?? "").trim().toLowerCase();
   if (backend === "memory") return getSharedMemoryRateLimitStore();
   if (backend === "failclosed") return new FailClosedRateLimitStore();
+
+  // Vitest / NODE_ENV=test: shared memory unless AI_RL_BACKEND=supabase explicitly
+  if (
+    backend !== "supabase" &&
+    (process.env["VITEST"] === "true" || process.env["NODE_ENV"] === "test")
+  ) {
+    return getSharedMemoryRateLimitStore();
+  }
+
   if (backend === "supabase" || isProductionLike()) {
     const db = await adminDbLoose();
     if (!db) {
@@ -186,11 +197,7 @@ export async function resolveAiRateLimitStore(): Promise<RateLimitStore> {
     }
     return new SupabaseRateLimitStore();
   }
-  // vitest / local default: shared memory (deterministic tests)
-  if (process.env["VITEST"] === "true" || process.env["NODE_ENV"] === "test") {
-    return getSharedMemoryRateLimitStore();
-  }
-  // Prefer supabase when service role present
+  // Prefer supabase when service role present (non-test)
   if (process.env["SUPABASE_SERVICE_ROLE_KEY"] && process.env["SUPABASE_URL"]) {
     return new SupabaseRateLimitStore();
   }

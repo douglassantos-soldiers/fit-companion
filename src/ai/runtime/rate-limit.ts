@@ -102,10 +102,13 @@ export type AiRateLimitKeys = {
   llmCostUnits?: number;
 };
 
+/** Per-request limit overrides — never mutate process.env to pass these. */
+export type AiRateLimitOverrides = Partial<ReturnType<typeof getAiRateLimitDefaults>>;
+
 type CheckSpec = { key: string; scope: string; window: string; limit: number; amount?: number };
 
-function buildChecks(keys: AiRateLimitKeys): CheckSpec[] {
-  const d = getAiRateLimitDefaults();
+function buildChecks(keys: AiRateLimitKeys, overrides?: AiRateLimitOverrides): CheckSpec[] {
+  const d = { ...getAiRateLimitDefaults(), ...overrides };
   const checks: CheckSpec[] = [];
   if (keys.userId)
     checks.push({ key: `ai:user:${keys.userId}`, scope: "user", window: "rpm", limit: d.user_rpm });
@@ -200,11 +203,12 @@ function buildChecks(keys: AiRateLimitKeys): CheckSpec[] {
 export async function checkAiRateLimits(
   keys: AiRateLimitKeys,
   store?: RateLimitStore,
+  overrides?: AiRateLimitOverrides,
 ): Promise<AiRateLimitResult> {
   if (isAiRateLimitDisabled()) return { ok: true };
 
   const backend = store ?? (await resolveAiRateLimitStore());
-  const checks = buildChecks(keys);
+  const checks = buildChecks(keys, overrides);
   let lastOk: RateLimitConsumeResult | null = null;
 
   for (const c of checks) {

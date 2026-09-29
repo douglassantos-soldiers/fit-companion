@@ -19,6 +19,15 @@ export {
   type ProductionAiRuntimeInject,
 } from "@/ai/runtime/production-runtime";
 
+export {
+  initializeAIInfrastructure,
+  ensureAIInfrastructureReady,
+  getAIInfrastructureReport,
+  resetAIInfrastructureForTests,
+  type AiInfrastructureReport,
+  type AiInfrastructureStatus,
+} from "@/ai/runtime/initialize-ai-infrastructure";
+
 /** Re-exports of operational controls (FASE 21) — not the canonical journey entrypoint. */
 export { getAiFeatureFlags } from "@/ai/runtime/feature-flags";
 export { resolveEffectiveRuntimeMode } from "@/ai/runtime/rollback";

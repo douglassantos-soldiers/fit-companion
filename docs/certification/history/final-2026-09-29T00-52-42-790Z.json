@@ -1,20 +1,20 @@
 {
   "report_version": "fase22_13_v1",
-  "timestamp": "2026-09-29T01:00:22.533Z",
+  "timestamp": "2026-09-29T00:52:42.790Z",
   "commit_sha": "88d237fcb24233324c9d0d3b0d413efd05b4c66e",
   "environment": "local",
   "runtime_version": "CANONICAL",
   "governance_version": "governance_v1",
   "contract_version": 1,
-  "production_ready": true,
+  "production_ready": false,
   "checks": [
     {
       "check_id": "identity",
       "name": "Identity",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:31.418Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T00:53:00.947Z",
+      "duration_ms": 0,
       "evidence": {
         "client_user_ignored": true,
         "cross_user_forbidden": true
@@ -27,8 +27,8 @@
       "name": "Authorization",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:31.419Z",
-      "duration_ms": 2,
+      "executed_at": "2026-09-29T00:53:00.947Z",
+      "duration_ms": 5,
       "evidence": {
         "unauthorized_tool_denied": true,
         "tool": "admin_wipe_everything"
@@ -41,8 +41,8 @@
       "name": "Context",
       "status": "PASS",
       "critical": false,
-      "executed_at": "2026-09-29T01:00:31.421Z",
-      "duration_ms": 299,
+      "executed_at": "2026-09-29T00:53:00.952Z",
+      "duration_ms": 656,
       "evidence": {
         "fingerprint": "v1:cb53ac50",
         "training_mode": "full"
@@ -55,8 +55,8 @@
       "name": "Safety",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:31.720Z",
-      "duration_ms": 227,
+      "executed_at": "2026-09-29T00:53:01.608Z",
+      "duration_ms": 384,
       "evidence": {
         "rejected": true,
         "reason": "escalate_requires_rest_aligned"
@@ -69,8 +69,8 @@
       "name": "Decision Engine",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:31.947Z",
-      "duration_ms": 233,
+      "executed_at": "2026-09-29T00:53:01.994Z",
+      "duration_ms": 445,
       "evidence": {
         "decision_id": "dec_cf1490e5",
         "forged_not_copied": true
@@ -83,8 +83,8 @@
       "name": "Proposal Contract",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:32.180Z",
-      "duration_ms": 395,
+      "executed_at": "2026-09-29T00:53:02.440Z",
+      "duration_ms": 687,
       "evidence": {
         "invalid_context_rejected": true,
         "reason": "context_fingerprint_mismatch"
@@ -97,8 +97,8 @@
       "name": "Tools",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:32.576Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T00:53:03.128Z",
+      "duration_ms": 3,
       "evidence": {
         "deny_ok": true
       },
@@ -110,8 +110,8 @@
       "name": "Skills",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:32.577Z",
-      "duration_ms": 545,
+      "executed_at": "2026-09-29T00:53:03.131Z",
+      "duration_ms": 852,
       "evidence": {
         "skill_count": 19,
         "ran": "analyze_training"
@@ -124,8 +124,8 @@
       "name": "RAG",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.122Z",
-      "duration_ms": 260,
+      "executed_at": "2026-09-29T00:53:03.983Z",
+      "duration_ms": 377,
       "evidence": {
         "RAG_READY": true,
         "environment": "production",
@@ -140,8 +140,8 @@
       "name": "Memory",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.382Z",
-      "duration_ms": 3,
+      "executed_at": "2026-09-29T00:53:04.360Z",
+      "duration_ms": 4,
       "evidence": {
         "MEMORY_READY": true,
         "environment": "test",
@@ -156,7 +156,7 @@
       "name": "LLM Gateway",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.385Z",
+      "executed_at": "2026-09-29T00:53:04.364Z",
       "duration_ms": 2,
       "evidence": {
         "LLM_READY": true,
@@ -172,7 +172,7 @@
       "name": "Audit",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.387Z",
+      "executed_at": "2026-09-29T00:53:04.366Z",
       "duration_ms": 2,
       "evidence": {
         "persisted": true,
@@ -188,8 +188,8 @@
       "name": "Database",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.389Z",
-      "duration_ms": 423,
+      "executed_at": "2026-09-29T00:53:04.369Z",
+      "duration_ms": 526,
       "evidence": {
         "verdict": "PASS",
         "check_count": 60,
@@ -201,16 +201,17 @@
     {
       "check_id": "rate_limit",
       "name": "Rate Limit",
-      "status": "PASS",
+      "status": "BLOCKED",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.812Z",
-      "duration_ms": 46,
+      "executed_at": "2026-09-29T00:53:04.895Z",
+      "duration_ms": 3,
       "evidence": {
         "tripped": true,
         "user_rpm": 2,
-        "readiness": "PASS"
+        "readiness": "BLOCKED",
+        "error_code": "RATE_LIMIT_VERIFICATION_BLOCKED"
       },
-      "error": null,
+      "error": "RATE_LIMIT_VERIFICATION_BLOCKED",
       "environment": "local"
     },
     {
@@ -218,8 +219,8 @@
       "name": "Kill Switch",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.858Z",
-      "duration_ms": 52,
+      "executed_at": "2026-09-29T00:53:04.898Z",
+      "duration_ms": 22,
       "evidence": {
         "mode": "deterministic",
         "force": true,
@@ -235,8 +236,8 @@
       "name": "Rollback",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.910Z",
-      "duration_ms": 1,
+      "executed_at": "2026-09-29T00:53:04.920Z",
+      "duration_ms": 0,
       "evidence": {
         "effective_mode": "deterministic"
       },
@@ -248,8 +249,8 @@
       "name": "Migrations",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:33.911Z",
-      "duration_ms": 368,
+      "executed_at": "2026-09-29T00:53:04.920Z",
+      "duration_ms": 409,
       "evidence": {
         "file_count": 54,
         "remote_verdict": "PASS",
@@ -261,16 +262,16 @@
     {
       "check_id": "e2e",
       "name": "E2E Bridge",
-      "status": "PASS",
+      "status": "BLOCKED",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:34.279Z",
-      "duration_ms": 2772,
+      "executed_at": "2026-09-29T00:53:05.329Z",
+      "duration_ms": 6648,
       "evidence": {
-        "production_e2e": "PASS",
-        "decision_id": "dec_32533c85",
-        "run_id": "prod_17yejue"
+        "production_e2e": "BLOCKED",
+        "local_bridge_decision": "dec_cf1490e5",
+        "note": "remote_stores_blocked_local_engine_ok"
       },
-      "error": null,
+      "error": "PRODUCTION_E2E_BLOCKED",
       "environment": "local"
     },
     {
@@ -278,7 +279,7 @@
       "name": "Cost Bounds",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:37.051Z",
+      "executed_at": "2026-09-29T00:53:11.978Z",
       "duration_ms": 0,
       "evidence": {
         "orchestrator_max": 80,
@@ -292,8 +293,8 @@
       "name": "Canonical Runtime",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:42.886Z",
-      "duration_ms": 991,
+      "executed_at": "2026-09-29T00:53:15.281Z",
+      "duration_ms": 766,
       "evidence": {
         "coach_uses_runtime": true,
         "coach_facade_label": true,
@@ -314,8 +315,8 @@
       "name": "Agents",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:43.878Z",
-      "duration_ms": 3007,
+      "executed_at": "2026-09-29T00:53:16.047Z",
+      "duration_ms": 482,
       "evidence": {
         "registered": 6,
         "specialist_id": "specialist_training",
@@ -332,12 +333,12 @@
       "name": "Evaluation",
       "status": "PASS",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:46.885Z",
-      "duration_ms": 4217,
+      "executed_at": "2026-09-29T00:53:16.529Z",
+      "duration_ms": 4818,
       "evidence": {
         "suite": "test:eval",
         "files": "src/ai/governance/evaluation.test.ts,src/ai/governance/eval-v2.test.ts",
-        "duration_ms": 4216,
+        "duration_ms": 4818,
         "golden": "golden_v1",
         "eval_version": "eval_v2"
       },
@@ -347,19 +348,16 @@
     {
       "check_id": "ci_cd",
       "name": "CI/CD Safety Gate",
-      "status": "PASS",
+      "status": "FAIL",
       "critical": true,
-      "executed_at": "2026-09-29T01:00:51.103Z",
-      "duration_ms": 232,
+      "executed_at": "2026-09-29T00:53:21.347Z",
+      "duration_ms": 746,
       "evidence": {
-        "workflow": true,
-        "script": true,
-        "latest": true,
-        "gate_stdout_class": "PASS",
-        "gate_exit": 0,
-        "workflow_has_gates": true
+        "workflow_has_gates": true,
+        "gate_stdout_class": "FAIL",
+        "gate_exit": 1
       },
-      "error": null,
+      "error": "ci_gate_exit_1",
       "environment": "local"
     }
   ],
@@ -369,7 +367,7 @@
       "check": "canonical_runtime",
       "status": "PASS",
       "evidence": "{\"coach_uses_runtime\":true,\"coach_facade_label\":true,\"runtime_path_canonical\":true,\"no_parallel_decision_writer\":true,\"runtime_path_label\":\"CANONICAL\",\"runtime_ok\":true,\"has_decision\":true,\"decision_id\":\"dec_80e8ca6f\",\"reason\":null,\"runtime_version\":\"CANONICAL\"}",
-      "timestamp": "2026-09-29T01:00:42.886Z",
+      "timestamp": "2026-09-29T00:53:15.281Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -380,7 +378,7 @@
       "check": "kill_switch",
       "status": "PASS",
       "evidence": "{\"mode\":\"deterministic\",\"force\":true,\"global_alias\":true,\"rag_alias\":true,\"readiness\":\"PASS\"}",
-      "timestamp": "2026-09-29T01:00:33.858Z",
+      "timestamp": "2026-09-29T00:53:04.898Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -391,7 +389,7 @@
       "check": "rollback",
       "status": "PASS",
       "evidence": "{\"effective_mode\":\"deterministic\"}",
-      "timestamp": "2026-09-29T01:00:33.910Z",
+      "timestamp": "2026-09-29T00:53:04.920Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -402,7 +400,7 @@
       "check": "decision_engine",
       "status": "PASS",
       "evidence": "{\"decision_id\":\"dec_cf1490e5\",\"forged_not_copied\":true}",
-      "timestamp": "2026-09-29T01:00:31.947Z",
+      "timestamp": "2026-09-29T00:53:01.994Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -413,7 +411,7 @@
       "check": "proposal_contract",
       "status": "PASS",
       "evidence": "{\"invalid_context_rejected\":true,\"reason\":\"context_fingerprint_mismatch\"}",
-      "timestamp": "2026-09-29T01:00:32.180Z",
+      "timestamp": "2026-09-29T00:53:02.440Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -424,7 +422,7 @@
       "check": "safety",
       "status": "PASS",
       "evidence": "{\"rejected\":true,\"reason\":\"escalate_requires_rest_aligned\"}",
-      "timestamp": "2026-09-29T01:00:31.720Z",
+      "timestamp": "2026-09-29T00:53:01.608Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -435,7 +433,7 @@
       "check": "identity",
       "status": "PASS",
       "evidence": "{\"client_user_ignored\":true,\"cross_user_forbidden\":true}",
-      "timestamp": "2026-09-29T01:00:31.418Z",
+      "timestamp": "2026-09-29T00:53:00.947Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -446,7 +444,7 @@
       "check": "authorization",
       "status": "PASS",
       "evidence": "{\"unauthorized_tool_denied\":true,\"tool\":\"admin_wipe_everything\"}",
-      "timestamp": "2026-09-29T01:00:31.419Z",
+      "timestamp": "2026-09-29T00:53:00.947Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -457,7 +455,7 @@
       "check": "tools",
       "status": "PASS",
       "evidence": "{\"deny_ok\":true}",
-      "timestamp": "2026-09-29T01:00:32.576Z",
+      "timestamp": "2026-09-29T00:53:03.128Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -468,7 +466,7 @@
       "check": "agents",
       "status": "PASS",
       "evidence": "{\"registered\":6,\"specialist_id\":\"specialist_training\",\"specialist_ok\":true,\"no_decision_authority\":true,\"has_proposal\":false,\"status\":\"completed\"}",
-      "timestamp": "2026-09-29T01:00:43.878Z",
+      "timestamp": "2026-09-29T00:53:16.047Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -479,7 +477,7 @@
       "check": "skills",
       "status": "PASS",
       "evidence": "{\"skill_count\":19,\"ran\":\"analyze_training\"}",
-      "timestamp": "2026-09-29T01:00:32.577Z",
+      "timestamp": "2026-09-29T00:53:03.131Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -490,7 +488,7 @@
       "check": "tools",
       "status": "PASS",
       "evidence": "{\"deny_ok\":true}",
-      "timestamp": "2026-09-29T01:00:32.576Z",
+      "timestamp": "2026-09-29T00:53:03.128Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -501,7 +499,7 @@
       "check": "rag",
       "status": "PASS",
       "evidence": "{\"RAG_READY\":true,\"environment\":\"production\",\"store_id\":\"supabase_pgvector_v1\",\"reasons\":null}",
-      "timestamp": "2026-09-29T01:00:33.122Z",
+      "timestamp": "2026-09-29T00:53:03.983Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -512,7 +510,7 @@
       "check": "memory",
       "status": "PASS",
       "evidence": "{\"MEMORY_READY\":true,\"environment\":\"test\",\"store_id\":\"memory_v1\",\"reasons\":null}",
-      "timestamp": "2026-09-29T01:00:33.382Z",
+      "timestamp": "2026-09-29T00:53:04.360Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -523,7 +521,7 @@
       "check": "llm",
       "status": "PASS",
       "evidence": "{\"LLM_READY\":true,\"environment\":\"test\",\"primary\":\"openai\",\"reasons\":null}",
-      "timestamp": "2026-09-29T01:00:33.385Z",
+      "timestamp": "2026-09-29T00:53:04.364Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -534,7 +532,7 @@
       "check": "cost",
       "status": "PASS",
       "evidence": "{\"orchestrator_max\":80,\"gateway_max_tokens\":900}",
-      "timestamp": "2026-09-29T01:00:37.051Z",
+      "timestamp": "2026-09-29T00:53:11.978Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -545,7 +543,7 @@
       "check": "audit",
       "status": "PASS",
       "evidence": "{\"persisted\":true,\"audit_id\":\"audit_decision_dec_cert_audit\",\"durability\":\"critical\",\"store_size\":1}",
-      "timestamp": "2026-09-29T01:00:33.387Z",
+      "timestamp": "2026-09-29T00:53:04.366Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -555,8 +553,8 @@
       "component": "evaluation",
       "check": "evaluation",
       "status": "PASS",
-      "evidence": "{\"suite\":\"test:eval\",\"files\":\"src/ai/governance/evaluation.test.ts,src/ai/governance/eval-v2.test.ts\",\"duration_ms\":4216,\"golden\":\"golden_v1\",\"eval_version\":\"eval_v2\"}",
-      "timestamp": "2026-09-29T01:00:46.885Z",
+      "evidence": "{\"suite\":\"test:eval\",\"files\":\"src/ai/governance/evaluation.test.ts,src/ai/governance/eval-v2.test.ts\",\"duration_ms\":4818,\"golden\":\"golden_v1\",\"eval_version\":\"eval_v2\"}",
+      "timestamp": "2026-09-29T00:53:16.529Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -565,20 +563,20 @@
     {
       "component": "ci_cd",
       "check": "ci_cd",
-      "status": "PASS",
-      "evidence": "{\"workflow\":true,\"script\":true,\"latest\":true,\"gate_stdout_class\":\"PASS\",\"gate_exit\":0,\"workflow_has_gates\":true}",
-      "timestamp": "2026-09-29T01:00:51.103Z",
-      "error": null,
+      "status": "FAIL",
+      "evidence": "{\"workflow_has_gates\":true,\"gate_stdout_class\":\"FAIL\",\"gate_exit\":1}",
+      "timestamp": "2026-09-29T00:53:21.347Z",
+      "error": "ci_gate_exit_1",
       "environment": "local",
       "critical": true,
-      "blocking": false
+      "blocking": true
     },
     {
       "component": "database",
       "check": "database",
       "status": "PASS",
       "evidence": "{\"verdict\":\"PASS\",\"check_count\":60,\"critical_drift\":\"none\"}",
-      "timestamp": "2026-09-29T01:00:33.389Z",
+      "timestamp": "2026-09-29T00:53:04.369Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -589,7 +587,7 @@
       "check": "migrations",
       "status": "PASS",
       "evidence": "{\"file_count\":54,\"remote_verdict\":\"PASS\",\"check_count\":60}",
-      "timestamp": "2026-09-29T01:00:33.911Z",
+      "timestamp": "2026-09-29T00:53:04.920Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -598,20 +596,20 @@
     {
       "component": "rate_limiting",
       "check": "rate_limit",
-      "status": "PASS",
-      "evidence": "{\"tripped\":true,\"user_rpm\":2,\"readiness\":\"PASS\"}",
-      "timestamp": "2026-09-29T01:00:33.812Z",
-      "error": null,
+      "status": "BLOCKED",
+      "evidence": "{\"tripped\":true,\"user_rpm\":2,\"readiness\":\"BLOCKED\",\"error_code\":\"RATE_LIMIT_VERIFICATION_BLOCKED\"}",
+      "timestamp": "2026-09-29T00:53:04.895Z",
+      "error": "RATE_LIMIT_VERIFICATION_BLOCKED",
       "environment": "local",
       "critical": true,
-      "blocking": false
+      "blocking": true
     },
     {
       "component": "kill_switch",
       "check": "kill_switch",
       "status": "PASS",
       "evidence": "{\"mode\":\"deterministic\",\"force\":true,\"global_alias\":true,\"rag_alias\":true,\"readiness\":\"PASS\"}",
-      "timestamp": "2026-09-29T01:00:33.858Z",
+      "timestamp": "2026-09-29T00:53:04.898Z",
       "error": null,
       "environment": "local",
       "critical": true,
@@ -620,26 +618,35 @@
     {
       "component": "e2e",
       "check": "e2e",
-      "status": "PASS",
-      "evidence": "{\"production_e2e\":\"PASS\",\"decision_id\":\"dec_32533c85\",\"run_id\":\"prod_17yejue\"}",
-      "timestamp": "2026-09-29T01:00:34.279Z",
-      "error": null,
+      "status": "BLOCKED",
+      "evidence": "{\"production_e2e\":\"BLOCKED\",\"local_bridge_decision\":\"dec_cf1490e5\",\"note\":\"remote_stores_blocked_local_engine_ok\"}",
+      "timestamp": "2026-09-29T00:53:05.329Z",
+      "error": "PRODUCTION_E2E_BLOCKED",
       "environment": "local",
       "critical": true,
-      "blocking": false
+      "blocking": true
     }
   ],
-  "failed_checks": [],
-  "blocked_checks": [],
+  "failed_checks": [
+    "ci_cd"
+  ],
+  "blocked_checks": [
+    "rate_limit",
+    "e2e"
+  ],
   "untested_checks": [],
   "warnings": [],
-  "failures": [],
+  "failures": [
+    "rate_limit:BLOCKED:RATE_LIMIT_VERIFICATION_BLOCKED",
+    "e2e:BLOCKED:PRODUCTION_E2E_BLOCKED",
+    "ci_cd:FAIL:ci_gate_exit_1"
+  ],
   "evidence": {
     "probe_count": 19,
     "critical_count": 16,
-    "pass_count": 19,
+    "pass_count": 17,
     "untested_count": 0,
-    "blocked_count": 0,
+    "blocked_count": 2,
     "fail_count": 0,
     "final_report_version": "fase22_13_v1",
     "supplemental_count": 4,
@@ -651,7 +658,7 @@
     "ok": true,
     "passed": 28,
     "failed": 0,
-    "duration_ms": 7178,
+    "duration_ms": 17689,
     "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
     "error": null
   },
@@ -670,8 +677,8 @@
     {
       "id": "rate-limit-readiness",
       "path": "docs/certification/rate-limit-readiness.json",
-      "verdict": "PASS",
-      "error_code": null
+      "verdict": "BLOCKED",
+      "error_code": "RATE_LIMIT_VERIFICATION_BLOCKED"
     },
     {
       "id": "kill-switch-readiness",
@@ -682,8 +689,8 @@
     {
       "id": "production-e2e",
       "path": "docs/certification/production-e2e.json",
-      "verdict": "PASS",
-      "error_code": null
+      "verdict": "BLOCKED",
+      "error_code": "PRODUCTION_E2E_BLOCKED"
     }
   ],
   "providers": "PASS:{LLM_READY,environment,primary,reasons}",
@@ -691,7 +698,7 @@
   "rag_status": "PASS:{RAG_READY,environment,store_id,reasons}",
   "memory_status": "PASS:{MEMORY_READY,environment,store_id,reasons}",
   "audit_status": "PASS:{persisted,audit_id,durability,store_size}",
-  "e2e_status": "PASS:{production_e2e,decision_id,run_id}",
+  "e2e_status": "BLOCKED:{production_e2e,local_bridge_decision,note}",
   "files_changed_note": "FASE 22.13 certification aggregator only — see final.json / this markdown; no product feature commits implied",
   "tests_executed": [
     "certification vitest suite (security/data/failure/runtime/integrity)",

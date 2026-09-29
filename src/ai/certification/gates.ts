@@ -37,6 +37,8 @@ export type EvaluateReadyInput = {
   test_suite: CertTestSuiteResult;
   timestamp?: string;
   commit_sha?: string;
+  /** When set, mismatch with commit_sha → CERTIFICATION_STALE and production_ready=false */
+  expected_commit_sha?: string;
   environment?: CertEnvironment;
   evidence?: Record<string, string | number | boolean | null>;
 };
@@ -47,6 +49,7 @@ export type EvaluateReadyInput = {
  * - no critical FAIL/UNTESTED/BLOCKED/DEGRADED
  * - test suite executed and ok
  * - critical gates all 100%
+ * - commit matches expected HEAD when provided (FASE 23.10)
  */
 export function evaluateProductionReady(input: EvaluateReadyInput): CertificationReport {
   const checks = input.checks.map(normalizeCheck);
@@ -59,6 +62,19 @@ export function evaluateProductionReady(input: EvaluateReadyInput): Certificatio
   } else if (!input.test_suite.ok) {
     failures.push(
       `test_suite:failed${input.test_suite.failed != null ? `:${input.test_suite.failed}` : ""}`,
+    );
+  }
+
+  const commit_sha = input.commit_sha ?? "unknown";
+  if (
+    input.expected_commit_sha &&
+    input.expected_commit_sha.trim() !== "" &&
+    commit_sha !== "unknown" &&
+    !commit_sha.startsWith(input.expected_commit_sha.trim()) &&
+    !input.expected_commit_sha.trim().startsWith(commit_sha)
+  ) {
+    failures.push(
+      `CERTIFICATION_STALE:report=${commit_sha.slice(0, 12)} expected=${input.expected_commit_sha.slice(0, 12)}`,
     );
   }
 
@@ -94,10 +110,10 @@ export function evaluateProductionReady(input: EvaluateReadyInput): Certificatio
     checks.filter((c) => c.critical).every((c) => isExecutedPass(c));
 
   return {
-    report_version: "fase22_7_v1",
+    report_version: "fase23_10_v1",
     timestamp: input.timestamp ?? new Date().toISOString(),
-    commit_sha: input.commit_sha ?? "unknown",
-    environment: input.environment ?? "local",
+    commit_sha,
+    environment: input.environment ?? "LOCAL_TEST",
     production_ready,
     checks,
     failures: uniqFailures,

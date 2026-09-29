@@ -4,6 +4,7 @@ import {
   readAccessSession,
 } from "@/lib/access-session.server";
 import { checkAiRateLimits } from "@/ai/runtime/rate-limit";
+import { ensureAIInfrastructureReady } from "@/ai/runtime/initialize-ai-infrastructure";
 import {
   buildStructuredCoachReply,
   detectCoachIntent,
@@ -87,19 +88,26 @@ export const askAiCoach = createServerFn({ method: "POST" })
       return { text: "", error: "unauthorized" as const };
     }
 
+    // FASE 23.4 — warm AI infra (RAG/Memory/RL); Coach continues if degraded.
+    try {
+      await ensureAIInfrastructureReady();
+    } catch {
+      /* readiness checked inside runtime; do not hard-fail coach */
+    }
+
     const limits = coachRateLimits();
-    // Preserve COACH_RPM/COACH_RPD via env while using distributed store (api + session).
-    const prevApi = process.env["AI_RL_API_RPM"];
-    const prevSession = process.env["AI_RL_SESSION_RPM"];
-    process.env["AI_RL_API_RPM"] = String(limits.rpm);
-    process.env["AI_RL_SESSION_RPM"] = String(limits.rpm);
+    // FASE 23.5 — pass COACH_RPM via explicit overrides (never mutate process.env).
     let rl;
     try {
-      rl = await checkAiRateLimits({
-        apiKey: session.userId ?? session.email,
-        sessionId: session.email,
-        ...(session.userId ? { userId: session.userId } : {}),
-      });
+      rl = await checkAiRateLimits(
+        {
+          apiKey: session.userId ?? session.email,
+          sessionId: session.email,
+          ...(session.userId ? { userId: session.userId } : {}),
+        },
+        undefined,
+        { api_rpm: limits.rpm, session_rpm: limits.rpm },
+      );
       // Daily coach budget (separate key / 24h window via api key day suffix handled by extra consume)
       if (rl.ok) {
         const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
@@ -123,11 +131,8 @@ export const askAiCoach = createServerFn({ method: "POST" })
           };
         }
       }
-    } finally {
-      if (prevApi === undefined) delete process.env["AI_RL_API_RPM"];
-      else process.env["AI_RL_API_RPM"] = prevApi;
-      if (prevSession === undefined) delete process.env["AI_RL_SESSION_RPM"];
-      else process.env["AI_RL_SESSION_RPM"] = prevSession;
+    } catch {
+      return { text: "", error: "misconfigured" as const };
     }
     if (!rl.ok) {
       return {

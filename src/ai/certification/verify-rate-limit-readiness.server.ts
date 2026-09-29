@@ -93,7 +93,7 @@ export async function verifyAiRateLimitReadiness(opts?: {
         status: "pass",
       });
       const rpc = (
-        db as {
+        db as unknown as {
           rpc: (
             fn: string,
             args?: Record<string, unknown>,

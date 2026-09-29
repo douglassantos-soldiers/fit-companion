@@ -23,6 +23,7 @@
     "cert:migrations": "npx vitest run src/ai/certification/performance.bench.test.ts -t \"defaults are UNTESTED\"",
     "ai:certification": "npx vitest run src/ai/certification/run-production-certification.cli.test.ts --reporter=verbose",
     "ai:ci-verdict": "node scripts/ai-ci-gate-verdict.mjs",
+    "ai:release-verdict": "node scripts/ai-ci-gate-verdict.mjs --release",
     "ai:db-readiness": "npx vitest run src/ai/certification/database-readiness.test.ts --reporter=verbose",
     "ai:rate-limit": "npx vitest run src/ai/runtime/rate-limit.distributed.test.ts src/ai/certification/runtime-controls.test.ts --reporter=verbose",
     "ai:kill-switch": "npx vitest run src/ai/runtime/kill-switch.test.ts src/ai/certification/runtime-controls.test.ts --reporter=verbose",

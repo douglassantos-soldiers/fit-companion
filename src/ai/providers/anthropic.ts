@@ -36,7 +36,32 @@ export class AnthropicProvider implements AIProvider {
   async healthCheck(): Promise<{ ok: boolean; detail?: string }> {
     const key = process.env["ANTHROPIC_API_KEY"]?.trim();
     if (!key) return { ok: false, detail: "ANTHROPIC_API_KEY_missing" };
-    return { ok: true, detail: "configured" };
+    const probe =
+      process.env["AI_LLM_CREDENTIAL_PROBE"] === "1" ||
+      process.env["AI_LLM_CREDENTIAL_PROBE"] === "true" ||
+      process.env["AI_LLM_ENV"] === "production" ||
+      process.env["NODE_ENV"] === "production";
+    if (!probe) return { ok: true, detail: "configured" };
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/models", {
+        method: "GET",
+        headers: {
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (res.status === 401 || res.status === 403) {
+        return { ok: false, detail: "LLM_PROVIDER_UNAVAILABLE:unauthorized" };
+      }
+      if (!res.ok) {
+        return { ok: false, detail: `LLM_PROVIDER_UNAVAILABLE:http_${res.status}` };
+      }
+      return { ok: true, detail: "credential_validated" };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, detail: `LLM_PROVIDER_UNAVAILABLE:${msg.slice(0, 120)}` };
+    }
   }
 
   async stream(): Promise<ReturnType<typeof makeAIError>> {

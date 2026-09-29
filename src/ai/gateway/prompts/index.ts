@@ -35,8 +35,29 @@ Proposal is a candidate only; Decision Engine remains the sole authority.
 Use provided skill/RAG/tool context; do not invent medical claims.`,
 };
 
+const MEAL_V1: PromptRecord = {
+  prompt_id: "meal_ai.v1",
+  version: "1.0.0",
+  domain: "nutrition",
+  agent_id: "meal_ai",
+  created_at: "2026-09-28T00:00:00.000Z",
+  system: `You estimate meal macros as JSON only. You NEVER emit a Decision or write Living Plan state.
+Output suggestion fields only (label, proteinG, kcal, quality, confidence). Not medical advice.`,
+};
+
+const COACH_LEGACY_V1: PromptRecord = {
+  prompt_id: "coach_legacy.v1",
+  version: "1.0.0",
+  domain: "coach",
+  agent_id: "coach_legacy_provider",
+  created_at: "2026-09-28T00:00:00.000Z",
+  system: `You are a fitness coach assistant. You do not emit final Decisions; proposals only.`,
+};
+
 const PROMPTS: Record<string, PromptRecord> = {
   [TRAINING_V1.prompt_id]: TRAINING_V1,
+  [MEAL_V1.prompt_id]: MEAL_V1,
+  [COACH_LEGACY_V1.prompt_id]: COACH_LEGACY_V1,
 };
 
 export function getPrompt(promptId: string): PromptRecord | null {

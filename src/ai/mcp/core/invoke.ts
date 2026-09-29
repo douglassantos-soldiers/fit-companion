@@ -100,11 +100,12 @@ export async function invokeTool(req: ToolInvokeRequest): Promise<ToolInvokeResu
   }
 
   const { checkAiRateLimits } = await import("@/ai/runtime/rate-limit");
+  // Do not pass runId here: run_per_invoke gates top-level LLM/gateway invokes,
+  // not every MCP tool call inside a specialist run.
   const rl = await checkAiRateLimits({
     ...(authz.userId ? { userId: authz.userId } : {}),
     toolId: req.toolId,
     agentId: agent_id,
-    ...(req.runId ? { runId: req.runId } : {}),
   });
   if (!rl.ok) {
     return finish({
