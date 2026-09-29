@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-09-29T01:34:17.307Z",
+  "project_ref": "zphtvrsxlhfgltwgbreu",
+  "project_name": "APP",
+  "migrations": "already_in_sync",
+  "migration_count": 54,
+  "db_push_dry_run": "upToDate",
+  "bundles_executed": [],
+  "rag_seed": {
+    "ok": true,
+    "documents": 25,
+    "chunks": 25,
+    "store_id": "supabase_pgvector_v1"
+  },
+  "database_readiness": {
+    "verdict": "PASS",
+    "error_code": null
+  },
+  "rate_limit_readiness": {
+    "verdict": "PASS",
+    "error_code": null
+  },
+  "advisors": {
+    "blocking": false,
+    "warnings": [
+      "extension_in_public:vector",
+      "auth_leaked_password_protection_disabled"
+    ]
+  }
+}
