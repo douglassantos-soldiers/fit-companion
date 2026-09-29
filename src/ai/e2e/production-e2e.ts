@@ -328,7 +328,15 @@ export async function runProductionE2E(
     if (mode === "happy" || mode === "full") {
       // Failures + isolation burn shared agent/tool RL buckets — clear again before happy.
       resetAiRateLimitStoreForTests();
-      happy = await runHappyPath(correlation);
+      const prevRl = process.env["AI_RL_DISABLED"];
+      // Happy path certifies Decision Authority, not RL (covered by rate-limit-readiness).
+      process.env["AI_RL_DISABLED"] = "1";
+      try {
+        happy = await runHappyPath(correlation);
+      } finally {
+        if (prevRl === undefined) delete process.env["AI_RL_DISABLED"];
+        else process.env["AI_RL_DISABLED"] = prevRl;
+      }
     }
 
     const failuresFailed = failures.some((f) => f.expected_fail && !f.ok);
@@ -413,10 +421,14 @@ async function runHappyPath(
     correlation.proposal_id = out.correlation.proposal_id;
 
     if (!out.decision) {
+      const warn = out.specialist_results
+        .flatMap((r) => r.warnings ?? [])
+        .slice(0, 8)
+        .join("|");
       return {
         id: "happy",
         ok: false,
-        detail: `${out.reason ?? "no_decision"};merge=${out.merge?.resolution_reason ?? "n/a"}`,
+        detail: `${out.reason ?? "no_decision"};merge=${out.merge?.resolution_reason ?? "n/a"};warnings=${warn || "none"}`,
       };
     }
     if (!out.proposal) {
