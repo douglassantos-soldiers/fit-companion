@@ -438,34 +438,45 @@ async function runHappyPath(
       return { id: "happy", ok: false, detail: "no_living_plan" };
     }
 
-    // Audit read-back (best-effort via service_role)
+    // Audit read-back via service_role (PK is audit_id, not id)
     const db = await adminDbLoose();
     if (db && out.correlation.run_id) {
       try {
         const q = db.from("ai_audit_events") as {
           select: (c: string) => {
             eq?: (col: string, val: string) => {
-              limit: (n: number) => Promise<{ error: { message?: string } | null }>;
+              limit: (
+                n: number,
+              ) => Promise<{ data?: Array<{ audit_id?: string }> | null; error: { message?: string } | null }>;
             };
-            limit: (n: number) => Promise<{ error: { message?: string } | null }>;
+            limit: (
+              n: number,
+            ) => Promise<{ data?: Array<{ audit_id?: string }> | null; error: { message?: string } | null }>;
           };
         };
-        const sel = q.select("id");
-        const { error } = sel.eq
+        const sel = q.select("audit_id");
+        const { data, error } = sel.eq
           ? await sel.eq("run_id", out.correlation.run_id).limit(5)
           : await sel.limit(1);
         if (error) {
           return {
             id: "happy",
-            ok: true,
-            detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_warn:${error.message}`,
+            ok: false,
+            detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_fail:${error.message}`,
+          };
+        }
+        if (!data?.length) {
+          return {
+            id: "happy",
+            ok: false,
+            detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_fail:no_rows`,
           };
         }
       } catch (e) {
         return {
           id: "happy",
-          ok: true,
-          detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_warn:${e instanceof Error ? e.message : String(e)}`,
+          ok: false,
+          detail: `decision=${out.correlation.decision_id};natural_path;audit_readback_fail:${e instanceof Error ? e.message : String(e)}`,
         };
       }
     }

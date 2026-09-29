@@ -66,6 +66,13 @@ npm run cert:migrations
 
 Tabelas canônicas: `ai_audit_events`, `ai_*_memory`, `ai_knowledge_*`.
 
+## Sync / persistência de domínio
+
+- `pushStateServer` grava via **upserts paralelos** (sem `BEGIN/COMMIT` atômico). Falha em uma tabela pode deixar o remoto parcial.
+- O cliente (`pushState`) **não** faz ACK/`flushOutbox` quando `ok === false` ou `partial === true`.
+- `clearAccountData` só limpa local após wipe remoto `ok` sem `partial`.
+- Outbox offline cobre eventos + day_checkin; o restante depende do push full-state.
+
 ## Certificação (FASE 22.7)
 
 ```bash

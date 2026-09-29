@@ -7,6 +7,19 @@ import { clearRemoteStateFn, pullStateFn, pushStateFn } from "@/lib/sync.functio
 
 const DEVICE_KEY = "soldiers-device-id";
 
+export type PushStateResult = {
+  ok: boolean;
+  partial?: boolean;
+  userId: string | null;
+  conflicts?: string[];
+  errors?: Array<{ table: string; code: string }>;
+};
+
+/** Full ACK only when every critical write succeeded (no partial / failed push). */
+export function shouldAckPushAndFlushOutbox(result: PushStateResult): boolean {
+  return result.ok === true && result.partial !== true;
+}
+
 export function getDeviceId(): string {
   if (typeof window === "undefined") return "";
   let id = window.localStorage.getItem(DEVICE_KEY);
@@ -29,15 +42,33 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
   }
 }
 
-/** Push state; server stamps trusted user_id (ignores client userId claim). */
-export async function pushState(deviceId: string, state: AppState): Promise<void> {
-  if (!deviceId) return;
+/**
+ * Push state; server stamps trusted user_id (ignores client userId claim).
+ * Returns server result. Does not flush outbox on ok=false or partial writes.
+ */
+export async function pushState(deviceId: string, state: AppState): Promise<PushStateResult> {
+  if (!deviceId) return { ok: false, userId: null };
   try {
-    await pushStateFn({ data: { deviceId, state } });
+    const result = (await pushStateFn({ data: { deviceId, state } })) as PushStateResult;
+    if (!shouldAckPushAndFlushOutbox(result)) {
+      console.error("Falha parcial ao sincronizar dados", {
+        ok: result.ok,
+        partial: result.partial,
+        errors: result.errors,
+        conflicts: result.conflicts,
+      });
+      return result;
+    }
     const { flushOutbox } = await import("@/lib/sync/outbox");
     void flushOutbox().catch(() => undefined);
+    return result;
   } catch (e) {
     console.error("Falha ao sincronizar dados", e);
+    return {
+      ok: false,
+      userId: null,
+      errors: [{ table: "client", code: "push_exception" }],
+    };
   }
 }
 

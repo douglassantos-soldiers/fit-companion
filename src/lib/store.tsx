@@ -2137,13 +2137,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // Local-only clear — does not wipe server account data
       },
       clearAccountData: async () => {
+        const { clearUserDataFn } = await import("@/lib/sync.functions");
+        const remote = await clearUserDataFn({ data: { deviceId: deviceId.current } });
+        if (!remote.ok || remote.partial) {
+          return remote;
+        }
         skipPush.current = true;
         setState(emptyState);
         applyUserCatalog([]);
         applyTheme("dark");
         if (typeof window !== "undefined") window.localStorage.removeItem(KEY);
-        const { clearUserDataFn } = await import("@/lib/sync.functions");
-        return clearUserDataFn({ data: { deviceId: deviceId.current } });
+        return remote;
       },
     }),
     [state, hydrated, update, lastSessionXp],

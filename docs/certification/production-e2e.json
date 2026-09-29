@@ -1,7 +1,7 @@
 {
   "report_version": "fase22_12_v1",
-  "checked_at": "2026-09-29T01:27:58.952Z",
-  "environment": "test",
+  "checked_at": "2026-09-29T02:12:39.478Z",
+  "environment": "production",
   "verdict": "PASS",
   "path_label": "PRODUCTION_E2E",
   "stores": {
@@ -14,7 +14,7 @@
   "happy": {
     "id": "happy",
     "ok": true,
-    "detail": "decision=dec_32533c85;natural_path;audit_readback_warn:column ai_audit_events.id does not exist"
+    "detail": "decision=dec_32533c85;natural_path;proposal=sp_d35afe01"
   },
   "failures": [
     {
@@ -75,14 +75,14 @@
   "correlation": {
     "run_id": "prod_17yejue",
     "decision_id": "dec_32533c85",
-    "outcome_id": "out_dec_32533c85_mulzyvgn",
-    "learning_event_id": "le_339bcd05",
-    "proposal_id": "sp_2d77c40d"
+    "outcome_id": "out_dec_32533c85_mum1kaol",
+    "learning_event_id": "le_d7fd07e",
+    "proposal_id": "sp_d35afe01"
   },
   "idempotency": {
     "id": "idempotency",
     "ok": true,
-    "detail": "prod_zx1nse"
+    "detail": "prod_1krhghf"
   },
   "isolation": {
     "id": "isolation",

@@ -1,26 +1,28 @@
 # FASE 23 — Production Readiness Matrix
 
-**Commit:** `c189e8645ecf19046c6e0c68b2f7e8b17cd6eb32`  
+**Commit:** `af82ed7f9485144509bc478739fafe50daabd656`  
 **Environment:** `LOCAL_TEST` (remote Supabase with service_role)  
 **Certified at:** see `docs/certification/latest.json` timestamp  
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| Current Commit | PASS | Matches HEAD `c189e86` |
-| Supabase | PASS | database-readiness PASS |
+| Current Commit | PASS | Exact SHA match HEAD `af82ed7` (ancestor/prefix não aceitos) |
+| Supabase | PASS | database-readiness PASS + probe-ai-tables HTTP 200 |
 | Migrations | PASS | remote verification PASS |
-| RAG | PASS | seed 25 docs; retrieval READY |
+| RAG | PASS | seed 25 docs (`AI_RAG_ENV=production`); retrieval READY |
 | Memory | PASS | SupabaseMemoryStore ping + isolation |
 | LLM Gateway | PASS (structural) | live provider probe **BLOCKED** without keys — see `llm-live-probe.json` |
 | Decision Authority | PASS | proposal ≠ decision; natural specialist→bridge E2E |
 | Identity/RLS | PASS | ai_* service_role-only; device_id provenance only |
-| Audit | PASS | critical persist on E2E (fixture users) |
+| Audit | PASS | critical persist + readback `audit_id` on E2E |
 | Rate Limit | PASS | `ai_rate_limit_consume` remote RPC; tool path no longer misuses run_per_invoke |
 | Kill Switch | PASS | kill-switch-readiness PASS |
 | CI Structural Gate | PASS | `npm run ai:ci-verdict` exit 0 |
-| Production Release Gate | PASS when production_ready | `npm run ai:release-verdict` |
+| Production Release Gate | PASS | `npm run ai:release-verdict` + exact SHA |
 | Production E2E | PASS | happy `natural_path` (no aligned_proposal fallback) |
 | Certification | PASS | `production_ready: true` on HEAD |
+| Sync partial | PASS (code) | client no ACK on partial; clearAccountData remote-first |
+| UI smoke | PENDING_OPERATOR | `docs/certification/ui-smoke-checklist.md` |
 
 ## Notes
 

@@ -667,7 +667,7 @@ export async function pushStateServer(
 
   const userId = identity.userId;
   const channel = { user_id: userId, device_id: deviceId };
-  const tasks: Array<PromiseLike<unknown>> = [];
+  const tasks: Array<{ table: string; run: PromiseLike<unknown> }> = [];
   const conflicts: string[] = [];
 
   if (state.profile) {
@@ -683,8 +683,9 @@ export async function pushStateServer(
         clientUpdatedAt: new Date().toISOString(),
       })
     ) {
-      tasks.push(
-        db.from("profiles").upsert(
+      tasks.push({
+        table: "profiles",
+        run: db.from("profiles").upsert(
           {
             ...channel,
             name: state.profile.name,
@@ -715,23 +716,25 @@ export async function pushStateServer(
           },
           { onConflict: "user_id" },
         ),
-      );
-      tasks.push(
-        db
+      });
+      tasks.push({
+        table: "users",
+        run: db
           .from("users")
           .update({
             timezone: state.profile.timezone ?? "America/Sao_Paulo",
             updated_at: new Date().toISOString(),
           })
           .eq("id", userId),
-      );
+      });
     } else {
       conflicts.push("profile");
     }
   }
 
-  tasks.push(
-    (async () => {
+  tasks.push({
+    table: "app_state",
+    run: (async () => {
       const { data: remoteApp } = await db
         .from("app_state")
         .select("version, updated_at")
@@ -765,7 +768,7 @@ export async function pushStateServer(
         { onConflict: "user_id" },
       );
     })(),
-  );
+  });
 
   if (state.sessions.length) {
     const { data: remoteSessions } = await db
@@ -788,8 +791,9 @@ export async function pushStateServer(
       return ok;
     });
     if (accepted.length) {
-      tasks.push(
-        db.from("sessions").upsert(
+      tasks.push({
+        table: "sessions",
+        run: db.from("sessions").upsert(
           accepted.map((s) => {
             const remote = remoteById.get(s.id);
             return {
@@ -809,13 +813,14 @@ export async function pushStateServer(
           }),
           { onConflict: "user_id,client_id" },
         ),
-      );
+      });
     }
   }
 
   if (state.weights.length) {
-    tasks.push(
-      db.from("weights").upsert(
+    tasks.push({
+      table: "weights",
+      run: db.from("weights").upsert(
         state.weights.map((w) => ({
           ...channel,
           date: w.date,
@@ -823,7 +828,7 @@ export async function pushStateServer(
         })),
         { onConflict: "user_id,date" },
       ),
-    );
+    });
   }
 
   if ((state.measurements ?? []).length) {
@@ -833,8 +838,9 @@ export async function pushStateServer(
       .eq("user_id", userId)
       .limit(1);
     if (!measProbe.error) {
-      tasks.push(
-        db.from("body_measurements").upsert(
+      tasks.push({
+        table: "body_measurements",
+        run: db.from("body_measurements").upsert(
           state.measurements.map((m) => ({
             ...channel,
             ...measurementToRow(m),
@@ -842,15 +848,16 @@ export async function pushStateServer(
           })),
           { onConflict: "user_id,date" },
         ),
-      );
+      });
     }
   }
 
   if ((state.progressPhotos ?? []).length) {
     const photoProbe = await db.from("progress_photos").select("id").eq("user_id", userId).limit(1);
     if (!photoProbe.error) {
-      tasks.push(
-        db.from("progress_photos").upsert(
+      tasks.push({
+        table: "progress_photos",
+        run: db.from("progress_photos").upsert(
           state.progressPhotos.map((p) => ({
             ...channel,
             id: p.id,
@@ -862,14 +869,15 @@ export async function pushStateServer(
           })),
           { onConflict: "user_id,taken_on,pose" },
         ),
-      );
+      });
     }
   }
 
   const days = Object.values(state.days);
   if (days.length) {
-    tasks.push(
-      db.from("daily_metrics").upsert(
+    tasks.push({
+      table: "daily_metrics",
+      run: db.from("daily_metrics").upsert(
         days.map((d) => ({
           ...channel,
           date: d.date,
@@ -878,13 +886,14 @@ export async function pushStateServer(
         })),
         { onConflict: "user_id,date" },
       ),
-    );
+    });
   }
 
   const supplementDays = Object.entries(state.supplementLogs);
   if (supplementDays.length) {
-    tasks.push(
-      db.from("supplement_logs").upsert(
+    tasks.push({
+      table: "supplement_logs",
+      run: db.from("supplement_logs").upsert(
         supplementDays.map(([date, ids]) => ({
           ...channel,
           date,
@@ -892,7 +901,7 @@ export async function pushStateServer(
         })),
         { onConflict: "user_id,date" },
       ),
-    );
+    });
   }
 
   if (state.meals?.length) {
@@ -916,8 +925,9 @@ export async function pushStateServer(
       return ok;
     });
     if (accepted.length) {
-      tasks.push(
-        db.from("meal_entries").upsert(
+      tasks.push({
+        table: "meal_entries",
+        run: db.from("meal_entries").upsert(
           accepted.map((m) => {
             const remote = remoteById.get(m.id);
             return {
@@ -938,10 +948,13 @@ export async function pushStateServer(
           }),
           { onConflict: "user_id,client_id" },
         ),
-      );
+      });
       const itemRows = mealItemsToRows(accepted, channel);
       if (itemRows.length) {
-        tasks.push(db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }));
+        tasks.push({
+          table: "meal_items",
+          run: db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }),
+        });
       }
     }
   }
@@ -970,8 +983,9 @@ export async function pushStateServer(
         return ok;
       });
       if (accepted.length) {
-        tasks.push(
-          db.from("supplement_dose_logs").upsert(
+        tasks.push({
+          table: "supplement_dose_logs",
+          run: db.from("supplement_dose_logs").upsert(
             accepted.map((d) => {
               const remote = remoteById.get(d.id);
               return {
@@ -989,7 +1003,7 @@ export async function pushStateServer(
             }),
             { onConflict: "user_id,client_id" },
           ),
-        );
+        });
       }
     }
   }
@@ -1017,8 +1031,9 @@ export async function pushStateServer(
       return ok;
     });
     if (accepted.length) {
-      tasks.push(
-        db.from("day_checkins").upsert(
+      tasks.push({
+        table: "day_checkins",
+        run: db.from("day_checkins").upsert(
           accepted.map((c) => {
             const remote = remoteByDate.get(c.date.slice(0, 10));
             return dayCheckInToRow(
@@ -1029,17 +1044,17 @@ export async function pushStateServer(
           }),
           { onConflict: "user_id,date" },
         ),
-      );
+      });
     }
   }
 
   const results = await Promise.all(
     tasks.map(async (t) => {
       try {
-        const r = (await t) as { error?: { message?: string; code?: string } | null };
-        return r;
+        const r = (await t.run) as { error?: { message?: string; code?: string } | null };
+        return { table: t.table, error: r?.error ?? null };
       } catch (e) {
-        return { error: e as { message?: string; code?: string } };
+        return { table: t.table, error: e as { message?: string; code?: string } };
       }
     }),
   );
@@ -1053,11 +1068,11 @@ export async function pushStateServer(
     if (!error) continue;
     const code = String(error.code ?? "write_failed");
     criticalFailed = true;
-    errors.push({ table: "domain", code });
+    errors.push({ table: r.table, code });
     logSyncOp({
       userId,
       operation: "push",
-      table: "domain",
+      table: r.table,
       status: "error",
       errorCode: code,
     });

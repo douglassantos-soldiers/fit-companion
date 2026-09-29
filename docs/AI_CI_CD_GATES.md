@@ -47,11 +47,15 @@ Script: [`scripts/ai-ci-gate-verdict.mjs`](../scripts/ai-ci-gate-verdict.mjs)
 
 | Gate | Significado | Exit |
 |------|-------------|------|
-| **FAIL** | Report ausente, suite não executada, critical `FAIL`/`UNTESTED`, ou `production_ready` exigido com service role e false | 1 |
+| **FAIL** | Report ausente, suite não executada, critical `FAIL`/`UNTESTED`, `CERTIFICATION_STALE` (SHA ≠ HEAD), ou `production_ready` exigido com service role e false | 1 |
 | **BLOCKED** | Probes remotas BLOCKED/DEGRADED (DB/migrations/RAG sem secret) sem FAIL local | 0 |
 | **PASS** | `production_ready: true` e nenhum blocker | 0 |
 
+**SHA:** `commit_sha` do report deve ser **igual** ao `git rev-parse HEAD` (SHA completo). Ancestor ou prefix match **não** contam — re-certifique no HEAD atual após qualquer commit de evidência.
+
 Com secret `SUPABASE_SERVICE_ROLE_KEY` no repo: exige `production_ready === true` (senão FAIL).
+
+Release: `npm run ai:release-verdict` (`AI_RELEASE_GATE=1` / `--release`) falha com qualquer BLOCKED crítico ou SHA divergente.
 
 ## Regression suite
 

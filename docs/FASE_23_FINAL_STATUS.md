@@ -43,10 +43,12 @@
 
 ## 17–20. E2E / Cert / Commit / Ready
 
-- Production E2E: **PASS** (`natural_path`)
-- Certification: **PASS** (`fase23_10_v1`) — re-cert after commit updates SHA in `latest.json`
+- Production E2E: **PASS** (`natural_path`; audit readback via `audit_id`, sem soft-warn)
+- Certification: **PASS** (`fase23_10_v1`) — gate exige SHA **exato** (`head === commit_sha`)
 - Live LLM: **BLOCKED** (no `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`; probe disabled) — does not block deterministic readiness
-- Current commit: `c189e8645ecf19046c6e0c68b2f7e8b17cd6eb32` (see also `docs/certification/latest.json`)
-- **production_ready: true** (evidência em `docs/certification/latest.json`)
+- Current commit: `af82ed7f9485144509bc478739fafe50daabd656` (see also `docs/certification/latest.json`)
+- **production_ready: true** · `npm run ai:release-verdict` → **PASS**
+- Sync: cliente não ACK/`flushOutbox` em `partial`/`ok=false`; `clearAccountData` remote-first
+- UI smoke: checklist operador em `docs/certification/ui-smoke-checklist.md`
 
 Matriz objetiva: [FASE_23_READINESS_MATRIX.md](./FASE_23_READINESS_MATRIX.md)
