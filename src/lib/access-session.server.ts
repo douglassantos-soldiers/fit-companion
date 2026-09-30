@@ -422,7 +422,6 @@ export async function authenticateAdmin(
     envConfigured && secretEqual(email, expectedEmail) && secretEqual(password, expectedPass);
   if (envOk) return "ok";
   if (await verifyAdminAuthUser(email, password)) return "ok";
-  if (!envConfigured) return "not_configured";
   return "invalid";
 }
 
