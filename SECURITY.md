@@ -4,14 +4,15 @@
 
 1. Shopify Admin → Apps → seu app → **API credentials** → **Admin API access token** → regenerar.
 2. Atualizar `SHOPIFY_ADMIN_ACCESS_TOKEN` no host (Lovable / `.env` local) — **nunca** comitar.
-3. Regenerar `SHOPIFY_WEBHOOK_SECRET` e `ACCESS_SESSION_SECRET` (secrets distintos — nunca compartilhar).
+3. Regenerar `SHOPIFY_WEBHOOK_SECRET`, `ACCESS_SESSION_SECRET` e `ADMIN_SESSION_SECRET` (secrets distintos — nunca compartilhar).
 4. Confirmar que `.env` está no `.gitignore` (já configurado).
 
-## Access session (fail closed)
+## Access / admin session (fail closed)
 
-- Produção **exige** `ACCESS_SESSION_SECRET`. Sem ele o servidor aborta (`assertSecurityConfiguration`).
+- Produção **exige** `ACCESS_SESSION_SECRET` e `ADMIN_SESSION_SECRET`, distintos entre si. Sem eles o servidor aborta (`assertSecurityConfiguration`).
+- Tokens de acesso (`kind: "access"`) e admin (`kind: "admin"`) usam HMAC separados — um não pode ser colado no cookie do outro.
 - Nunca usar `SHOPIFY_WEBHOOK_SECRET`, `OPENAI_API_KEY` ou literais conhecidos como fallback de assinatura.
-- Dev local: defina `ACCESS_SESSION_SECRET` ou `ALLOW_INSECURE_DEV_SECRETS=true` (somente fora de produção).
+- Dev local: defina ambos os secrets ou `ALLOW_INSECURE_DEV_SECRETS=true` (somente fora de produção; fallbacks de access e admin são distintos).
 
 ## Gate de acesso (FASE 1)
 

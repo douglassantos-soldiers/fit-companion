@@ -12,7 +12,7 @@ export function registerNutritionSkills(): void {
     description: "Analyze nutrition adherence signals",
     domain: "nutrition",
     required_tool_ids: ["get_nutrition"],
-    required_knowledge: ["kb:nutrition.basics"],
+    required_knowledge: ["kb:nutrition.basics", "kb:nutrition.knowledge"],
     execute: async (ctx, input) => {
       const di = dateInput(ctx, input);
       const warnings: string[] = [];
@@ -47,7 +47,7 @@ export function registerNutritionSkills(): void {
     domain: "nutrition",
     kind: "proposal",
     required_tool_ids: ["get_nutrition", "get_user_goal"],
-    required_knowledge: ["kb:nutrition.macros"],
+    required_knowledge: ["kb:nutrition.macros", "kb:nutrition.knowledge"],
     safety_requirements: {
       requires_decision_authority: true,
       proposal_only_for_side_effects: true,
@@ -97,7 +97,7 @@ export function registerNutritionSkills(): void {
     domain: "nutrition",
     kind: "proposal",
     required_tool_ids: ["get_nutrition"],
-    required_knowledge: ["kb:nutrition.meals"],
+    required_knowledge: ["kb:nutrition.meals", "kb:nutrition.knowledge"],
     safety_requirements: {
       requires_decision_authority: true,
       proposal_only_for_side_effects: true,

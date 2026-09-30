@@ -37,10 +37,29 @@ export function classifyIntent(intent: string): IntentClass {
     "muscul",
     "progression",
     "deload",
+    "série",
+    "serie",
+    "carga",
   ]);
   const nutrition = hasAny(t, ["comida", "refei", "macro", "prote", "nutri", "dieta", "calor"]);
   const recovery = hasAny(t, ["cansad", "fadig", "sono", "sleep", "recover", "recupera", "exaust"]);
   const behavior = hasAny(t, ["hábito", "habito", "aderência", "aderencia", "checkin", "fric"]);
+  const supplementation = hasAny(t, [
+    "suplement",
+    "creatina",
+    "whey",
+    "proteína em pó",
+    "proteina em po",
+    "pré-treino",
+    "pre-treino",
+    "pre treino",
+    "cafeína",
+    "cafeina",
+    "beta-alanina",
+    "beta alanina",
+    "eletrólito",
+    "eletrolito",
+  ]);
   const performance = hasAny(t, [
     "performance",
     "resultado",
@@ -51,6 +70,15 @@ export function classifyIntent(intent: string): IntentClass {
     "driver",
     "c360",
   ]);
+  const knowledgeAsk = hasAny(t, [
+    "o que é",
+    "como funciona",
+    "por que",
+    "porque",
+    "evidência",
+    "evidencia",
+    "estudo",
+  ]);
 
   const agents: string[] = [];
   const knowledgeDomains: KnowledgeDomain[] = [];
@@ -58,7 +86,7 @@ export function classifyIntent(intent: string): IntentClass {
   const toolHints: string[] = [];
   const labels: string[] = [];
 
-  if (performance && !training && !nutrition && !recovery && !behavior) {
+  if (performance && !training && !nutrition && !recovery && !behavior && !supplementation) {
     agents.push(SPECIALIST_PERFORMANCE_ID);
     knowledgeDomains.push("performance", "coaching");
     skillHints.push("analyze_performance", "explain_decision", "analyze_outcome");
@@ -75,7 +103,7 @@ export function classifyIntent(intent: string): IntentClass {
   }
   if (training) {
     agents.push(SPECIALIST_TRAINING_ID);
-    knowledgeDomains.push("exercise", "performance");
+    knowledgeDomains.push("exercise", "training", "performance");
     skillHints.push(
       "analyze_training",
       "adjust_training_load",
@@ -83,15 +111,27 @@ export function classifyIntent(intent: string): IntentClass {
       "regression",
       "select_exercise",
     );
-    toolHints.push("get_training_history", "get_current_plan", "get_recovery");
+    toolHints.push(
+      "get_training_history",
+      "get_current_plan",
+      "get_recovery",
+      "search_knowledge",
+    );
     labels.push("training");
   }
   if (nutrition) {
     agents.push(SPECIALIST_NUTRITION_ID);
     knowledgeDomains.push("nutrition");
     skillHints.push("analyze_nutrition", "adjust_macros", "meal_substitution");
-    toolHints.push("get_nutrition", "get_user_goal");
+    toolHints.push("get_nutrition", "get_user_goal", "search_knowledge");
     labels.push("nutrition");
+  }
+  if (supplementation) {
+    agents.push(SPECIALIST_NUTRITION_ID);
+    knowledgeDomains.push("supplementation", "products");
+    skillHints.push("explain_supplement");
+    toolHints.push("search_knowledge", "get_knowledge_document", "get_products");
+    labels.push("supplementation");
   }
   if (behavior) {
     agents.push(SPECIALIST_BEHAVIOR_ID);
@@ -101,11 +141,17 @@ export function classifyIntent(intent: string): IntentClass {
     labels.push("behavior");
   }
 
+  if (knowledgeAsk && knowledgeDomains.length === 0) {
+    knowledgeDomains.push("coaching", "training", "nutrition", "supplementation");
+    toolHints.push("search_knowledge");
+    skillHints.push("explain_decision");
+  }
+
   if (agents.length === 0) {
     agents.push(COACH_AGENT_ID);
     knowledgeDomains.push("coaching", "performance");
     skillHints.push("explain_decision", "generate_daily_context");
-    toolHints.push("get_user_profile", "get_recent_decisions");
+    toolHints.push("get_user_profile", "get_recent_decisions", "search_knowledge");
     labels.push("simple");
   }
 

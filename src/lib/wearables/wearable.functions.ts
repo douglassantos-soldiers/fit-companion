@@ -3,7 +3,6 @@
  * Auth via resolveTrustedIdentity — never trust session.userId alone without device bind.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import {
@@ -87,8 +86,18 @@ export const connectWearableFn = createServerFn({ method: "POST" })
       });
       if (!identity) return { ok: false, reason: "unauthorized" };
       const rlKey = identity.email ?? identity.userId;
-      if (!rateLimitKey(`wearable-connect:${rlKey}`, 20, 60 * 60_000)) {
-        return { ok: false, reason: "rate_limited" };
+      {
+        const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+        const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+        if (!isAiRateLimitDisabled()) {
+          const store = await resolveAiRateLimitStore();
+          const burst = await store.consume({
+            key: `ai:wearable-connect:${rlKey}`,
+            limit: 20,
+            windowMs: 60 * 60_000,
+          });
+          if (!burst.allowed) return { ok: false, reason: "rate_limited" };
+        }
       }
       const redirect = `${appOrigin()}/wearables/callback`;
       if (data.provider === "strava") {
@@ -163,8 +172,18 @@ export const syncWearableFn = createServerFn({ method: "POST" })
       });
       if (!identity) return { ok: false, reason: "unauthorized" };
       const rlKey = identity.email ?? identity.userId;
-      if (!rateLimitKey(`wearable-sync:${rlKey}`, 30, 60 * 60_000)) {
-        return { ok: false, reason: "rate_limited" };
+      {
+        const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+        const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+        if (!isAiRateLimitDisabled()) {
+          const store = await resolveAiRateLimitStore();
+          const burst = await store.consume({
+            key: `ai:wearable-sync:${rlKey}`,
+            limit: 30,
+            windowMs: 60 * 60_000,
+          });
+          if (!burst.allowed) return { ok: false, reason: "rate_limited" };
+        }
       }
       const userId = identity.userId;
 

@@ -321,7 +321,7 @@ interface Store {
     lastPaidAt?: string | null;
     accessExpiresAt?: string | null;
     shopifyDisplayName?: string | null;
-  }) => Promise<void>;
+  }) => Promise<{ ok: true } | { ok: false; reason?: string }>;
   /** Sync UX flag from validated server cookie (no entitlement write). */
   updateAccessFromSession: (opts: {
     email: string;
@@ -1985,11 +1985,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   )
                 : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs),
             }));
-          } else {
-            update((s) => ({ ...s, accessGranted: false }));
+            return { ok: true as const };
           }
+          update((s) => ({ ...s, accessGranted: false }));
+          return { ok: false as const, reason: session.reason };
         } catch (e) {
           console.warn("establishAccessSession failed", e);
+          update((s) => ({ ...s, accessGranted: false }));
+          return { ok: false as const };
         }
       },
       updateAccessFromSession: (opts) => {

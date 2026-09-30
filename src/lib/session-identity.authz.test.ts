@@ -128,6 +128,7 @@ describe("FASE2 access matrix", () => {
 describe("FASE2 session id + admin cookie isolation", () => {
   it("deriveAccessSessionId is stable and opaque", () => {
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-fase2-identity";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-fase2";
     process.env["NODE_ENV"] = "test";
     const token = encodeAccessToken({
       email: "a@soldiers.com",
@@ -143,6 +144,7 @@ describe("FASE2 session id + admin cookie isolation", () => {
 
   it("admin token alone is not an access session payload with userId", () => {
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-fase2-identity";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-fase2";
     process.env["NODE_ENV"] = "test";
     const admin = encodeAdminToken("admin@soldiers.com", "admin");
     // Admin token shape is not a valid access token

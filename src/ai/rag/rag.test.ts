@@ -35,7 +35,11 @@ describe("RAG Infrastructure", () => {
     const ids = listConnectedSourceIds();
     expect(sources.length).toBe(ids.length);
     expect(sources.every((s) => s.status === "active")).toBe(true);
-    expect(sources.every((s) => s.trust_level === "curated")).toBe(true);
+    expect(
+      sources.every(
+        (s) => s.trust_level === "curated" || s.trust_level === "internal",
+      ),
+    ).toBe(true);
   });
 
   it("production adapters return curated documents", async () => {

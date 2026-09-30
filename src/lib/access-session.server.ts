@@ -1,17 +1,22 @@
 /**
- * Signed HttpOnly access session (server-only).
- * Production: ACCESS_SESSION_SECRET is required (fail closed).
- * Development: ACCESS_SESSION_SECRET, or ALLOW_INSECURE_DEV_SECRETS=true with a non-production fallback.
+ * Signed HttpOnly access / admin sessions (server-only).
+ * Production: ACCESS_SESSION_SECRET and ADMIN_SESSION_SECRET required and must differ (fail closed).
+ * Development: set both, or ALLOW_INSECURE_DEV_SECRETS=true with distinct non-production fallbacks.
  * Never fall back to SHOPIFY_WEBHOOK_SECRET or API keys.
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
+import { getCookie, setCookie, deleteCookie, getRequest } from "@tanstack/react-start/server";
 
 import { ACCESS_WINDOW_SEC, accessCookieExpSec, isPurchaseWithinWindow } from "@/lib/access-window";
 
 export const ACCESS_COOKIE = "soldiers_access";
 const MAX_AGE_SEC = ACCESS_WINDOW_SEC;
 const DEV_ONLY_SECRET = "dev-only-change-me";
+const DEV_ONLY_ADMIN_SECRET = "dev-only-admin-change-me";
+
+const ADMIN_ROLES = ["admin", "editor", "support", "analyst"] as const;
+
+export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export type AccessSessionPayload = {
   email: string;
@@ -43,31 +48,53 @@ function allowInsecureDev(): boolean {
   );
 }
 
+function isInsecureSecret(value: string): boolean {
+  return value === DEV_ONLY_SECRET || value === DEV_ONLY_ADMIN_SECRET;
+}
+
 /**
  * Validate critical secrets before protected operations.
- * Throws in production when ACCESS_SESSION_SECRET is missing.
+ * Production: both session secrets required, distinct, and not insecure fallbacks.
  */
 export function assertSecurityConfiguration(): void {
   const access = process.env["ACCESS_SESSION_SECRET"]?.trim() ?? "";
+  const admin = process.env["ADMIN_SESSION_SECRET"]?.trim() ?? "";
+
   if (isProduction()) {
-    if (!access || access === DEV_ONLY_SECRET) {
+    if (!access || isInsecureSecret(access)) {
       throw new SecurityConfigurationError(
         "ACCESS_SESSION_SECRET is required in production (fail closed)",
       );
     }
+    if (!admin || isInsecureSecret(admin)) {
+      throw new SecurityConfigurationError(
+        "ADMIN_SESSION_SECRET is required in production (fail closed)",
+      );
+    }
+    if (access === admin) {
+      throw new SecurityConfigurationError(
+        "ADMIN_SESSION_SECRET must differ from ACCESS_SESSION_SECRET in production",
+      );
+    }
     return;
   }
+
   if (!access && !allowInsecureDev()) {
     throw new SecurityConfigurationError(
       "ACCESS_SESSION_SECRET missing. Set it, or ALLOW_INSECURE_DEV_SECRETS=true for local only.",
     );
   }
+  if (!admin && !allowInsecureDev()) {
+    throw new SecurityConfigurationError(
+      "ADMIN_SESSION_SECRET missing. Set it, or ALLOW_INSECURE_DEV_SECRETS=true for local only.",
+    );
+  }
 }
 
-/** Resolve signing secret — never uses Shopify/API key fallbacks. */
+/** Resolve access signing secret — never uses Shopify/API key fallbacks. */
 export function resolveAccessSessionSecret(): string {
   const access = process.env["ACCESS_SESSION_SECRET"]?.trim() ?? "";
-  if (access && access !== DEV_ONLY_SECRET) return access;
+  if (access && !isInsecureSecret(access)) return access;
 
   if (isProduction()) {
     throw new SecurityConfigurationError(
@@ -76,7 +103,7 @@ export function resolveAccessSessionSecret(): string {
   }
 
   if (allowInsecureDev()) {
-    return access || DEV_ONLY_SECRET;
+    return access && access !== DEV_ONLY_ADMIN_SECRET ? access : DEV_ONLY_SECRET;
   }
 
   throw new SecurityConfigurationError(
@@ -84,8 +111,34 @@ export function resolveAccessSessionSecret(): string {
   );
 }
 
-function secret(): string {
-  return resolveAccessSessionSecret();
+/** Resolve admin signing secret — never shares HMAC with access sessions. */
+export function resolveAdminSessionSecret(): string {
+  const admin = process.env["ADMIN_SESSION_SECRET"]?.trim() ?? "";
+  if (admin && !isInsecureSecret(admin)) {
+    if (isProduction()) {
+      const access = process.env["ACCESS_SESSION_SECRET"]?.trim() ?? "";
+      if (admin === access) {
+        throw new SecurityConfigurationError(
+          "ADMIN_SESSION_SECRET must differ from ACCESS_SESSION_SECRET in production",
+        );
+      }
+    }
+    return admin;
+  }
+
+  if (isProduction()) {
+    throw new SecurityConfigurationError(
+      "ADMIN_SESSION_SECRET is required in production (fail closed)",
+    );
+  }
+
+  if (allowInsecureDev()) {
+    return admin && admin !== DEV_ONLY_SECRET ? admin : DEV_ONLY_ADMIN_SECRET;
+  }
+
+  throw new SecurityConfigurationError(
+    "ADMIN_SESSION_SECRET missing. Set it, or ALLOW_INSECURE_DEV_SECRETS=true for local only.",
+  );
 }
 
 export function setAccessSessionCookie(
@@ -109,14 +162,28 @@ function b64url(buf: Buffer | string) {
   return b.toString("base64url");
 }
 
-function signRaw(data: string) {
-  return createHmac("sha256", secret()).update(data).digest("base64url");
+function signRaw(data: string, signingSecret: string) {
+  return createHmac("sha256", signingSecret).update(data).digest("base64url");
+}
+
+function signAccessRaw(data: string) {
+  return signRaw(data, resolveAccessSessionSecret());
+}
+
+function signAdminRaw(data: string) {
+  return signRaw(data, resolveAdminSessionSecret());
+}
+
+function parseAdminRole(raw: unknown): AdminRole | null {
+  if (typeof raw !== "string") return null;
+  return (ADMIN_ROLES as readonly string[]).includes(raw) ? (raw as AdminRole) : null;
 }
 
 export function encodeAccessToken(
   payload: Omit<AccessSessionPayload, "exp"> & { exp?: number },
 ): string {
-  const body: AccessSessionPayload = {
+  const body: AccessSessionPayload & { kind: "access" } = {
+    kind: "access",
     email: payload.email.trim().toLowerCase(),
     tier: payload.tier === "performance" ? "performance" : "base",
     exp: payload.exp ?? accessCookieExpSec(payload.lastPaidAt ?? null),
@@ -124,7 +191,7 @@ export function encodeAccessToken(
   if (payload.userId) body.userId = payload.userId;
   if (payload.lastPaidAt) body.lastPaidAt = payload.lastPaidAt;
   const data = b64url(JSON.stringify(body));
-  const sig = signRaw(data);
+  const sig = signAccessRaw(data);
   return `${data}.${sig}`;
 }
 
@@ -132,7 +199,7 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
   if (!token || !token.includes(".")) return null;
   let expected: string;
   try {
-    expected = signRaw(token.split(".")[0]!);
+    expected = signAccessRaw(token.split(".")[0]!);
   } catch {
     return null;
   }
@@ -148,9 +215,8 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
   try {
     const json = JSON.parse(
       Buffer.from(data, "base64url").toString("utf8"),
-    ) as AccessSessionPayload & { role?: string };
-    // Reject admin token shape (role without access session fields)
-    if (typeof (json as { role?: unknown }).role === "string") return null;
+    ) as AccessSessionPayload & { kind?: string };
+    if (json.kind !== "access") return null;
     if (!json.email || !json.exp || json.exp * 1000 < Date.now()) return null;
     // Access sessions always encode tier explicitly
     if (json.tier !== "base" && json.tier !== "performance") return null;
@@ -205,8 +271,6 @@ export function deriveAccessSessionId(token: string | null | undefined): string 
   return createHash("sha256").update(token).digest("hex").slice(0, 32);
 }
 
-export type AdminRole = "admin" | "editor" | "support" | "analyst";
-
 export type AdminSessionPayload = {
   role: AdminRole;
   email: string;
@@ -217,12 +281,13 @@ export function encodeAdminToken(email: string, role: AdminRole = "admin"): stri
   const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
   const data = b64url(
     JSON.stringify({
+      kind: "admin",
       role,
       email: email.trim().toLowerCase(),
       exp,
     }),
   );
-  return `${data}.${signRaw(data)}`;
+  return `${data}.${signAdminRaw(data)}`;
 }
 
 export function decodeAdminToken(token: string | undefined | null): AdminSessionPayload | null {
@@ -231,7 +296,7 @@ export function decodeAdminToken(token: string | undefined | null): AdminSession
   if (!data || !sig) return null;
   let expected: string;
   try {
-    expected = signRaw(data);
+    expected = signAdminRaw(data);
   } catch {
     return null;
   }
@@ -240,29 +305,22 @@ export function decodeAdminToken(token: string | undefined | null): AdminSession
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     const json = JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as {
+      kind?: string;
       role?: string;
       email?: string;
       exp?: number;
     };
-    const roleRaw = String(json.role ?? "admin");
-    const role: AdminRole =
-      roleRaw === "editor" || roleRaw === "support" || roleRaw === "analyst" || roleRaw === "admin"
-        ? roleRaw
-        : "admin";
-    // Legacy PIN tokens only ever issued "admin"; reject unknown
-    if (role !== "admin" && role !== "editor" && role !== "support" && role !== "analyst") {
-      return null;
-    }
+    if (json.kind !== "admin") return null;
+    const role = parseAdminRole(json.role);
+    if (!role) return null;
     if (typeof json.exp !== "number" || json.exp * 1000 <= Date.now()) {
       return null;
     }
     const email = String(json.email ?? "")
       .trim()
       .toLowerCase();
-    const fallback = (process.env["ADMIN_EMAIL"] ?? "").trim().toLowerCase();
-    const resolved = email.includes("@") ? email : fallback;
-    if (!resolved.includes("@")) return null;
-    return { role, email: resolved, exp: json.exp };
+    if (!email.includes("@")) return null;
+    return { role, email, exp: json.exp };
   } catch {
     return null;
   }
@@ -378,30 +436,24 @@ export async function authenticateAdminWithRole(
   return { ok: false, reason: "invalid" };
 }
 
-/** In-memory rate limit buckets (per process). */
-const buckets = new Map<string, { n: number; reset: number }>();
-
-export function rateLimitKey(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const cur = buckets.get(key);
-  if (!cur || now > cur.reset) {
-    buckets.set(key, { n: 1, reset: now + windowMs });
-    return true;
+/**
+ * Opaque client IP fingerprint for distributed rate limits.
+ * Prefer first X-Forwarded-For hop, then common proxy headers.
+ */
+export function resolveClientIpFingerprint(): string {
+  try {
+    const request = getRequest();
+    const headers = request.headers;
+    const forwarded = headers.get("x-forwarded-for");
+    const firstHop = forwarded?.split(",")[0]?.trim() ?? "";
+    const raw =
+      firstHop ||
+      headers.get("cf-connecting-ip")?.trim() ||
+      headers.get("x-real-ip")?.trim() ||
+      "";
+    if (!raw) return "unknown";
+    return createHash("sha256").update(raw).digest("hex").slice(0, 32);
+  } catch {
+    return "unknown";
   }
-  if (cur.n >= limit) return false;
-  cur.n += 1;
-  return true;
-}
-
-/** Dual window rate limit (e.g. per-minute + per-day). Returns which window failed. */
-export function rateLimitWindows(
-  key: string,
-  windows: Array<{ suffix: string; limit: number; windowMs: number }>,
-): { ok: true } | { ok: false; window: string } {
-  for (const w of windows) {
-    if (!rateLimitKey(`${key}:${w.suffix}`, w.limit, w.windowMs)) {
-      return { ok: false, window: w.suffix };
-    }
-  }
-  return { ok: true };
 }

@@ -8,6 +8,22 @@
 
 No new duplicate migrations were required for FASE 23 activation.
 
+## Deploy remoto — 2026-09-30 (revalidado ~00:20Z)
+
+| Item | Resultado |
+|------|-----------|
+| Project | `zphtvrsxlhfgltwgbreu` (APP), linked CLI |
+| `migration list --linked` | **54/54 synced** (local == remote) |
+| `db push --linked --dry-run` | **upToDate** |
+| `db push --linked` | **upToDate** — nada a aplicar |
+| Bundles `DEPLOY_ALL` / `HUBS` / `DEPLOY_PENDING_FASE22` | **Não executados** |
+| `rag:seed` (`AI_RAG_ENV=production`) | **OK** — 85 docs / 430 chunks (`supabase_pgvector_v1`) |
+| `ai:db-readiness` | **PASS** |
+| Rate-limit readiness (`ai_rate_limit_consume`) | **PASS** |
+| Advisors | WARNs não-bloqueantes: `vector` em `public`; leaked-password protection off |
+
+Evidência JSON: [`docs/certification/supabase-deploy-evidence.json`](./certification/supabase-deploy-evidence.json).
+
 ## Deploy remoto — 2026-09-29 (revalidado 02:28Z)
 
 | Item | Resultado |

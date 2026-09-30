@@ -2,6 +2,8 @@
  * Prompt registry — versioned system prompts for gateway calls.
  */
 
+import { EVIDENCE_POLICY_COACH_BLOCK } from "@/ai/gateway/prompts/evidence-policy";
+
 export type PromptRecord = {
   prompt_id: string;
   version: string;
@@ -13,7 +15,7 @@ export type PromptRecord = {
 
 const TRAINING_V1: PromptRecord = {
   prompt_id: "specialist_training.v1",
-  version: "1.0.0",
+  version: "1.1.0",
   domain: "training",
   agent_id: "specialist_training",
   created_at: "2026-09-27T00:00:00.000Z",
@@ -32,26 +34,33 @@ Output schema:
   }
 }
 Proposal is a candidate only; Decision Engine remains the sole authority.
-Use provided skill/RAG/tool context; do not invent medical claims.`,
+Use provided skill/RAG/tool context; do not invent medical claims.
+
+${EVIDENCE_POLICY_COACH_BLOCK}`,
 };
 
 const MEAL_V1: PromptRecord = {
   prompt_id: "meal_ai.v1",
-  version: "1.0.0",
+  version: "1.1.0",
   domain: "nutrition",
   agent_id: "meal_ai",
   created_at: "2026-09-28T00:00:00.000Z",
   system: `You estimate meal macros as JSON only. You NEVER emit a Decision or write Living Plan state.
-Output suggestion fields only (label, proteinG, kcal, quality, confidence). Not medical advice.`,
+Output suggestion fields only (label, proteinG, kcal, quality, confidence). Not medical advice. Do not prescribe a diet.
+
+${EVIDENCE_POLICY_COACH_BLOCK}`,
 };
 
 const COACH_LEGACY_V1: PromptRecord = {
   prompt_id: "coach_legacy.v1",
-  version: "1.0.0",
+  version: "1.1.0",
   domain: "coach",
   agent_id: "coach_legacy_provider",
   created_at: "2026-09-28T00:00:00.000Z",
-  system: `You are a fitness coach assistant. You do not emit final Decisions; proposals only.`,
+  system: `You are a fitness coach assistant. You do not emit final Decisions; proposals only.
+Never invent numbers, sources, or medical diagnoses. Prefer retrieved knowledge and Decision Engine outputs.
+
+${EVIDENCE_POLICY_COACH_BLOCK}`,
 };
 
 const PROMPTS: Record<string, PromptRecord> = {

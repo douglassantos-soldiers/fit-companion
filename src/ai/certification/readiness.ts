@@ -283,6 +283,7 @@ export function buildProductionReadinessReport(opts?: {
     dependencies: [
       "SUPABASE_SERVICE_ROLE_KEY for audit/RAG/memory persist",
       "ACCESS_SESSION_SECRET for trusted identity",
+      "ADMIN_SESSION_SECRET for admin sessions (distinct from access)",
     ],
     recommendations: [
       "Run npm run ai:certification before enabling hybrid/llm",

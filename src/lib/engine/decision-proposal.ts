@@ -188,12 +188,28 @@ export function validateProposalContext(
 
 /**
  * Safety gate: escalateCare only aligns with REST / rest-like proposals.
+ * EMERGENCY / RED also reject commerce-oriented proposal types.
  * Does not invent a Decision — only accepts/rejects the proposal.
  */
 export function validateProposalAgainstSafety(
   proposal: DecisionProposal,
   safety: SafetyVerdict,
 ): { ok: boolean; reason?: string } {
+  const level = safety.level ?? (safety.escalateCare ? "RED" : "GREEN");
+  if (level === "EMERGENCY") {
+    return { ok: false, reason: "emergency_blocks_all_proposals" };
+  }
+  if (safety.blockCommerce || level === "RED" || level === "YELLOW") {
+    const commerceType =
+      proposal.proposed_type === "PRODUCT_NUDGE" ||
+      proposal.proposed_type === "RESTOCK" ||
+      proposal.proposed_type === "SUPPLEMENT_UPSSELL" ||
+      (typeof proposal.proposed_value === "string" &&
+        /product|restock|upsell|compra/i.test(proposal.proposed_value));
+    if (commerceType) {
+      return { ok: false, reason: "saf005_no_commerce_when_not_green" };
+    }
+  }
   if (!safety.escalateCare) return { ok: true };
   const restAligned =
     proposal.proposed_type === "REST" ||

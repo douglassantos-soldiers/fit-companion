@@ -31,6 +31,11 @@ export type CoachFactPack = {
   proposalRejectReason?: string;
   citationsCount: number;
   memoryCount: number;
+  /** SAF fixed copy (EMERGENCY) — respond.ts short-circuits on this. */
+  safetyFixedMessage?: string;
+  safetyRuleIds?: string[];
+  safetyLevel?: string;
+  blockCommerce?: boolean;
 };
 
 export function emptyWhyFacts(): WhyFacts {
@@ -54,6 +59,10 @@ export function buildFactPack(opts: {
   proposal: DecisionProposal | null;
   proposalStatus: CoachFactPack["proposalStatus"];
   proposalRejectReason?: string;
+  safetyFixedMessage?: string;
+  safetyRuleIds?: string[];
+  safetyLevel?: string;
+  blockCommerce?: boolean;
 }): CoachFactPack {
   const evidence: SkillEvidenceItem[] = [];
   const warnings: string[] = [];
@@ -90,5 +99,9 @@ export function buildFactPack(opts: {
     memoryCount,
   };
   if (opts.proposalRejectReason) pack.proposalRejectReason = opts.proposalRejectReason;
+  if (opts.safetyFixedMessage) pack.safetyFixedMessage = opts.safetyFixedMessage;
+  if (opts.safetyRuleIds?.length) pack.safetyRuleIds = opts.safetyRuleIds;
+  if (opts.safetyLevel) pack.safetyLevel = opts.safetyLevel;
+  if (opts.blockCommerce != null) pack.blockCommerce = opts.blockCommerce;
   return pack;
 }

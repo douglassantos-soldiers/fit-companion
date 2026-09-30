@@ -3,6 +3,7 @@
  */
 import { registerCommerceTools } from "@/ai/mcp/commerce";
 import { registerDecisionTools } from "@/ai/mcp/decision";
+import { registerKnowledgeTools } from "@/ai/mcp/knowledge";
 import { registerNutritionTools } from "@/ai/mcp/nutrition";
 import { registerRecoveryTools } from "@/ai/mcp/recovery";
 import { registerSocialTools } from "@/ai/mcp/social";
@@ -27,6 +28,7 @@ export function registerAllMcpTools(opts?: { force?: boolean }): void {
   registerWearableTools();
   registerCommerceTools();
   registerDecisionTools();
+  registerKnowledgeTools();
   registerSocialTools();
   registerWriteTools();
   bootstrapped = true;

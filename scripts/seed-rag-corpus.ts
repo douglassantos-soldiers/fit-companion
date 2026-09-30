@@ -2,6 +2,10 @@
  * Idempotent RAG corpus seed against the configured VectorStore.
  * Usage: npm run rag:seed
  * Production: set AI_RAG_ENV=production (requires Supabase service role).
+ *
+ * Scope: FASE 16 product-knowledge + allowlisted Soldiers KB Markdown
+ * (tkd / nutrition / supplements / safety). Never indexes evidence-policy or
+ * spec-training-system (see `.cursor/rules/knowledge-rag-guard.mdc`).
  */
 import {
   ensureVectorStore,

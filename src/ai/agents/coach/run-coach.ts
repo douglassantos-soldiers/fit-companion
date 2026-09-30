@@ -375,6 +375,7 @@ async function runCoachViaCanonical(opts: {
     proposalRejectReason = "low_confidence";
   }
 
+  const safetySnap = opts.snapshot.safety;
   const factPack = buildFactPack({
     intentKind: opts.intentKind,
     message: opts.message,
@@ -383,6 +384,10 @@ async function runCoachViaCanonical(opts: {
     proposal,
     proposalStatus,
     ...(proposalRejectReason ? { proposalRejectReason } : {}),
+    ...(safetySnap?.fixedMessage ? { safetyFixedMessage: safetySnap.fixedMessage } : {}),
+    ...(safetySnap?.ruleIds?.length ? { safetyRuleIds: safetySnap.ruleIds } : {}),
+    ...(safetySnap?.level ? { safetyLevel: safetySnap.level } : {}),
+    ...(safetySnap?.blockCommerce != null ? { blockCommerce: safetySnap.blockCommerce } : {}),
   });
 
   const built = buildCoachResponse(factPack);
@@ -603,6 +608,7 @@ async function runCoachLegacySoft(opts: {
     proposalRejectReason = "low_confidence";
   }
 
+  const safetyLegacy = opts.safety;
   const factPack = buildFactPack({
     intentKind: opts.intentKind,
     message: opts.message,
@@ -611,6 +617,12 @@ async function runCoachLegacySoft(opts: {
     proposal,
     proposalStatus,
     ...(proposalRejectReason ? { proposalRejectReason } : {}),
+    ...(safetyLegacy?.fixedMessage ? { safetyFixedMessage: safetyLegacy.fixedMessage } : {}),
+    ...(safetyLegacy?.ruleIds?.length ? { safetyRuleIds: safetyLegacy.ruleIds } : {}),
+    ...(safetyLegacy?.level ? { safetyLevel: safetyLegacy.level } : {}),
+    ...(safetyLegacy?.blockCommerce != null
+      ? { blockCommerce: safetyLegacy.blockCommerce }
+      : {}),
   });
 
   const built = buildCoachResponse(factPack);

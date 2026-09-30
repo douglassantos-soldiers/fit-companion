@@ -81,7 +81,7 @@ function AccessPage() {
     accessExpiresAt: string;
     shopifyDisplayName: string | null;
   }) => {
-    await setAccessGranted({
+    const grant = await setAccessGranted({
       email: result.email,
       shopifyCustomerId: result.shopifyCustomerId,
       orderCount: result.orderCount,
@@ -92,6 +92,12 @@ function AccessPage() {
       accessExpiresAt: result.accessExpiresAt,
       shopifyDisplayName: result.shopifyDisplayName,
     });
+    if (!grant.ok) {
+      if (grant.reason === "rate_limited") {
+        toast.error("Muitas tentativas, aguarde alguns minutos");
+      }
+      return;
+    }
     toast.success("Acesso liberado");
     navigate({ to: state.profile ? "/" : "/onboarding" });
   };

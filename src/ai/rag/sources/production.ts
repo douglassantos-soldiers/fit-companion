@@ -1,18 +1,23 @@
 /**
- * Curated product knowledge loaders — structured corpus in-repo (no web scraping).
+ * Curated product knowledge loaders — FASE 16 structured corpus + Soldiers KB Markdown allowlist.
  */
 
 import type { KnowledgeDocument } from "@/ai/contracts/knowledge-document";
 import type { KnowledgeSource } from "@/ai/contracts/knowledge-source";
 import type { KnowledgeSourceAdapter } from "@/ai/rag/core/types";
 import { PRODUCT_KNOWLEDGE_CORPUS } from "@/ai/rag/corpus/product-knowledge";
+import {
+  loadSoldiersKnowledgeDocuments,
+  SOLDIERS_KNOWLEDGE_SPECS,
+  soldiersKnowledgeSourceIds,
+} from "@/ai/rag/corpus/soldiers-knowledge";
 
 const NOW = "2026-03-11T12:00:00.000Z";
 const EFFECTIVE = "2026-01-01";
 
 const SOURCE_META: Record<
   string,
-  { name: string; domain: KnowledgeDocument["domain"] }
+  { name: string; domain: KnowledgeDocument["domain"]; trust?: "curated" | "draft_internal" }
 > = {
   src_exercise_catalog_schema: {
     name: "Exercise / training catalog schema",
@@ -26,6 +31,26 @@ const SOURCE_META: Record<
   src_supplementation_timing: { name: "Supplement timing", domain: "supplementation" },
   src_products_catalog: { name: "Products catalog schema", domain: "products" },
   src_coaching_faq: { name: "Coach FAQ deterministic", domain: "coaching" },
+  src_soldiers_tkd: {
+    name: "TKD resistido adultos",
+    domain: "training",
+    trust: "draft_internal",
+  },
+  src_soldiers_nutrition: {
+    name: "Nutrition knowledge Soldiers",
+    domain: "nutrition",
+    trust: "draft_internal",
+  },
+  src_soldiers_supplements: {
+    name: "Supplements knowledge Soldiers",
+    domain: "supplementation",
+    trust: "draft_internal",
+  },
+  src_soldiers_safety: {
+    name: "Safety knowledge Soldiers",
+    domain: "coaching",
+    trust: "draft_internal",
+  },
 };
 
 function makeSource(sourceId: string): KnowledgeSource {
@@ -33,22 +58,26 @@ function makeSource(sourceId: string): KnowledgeSource {
     name: sourceId,
     domain: "coaching" as const,
   };
+  const trust = meta.trust ?? "curated";
+  const isSoldiers = sourceId.startsWith("src_soldiers_");
   return {
     source_id: sourceId,
     name: meta.name,
     domain: meta.domain,
-    type: "structured",
-    source_type: "structured",
+    type: isSoldiers ? "markdown" : "structured",
+    source_type: isSoldiers ? "markdown" : "structured",
     publisher: "Soldiers Fit Companion",
     version: "1.0.0",
-    reference: `src/ai/rag/corpus/product-knowledge.ts#${sourceId}`,
+    reference: isSoldiers
+      ? `docs/knowledge/#${sourceId}`
+      : `src/ai/rag/corpus/product-knowledge.ts#${sourceId}`,
     license: "proprietary-internal",
     status: "active",
     created_at: NOW,
     updated_at: NOW,
-    trust_level: "curated",
-    trust_tier: "curated",
-    effective_date: EFFECTIVE,
+    trust_level: trust === "draft_internal" ? "internal" : "curated",
+    trust_tier: trust === "draft_internal" ? "internal" : "curated",
+    effective_date: isSoldiers ? "2026-09-29" : EFFECTIVE,
     expiration_date: null,
   };
 }
@@ -88,12 +117,36 @@ export function buildProductionSourceAdapters(): KnowledgeSourceAdapter[] {
     list.push(row);
     bySource.set(row.source_key, list);
   }
-  return [...bySource.entries()].map(([sourceId, rows]) => ({
-    source: makeSource(sourceId),
-    loadDocuments: async () => rows.map(rowToDocument),
+  const structured: KnowledgeSourceAdapter[] = [...bySource.entries()].map(
+    ([sourceId, rows]) => ({
+      source: makeSource(sourceId),
+      loadDocuments: async () => rows.map(rowToDocument),
+    }),
+  );
+
+  const soldiersBySource = new Map<string, KnowledgeDocument[]>();
+  // Lazy: load once when first adapter runs; share cache across adapters.
+  let cache: KnowledgeDocument[] | null = null;
+  const ensureSoldiers = (): KnowledgeDocument[] => {
+    if (!cache) cache = loadSoldiersKnowledgeDocuments();
+    return cache;
+  };
+
+  for (const spec of SOLDIERS_KNOWLEDGE_SPECS) {
+    soldiersBySource.set(spec.source_id, []);
+  }
+
+  const soldiersAdapters: KnowledgeSourceAdapter[] = SOLDIERS_KNOWLEDGE_SPECS.map((spec) => ({
+    source: makeSource(spec.source_id),
+    loadDocuments: async () =>
+      ensureSoldiers().filter((d) => d.source_id === spec.source_id),
   }));
+
+  return [...structured, ...soldiersAdapters];
 }
 
 export function listConnectedSourceIds(): string[] {
-  return Object.keys(SOURCE_META);
+  return [...Object.keys(SOURCE_META), ...soldiersKnowledgeSourceIds()].filter(
+    (id, i, arr) => arr.indexOf(id) === i,
+  );
 }

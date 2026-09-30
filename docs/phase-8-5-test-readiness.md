@@ -25,11 +25,13 @@ AppState = cache / UI / offline / drafts (não autoridade de negócio quando exi
 
 ## 4. Security changes
 
-- `ACCESS_SESSION_SECRET` obrigatório em produção (`assertSecurityConfiguration` / `resolveAccessSessionSecret`)
-- Removidos fallbacks `SHOPIFY_WEBHOOK_SECRET` e `"dev-only-change-me"` em produção
-- Dev: `ALLOW_INSECURE_DEV_SECRETS=true` ou Vitest/test
+- `ACCESS_SESSION_SECRET` e `ADMIN_SESSION_SECRET` obrigatórios e distintos em produção (`assertSecurityConfiguration`)
+- Tokens assinam com secrets separados + campo `kind` (`access` / `admin`)
+- Removidos fallbacks `SHOPIFY_WEBHOOK_SECRET` e literais inseguros em produção
+- Dev: `ALLOW_INSECURE_DEV_SECRETS=true` ou Vitest/test (fallbacks access/admin distintos)
 - Entitlements client: `fetchEntitlement` / `upsertEntitlement` neutralizados
 - Leituras sensíveis: `requireAccessIfLinked` em pull/C360/patterns/decisions/events
+- `establishAccessSession`: rate limit distribuído (e-mail 5/15min, IP 20/15min)
 
 ## 5. Identity changes
 
@@ -116,6 +118,6 @@ AppState = cache / UI / offline / drafts (não autoridade de negócio quando exi
 ## 18. Próximos passos
 
 1. Aplicar migration `20260922100000_phase85_core_integrity.sql` no Supabase
-2. Definir `ACCESS_SESSION_SECRET` em produção
+2. Definir `ACCESS_SESSION_SECRET` e `ADMIN_SESSION_SECRET` (distintos) em produção
 3. Smoke manual: onboarding → Today → treino → meal → coach → reset local vs clear conta
 4. Testes reais de produto com QA mode em staging (`ENABLE_QA_MODE=true`)

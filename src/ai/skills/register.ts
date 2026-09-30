@@ -6,6 +6,7 @@ import { clearSkillRegistry, hasSkill } from "@/ai/skills/core/registry";
 import { registerNutritionSkills } from "@/ai/skills/nutrition";
 import { registerPerformanceSkills } from "@/ai/skills/performance";
 import { registerRecoverySkills } from "@/ai/skills/recovery";
+import { registerSupplementSkills } from "@/ai/skills/supplements";
 import { registerTrainingSkills } from "@/ai/skills/training";
 
 let bootstrapped = false;
@@ -21,5 +22,6 @@ export function registerAllSkills(opts?: { force?: boolean }): void {
   registerRecoverySkills();
   registerBehaviorSkills();
   registerPerformanceSkills();
+  registerSupplementSkills();
   bootstrapped = true;
 }

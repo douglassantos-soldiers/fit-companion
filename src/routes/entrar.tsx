@@ -70,7 +70,7 @@ function EntrarPage() {
         navigate({ to: "/acesso", search: { token: undefined } });
         return;
       }
-      await setAccessGranted({
+      const grant = await setAccessGranted({
         email: result.email,
         shopifyCustomerId: result.shopifyCustomerId,
         orderCount: result.orderCount,
@@ -81,6 +81,12 @@ function EntrarPage() {
         accessExpiresAt: result.accessExpiresAt,
         shopifyDisplayName: result.shopifyDisplayName,
       });
+      if (!grant.ok) {
+        if (grant.reason === "rate_limited") {
+          toast.error("Muitas tentativas, aguarde alguns minutos");
+        }
+        return;
+      }
       toast.success("Bem-vindo de volta");
       navigate({ to: state.profile ? "/" : "/onboarding" });
     } catch (e) {

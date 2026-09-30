@@ -2,8 +2,14 @@
  * Safety Engine — contraindications and soft guards before recommendations / AI.
  * Pure TypeScript; no network. Does not diagnose.
  * Date-aware: always evaluate against the same calendar date as Living Plan / Today.
+ * Levels + SAF-* IDs aligned with docs/knowledge/safety-knowledge-001.md (pinned).
  */
 import { SLEEP_LOW_HOURS } from "@/lib/engine/decision-thresholds";
+import {
+  matchSafetyNotes,
+  notesSuggestEscalation,
+  type SafetyLevel,
+} from "@/lib/engine/safety-knowledge-rules";
 import { computeRecoverySnapshot, type RecoverySnapshot } from "@/lib/engine/recovery";
 import type { AppState, Goal } from "@/lib/types";
 import { getUserTodayKey, DEFAULT_USER_TIMEZONE } from "@/lib/timezone";
@@ -30,18 +36,30 @@ export type SafetyVerdict = {
   escalateCare: boolean;
   /** Calendar date used for evaluation */
   date: string;
+  /** SAFKD level (GREEN/YELLOW/RED/EMERGENCY). */
+  level: SafetyLevel;
+  /** Matched SAF-* rule ids. */
+  ruleIds: string[];
+  /** Fixed EMERGENCY/RED copy — never LLM-generated. */
+  fixedMessage?: string;
+  /** SAF-005: no product / commerce mentions when not GREEN. */
+  blockCommerce: boolean;
 };
 
-/** Non-diagnostic keyword scan for potentially serious check-in notes. */
-const ESCALATE_NOTE_RE =
-  /\b(dor\s+no\s+peito|dor\s+no\s+cora[cç][aã]o|falta\s+de\s+ar|n[aã]o\s+consigo\s+respirar|desmaio|desmaiei|tontura\s+forte|sangramento|peito\s+apertando|chest\s+pain|shortness\s+of\s+breath|fainted|seizure|convuls[aã]o)\b/i;
-
-export function notesSuggestEscalation(notes: string | null | undefined): boolean {
-  if (!notes?.trim()) return false;
-  return ESCALATE_NOTE_RE.test(notes);
-}
+export { notesSuggestEscalation, matchSafetyNotes };
+export type { SafetyLevel };
 
 export type SafetyInput = Pick<AppState, "dayCheckIns" | "sessions" | "profile">;
+
+function maxLevel(a: SafetyLevel, b: SafetyLevel): SafetyLevel {
+  const rank: Record<SafetyLevel, number> = {
+    GREEN: 0,
+    YELLOW: 1,
+    RED: 2,
+    EMERGENCY: 3,
+  };
+  return rank[a] >= rank[b] ? a : b;
+}
 
 /**
  * Evaluate safety for a specific calendar date (YYYY-MM-DD).
@@ -56,11 +74,13 @@ export function evaluateSafetyForDate(
   const reasons: string[] = [
     "O Coach não substitui orientação médica — ajuste se sentir dor ou mal-estar.",
   ];
+  const ruleIds: string[] = [];
 
   const checkIn = state.dayCheckIns?.[date];
   let blockStims = false;
   let preferLightTraining = false;
-  let escalateCare = false;
+  let level: SafetyLevel = "GREEN";
+  let fixedMessage: string | undefined;
 
   if (checkIn) {
     if (checkIn.sleepHours < SLEEP_LOW_HOURS) {
@@ -68,30 +88,40 @@ export function evaluateSafetyForDate(
       reasons.push("Sono baixo — evite estimulantes e prefira treino leve.");
       blockStims = true;
       preferLightTraining = true;
+      level = maxLevel(level, "YELLOW");
     }
     if (checkIn.energy === "baixa") {
       flags.push("high_fatigue");
       reasons.push("Energia baixa — priorize recuperação.");
       preferLightTraining = true;
+      level = maxLevel(level, "YELLOW");
     }
+    // SAF-160: soreness/stress alone are readiness, not EMERGENCY.
     if (checkIn.soreness != null && checkIn.soreness >= 4) {
       flags.push("under_recovery");
       reasons.push("Dor muscular alta no check-in — priorize recuperação.");
       preferLightTraining = true;
+      level = maxLevel(level, "YELLOW");
     }
     if (checkIn.soreness != null && checkIn.soreness >= 5) {
       flags.push("pain_signal");
       reasons.push(
         "Sinal de dor intensa no check-in — não trate como ajuste de treino comum. Se a dor for aguda ou incomum, procure um profissional de saúde.",
       );
-      escalateCare = true;
       preferLightTraining = true;
       blockStims = true;
+      level = maxLevel(level, "RED");
+      ruleIds.push("SAF-126");
+      if (!fixedMessage) {
+        fixedMessage =
+          "Vamos parar este exercício por hoje. O que você descreveu merece ser avaliado por um profissional de saúde antes de voltarmos a ele. Se quiser, seguimos com exercícios que não provoquem esse desconforto. Se a dor piorar, aparecer inchaço ou você não conseguir apoiar ou mover, procure atendimento hoje.";
+      }
     }
     if (checkIn.stress != null && checkIn.stress >= 5) {
       flags.push("high_stress");
       reasons.push("Estresse máximo no check-in — priorize descanso e sono.");
       preferLightTraining = true;
+      level = maxLevel(level, "YELLOW");
     }
     if (
       checkIn.soreness != null &&
@@ -99,21 +129,29 @@ export function evaluateSafetyForDate(
       checkIn.soreness >= 4 &&
       checkIn.stress >= 4
     ) {
-      escalateCare = true;
+      // SAF-160 / D-09: not escalate_care by itself — readiness / light day.
       preferLightTraining = true;
-      if (!flags.includes("pain_signal")) flags.push("pain_signal");
-      reasons.push(
-        "Dor e estresse elevados juntos — foque em recuperação; não é só deload de volume.",
-      );
+      level = maxLevel(level, "YELLOW");
+      if (!flags.includes("pain_signal") && (checkIn.soreness ?? 0) < 5) {
+        reasons.push(
+          "Dor e estresse elevados juntos — foque em recuperação; ajuste volume, não é emergência médica por si só.",
+        );
+      }
     }
-    if (notesSuggestEscalation(checkIn.notes)) {
-      flags.push("escalate_care");
-      escalateCare = true;
-      preferLightTraining = true;
-      blockStims = true;
-      reasons.push(
-        "Seu check-in menciona um sinal que merece atenção profissional. Não é adaptação de treino — pause o estímulo intenso e procure avaliação adequada se os sintomas persistirem.",
-      );
+
+    const noteMatch = matchSafetyNotes(checkIn.notes);
+    if (noteMatch.ruleIds.length) {
+      ruleIds.push(...noteMatch.ruleIds);
+      level = maxLevel(level, noteMatch.level);
+      if (noteMatch.fixedMessage) fixedMessage = noteMatch.fixedMessage;
+      if (noteMatch.level === "RED" || noteMatch.level === "EMERGENCY") {
+        flags.push("escalate_care");
+        preferLightTraining = true;
+        blockStims = true;
+        reasons.push(
+          "Seu check-in menciona um sinal que merece atenção profissional. Não é adaptação de treino — pause o estímulo intenso e procure avaliação adequada se os sintomas persistirem.",
+        );
+      }
     }
   }
 
@@ -125,6 +163,7 @@ export function evaluateSafetyForDate(
     flags.push("hard_rpe_streak");
     reasons.push("Três sessões difíceis seguidas — considere deload.");
     preferLightTraining = true;
+    level = maxLevel(level, "YELLOW");
   }
 
   try {
@@ -133,6 +172,7 @@ export function evaluateSafetyForDate(
       flags.push("under_recovery");
       reasons.push(snap.explanation);
       preferLightTraining = true;
+      level = maxLevel(level, "YELLOW");
       if (snap.reasonCodes.includes("sleep_low")) {
         blockStims = true;
       }
@@ -141,13 +181,16 @@ export function evaluateSafetyForDate(
     /* incomplete state */
   }
 
+  const escalateCare = level === "RED" || level === "EMERGENCY";
   if (escalateCare) {
     flags.push("escalate_care");
   }
   if (blockStims) flags.push("stim_restriction");
 
+  const blockCommerce = level !== "GREEN";
+
   return {
-    ok: !escalateCare,
+    ok: level === "GREEN" || level === "YELLOW",
     flags: [...new Set(flags)],
     reasons,
     blockStims,
@@ -155,6 +198,10 @@ export function evaluateSafetyForDate(
     requireMedicalDisclaimer: true,
     escalateCare,
     date,
+    level,
+    ruleIds: [...new Set(ruleIds)],
+    ...(fixedMessage ? { fixedMessage } : {}),
+    blockCommerce,
   };
 }
 

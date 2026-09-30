@@ -147,7 +147,7 @@ describe("FASE 1 Decision Contract Consolidation", () => {
       const resolved = resolveProposalAgainstEngine(bridged, forced);
       expect(resolved.ok).toBe(false);
       expect(resolved.rejection_reason).toMatch(
-        /conflicts_with_training_mode|escalate_requires_rest_aligned/,
+        /conflicts_with_training_mode|escalate_requires_rest_aligned|emergency_blocks_all_proposals/,
       );
       expect(resolved.authoritative.every((d) => d.user_id === forced.userId)).toBe(true);
       const modeDec = resolved.authoritative.find(

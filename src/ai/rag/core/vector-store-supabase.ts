@@ -19,7 +19,15 @@ function toVectorLiteral(emb: number[]): string {
 }
 
 function wrapDbError(err: unknown, context: string): never {
-  const msg = err instanceof Error ? err.message : String(err);
+  let msg: string;
+  if (err instanceof Error) {
+    msg = err.message;
+  } else if (err && typeof err === "object") {
+    const o = err as { message?: unknown; code?: unknown; details?: unknown };
+    msg = [o.code, o.message, o.details].filter(Boolean).map(String).join(" | ") || JSON.stringify(err);
+  } else {
+    msg = String(err);
+  }
   throw new RagError(RAG_ERROR.UNAVAILABLE, `RAG_UNAVAILABLE: ${context}: ${msg}`);
 }
 
@@ -124,13 +132,20 @@ export class SupabasePgvectorStore implements VectorStore {
   }): Promise<void> {
     const db = await this.db();
     const now = new Date().toISOString();
+    const trustRaw = String(source.trust_level ?? "curated");
+    const trust_level =
+      trustRaw === "draft_internal" || trustRaw === "internal"
+        ? "internal"
+        : trustRaw === "fixture" || trustRaw === "external_unverified"
+          ? trustRaw
+          : "curated";
     const { error } = await db.from("ai_knowledge_sources").upsert({
       source_id: source.source_id,
       name: source.name,
       domain: source.domain,
       type: source.type ?? "structured",
       version: source.version ?? "1.0.0",
-      trust_level: source.trust_level ?? "curated",
+      trust_level,
       status: source.status ?? "active",
       metadata: source.metadata ?? {},
       updated_at: now,

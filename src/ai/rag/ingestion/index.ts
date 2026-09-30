@@ -110,13 +110,20 @@ export async function ingestKnowledgeDocument(
   }
 
   if (normalized.source_id && typeof store.upsertSource === "function") {
+    const trustRaw = String(normalized.metadata["trust_level"] ?? "curated");
+    const trust_level =
+      trustRaw === "draft_internal" || trustRaw === "internal"
+        ? "internal"
+        : trustRaw === "fixture" || trustRaw === "external_unverified"
+          ? trustRaw
+          : "curated";
     await store.upsertSource({
       source_id: normalized.source_id,
       name: String(normalized.metadata["source_name"] ?? normalized.source_id),
       domain: normalized.domain,
       type: String(normalized.source_type ?? "structured"),
       version: normalized.version,
-      trust_level: String(normalized.metadata["trust_level"] ?? "curated"),
+      trust_level,
       status: "active",
     });
   }
@@ -223,6 +230,7 @@ export async function seedProductionCorpus(
 
 /** Expected minimum curated document count for readiness. */
 export function expectedCorpusDocumentMin(): number {
+  // FASE 16 corpus + Soldiers KB sections (allowlist); keep floor at 80% of product rows.
   return Math.max(1, Math.floor(PRODUCT_KNOWLEDGE_CORPUS.length * 0.8));
 }
 

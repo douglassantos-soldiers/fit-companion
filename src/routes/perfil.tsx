@@ -180,7 +180,7 @@ function ProfilePage() {
         toast.error("Compre para se manter ativo — janela de 40 dias.");
         return;
       }
-      await setAccessGranted({
+      const grant = await setAccessGranted({
         email: result.email,
         shopifyCustomerId: result.shopifyCustomerId,
         orderCount: result.orderCount,
@@ -191,6 +191,14 @@ function ProfilePage() {
         accessExpiresAt: result.accessExpiresAt,
         shopifyDisplayName: result.shopifyDisplayName,
       });
+      if (!grant.ok) {
+        if (grant.reason === "rate_limited") {
+          toast.error("Muitas tentativas, aguarde alguns minutos");
+        } else {
+          toast.error("Falha ao verificar");
+        }
+        return;
+      }
       toast.success("Acesso confirmado");
     } catch {
       toast.error("Falha ao verificar");

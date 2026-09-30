@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-09-29T02:28:40.000Z",
+  "checked_at": "2026-09-30T00:20:16.000Z",
   "project_ref": "zphtvrsxlhfgltwgbreu",
   "project_name": "APP",
   "cli_linked": true,
@@ -10,33 +10,35 @@
   "bundles_executed": [],
   "rag_seed": {
     "ok": true,
-    "documents": 25,
-    "chunks": 25,
+    "documents": 85,
+    "chunks": 430,
     "store_id": "supabase_pgvector_v1",
     "env": "production"
   },
   "database_readiness": {
     "verdict": "PASS",
-    "error_code": null
+    "error_code": null,
+    "checked_at": "2026-09-30T00:18:35.409Z"
   },
   "rate_limit_readiness": {
     "verdict": "PASS",
-    "error_code": null
+    "error_code": null,
+    "checked_at": "2026-09-30T00:20:29.524Z"
   },
   "service_role_smoke": {
     "ai_schema_inventory_probe": {
       "tables": 11,
-      "indexes": 25,
-      "extensions": ["vector"]
+      "extensions": ["vector"],
+      "ok": true
     },
     "ai_rate_limit_consume": {
       "allowed": true,
-      "http": 200
-    },
-    "probe_ai_tables": "all_http_200"
+      "ok": true
+    }
   },
   "advisors": {
     "blocking": false,
+    "rechecked": true,
     "warnings": [
       "extension_in_public:vector",
       "auth_leaked_password_protection_disabled"

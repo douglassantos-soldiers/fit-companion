@@ -3,7 +3,6 @@
  * Auth via resolveTrustedIdentity (access cookie + device bind).
  */
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey } from "@/lib/access-session.server";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import { barcodeHitFromOffProduct, parseEan, type BarcodeHit } from "@/lib/nutrition/barcode";
 
@@ -32,8 +31,18 @@ export const lookupBarcodeFn = createServerFn({ method: "POST" })
     });
     if (!identity) return { found: false, error: "unauthorized" };
     const rlKey = identity.email ?? identity.userId;
-    if (!rateLimitKey(`barcode:${rlKey}`, 60, 60 * 60_000)) {
-      return { found: false, error: "rate_limited" };
+    {
+      const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+      const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+      if (!isAiRateLimitDisabled()) {
+        const store = await resolveAiRateLimitStore();
+        const burst = await store.consume({
+          key: `ai:barcode:${rlKey}`,
+          limit: 60,
+          windowMs: 60 * 60_000,
+        });
+        if (!burst.allowed) return { found: false, error: "rate_limited" };
+      }
     }
 
     const ctrl = new AbortController();

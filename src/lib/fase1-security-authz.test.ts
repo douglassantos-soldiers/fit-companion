@@ -116,6 +116,7 @@ describe("FASE1 entitlement client claims", () => {
 describe("FASE1 admin roles", () => {
   it("encodes admin role in token (legacy PIN = admin)", () => {
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-fase1";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-fase1";
     process.env["NODE_ENV"] = "test";
     const token = encodeAdminToken("admin@soldiers.com", "admin");
     const decoded = decodeAdminToken(token);
@@ -125,6 +126,7 @@ describe("FASE1 admin roles", () => {
 
   it("encodes analyst role for future least-privilege reads", () => {
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-fase1";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-fase1";
     process.env["NODE_ENV"] = "test";
     const token = encodeAdminToken("analyst@soldiers.com", "analyst");
     expect(decodeAdminToken(token)?.role).toBe("analyst");

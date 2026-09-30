@@ -12,6 +12,7 @@ import {
   readAdminSession,
   readAppAccessSession,
   authenticateAdminWithRole,
+  resolveClientIpFingerprint,
 } from "@/lib/access-session.server";
 import { parseEstablishAccessInput,
   parseAdminLogin,
@@ -88,6 +89,30 @@ export const clearAccessSession = createServerFn({ method: "POST" }).handler(asy
 export const establishAccessSession = createServerFn({ method: "POST" })
   .inputValidator(parseEstablishAccessInput)
   .handler(async ({ data }) => {
+    const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+    const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+
+    if (!isAiRateLimitDisabled()) {
+      const store = await resolveAiRateLimitStore();
+      const emailKey = data.email.trim().toLowerCase();
+      const emailBurst = await store.consume({
+        key: `ai:access:email:${emailKey}`,
+        limit: 5,
+        windowMs: 15 * 60_000,
+      });
+      if (!emailBurst.allowed) {
+        return { ok: false as const, reason: "rate_limited" as const };
+      }
+      const ipBurst = await store.consume({
+        key: `ai:access:ip:${resolveClientIpFingerprint()}`,
+        limit: 20,
+        windowMs: 15 * 60_000,
+      });
+      if (!ipBurst.allowed) {
+        return { ok: false as const, reason: "rate_limited" as const };
+      }
+    }
+
     const { inspectAccessForEmail, upsertDeviceEntitlementAdmin, findEntitlementByEmail } =
       await import("@/lib/shopify.server");
     const { resolveOrCreateUserByEmail, linkDeviceToShopifyUser } = await import("@/lib/identity");

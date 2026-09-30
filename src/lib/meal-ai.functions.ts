@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { rateLimitKey } from "@/lib/access-session.server";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import {
   mealAiSystemPrompt,
@@ -162,8 +161,18 @@ export const analyzeMealAi = createServerFn({ method: "POST" })
     });
     if (!identity) return { error: "unauthorized" };
     const rlKey = identity.email ?? identity.userId;
-    if (!rateLimitKey(`meal-ai:${rlKey}`, 40, 60 * 60_000)) {
-      return { error: "rate_limited" };
+    {
+      const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+      const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+      if (!isAiRateLimitDisabled()) {
+        const store = await resolveAiRateLimitStore();
+        const burst = await store.consume({
+          key: `ai:meal-ai:${rlKey}`,
+          limit: 40,
+          windowMs: 60 * 60_000,
+        });
+        if (!burst.allowed) return { error: "rate_limited" };
+      }
     }
 
     const userId = identity.userId ?? identity.email;

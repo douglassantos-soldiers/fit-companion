@@ -1,5 +1,9 @@
 /**
  * Curated product knowledge corpus (FASE 16) — one doc per kb_ref used by skills + schema docs.
+ *
+ * Soldiers knowledge Markdown (TKD, nutrition, supplements, safety) is loaded
+ * separately via `soldiers-knowledge.ts` allowlist. evidence-policy and
+ * spec-training-system never enter this corpus. See docs/knowledge/README.md.
  */
 import type { KnowledgeDomain } from "@/ai/contracts/knowledge-document";
 

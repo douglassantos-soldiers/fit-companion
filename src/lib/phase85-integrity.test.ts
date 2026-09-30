@@ -2,9 +2,11 @@
  * PHASE 8.5 integrity tests — identity, secrets, C360, safety date, timezone, nutrition confidence.
  */
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { createHmac } from "node:crypto";
 import {
   assertSecurityConfiguration,
   resolveAccessSessionSecret,
+  resolveAdminSessionSecret,
   SecurityConfigurationError,
   encodeAccessToken,
   decodeAccessToken,
@@ -31,9 +33,25 @@ describe("PHASE 8.5 access session secrets", () => {
   it("fails closed in production without ACCESS_SESSION_SECRET", () => {
     process.env["NODE_ENV"] = "production";
     delete process.env["ACCESS_SESSION_SECRET"];
+    delete process.env["ADMIN_SESSION_SECRET"];
     delete process.env["ALLOW_INSECURE_DEV_SECRETS"];
     expect(() => assertSecurityConfiguration()).toThrow(SecurityConfigurationError);
     expect(() => resolveAccessSessionSecret()).toThrow(SecurityConfigurationError);
+  });
+
+  it("fails closed in production without ADMIN_SESSION_SECRET", () => {
+    process.env["NODE_ENV"] = "production";
+    process.env["ACCESS_SESSION_SECRET"] = "prod-access-secret-ok";
+    delete process.env["ADMIN_SESSION_SECRET"];
+    expect(() => assertSecurityConfiguration()).toThrow(SecurityConfigurationError);
+    expect(() => resolveAdminSessionSecret()).toThrow(SecurityConfigurationError);
+  });
+
+  it("fails closed in production when session secrets are equal", () => {
+    process.env["NODE_ENV"] = "production";
+    process.env["ACCESS_SESSION_SECRET"] = "same-secret-value";
+    process.env["ADMIN_SESSION_SECRET"] = "same-secret-value";
+    expect(() => assertSecurityConfiguration()).toThrow(SecurityConfigurationError);
   });
 
   it("never uses SHOPIFY_WEBHOOK_SECRET as signing secret", () => {
@@ -46,6 +64,7 @@ describe("PHASE 8.5 access session secrets", () => {
   it("signs and verifies with ACCESS_SESSION_SECRET", () => {
     process.env["NODE_ENV"] = "test";
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
     const token = encodeAccessToken({
       email: "a@b.com",
       tier: "base",
@@ -59,10 +78,62 @@ describe("PHASE 8.5 access session secrets", () => {
   it("admin token carries email and grants app access payload", () => {
     process.env["NODE_ENV"] = "test";
     process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
     const token = encodeAdminToken("  Teste@Teste.COM ");
     const payload = decodeAdminToken(token);
     expect(payload?.role).toBe("admin");
     expect(payload?.email).toBe("teste@teste.com");
+  });
+
+  it("rejects access token pasted into admin cookie decoder", () => {
+    process.env["NODE_ENV"] = "test";
+    process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
+    const access = encodeAccessToken({
+      email: "user@soldiers.com",
+      tier: "performance",
+      userId: "user-12345678",
+    });
+    expect(decodeAdminToken(access)).toBeNull();
+  });
+
+  it("rejects admin token pasted into access cookie decoder", () => {
+    process.env["NODE_ENV"] = "test";
+    process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
+    const admin = encodeAdminToken("admin@soldiers.com", "admin");
+    expect(decodeAccessToken(admin)).toBeNull();
+  });
+
+  it("rejects admin token without role or with unknown role", () => {
+    process.env["NODE_ENV"] = "test";
+    process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
+    const sign = (body: object) => {
+      const data = Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
+      const sig = createHmac("sha256", "test-admin-secret-phase85").update(data).digest("base64url");
+      return `${data}.${sig}`;
+    };
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    expect(decodeAdminToken(sign({ kind: "admin", email: "a@b.com", exp }))).toBeNull();
+    expect(
+      decodeAdminToken(sign({ kind: "admin", role: "superuser", email: "a@b.com", exp })),
+    ).toBeNull();
+  });
+
+  it("rejects admin-shaped payload signed with ACCESS_SESSION_SECRET", () => {
+    process.env["NODE_ENV"] = "test";
+    process.env["ACCESS_SESSION_SECRET"] = "test-secret-phase85";
+    process.env["ADMIN_SESSION_SECRET"] = "test-admin-secret-phase85";
+    const body = {
+      kind: "admin",
+      role: "admin",
+      email: "a@b.com",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    };
+    const data = Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
+    const sig = createHmac("sha256", "test-secret-phase85").update(data).digest("base64url");
+    expect(decodeAdminToken(`${data}.${sig}`)).toBeNull();
   });
 });
 

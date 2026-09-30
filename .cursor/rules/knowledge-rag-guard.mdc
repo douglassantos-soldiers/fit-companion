@@ -1,0 +1,27 @@
+---
+description: Regras da KB Soldiers — o que pode e não pode ir ao RAG
+globs: docs/knowledge/**/*
+alwaysApply: true
+---
+
+# Knowledge RAG Policy
+
+Markdown em `docs/knowledge/` alimenta o runtime com regras explícitas.
+
+## Indexáveis no RAG (allowlist)
+
+- `tkd-resistido-adultos-001`
+- `nutrition-knowledge-001`
+- `supplements-knowledge-001`
+- `safety-knowledge-001`
+
+Seed via adapters em `src/ai/rag/sources/production.ts` + loader `soldiers-knowledge` (paths fixos). Não varrer a pasta inteira.
+
+## Nunca no RAG
+
+- `evidence-policy-001` — Seção 8 vai para prompts (`src/ai/gateway/prompts/evidence-policy.ts`)
+- `spec-training-system-001` — especificação de engenharia (código), não retrieval
+
+## Safety pinned
+
+Além do RAG, regras `SAF-*` críticas vivem em `src/lib/engine/safety-knowledge-rules.ts` e `safety.ts` (`rag_pinned: sempre`).

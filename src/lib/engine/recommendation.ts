@@ -302,7 +302,7 @@ export function rankRecommendations(opts: {
     decisionType: "NUTRITION_FOCUS",
   });
 
-  if (!blockStimsEffective && lp.supplements.length) {
+  if (!blockStimsEffective && !safety.blockCommerce && lp.supplements.length) {
     const next = lp.supplements[0]!;
     out.push({
       id: "rec-supp",
@@ -333,6 +333,8 @@ export function rankRecommendations(opts: {
   }
 
   // Product recs: only owned / routine — never push catalog as ads.
+  // SAF-005: no commerce when safety level is not GREEN.
+  if (!safety.blockCommerce) {
   const ownedOrRoutine = new Set([
     ...purchaseProductIds,
     ...lp.supplements.map((s) => s.id),
@@ -358,6 +360,7 @@ export function rankRecommendations(opts: {
       ...(restockSoon ? { reasonCodes: ["restock_risk"] } : {}),
       decisionType: "SUPPLEMENT_REMINDER",
     });
+  }
   }
 
   out.push({

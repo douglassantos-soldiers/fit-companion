@@ -12,7 +12,7 @@ export function registerTrainingSkills(): void {
     description: "Summarize recent training history and current plan mode",
     domain: "training",
     required_tool_ids: ["get_training_history", "get_current_plan"],
-    required_knowledge: ["kb:training.basics"],
+    required_knowledge: ["kb:training.basics", "kb:tkd.resistido"],
     execute: async (ctx, input) => {
       const warnings: string[] = [];
       const di = dateInput(ctx, input);
@@ -101,7 +101,7 @@ export function registerTrainingSkills(): void {
     description: "Heuristic exercise pick from recent history",
     domain: "training",
     required_tool_ids: ["get_training_history"],
-    required_knowledge: ["kb:training.exercises"],
+    required_knowledge: ["kb:training.exercises", "kb:tkd.resistido"],
     execute: async (ctx, input) => {
       const di = dateInput(ctx, input);
       const hist = await requireToolData(ctx.callTool, "get_training_history", { ...di, limit: 5 });
@@ -125,7 +125,7 @@ export function registerTrainingSkills(): void {
     description: "Suggest a substitute for a session exercise (heuristic)",
     domain: "training",
     required_tool_ids: ["get_training_session"],
-    required_knowledge: ["kb:training.substitutions"],
+    required_knowledge: ["kb:training.substitutions", "kb:tkd.resistido"],
     input_schema: {
       type: "object",
       required: ["sessionId"],
@@ -168,7 +168,7 @@ export function registerTrainingSkills(): void {
     domain: "training",
     kind: "proposal",
     required_tool_ids: ["get_recovery", "get_current_plan"],
-    required_knowledge: ["kb:training.load"],
+    required_knowledge: ["kb:training.load", "kb:tkd.resistido"],
     safety_requirements: {
       requires_decision_authority: true,
       proposal_only_for_side_effects: true,
@@ -215,7 +215,7 @@ export function registerTrainingSkills(): void {
     domain: "training",
     kind: "proposal",
     required_tool_ids: ["get_training_history", "get_recent_decisions"],
-    required_knowledge: ["kb:training.progression"],
+    required_knowledge: ["kb:training.progression", "kb:tkd.resistido"],
     safety_requirements: {
       requires_decision_authority: true,
       proposal_only_for_side_effects: true,
@@ -257,7 +257,7 @@ export function registerTrainingSkills(): void {
     domain: "training",
     kind: "proposal",
     required_tool_ids: ["get_training_history", "get_recent_decisions"],
-    required_knowledge: ["kb:training.regression"],
+    required_knowledge: ["kb:training.regression", "kb:tkd.resistido"],
     safety_requirements: {
       requires_decision_authority: true,
       proposal_only_for_side_effects: true,

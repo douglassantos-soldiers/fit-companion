@@ -71,6 +71,28 @@ export function buildCoachResponse(pack: CoachFactPack): BuiltCoachResponse {
     value: e.value,
   }));
 
+  // EMERGENCY / fixed SAF copy wins over any generated narrative (SAF-004).
+  const fixed =
+    typeof pack.safetyFixedMessage === "string" && pack.safetyFixedMessage.trim()
+      ? pack.safetyFixedMessage.trim()
+      : null;
+  if (fixed) {
+    return {
+      text: fixed,
+      status: "blocked",
+      structured: {
+        summary: fixed,
+        why: [],
+        decisions: [],
+        evidence,
+        warnings: [...pack.warnings, "safety_fixed_message", ...(pack.safetyRuleIds ?? [])],
+        proposalStatus: "safety_blocked",
+        intentKind: pack.intentKind,
+        safetyNotice: fixed,
+      },
+    };
+  }
+
   if (pack.intentKind === "why_plan_changed") {
     if (!pack.why || (pack.why.reason_codes.length === 0 && whyLines.length === 0)) {
       const text =
