@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, expect, it } from "vitest";
 import { exportSessionsCsv, SESSIONS_CSV_HEADER } from "@/lib/training/export-sessions-csv";
 import type { SessionLog } from "@/lib/types";

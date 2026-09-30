@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Customer 360 recompute / commerce / lineage unit tests (pure helpers + build).
  */

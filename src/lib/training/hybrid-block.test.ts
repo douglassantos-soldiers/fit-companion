@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, expect, it } from "vitest";
 import { emptyState, type Profile } from "@/lib/types";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";

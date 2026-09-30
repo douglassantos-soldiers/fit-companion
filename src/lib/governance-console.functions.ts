@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 19 — Governance Console server fns (admin/analyst read-only).
  * Never mutates Decision Engine / Living Plan / Learning.

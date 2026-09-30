@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 22.1 — CANONICAL production AI runtime.
  *

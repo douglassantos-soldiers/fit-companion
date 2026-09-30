@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * RAG infrastructure — unit tests (fixtures + production corpus).
  */

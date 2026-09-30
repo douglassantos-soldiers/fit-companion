@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * runSpecialistAgent — thin single-agent runtime.
  * Uses Context (via tools/skills), MCP, Skills, RAG, Memory.

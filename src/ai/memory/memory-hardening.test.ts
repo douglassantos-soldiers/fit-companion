@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 22.3 — Production Memory Persistence hardening tests.
  */

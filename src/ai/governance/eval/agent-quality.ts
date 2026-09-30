@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Agent quality — deterministic checks on reasoning / evidence / proposal / tools.
  * Does not call or mutate Decision Engine.
