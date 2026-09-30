@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { SoldiersLogo } from "@/components/soldiers-logo";
 import { Button } from "@/components/ui/button";
-import { completeAccountAccess } from "@/lib/access.functions";
-import { getAuthUser } from "@/lib/auth";
+import { completeAccountAccess, grantAdminAppAccess } from "@/lib/access.functions";
+import { getAuthUser, getAuthSession } from "@/lib/auth";
 import {
   ACCESS_PURCHASE_WINDOW_DAYS,
   daysSincePaid,
@@ -59,6 +59,7 @@ function AccessPage() {
   const { state, setAccessGranted, setAuthUserId } = useStore();
   const complete = useServerFn(completeAccountAccess);
   const redeem = useServerFn(redeemMagicToken);
+  const grantAdmin = useServerFn(grantAdminAppAccess);
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
   const [tokenError, setTokenError] = useState(false);
@@ -103,6 +104,15 @@ function AccessPage() {
   };
 
   const verifyPurchase = async (email: string, authUserId: string) => {
+    const session = await getAuthSession().catch(() => null);
+    if (session?.access_token) {
+      const admin = await grantAdmin({ data: { accessToken: session.access_token } }).catch(() => null);
+      if (admin?.ok) {
+        toast.success("Acesso de admin liberado");
+        window.location.assign(state.profile ? "/" : "/onboarding");
+        return true;
+      }
+    }
     const result = await complete({
       data: {
         email,
