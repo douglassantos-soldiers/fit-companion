@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { SoldiersSplash, type SplashStatus } from "@/components/soldiers-splash";
-import { checkAccessSession } from "@/lib/access.functions";
+import { checkAccessSession, grantAdminAppAccess } from "@/lib/access.functions";
 import { getAuthSession } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
@@ -22,6 +22,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const checkSession = useServerFn(checkAccessSession);
+  const grantAdmin = useServerFn(grantAdminAppAccess);
   const [ready, setReady] = useState(false);
   const [hasAuth, setHasAuth] = useState(false);
   const [shopifyOk, setShopifyOk] = useState(false);
@@ -49,7 +50,14 @@ export function AccessGate({ children }: { children: ReactNode }) {
         setConnectionError(true);
       }
       try {
-        const res = await checkSession();
+        let res = await checkSession();
+        if (!res.ok && res.reason !== "account_blocked") {
+          const s = await getAuthSession();
+          if (s?.access_token) {
+            const g = await grantAdmin({ data: { accessToken: s.access_token } }).catch(() => null);
+            if (g?.ok) res = await checkSession();
+          }
+        }
         if (cancelled) return;
         if (res.ok) {
           setAccountBlocked(false);
@@ -76,7 +84,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, pathname, checkSession, updateAccessFromSession, revokeAccessLocal]);
+  }, [hydrated, pathname, checkSession, grantAdmin, updateAccessFromSession, revokeAccessLocal]);
 
   useEffect(() => {
     if (!hydrated || !ready) return;
