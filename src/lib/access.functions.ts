@@ -391,3 +391,32 @@ export const logoutAdmin = createServerFn({ method: "POST" }).handler(async () =
   clearAdminSessionCookie();
   return { ok: true as const };
 });
+
+/**
+ * Supabase Auth user with app_metadata.role = admin → full app access.
+ * Token is validated server-side; role is read from Supabase, never from the client.
+ */
+export const grantAdminAppAccess = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => {
+    const t = (d as { accessToken?: unknown })?.accessToken;
+    if (typeof t !== "string" || t.split(".").length !== 3) throw new Error("invalid token");
+    return { accessToken: t };
+  })
+  .handler(async ({ data }) => {
+    const url =
+      process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || import.meta.env["VITE_SUPABASE_URL"] || "";
+    const anon =
+      process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+      process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+      import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+      "";
+    if (!url || !anon) return { ok: false as const };
+    const { createClient } = await import("@supabase/supabase-js");
+    const client = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: u, error } = await client.auth.getUser(data.accessToken);
+    if (error || !u.user?.email) return { ok: false as const };
+    const role = (u.user.app_metadata as { role?: string } | undefined)?.role;
+    if (role !== "admin") return { ok: false as const };
+    setAdminSessionCookie(u.user.email.toLowerCase(), "admin");
+    return { ok: true as const };
+  });
