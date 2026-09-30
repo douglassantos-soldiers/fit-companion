@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { AppShell, EmptyState } from "@/components/app-shell";
 import { MetricRing } from "@/components/metric-ring";
-import { ShareCardPicker } from "@/components/progress/share-card";
+import { PeriodShareCard, ShareCardPicker } from "@/components/progress/share-card";
 import { ProofCard } from "@/components/social/proof-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,15 @@ import { NumberTicker } from "@/components/ui/number-ticker";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import { exerciseById } from "@/data/exercises";
 import { PRODUCTS } from "@/data/products";
+import { seedCoachQuestion } from "@/lib/coach/seed";
+import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
+import { selectPrimaryAction } from "@/lib/engine/decision-context-snapshot";
 import {
+  adherenceScore,
   frequencyHeatmap,
   performanceDimensions,
   performanceScore,
-  personalRecords,
+  primaryBlockerDimension,
   prsInCurrentWeek,
   streak,
   weekOverWeek,
@@ -45,23 +49,43 @@ import { currentPersonalRecords } from "@/lib/training/prs";
 import { computeMuscleLoad } from "@/lib/training/muscle-load";
 import { computeStrengthScore } from "@/lib/training/strength-score";
 import { buildProofOfPerformance } from "@/lib/engine/proof-of-performance";
+import { livingPlanForDate } from "@/lib/engine/living-plan";
 import { nutritionGoals, weeklyNutritionSeries } from "@/lib/engine/nutrition";
 import { weeklySupplementAdherence } from "@/lib/engine/supplements";
 import { publishProofEvent } from "@/lib/social";
 import { shouldPublishEvent } from "@/lib/social/visibility";
 import { PeriodReviewCard } from "@/components/progress/period-review-card";
 import { periodReview } from "@/lib/engine/period-review";
+import {
+  goalProgressCard,
+  resolveProgressNextAction,
+  weightDeltaRecent,
+} from "@/lib/progress/next-action";
+import { datesForPose } from "@/lib/progress/body";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
+import { todayKey } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const DIM_KEYS = [
-  { key: "forca", label: "Força", color: "var(--chart-1)" },
-  { key: "resistencia", label: "Resistência", color: "var(--chart-2)" },
+const PERF_DIM_KEYS = [
+  { key: "forca", label: "Treinamento", color: "var(--chart-1)" },
+  { key: "resistencia", label: "Condicionamento", color: "var(--chart-2)" },
   { key: "consistencia", label: "Consistência", color: "var(--chart-3)" },
   { key: "recuperacao", label: "Recuperação", color: "var(--chart-4)" },
-  { key: "nutricao", label: "Nutrição", color: "var(--chart-5)" },
+  { key: "sono", label: "Sono", color: "var(--chart-5)" },
 ] as const;
+
+const ADHERE_DIM_KEYS = [
+  { key: "nutricao", label: "Nutrição", color: "var(--chart-1)" },
+  { key: "suplementacao", label: "Suplementos", color: "var(--chart-2)" },
+  { key: "habitos", label: "Hábitos", color: "var(--chart-3)" },
+] as const;
+
+const TRAFFIC_LABEL: Record<string, string> = {
+  green: "verde",
+  yellow: "âmbar",
+  red: "vermelho",
+};
 
 const HEAT_LEVEL: Record<0 | 1 | 2 | 3 | 4, string> = {
   0: "bg-muted",
@@ -110,12 +134,30 @@ export function ProgressPage() {
 
   const dims = performanceDimensions(state, state.profile);
   const score = performanceScore(dims);
+  const adhere = adherenceScore(dims);
+  const blocker = primaryBlockerDimension(state, state.profile);
   const strength = computeStrengthScore(state.sessions, state.profile);
   const volume = weeklyVolumeSeries(state.sessions);
-  const records = personalRecords(state.sessions);
   const wow = weekOverWeek(state.sessions);
   const heat = frequencyHeatmap(state.sessions, 12);
   const weekPrs = prsInCurrentWeek(state.sessions);
+  const weekReview = periodReview(state, "week");
+  const living = livingPlanForDate(state);
+  const decisionCtx = decisionContextForUi(state, todayKey());
+  const livingPrimary = decisionCtx ? selectPrimaryAction(decisionCtx) : null;
+  const dow = new Date().getDay();
+  const isRitualDay = dow === 0 || dow === 1 || weekReview.isSundayRitual;
+  const hasComparePose = (["front", "side", "back"] as const).some(
+    (pose) => datesForPose(state.progressPhotos ?? [], pose).length >= 2,
+  );
+  const nextAction = resolveProgressNextAction({
+    blocker,
+    livingPrimary,
+    coachLine: weekReview.coachLine,
+    score,
+    hasBodyPhotos: hasComparePose || (state.progressPhotos?.length ?? 0) > 0,
+    isRitualDay,
+  });
   const selectedHistory: ExerciseHistorySummary | null =
     exerciseHistory.find((h) => h.exerciseId === historyExId) ?? exerciseHistory[0] ?? null;
   const historyChart =
@@ -145,6 +187,23 @@ export function ProgressPage() {
 
   const goals = nutritionGoals(state.profile);
   const nutritionWeek = weeklyNutritionSeries(state.meals ?? []);
+  const proteinHitDays = nutritionWeek.filter((d) => d.proteinG >= goals.proteinG * 0.9).length;
+  const sleepVals = Object.values(state.dayCheckIns ?? {})
+    .map((c) => c.sleepHours)
+    .filter((h): h is number => typeof h === "number");
+  const sleepAvg7d =
+    sleepVals.length > 0
+      ? sleepVals.slice(-7).reduce((s, h) => s + h, 0) / Math.min(7, sleepVals.length)
+      : null;
+  const goalCard = goalProgressCard({
+    goal: state.profile.goal,
+    weightDelta7d: weightDeltaRecent(state.weights, 14),
+    strengthDelta28d: strength.delta28d,
+    prCountWeek: weekPrs.length,
+    proteinHitDays7d: proteinHitDays,
+    sleepAvg7d,
+  });
+  const recoveryTraffic = living?.traffic.recovery ?? null;
   const routineIds = state.supplementRoutine.length
     ? state.supplementRoutine
     : PRODUCTS.filter((p) => p.goals.includes(state.profile!.goal))
@@ -155,6 +214,8 @@ export function ProgressPage() {
     ...n,
     aderencia: suppWeek[i]?.pct ?? 0,
   }));
+  const perfDims = dims.filter((d) => PERF_DIM_KEYS.some((k) => k.key === d.key));
+  const adhereDims = dims.filter((d) => ADHERE_DIM_KEYS.some((k) => k.key === d.key));
 
   const heatCols = 12;
   const heatByCol: (typeof heat)[] = Array.from({ length: heatCols }, () => []);
@@ -193,8 +254,90 @@ export function ProgressPage() {
 
   return (
     <AppShell title="Progresso" subtitle="Semana · força · corpo">
-      <PeriodReviewCard review={periodReview(state, "week")} />
-      <PeriodReviewCard review={periodReview(state, "month")} />
+      <section className="surface-glass mb-4 border-primary/30 p-5">
+        <p className="eyebrow">Próxima ação</p>
+        <h2 className="mt-1 text-display text-xl">{nextAction.title}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{nextAction.reason}</p>
+        <Link
+          to={nextAction.to}
+          {...(nextAction.search ? { search: nextAction.search as never } : {})}
+          className="mt-4 block"
+        >
+          <Button className="h-11 w-full font-bold uppercase tracking-wide">
+            {nextAction.ctaLabel}
+          </Button>
+        </Link>
+      </section>
+
+      {isRitualDay ? (
+        <section className="surface-glass mb-4 space-y-3 p-4">
+          <p className="eyebrow">{weekReview.isSundayRitual ? "Ritual de domingo" : "Revisão da semana"}</p>
+          <h2 className="text-display text-xl">{weekReview.label}</h2>
+          {weekReview.wins.length ? (
+            <ul className="space-y-0.5 text-xs text-primary">
+              {weekReview.wins.slice(0, 3).map((w) => (
+                <li key={w}>· {w}</li>
+              ))}
+            </ul>
+          ) : null}
+          {weekReview.nextBlock && weekReview.nextBlock.days.length > 0 ? (
+            <div className="rounded-xl border border-white/10 px-3 py-2">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                {weekReview.nextBlock.label}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                {weekReview.nextBlock.days.slice(0, 3).map((d) => (
+                  <li key={d.title}>
+                    {d.title} · {d.exerciseCount} ex.
+                  </li>
+                ))}
+              </ul>
+              <Link to="/treino" className="mt-2 inline-block text-xs font-semibold text-primary">
+                Ver treino →
+              </Link>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Link to="/progresso/corpo">
+              <Button size="sm" variant="secondary">
+                {hasComparePose ? "Ver antes/agora" : "Registrar corpo"}
+              </Button>
+            </Link>
+            <Link to="/progresso/resumo" search={{ period: "week" }}>
+              <Button size="sm" variant="outline">
+                Resumo completo
+              </Button>
+            </Link>
+          </div>
+          <PeriodShareCard
+            athleteName={state.profile.name}
+            title={weekReview.label}
+            sessions={weekReview.sessions}
+            volumeKg={weekReview.volumeKg}
+            prCount={weekReview.prCount}
+            consistencyPct={weekReview.consistencyPct}
+          />
+        </section>
+      ) : null}
+
+      {!isRitualDay ? <PeriodReviewCard review={weekReview} /> : null}
+      <p className="mb-3 text-right">
+        <Link
+          to="/progresso/resumo"
+          search={{ period: "month" }}
+          className="text-xs font-semibold text-primary"
+        >
+          Ver resumo do mês →
+        </Link>
+      </p>
+
+      <section className="surface-glass mb-4 p-4">
+        <p className="eyebrow">Objetivo</p>
+        <h2 className="mt-1 text-display text-lg">{goalCard.title}</h2>
+        <p className="mt-1 text-sm text-foreground">{goalCard.line}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{goalCard.hint}</p>
+      </section>
+
       <ProofCard
         className="mb-4"
         proof={proof}
@@ -222,33 +365,6 @@ export function ProgressPage() {
         }}
       />
 
-      {score < 40 ? (
-        <section className="surface-glass mb-4 border-primary/30 p-5">
-          <p className="eyebrow">Próxima ação</p>
-          <h2 className="mt-1 text-display text-xl">Score baixo — feche o gap hoje</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Treine ou feche a proteína para subir consistência e nutrição.
-          </p>
-          <div className="mt-4 flex gap-2">
-            <Link to="/treino" className="flex-1">
-              <Button className="h-11 w-full font-bold uppercase tracking-wide">Treinar</Button>
-            </Link>
-            <Link to="/nutricao" className="flex-1">
-              <Button variant="secondary" className="h-11 w-full font-bold uppercase tracking-wide">
-                Proteína
-              </Button>
-            </Link>
-          </div>
-        </section>
-      ) : null}
-
-      <ProofCard
-        className="mb-4"
-        proof={proof}
-        name={state.profile.name}
-        sharing={proofSharing}
-        state={state}
-      />
       <section className="surface-glass relative overflow-hidden p-6">
         <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/20 blur-3xl" />
         <p className="eyebrow">Semana</p>
@@ -402,9 +518,21 @@ export function ProgressPage() {
                     tendência {selectedHistory.trend === "unknown" ? "—" : selectedHistory.trend}
                   </Badge>
                   {selectedHistory.plateau ? (
-                    <Badge variant="outline" className="border-chart-4/50 text-xs text-chart-4">
-                      Plateau
-                    </Badge>
+                    <Link
+                      to="/coach"
+                      onClick={() =>
+                        seedCoachQuestion(
+                          `Estou em plateau em ${selectedHistory.name}. Como ajustar a progressão sem forçar carga?`,
+                        )
+                      }
+                    >
+                      <Badge
+                        variant="outline"
+                        className="border-chart-4/50 text-xs text-chart-4 hover:bg-chart-4/10"
+                      >
+                        Plateau · pedir ajuste no Coach
+                      </Badge>
+                    </Link>
                   ) : null}
                 </div>
               ) : null}
@@ -477,17 +605,45 @@ export function ProgressPage() {
         </div>
 
         <div className="border-t border-white/10 pt-4">
-          <h3 className="text-sm font-semibold">PRs recentes</h3>
-          {typedPrs.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">Bata cargas e volumes para registrar PRs tipados.</p>
+          <h3 className="text-sm font-semibold">PRs</h3>
+          {weekPrs.length === 0 && typedPrs.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Bata cargas e volumes para registrar PRs tipados e da semana.
+            </p>
           ) : (
-            <ul className="mt-2 space-y-1.5">
-              {typedPrs.map((pr) => (
-                <li key={pr.id} className="text-sm text-muted-foreground">
-                  <span className="text-foreground">{pr.label}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2 space-y-3">
+              {weekPrs.length > 0 ? (
+                <div>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                    Esta semana
+                  </p>
+                  <ul className="mt-1 space-y-1.5">
+                    {weekPrs.map((r) => (
+                      <li key={r.exerciseId} className="flex justify-between text-sm">
+                        <span>{exerciseById(r.exerciseId)?.name ?? r.exerciseId}</span>
+                        <span className="text-display text-primary">
+                          {r.weightKg} kg × {r.reps}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {typedPrs.length > 0 ? (
+                <div>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Tipados recentes
+                  </p>
+                  <ul className="mt-1 space-y-1.5">
+                    {typedPrs.map((pr) => (
+                      <li key={pr.id} className="text-sm text-muted-foreground">
+                        <span className="text-foreground">{pr.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
 
@@ -505,42 +661,6 @@ export function ProgressPage() {
           </ul>
         </div>
 
-        <div className="border-t border-white/10 pt-4">
-          <h3 className="text-sm font-semibold">PRs desta semana</h3>
-          {weekPrs.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">Bata um recorde de carga em qualquer exercício.</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {weekPrs.map((r) => (
-                <li key={r.exerciseId} className="flex justify-between text-sm">
-                  <span>{exerciseById(r.exerciseId)?.name ?? r.exerciseId}</span>
-                  <span className="text-display text-primary">
-                    {r.weightKg} kg × {r.reps}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="border-t border-white/10 pt-4">
-          <h3 className="text-sm font-semibold">Recordes pessoais</h3>
-          {records.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">Conclua séries para registrar PRs.</p>
-          ) : (
-            <ul className="mt-2 space-y-2">
-              {records.slice(0, 8).map((r) => (
-                <li key={r.exerciseId} className="flex items-center justify-between text-sm">
-                  <span>{exerciseById(r.exerciseId)?.name ?? r.exerciseId}</span>
-                  <span className="text-display text-primary">
-                    {r.weightKg} kg × {r.reps}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
         {latestSession ? (
           <Button className="h-11 w-full" variant="secondary" onClick={() => setShareOpen(true)}>
             <Share2 className="size-4" /> Compartilhar card
@@ -550,27 +670,66 @@ export function ProgressPage() {
 
       {/* Bloco 3 — Corpo */}
       <section className="surface-glass mt-4 space-y-6 p-6">
-        <div>
-          <p className="eyebrow">Corpo</p>
-          <h2 className="mt-1 text-display text-2xl">Dimensões e nutrição</h2>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">Corpo</p>
+            <h2 className="mt-1 text-display text-2xl">Dimensões e nutrição</h2>
+          </div>
+          <Link to="/progresso/corpo">
+            <Button size="sm" variant="secondary">
+              {hasComparePose ? "Antes/agora" : "Registrar"}
+            </Button>
+          </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {dims.map((d) => (
-            <MetricRing key={d.key} value={d.score} max={100} label={d.label} size="lg" />
-          ))}
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Performance</p>
+            <span className="text-display text-primary">{score}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {perfDims.map((d) => (
+              <div key={d.key} className="relative">
+                <MetricRing value={d.score} max={100} label={d.label} size="lg" />
+                {d.key === "recuperacao" && recoveryTraffic ? (
+                  <p
+                    className={cn(
+                      "mt-1 text-center text-[0.6rem] font-semibold uppercase tracking-wide",
+                      recoveryTraffic === "green" && "text-primary",
+                      recoveryTraffic === "yellow" && "text-chart-4",
+                      recoveryTraffic === "red" && "text-destructive",
+                    )}
+                  >
+                    Plano {TRAFFIC_LABEL[recoveryTraffic] ?? recoveryTraffic}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-white/10 pt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Aderência</p>
+            <span className="text-display text-primary">{adhere}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {adhereDims.map((d) => (
+              <MetricRing key={d.key} value={d.score} max={100} label={d.label} size="lg" />
+            ))}
+          </div>
         </div>
 
         {dimSeries.length > 1 ? (
           <div className="h-44 border-t border-white/10 pt-4">
-            <p className="mb-2 text-sm font-semibold">Evolução</p>
+            <p className="mb-2 text-sm font-semibold">Evolução · performance</p>
             <ResponsiveContainer width="100%" height="90%">
               <LineChart data={dimSeries}>
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} />
                 <Tooltip contentStyle={chartTooltip} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                {DIM_KEYS.map((d) => (
+                {PERF_DIM_KEYS.map((d) => (
                   <Line key={d.key} type="monotone" dataKey={d.key} name={d.label} stroke={d.color} strokeWidth={2} dot={false} />
                 ))}
               </LineChart>
@@ -580,7 +739,9 @@ export function ProgressPage() {
 
         <div className="border-t border-white/10 pt-4">
           <p className="text-sm font-semibold">Nutrição · 7 dias</p>
-          <p className="text-xs text-muted-foreground">Meta {goals.proteinG} g proteína</p>
+          <p className="text-xs text-muted-foreground">
+            Meta {goals.proteinG} g · hit {proteinHitDays}/7d
+          </p>
           <div className="mt-3 h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={nutritionChart}>

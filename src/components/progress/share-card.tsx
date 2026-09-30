@@ -26,6 +26,7 @@ import {
 import { signedProgressPhotoUrl, visibilityAfterCardPublish } from "@/lib/progress/photos";
 import { updateProgressPhotoVisibilityFn } from "@/lib/progress/photos.functions";
 import { challengeProgress, publishEvent, uploadCheckinImage, type ChallengeProgressOpts } from "@/lib/social";
+import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
 import { currentPersonalRecords } from "@/lib/training/prs";
 import type { AppState, SessionLog } from "@/lib/types";
@@ -172,6 +173,7 @@ export function ShareCardPicker({
   rankLabel?: string;
 }) {
   const reduce = useReducedMotion();
+  const { markQuestShare } = useStore();
   const [kind, setKind] = useState<ShareCardKind>(defaultKind);
   const [includePhotos, setIncludePhotos] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -265,6 +267,7 @@ export function ShareCardPicker({
         }
       }
       toast.success("Card publicado no feed (PNG composto).");
+      markQuestShare();
     } catch {
       toast.error("Não foi possível publicar no feed.");
     } finally {
@@ -373,10 +376,17 @@ export function ShareCardPicker({
         ) : null}
       </div>
 
-      <ShareButtons cardRef={ref} fileName={`soldiers-${kind}.png`} />
-      <Button variant="outline" className="h-10 w-full" disabled={publishing} onClick={() => void publishToFeed()}>
-        {publishing ? "Publicando…" : "Publicar no feed"}
-      </Button>
+      <div className="mt-3 space-y-2">
+        <Button
+          variant="outline"
+          className="h-10 w-full"
+          disabled={publishing}
+          onClick={() => void publishToFeed()}
+        >
+          {publishing ? "Publicando…" : "Publicar no clube / feed"}
+        </Button>
+        <ShareButtons cardRef={ref} fileName={`soldiers-${kind}.png`} />
+      </div>
       <p className="text-[10px] text-muted-foreground">
         Publicar sobe só o PNG composto. Fotos de corpo originais ficam no bucket privado.
       </p>
@@ -504,10 +514,10 @@ function ShareButtons({ cardRef, fileName }: { cardRef: RefObject<HTMLDivElement
   return (
     <div className={cn("mt-3 grid grid-cols-2 gap-2")}>
       <Button variant="secondary" disabled={busy} onClick={() => void download()}>
-        Baixar PNG
+        Salvar imagem
       </Button>
       <Button disabled={busy} onClick={() => void share()}>
-        Compartilhar
+        WhatsApp / sistema
       </Button>
     </div>
   );

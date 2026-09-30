@@ -8,8 +8,11 @@ import { pickEditorialItems } from "@/lib/content/recommend";
 import { isEditorialDismissed, rankForYou } from "@/lib/social/feed-rank";
 import {
   DEFAULT_SOCIAL_PRIVACY,
+  canSeeContent,
+  isDismissalActive,
   isReactionKind,
   normalizeSocialPrivacy,
+  privacyKeyForEvent,
   selectForYouFeed,
   type FeedCandidate,
   type ReactionKind,
@@ -375,6 +378,140 @@ export async function getForYouFeedServer(
       };
     }),
   };
+}
+
+/** Feed only from people the viewer follows — no editorial, no club/PR discovery. */
+export async function getFollowingFeedServer(
+  deviceId: string,
+  limit = 30,
+): Promise<{
+  ok: boolean;
+  events: ForYouEvent[];
+  viewerUserId: string | null;
+}> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity) return { ok: false, events: [], viewerUserId: null };
+  const db = await adminDbLoose();
+  if (!db) return { ok: false, events: [], viewerUserId: identity.userId };
+
+  const ctx = await loadGraphContext(identity.userId);
+  if (!ctx.followingIds.length) {
+    return { ok: true, events: [], viewerUserId: identity.userId };
+  }
+
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: rows } = await db
+    .from("activity_events")
+    .select("id, device_id, user_id, display_name, kind, payload, kudos_count, created_at")
+    .is("hidden_at", null)
+    .in("user_id", ctx.followingIds.slice(0, 100))
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(120, Math.max(limit * 3, 40)));
+
+  const raw = ((rows ?? []) as Row[]).map((r) => ({
+    id: String(r["id"]),
+    deviceId: String(r["device_id"] ?? ""),
+    userId: String(r["user_id"] ?? ""),
+    displayName: String(r["display_name"] ?? "Soldado"),
+    kind: String(r["kind"] ?? ""),
+    payload: jsonRecord((r["payload"] as Record<string, unknown>) ?? {}),
+    kudosCount: Number(r["kudos_count"] ?? 0),
+    createdAt: String(r["created_at"] ?? ""),
+  }));
+
+  const authorIds = [...new Set(raw.map((e) => e.userId).filter(Boolean))];
+  const privacyByUser: Record<string, SocialPrivacy> = {};
+  if (authorIds.length) {
+    const { data: profiles } = await db
+      .from("social_profiles")
+      .select(
+        "app_user_id, privacy_profile, privacy_workouts, privacy_prs, privacy_weight, privacy_photos, privacy_nutrition",
+      )
+      .in("app_user_id", authorIds);
+    for (const p of (profiles ?? []) as Row[]) {
+      const id = String(p["app_user_id"] ?? "");
+      if (id) privacyByUser[id] = mapPrivacy(p);
+    }
+  }
+
+  const following = new Set(ctx.followingIds);
+  const followers = new Set(ctx.followerIds);
+  const club = new Set(ctx.clubUserIds);
+  const blocked = new Set(ctx.blockedIds);
+  const muted = new Set(ctx.mutedIds);
+  const dismissed = new Set(
+    ctx.dismissals
+      .filter((d) => isDismissalActive(d.createdAt))
+      .map((d) => `${d.authorUserId}:${d.kind}`),
+  );
+
+  const filtered = raw.filter((e) => {
+    if (!e.userId || !following.has(e.userId)) return false;
+    if (blocked.has(e.userId) || muted.has(e.userId)) return false;
+    if (dismissed.has(`${e.userId}:${e.kind}`)) return false;
+    const privacy = privacyByUser[e.userId] ?? DEFAULT_SOCIAL_PRIVACY;
+    const key = privacyKeyForEvent(e.kind, e.payload);
+    return canSeeContent({
+      viewerId: identity.userId,
+      authorId: e.userId,
+      level: privacy[key],
+      viewerFollowsAuthor: true,
+      authorFollowsViewer: followers.has(e.userId),
+      sameClub: club.has(e.userId),
+      blockedEitherWay: blocked.has(e.userId),
+    });
+  });
+
+  const socialIds = filtered.slice(0, limit).map((e) => e.id);
+  const reactionCounts = emptyReactionMap();
+  const myReaction: Record<string, ReactionKind> = {};
+  const commentCount: Record<string, number> = {};
+
+  if (socialIds.length) {
+    const { data: reacts } = await db
+      .from("activity_reactions")
+      .select("event_id, user_id, kind")
+      .in("event_id", socialIds);
+    for (const r of (reacts ?? []) as Row[]) {
+      const eid = String(r["event_id"]);
+      const kind = r["kind"];
+      if (!isReactionKind(kind)) continue;
+      if (!reactionCounts[eid]) reactionCounts[eid] = emptyCounts();
+      const bag = reactionCounts[eid] ?? emptyCounts();
+      bag[kind] += 1;
+      reactionCounts[eid] = bag;
+      if (String(r["user_id"]) === identity.userId) myReaction[eid] = kind;
+    }
+    const { data: comments } = await db
+      .from("activity_comments")
+      .select("event_id")
+      .in("event_id", socialIds)
+      .is("hidden_at", null);
+    for (const c of (comments ?? []) as Row[]) {
+      const eid = String(c["event_id"]);
+      commentCount[eid] = (commentCount[eid] ?? 0) + 1;
+    }
+  }
+
+  const events = filtered.slice(0, limit).map((base) => {
+    const counts = reactionCounts[base.id] ?? emptyCounts();
+    return {
+      id: base.id,
+      deviceId: base.deviceId,
+      userId: base.userId,
+      displayName: base.displayName,
+      kind: base.kind,
+      payload: base.payload,
+      kudosCount: counts.fire || base.kudosCount,
+      createdAt: base.createdAt,
+      reactionCounts: counts,
+      myReaction: myReaction[base.id] ?? null,
+      commentCount: commentCount[base.id] ?? 0,
+    };
+  });
+
+  return { ok: true, viewerUserId: identity.userId, events };
 }
 
 function emptyCounts(): Record<ReactionKind, number> {

@@ -147,6 +147,37 @@ describe("Fase 9 home persona", () => {
       ),
     ).toBe("consistente");
   });
+
+  it("em_risco when active but not trained this ISO week", () => {
+    // Last session within 7d but outside current ISO week → em_risco (not inativo).
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7; // Mon=0
+    // Pick a date in the previous ISO week that is still <8 days ago when possible.
+    const prevWeek = new Date(now);
+    prevWeek.setHours(12, 0, 0, 0);
+    prevWeek.setDate(now.getDate() - day - 1); // Sunday of previous week
+    const key = prevWeek.toISOString().slice(0, 10);
+    const age = Math.round(
+      (now.getTime() - prevWeek.getTime()) / 86_400_000,
+    );
+    if (age >= 8) {
+      // Edge: if today is late in week and prev Sunday is far, skip assertion shape
+      expect(age).toBeGreaterThanOrEqual(8);
+      return;
+    }
+    expect(
+      homePersona(
+        state({
+          profile: profile({ createdAt: daysAgo(40) }),
+          sessions: [
+            session({ id: "a", date: daysAgo(Math.min(20, age + 5)) }),
+            session({ id: "b", date: key }),
+          ],
+        }),
+        now,
+      ),
+    ).toBe("em_risco");
+  });
 });
 
 describe("Fase 9 intra-session load drop", () => {

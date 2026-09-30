@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { Share2 } from "lucide-react";
+import { MessageSquare, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { seedCoachQuestion, weeklyReviewCoachSeed } from "@/lib/coach/seed";
 import type { PeriodReview } from "@/lib/engine/period-review";
 
 export function PeriodReviewCard({ review }: { review: PeriodReview }) {
@@ -97,6 +98,24 @@ export function PeriodReviewCard({ review }: { review: PeriodReview }) {
         </div>
       ) : null}
       <p className="mt-2 text-xs text-muted-foreground">{review.coachLine}</p>
+      <Link
+        to="/coach"
+        className="mt-3 block"
+        onClick={() =>
+          seedCoachQuestion(
+            weeklyReviewCoachSeed({
+              coachLine: review.coachLine,
+              wins: review.wins,
+              risks: review.risks,
+            }),
+          )
+        }
+      >
+        <Button variant="secondary" className="h-10 w-full gap-2 font-semibold">
+          <MessageSquare className="size-3.5" />
+          Revisar com o Coach
+        </Button>
+      </Link>
     </section>
   );
 }

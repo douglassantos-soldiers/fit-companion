@@ -12,6 +12,7 @@ const ACTION_META: Record<CoachActionId, { label: string; href: string }> = {
   start_checkin: { label: "Começar check-in", href: "/" },
   open_training: { label: "Abrir treino", href: "/treino" },
   open_nutrition: { label: "Abrir nutrição", href: "/nutricao" },
+  open_progress: { label: "Ver no Progresso", href: "/progresso" },
 };
 
 export function coachAction(id: CoachActionId): CoachAction {

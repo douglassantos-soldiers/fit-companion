@@ -16,7 +16,8 @@ export type CoachActionId =
   | "recommend_hydration"
   | "start_checkin"
   | "open_training"
-  | "open_nutrition";
+  | "open_nutrition"
+  | "open_progress";
 
 export type CoachProposalType =
   | "REDUCE_VOLUME"

@@ -5,6 +5,7 @@
 import type { BehaviorProfile } from "@/lib/engine/behavior";
 import type { AppState } from "@/lib/types";
 
+/** Rendered outside `orderHomeBlocks` (above-fold / persona CTAs) — not in the sortable queue. */
 export const PINNED_HOME_BLOCKS = ["inactive", "livingHero"] as const;
 export type PinnedHomeBlockId = (typeof PINNED_HOME_BLOCKS)[number];
 
@@ -39,7 +40,7 @@ const HIGH = 0.7;
 export function orderHomeBlocks(
   _state: AppState,
   behavior: BehaviorProfile,
-  opts?: { hasClub?: boolean; followingCount?: number; level?: string | null; isSunday?: boolean },
+  opts?: { hasClub?: boolean; followingCount?: number; level?: string | null; isSunday?: boolean; isMonday?: boolean },
 ): HomeBlockId[] {
   const scores = new Map<HomeBlockId, number>(DEFAULT_ORDER.map((id, i) => [id, DEFAULT_ORDER.length - i]));
 
@@ -47,7 +48,7 @@ export function orderHomeBlocks(
     scores.set(id, (scores.get(id) ?? 0) + amount);
   };
 
-  if (opts?.isSunday) {
+  if (opts?.isSunday || opts?.isMonday) {
     bump("periodReview", 80);
     bump("weekPrs", 40);
     bump("wow", 35);

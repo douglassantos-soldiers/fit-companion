@@ -306,17 +306,21 @@ function shopifyConfigured(): boolean {
 
 /**
  * Lookup Shopify customer by the account email (Admin search — not a full dump).
- * Access only if there is a paid order in the last 40 days.
- * Entitlement fallback does not grant if last_order_at is missing or older than 40 days.
+ * Access if paid order in last 40 days, or admin trial entitlement (tag admin_trial_7d) within 7 days.
  */
 export async function inspectAccessForEmail(email: string): Promise<AccessInspection> {
-  const { isPurchaseWithinWindow, latestPaidAt } = await import("@/lib/access-window");
+  const { isPurchaseWithinWindow, latestPaidAt, windowDaysFromEntitlementTags } = await import(
+    "@/lib/access-window",
+  );
   const normalized = email.trim().toLowerCase();
   if (!normalized.includes("@")) {
     return { granted: false, email: normalized, reason: "no_purchase", lastPaidAt: null };
   }
 
   const row = await findEntitlementByEmail(normalized);
+  const rowWindowDays = windowDaysFromEntitlementTags(row?.snapshot?.tags);
+  const rowInWindow =
+    Boolean(row?.lastOrderAt) && isPurchaseWithinWindow(row!.lastOrderAt, Date.now(), rowWindowDays);
 
   if (shopifyConfigured()) {
     try {
@@ -324,7 +328,7 @@ export async function inspectAccessForEmail(email: string): Promise<AccessInspec
         "@/lib/shopify-orders.server"
       );
       const { orders, customerId } = await fetchPaidOrdersByEmailServer(normalized);
-      const lastPaidAt = latestPaidAt(orders) ?? row?.lastOrderAt ?? null;
+      const lastPaidAt = latestPaidAt(orders) ?? null;
       if (orders.length > 0 && lastPaidAt && isPurchaseWithinWindow(lastPaidAt)) {
         const sorted = [...orders].sort((a, b) => {
           const ta = new Date(a.processed_at || a.created_at || 0).getTime();
@@ -366,13 +370,11 @@ export async function inspectAccessForEmail(email: string): Promise<AccessInspec
           customerTags,
         };
       }
-      if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt)) {
-        return { granted: false, email: normalized, reason: "stale_purchase", lastPaidAt };
+      // No recent Shopify paid order — fall back to entitlement row (manual / trial).
+      if (orders.length === 0 && rowInWindow) {
+        return grantFromEntitlementRow(normalized, row!);
       }
-      if (orders.length === 0 && row?.lastOrderAt && isPurchaseWithinWindow(row.lastOrderAt)) {
-        return grantFromEntitlementRow(normalized, row);
-      }
-      if (orders.length === 0 && row?.lastOrderAt) {
+      if (orders.length === 0 && row?.lastOrderAt && !rowInWindow) {
         return {
           granted: false,
           email: normalized,
@@ -380,14 +382,19 @@ export async function inspectAccessForEmail(email: string): Promise<AccessInspec
           lastPaidAt: row.lastOrderAt,
         };
       }
+      if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt)) {
+        // Prefer active trial row over stale Shopify lastPaid
+        if (rowInWindow) return grantFromEntitlementRow(normalized, row!);
+        return { granted: false, email: normalized, reason: "stale_purchase", lastPaidAt };
+      }
       return { granted: false, email: normalized, reason: "no_purchase", lastPaidAt };
     } catch (e) {
       console.warn("inspectAccessForEmail Admin fetch failed", e);
     }
   }
 
-  if (row?.lastOrderAt && isPurchaseWithinWindow(row.lastOrderAt)) {
-    return grantFromEntitlementRow(normalized, row);
+  if (rowInWindow) {
+    return grantFromEntitlementRow(normalized, row!);
   }
   if (row?.lastOrderAt) {
     return {

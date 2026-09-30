@@ -5,9 +5,37 @@
 
 export const ACCESS_PURCHASE_WINDOW_DAYS = 40;
 
+/** Admin-issued free trial (tag admin_trial_7d on entitlement snapshot). */
+export const ACCESS_TRIAL_WINDOW_DAYS = 7;
+
+export const ADMIN_TRIAL_TAG = "admin_trial_7d";
+
 export const ACCESS_WINDOW_MS = ACCESS_PURCHASE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 export const ACCESS_WINDOW_SEC = ACCESS_PURCHASE_WINDOW_DAYS * 24 * 60 * 60;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function windowMsForDays(windowDays: number): number {
+  return Math.max(1, windowDays) * DAY_MS;
+}
+
+export function windowSecForDays(windowDays: number): number {
+  return Math.max(1, windowDays) * 24 * 60 * 60;
+}
+
+/** Resolve access window from entitlement snapshot tags. */
+export function windowDaysFromEntitlementTags(tags: string[] | null | undefined): number {
+  if (!tags?.length) return ACCESS_PURCHASE_WINDOW_DAYS;
+  if (tags.some((t) => t.trim().toLowerCase() === ADMIN_TRIAL_TAG)) {
+    return ACCESS_TRIAL_WINDOW_DAYS;
+  }
+  return ACCESS_PURCHASE_WINDOW_DAYS;
+}
+
+export function isAdminTrialTags(tags: string[] | null | undefined): boolean {
+  return windowDaysFromEntitlementTags(tags) === ACCESS_TRIAL_WINDOW_DAYS;
+}
 
 export function paidAtMs(iso: string | null | undefined): number | null {
   if (!iso) return null;
@@ -15,30 +43,43 @@ export function paidAtMs(iso: string | null | undefined): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-/** True when last paid order is within the 40-day window. */
+/** True when last paid / trial start is within the window (default 40 days). */
 export function isPurchaseWithinWindow(
   lastPaidAt: string | null | undefined,
   now = Date.now(),
+  windowDays: number = ACCESS_PURCHASE_WINDOW_DAYS,
 ): boolean {
   const t = paidAtMs(lastPaidAt);
   if (t == null) return false;
-  return now - t <= ACCESS_WINDOW_MS;
+  return now - t <= windowMsForDays(windowDays);
 }
 
-export function accessExpiresAtMs(lastPaidAt: string, now = Date.now()): number {
+export function accessExpiresAtMs(
+  lastPaidAt: string,
+  now = Date.now(),
+  windowDays: number = ACCESS_PURCHASE_WINDOW_DAYS,
+): number {
   const paid = paidAtMs(lastPaidAt) ?? now;
-  return paid + ACCESS_WINDOW_MS;
+  return paid + windowMsForDays(windowDays);
 }
 
-export function accessExpiresAtIso(lastPaidAt: string, now = Date.now()): string {
-  return new Date(accessExpiresAtMs(lastPaidAt, now)).toISOString();
+export function accessExpiresAtIso(
+  lastPaidAt: string,
+  now = Date.now(),
+  windowDays: number = ACCESS_PURCHASE_WINDOW_DAYS,
+): string {
+  return new Date(accessExpiresAtMs(lastPaidAt, now, windowDays)).toISOString();
 }
 
 /** Cookie exp (unix seconds) = min(now + window, lastPaidAt + window). */
-export function accessCookieExpSec(lastPaidAt: string | null | undefined, now = Date.now()): number {
-  const cap = Math.floor(now / 1000) + ACCESS_WINDOW_SEC;
+export function accessCookieExpSec(
+  lastPaidAt: string | null | undefined,
+  now = Date.now(),
+  windowDays: number = ACCESS_PURCHASE_WINDOW_DAYS,
+): number {
+  const cap = Math.floor(now / 1000) + windowSecForDays(windowDays);
   if (!lastPaidAt) return cap;
-  return Math.min(cap, Math.floor(accessExpiresAtMs(lastPaidAt, now) / 1000));
+  return Math.min(cap, Math.floor(accessExpiresAtMs(lastPaidAt, now, windowDays) / 1000));
 }
 
 export function orderPaidAt(order: { processed_at?: string; created_at?: string }): string | null {
@@ -68,8 +109,6 @@ export function formatAccessDate(iso: string | null | undefined): string {
   if (!Number.isFinite(d.getTime())) return "—";
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Whole days left until expiry (0 if already expired). */
 export function accessDaysRemaining(

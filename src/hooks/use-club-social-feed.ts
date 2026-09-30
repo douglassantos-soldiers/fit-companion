@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import {
   fetchClubFeed,
+  fetchFollowingFeed,
   fetchForYouFeed,
   fetchFeed,
   hasGivenKudos,
@@ -9,19 +9,31 @@ import {
   type ClubSummary,
 } from "@/lib/social";
 import type { ReactionKind } from "@/lib/social/visibility";
+import { useEffect, useState } from "react";
 
-/** Shared club / for-you feed + kudos map for Hoje / Social. */
+export type ClubSocialFeedMode = "club" | "foryou" | "following";
+
+/** Shared club / for-you / following feed + kudos map for Hoje / Social. */
 export function useClubSocialFeed(opts: {
   enabled: boolean;
   deviceId: string;
   limit?: number;
   globalFallback?: boolean;
   refreshKey?: number | string;
-  mode?: "club" | "foryou";
+  mode?: ClubSocialFeedMode;
   goal?: string | null;
   level?: string | null;
 }) {
-  const { enabled, deviceId, limit = 12, globalFallback = false, refreshKey, mode = "club", goal, level } = opts;
+  const {
+    enabled,
+    deviceId,
+    limit = 12,
+    globalFallback = false,
+    refreshKey,
+    mode = "club",
+    goal,
+    level,
+  } = opts;
   const [club, setClub] = useState<ClubSummary | null>(null);
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
   const [kudosGiven, setKudosGiven] = useState<Record<string, boolean>>({});
@@ -41,6 +53,8 @@ export function useClubSocialFeed(opts: {
           if (!events.length && !c && globalFallback) {
             events = (await fetchFeed(Math.max(limit, 20))) ?? [];
           }
+        } else if (mode === "following") {
+          events = await fetchFollowingFeed(deviceId, Math.max(limit, 20));
         } else {
           events = c
             ? ((await fetchClubFeed(
@@ -80,17 +94,14 @@ export function useClubSocialFeed(opts: {
         if (x.myReaction) counts[x.myReaction] = Math.max(0, (counts[x.myReaction] ?? 0) - 1);
         const nextKind = kind ?? "fire";
         counts[nextKind] = (counts[nextKind] ?? 0) + 1;
-        const next: ActivityEvent = {
+        return {
           ...x,
           myReaction: nextKind,
           reactionCounts: counts,
-          kudosCount: counts.fire,
+          kudosCount: nextKind === "fire" ? counts.fire : x.kudosCount,
         };
-        if (x.commentCount != null) next.commentCount = x.commentCount;
-        return next;
       }),
     );
-    setKudosGiven((g) => ({ ...g, [id]: true }));
   };
 
   return { club, feed, setFeed, kudosGiven, setKudosGiven, applyReaction };

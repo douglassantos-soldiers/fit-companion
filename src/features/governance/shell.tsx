@@ -82,8 +82,8 @@ export function GovernanceShell(props: {
           >
             Entrar
           </button>
-          <Link to="/admin" className="mt-3 block text-center text-xs text-zinc-500 underline">
-            Ir para Admin CMS
+          <Link to="/admin" search={{ tab: "dashboard" }} className="mt-3 block text-center text-xs text-zinc-500 underline">
+            Ir para Admin Console
           </Link>
         </form>
       </div>

@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCESS_PURCHASE_WINDOW_DAYS,
+  ACCESS_TRIAL_WINDOW_DAYS,
+  ADMIN_TRIAL_TAG,
   accessCookieExpSec,
   accessDaysRemaining,
   accessExpiresAtMs,
   accessUrgencyLevel,
   daysSincePaid,
+  isAdminTrialTags,
   isPurchaseWithinWindow,
   latestPaidAt,
+  windowDaysFromEntitlementTags,
 } from "@/lib/access-window";
 
 describe("40-day purchase access window", () => {
@@ -74,5 +78,31 @@ describe("40-day purchase access window", () => {
     expect(accessUrgencyLevel(1)).toBe("d1");
     expect(accessUrgencyLevel(12)).toBeNull();
     expect(daysSincePaid(new Date(now - 10 * day).toISOString(), now)).toBe(10);
+  });
+});
+
+describe("admin trial 7-day window", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const now = Date.parse("2026-09-19T12:00:00.000Z");
+
+  it("maps trial tag to 7 days", () => {
+    expect(ACCESS_TRIAL_WINDOW_DAYS).toBe(7);
+    expect(windowDaysFromEntitlementTags([ADMIN_TRIAL_TAG])).toBe(7);
+    expect(windowDaysFromEntitlementTags(["admin_manual"])).toBe(40);
+    expect(isAdminTrialTags(["admin_manual", ADMIN_TRIAL_TAG])).toBe(true);
+  });
+
+  it("grants trial within 7 days and denies on day 8", () => {
+    const started = new Date(now - 6 * day).toISOString();
+    expect(isPurchaseWithinWindow(started, now, ACCESS_TRIAL_WINDOW_DAYS)).toBe(true);
+    const stale = new Date(now - 8 * day).toISOString();
+    expect(isPurchaseWithinWindow(stale, now, ACCESS_TRIAL_WINDOW_DAYS)).toBe(false);
+  });
+
+  it("trial expiry is start + 7 days", () => {
+    const started = "2026-09-19T12:00:00.000Z";
+    expect(accessExpiresAtMs(started, now, ACCESS_TRIAL_WINDOW_DAYS)).toBe(
+      Date.parse(started) + 7 * day,
+    );
   });
 });

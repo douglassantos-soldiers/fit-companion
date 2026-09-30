@@ -562,6 +562,20 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         payload,
       });
       if (error) console.error("publishEvent failed", error);
+      else if (op.kind === "session" || op.kind === "proof") {
+        const title =
+          op.kind === "proof" ? "Novo card no feed" : "Treino publicado";
+        const body = `${op.displayName || "Alguém"} acabou de treinar — veja no Social.`;
+        void import("@/lib/push.server")
+          .then(({ fanOutSocialActivityPush }) =>
+            fanOutSocialActivityPush({
+              actorUserId: identity.userId,
+              title,
+              body,
+            }),
+          )
+          .catch(() => undefined);
+      }
       return { ok: !error };
     }
     case "giveKudos": {

@@ -1,5 +1,7 @@
+import { Link } from "@tanstack/react-router";
 import { CalendarDays, Flame, Star } from "lucide-react";
 import { MetricRing } from "@/components/metric-ring";
+import { trackHomeSurface } from "@/lib/home/track-home-surface";
 
 export function HomeProgressCard({
   score,
@@ -15,7 +17,11 @@ export function HomeProgressCard({
   streakDays: number;
 }) {
   return (
-    <section className="surface-glass mb-4 p-4">
+    <Link
+      to="/progresso"
+      className="surface-glass mb-4 block p-4 transition-colors hover:border-primary/40"
+      onClick={() => trackHomeSurface("home_block_click", { blockId: "wow" })}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-3">
           <p className="eyebrow">Progresso</p>
@@ -58,9 +64,10 @@ export function HomeProgressCard({
               </div>
             </li>
           </ul>
+          <p className="text-xs font-semibold text-primary">Ver Progresso →</p>
         </div>
         <MetricRing value={score} max={100} label="Score" size="lg" />
       </div>
-    </section>
+    </Link>
   );
 }

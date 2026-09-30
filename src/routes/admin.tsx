@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
+import { parseAdminSearch } from "@/features/admin/admin-search";
 
 const AdminPage = lazy(() =>
   import("@/features/admin-page").then((m) => ({ default: m.AdminPage })),
 );
 
 export const Route = createFileRoute("/admin")({
+  validateSearch: (search: Record<string, unknown>) => parseAdminSearch(search),
   head: () => ({
     meta: [
       { title: "Admin Console — Soldiers" },

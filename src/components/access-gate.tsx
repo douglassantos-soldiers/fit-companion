@@ -16,6 +16,10 @@ function isPublicPath(pathname: string) {
  * Dual gate: Supabase Auth (identity) + Shopify paid window (cookie).
  * Device is a channel, not the person.
  * Brand splash while session/access resolve (OAuth social is out of scope).
+ *
+ * Admin / iframe: SameSite=None cookies (access-session.server) + anti-loop —
+ * if grantAdmin succeeds but the next checkSession fails, show a clear error
+ * instead of bouncing /acesso ↔ /onboarding forever.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
   const { state, hydrated, updateAccessFromSession, revokeAccessLocal } = useStore();
@@ -29,14 +33,18 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const [accountBlocked, setAccountBlocked] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const adminGrantedRef = useRef(false);
+  const adminTriedRef = useRef(false);
   const [adminCookieLost, setAdminCookieLost] = useState(false);
   const shopifyOkRef = useRef(shopifyOk);
   shopifyOkRef.current = shopifyOk;
+  /** Once access was OK this session, don't destroy mid-wizard UX on a flaky re-check. */
+  const heldAccessRef = useRef(false);
 
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
-    if (!shopifyOkRef.current && !isPublicPath(pathname)) {
+    const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+    if (!shopifyOkRef.current && !isPublicPath(pathname) && !(onOnboarding && heldAccessRef.current)) {
       setReady(false);
     }
     void (async () => {
@@ -53,9 +61,10 @@ export function AccessGate({ children }: { children: ReactNode }) {
       }
       try {
         let res = await checkSession();
-        if (!res.ok && res.reason !== "account_blocked") {
+        if (!res.ok && res.reason !== "account_blocked" && !adminTriedRef.current) {
           const s = await getAuthSession();
           if (s?.access_token) {
+            adminTriedRef.current = true;
             const g = await grantAdmin({ data: { accessToken: s.access_token } }).catch(() => null);
             if (g?.ok) {
               adminGrantedRef.current = true;
@@ -68,6 +77,8 @@ export function AccessGate({ children }: { children: ReactNode }) {
         if (res.ok) {
           setAccountBlocked(false);
           setShopifyOk(true);
+          heldAccessRef.current = true;
+          setAdminCookieLost(false);
           updateAccessFromSession({
             email: res.email,
             tier: res.tier,
@@ -76,7 +87,11 @@ export function AccessGate({ children }: { children: ReactNode }) {
         } else {
           setShopifyOk(false);
           setAccountBlocked(res.reason === "account_blocked");
-          revokeAccessLocal();
+          if (adminGrantedRef.current) {
+            setAdminCookieLost(true);
+          } else if (!(onOnboarding && heldAccessRef.current)) {
+            revokeAccessLocal();
+          }
         }
       } catch (e) {
         if (cancelled) return;
@@ -95,6 +110,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || !ready) return;
     const isPublic = isPublicPath(pathname);
+    const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
     if (!hasAuth && !isPublic) {
       void navigate({ to: "/welcome" });
       return;
@@ -104,7 +120,14 @@ export function AccessGate({ children }: { children: ReactNode }) {
     }
     if (hasAuth && !shopifyOk && !accountBlocked && !isPublic) {
       if (adminCookieLost) return;
-      void navigate({ to: "/acesso", search: { token: undefined } });
+      // Keep wizard if access was held this session (transient cookie blip)
+      if (onOnboarding && heldAccessRef.current) return;
+      void navigate({
+        to: "/acesso",
+        search: {
+          next: state.profile ? "/" : "/onboarding",
+        },
+      });
       return;
     }
     if (hasAuth && shopifyOk && (pathname === "/acesso" || pathname === "/welcome" || pathname === "/cadastro" || pathname === "/entrar")) {
@@ -112,7 +135,12 @@ export function AccessGate({ children }: { children: ReactNode }) {
       return;
     }
     if (hasAuth && !shopifyOk && pathname === "/welcome") {
-      void navigate({ to: "/acesso", search: { token: undefined } });
+      void navigate({
+        to: "/acesso",
+        search: {
+          next: state.profile ? "/" : "/onboarding",
+        },
+      });
     }
   }, [hydrated, ready, hasAuth, shopifyOk, accountBlocked, adminCookieLost, state.profile, pathname, navigate]);
 
@@ -136,6 +164,19 @@ export function AccessGate({ children }: { children: ReactNode }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Esta conta está bloqueada. O progresso é mantido; o acesso volta quando a suspensão terminar.
         </p>
+        <a
+          href="mailto:privacy@soldiersnutrition.com.br?subject=Conta%20suspensa%20Soldiers%20Training"
+          className="mt-6 text-sm font-semibold text-primary"
+        >
+          Falar com o suporte
+        </a>
+        <button
+          type="button"
+          className="mt-3 text-sm text-muted-foreground underline"
+          onClick={() => window.location.reload()}
+        >
+          Tentar de novo
+        </button>
       </div>
     );
   }
@@ -146,10 +187,25 @@ export function AccessGate({ children }: { children: ReactNode }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Não foi possível guardar o acesso neste navegador. Abra o app em uma nova aba e entre de novo.
         </p>
+        <a
+          href="mailto:privacy@soldiersnutrition.com.br?subject=Acesso%20admin%20Soldiers%20Training"
+          className="mt-6 text-sm font-semibold text-primary"
+        >
+          Falar com o suporte
+        </a>
+        <button
+          type="button"
+          className="mt-3 text-sm text-muted-foreground underline"
+          onClick={() => window.location.reload()}
+        >
+          Tentar de novo
+        </button>
       </div>
     );
   }
-  const allowed = isPublic || (hasAuth && shopifyOk);
+  const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+  const allowed =
+    isPublic || (hasAuth && shopifyOk) || (hasAuth && onOnboarding && heldAccessRef.current);
   if (!allowed) {
     return <SoldiersSplash status={splashStatus()} />;
   }

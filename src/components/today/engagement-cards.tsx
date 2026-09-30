@@ -1,11 +1,22 @@
 import { Link } from "@tanstack/react-router";
-import { Bell, Check, Flame, Sparkles, Trophy, Users, X } from "lucide-react";
+import { Bell, Check, ChevronRight, Flame, Sparkles, Trophy, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { postWorkoutCoachSeed, seedCoachQuestion } from "@/lib/coach/seed";
 import { DAILY_XP_GOAL } from "@/lib/types";
-import { questById, isQuestComplete, questProgressValue } from "@/data/daily-quests";
+import {
+  questById,
+  isQuestComplete,
+  questProgressValue,
+  type QuestKind,
+} from "@/data/daily-quests";
 import type { AppState } from "@/lib/types";
-import { PUSH_AFTER_FIRST_BODY, PUSH_AFTER_FIRST_TITLE, SHARE_FIRST_WORKOUT } from "@/lib/ui/platform-copy";
+import {
+  PUSH_AFTER_FIRST_BODY,
+  PUSH_AFTER_FIRST_TITLE,
+  SHARE_FIRST_WORKOUT,
+} from "@/lib/ui/platform-copy";
+import { trackHomeSurface } from "@/lib/home/track-home-surface";
 
 export function XpBar({ xp, className }: { xp: number; className?: string }) {
   const pct = Math.min(100, Math.round((xp / DAILY_XP_GOAL) * 100));
@@ -22,7 +33,42 @@ export function XpBar({ xp, className }: { xp: number; className?: string }) {
   );
 }
 
-export function DailyQuestsCard({ state }: { state: AppState }) {
+function questCta(kind: QuestKind): {
+  label: string;
+  to?: "/treino" | "/nutricao" | "/coach" | "/social" | "/";
+  search?: { tab: string };
+} | null {
+  switch (kind) {
+    case "train":
+      return { label: "Treinar", to: "/treino" };
+    case "protein80":
+    case "meals2":
+      return { label: "Comer", to: "/nutricao" };
+    case "water":
+      return { label: "Água", to: "/" };
+    case "supplements":
+      return { label: "Doses", to: "/nutricao", search: { tab: "doses" } };
+    case "coach":
+      return { label: "Coach", to: "/coach" };
+    case "kudos":
+    case "share":
+    case "follow":
+      return { label: "Social", to: "/social", search: { tab: "feed" } };
+    case "xp_goal":
+      return { label: "Ver dia", to: "/" };
+    default:
+      return null;
+  }
+}
+
+export function DailyQuestsCard({
+  state,
+  onWaterQuest,
+}: {
+  state: AppState;
+  /** When water quest is incomplete, prefer local +500ml over navigating away. */
+  onWaterQuest?: () => void;
+}) {
   const ids = state.dailyQuestIds ?? [];
   if (ids.length < 3) return null;
   const done = ids.filter((id) => {
@@ -42,21 +88,55 @@ export function DailyQuestsCard({ state }: { state: AppState }) {
           if (!q) return null;
           const progress = questProgressValue(state, q);
           const complete = progress >= q.target;
+          const cta = !complete ? questCta(q.kind) : null;
           return (
             <li key={id} className="flex items-center gap-2 text-sm">
               <span
-                className={`flex size-5 items-center justify-center rounded-full ${
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
                   complete ? "bg-primary/20 text-primary" : "bg-muted/40 text-muted-foreground"
                 }`}
               >
                 {complete ? <Check className="size-3" /> : null}
               </span>
-              <span className={complete ? "text-muted-foreground line-through" : "font-medium"}>
+              <span
+                className={
+                  complete
+                    ? "min-w-0 flex-1 text-muted-foreground line-through"
+                    : "min-w-0 flex-1 font-medium"
+                }
+              >
                 {q.title}
               </span>
-              <span className="ml-auto text-[0.65rem] text-muted-foreground">
+              <span className="shrink-0 text-[0.65rem] text-muted-foreground">
                 {Math.min(progress, q.target)}/{q.target}
               </span>
+              {cta ? (
+                q.kind === "water" && onWaterQuest ? (
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-0.5 text-[0.65rem] font-semibold text-primary"
+                    onClick={() => {
+                      trackHomeSurface("home_block_click", { blockId: "quest", questId: q.id });
+                      onWaterQuest();
+                    }}
+                  >
+                    {cta.label}
+                    <ChevronRight className="size-3" />
+                  </button>
+                ) : cta.to ? (
+                  <Link
+                    to={cta.to}
+                    {...(cta.search ? { search: cta.search as never } : {})}
+                    className="inline-flex shrink-0 items-center gap-0.5 text-[0.65rem] font-semibold text-primary"
+                    onClick={() =>
+                      trackHomeSurface("home_block_click", { blockId: "quest", questId: q.id })
+                    }
+                  >
+                    {cta.label}
+                    <ChevronRight className="size-3" />
+                  </Link>
+                ) : null
+              ) : null}
             </li>
           );
         })}
@@ -89,6 +169,10 @@ export function SessionCelebration({
   onDismissPush,
   shareFirst,
   onShareFirst,
+  onPublishFeed,
+  showCoachCta,
+  coachSeedTitle,
+  coachSeedRpe,
 }: {
   open: boolean;
   onClose: () => void;
@@ -108,6 +192,13 @@ export function SessionCelebration({
   onDismissPush?: () => void;
   shareFirst?: boolean;
   onShareFirst?: () => void;
+  onPublishFeed?: () => void;
+  /** Post-workout Coach discovery (activation). */
+  showCoachCta?: boolean;
+  /** Session title for post-workout coach seed. */
+  coachSeedTitle?: string | null;
+  /** Session RPE for post-workout coach seed. */
+  coachSeedRpe?: string | null;
 }) {
   if (!open) return null;
   return (
@@ -118,7 +209,12 @@ export function SessionCelebration({
             <p className="eyebrow">Treino salvo</p>
             <h2 className="text-display text-2xl">Missão cumprida</h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground" aria-label="Fechar">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted-foreground"
+            aria-label="Fechar"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -146,6 +242,24 @@ export function SessionCelebration({
               Ver meu progresso
             </Button>
           </Link>
+          {showCoachCta ? (
+            <Link
+              to="/coach"
+              onClick={() => {
+                seedCoachQuestion(
+                  postWorkoutCoachSeed({
+                    title: coachSeedTitle,
+                    rpe: coachSeedRpe,
+                  }),
+                );
+                onClose();
+              }}
+            >
+              <Button className="h-10 w-full font-bold uppercase tracking-wide">
+                Revisar com o Coach
+              </Button>
+            </Link>
+          ) : null}
           <p className="text-sm text-muted-foreground">
             Missões {questsDone}/{questsTotal}
           </p>
@@ -204,6 +318,11 @@ export function SessionCelebration({
               {SHARE_FIRST_WORKOUT}
             </Button>
           ) : null}
+          {onPublishFeed ? (
+            <Button className="w-full" size="sm" onClick={() => onPublishFeed()}>
+              Publicar no feed
+            </Button>
+          ) : null}
         </div>
         <div className="mt-4 flex gap-2">
           <Link to="/social" search={{ tab: "desafios" }} className="flex-1" onClick={onClose}>
@@ -211,12 +330,7 @@ export function SessionCelebration({
               <Users className="size-4" /> Social
             </Button>
           </Link>
-          <Link
-            to="/desafios"
-            search={{ challenge: "consistencia-30-personal" }}
-            className="flex-1"
-            onClick={onClose}
-          >
+          <Link to="/social" search={{ tab: "desafios" }} className="flex-1" onClick={onClose}>
             <Button className="w-full" variant="outline">
               <Trophy className="size-4" /> Desafio
             </Button>

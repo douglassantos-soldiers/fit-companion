@@ -86,6 +86,39 @@ import {
   privacyFromLegacyShareProgress,
   shouldPublishEvent,
 } from "@/lib/social/visibility";
+import {
+  isActivationReady,
+  isNutritionReady,
+  isRecoveryReady,
+} from "@/lib/profile-readiness";
+
+function emitReadinessEvents(
+  deviceId: string,
+  prev: Profile | null | undefined,
+  next: Profile,
+  opts?: { source?: "onboarding" | "enrichment" },
+) {
+  if (!deviceId) return;
+  const source = opts?.source ?? "enrichment";
+  if (!isActivationReady(prev) && isActivationReady(next)) {
+    emitAppEvent(deviceId, "activation_ready", { goal: next.goal, source });
+  }
+  if (!isNutritionReady(prev) && isNutritionReady(next)) {
+    emitAppEvent(deviceId, "nutrition_ready", { goal: next.goal, source });
+  }
+  if (source === "enrichment") {
+    const gainedRecovery = !isRecoveryReady(prev) && isRecoveryReady(next);
+    const gainedActivation = !isActivationReady(prev) && isActivationReady(next);
+    const gainedNutrition = !isNutritionReady(prev) && isNutritionReady(next);
+    if (gainedRecovery || gainedActivation || gainedNutrition) {
+      emitAppEvent(deviceId, "profile_enriched", {
+        recovery: isRecoveryReady(next),
+        activation: isActivationReady(next),
+        nutrition: isNutritionReady(next),
+      });
+    }
+  }
+}
 
 function emitAppEvent(
   deviceId: string,
@@ -280,6 +313,10 @@ interface Store {
   bumpChallengeInvitesSent: () => void;
   dismissCoachNudge: () => void;
   markCoachNudgeShown: () => void;
+  setCoachProposalFollowUp: (
+    followUp: import("@/lib/coach/proposal-followup").CoachProposalFollowUp | null,
+  ) => void;
+  answerCoachProposalFollowUp: () => void;
   toggleHub: (hubId: string) => void;
   logActivity: (
     kind: ActivityLogKind,
@@ -308,6 +345,7 @@ interface Store {
   useStreakFreeze: () => boolean;
   markQuestCoachOpened: () => void;
   markQuestKudos: () => void;
+  markQuestShare: () => void;
   setBio: (bio: string) => void;
   setAvatarUrl: (url: string | null) => void;
   setAuthUserId: (id: string | null) => void;
@@ -854,6 +892,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       lastSessionXp,
       setProfile: (profile) => {
         const wasFirst = !stateRef.current.profile;
+        const prevProfile = stateRef.current.profile;
         const nextProfile = withProfileTimezone(profile);
         update((s) => withSnapshot(withQuests({ ...s, profile: nextProfile }, deviceId.current)));
         if (deviceId.current) {
@@ -864,15 +903,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (wasFirst && deviceId.current) {
           emitAppEvent(deviceId.current, "onboarding_completed", { goal: nextProfile.goal });
         }
+        if (deviceId.current) {
+          emitReadinessEvents(deviceId.current, prevProfile, nextProfile, {
+            source: "onboarding",
+          });
+        }
       },
       patchProfile: (patch) => {
+        const prevProfile = stateRef.current.profile;
+        if (!prevProfile) return;
+        const nextProfile = withProfileTimezone({ ...prevProfile, ...patch });
         update((s) => {
           if (!s.profile) return s;
           return withSnapshot({
             ...s,
-            profile: withProfileTimezone({ ...s.profile, ...patch }),
+            profile: nextProfile,
           });
         });
+        if (deviceId.current) {
+          emitReadinessEvents(deviceId.current, prevProfile, nextProfile, {
+            source: "enrichment",
+          });
+        }
       },
       addSession: (session, opts) => {
         const prs = prsAchievedInSession(session, stateRef.current.sessions);
@@ -1658,6 +1710,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         update((s) => ({ ...s, coachNudgeDismissedAt: new Date().toISOString() })),
       markCoachNudgeShown: () =>
         update((s) => ({ ...s, coachNudgeShownAt: new Date().toISOString() })),
+      setCoachProposalFollowUp: (followUp) =>
+        update((s) => ({ ...s, coachProposalFollowUp: followUp })),
+      answerCoachProposalFollowUp: () =>
+        update((s) => ({
+          ...s,
+          coachProposalFollowUp: s.coachProposalFollowUp
+            ? { ...s.coachProposalFollowUp, answeredAt: new Date().toISOString() }
+            : null,
+        })),
       logActivity: (kind, value, date) => {
         const day = date ?? todayKey();
         const fraud = validateActivityLog({ kind, value, date: day });
@@ -1730,10 +1791,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       markFollowedSomeone: () =>
         update((s) => {
-          if (s.hasFollowedSomeone) return s;
-          const next = { ...s, hasFollowedSomeone: true };
-          const granted = grantPendingAchievements(next);
-          return granted.state;
+          let next = withQuests(s, deviceId.current);
+          next = bumpManualQuest(next, "follow");
+          if (!next.hasFollowedSomeone) {
+            next = { ...next, hasFollowedSomeone: true };
+            const granted = grantPendingAchievements(next);
+            next = granted.state;
+          }
+          return next;
         }),
       toggleHub: (hubId) => {
         const current = stateRef.current;
@@ -1922,6 +1987,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return afterXpSideEffects(prev, next, deviceId.current);
         });
       },
+      markQuestShare: () =>
+        update((s) => bumpManualQuest(withQuests(s, deviceId.current), "share")),
       setBio: (bio) => update((s) => ({ ...s, bio: bio.slice(0, 160) })),
       setAvatarUrl: (url) => update((s) => ({ ...s, avatarUrl: url })),
       setAuthUserId: (id) => update((s) => ({ ...s, authUserId: id })),

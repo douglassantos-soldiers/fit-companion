@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   BookmarkPlus,
@@ -34,6 +34,7 @@ import {
   buildDailyMealPlan,
   buildMultiDayMealPlan,
   dayNutritionTotalsFromState,
+  nextSuggestedMeal,
   nutritionGoals,
   QUALITY_LABEL,
   scalePreset,
@@ -43,11 +44,18 @@ import {
   clampServings,
   copyMealToSlot,
   lastMealForSlot,
+  nutritionProofLine,
   proteinGapLine,
 } from "@/lib/nutrition/log-loop";
 import { customPickFromSaved, nutritionLibrary, savedMealFromEntry } from "@/lib/nutrition/library";
 import { dayPerformanceMicros } from "@/lib/nutrition/nutrients";
-import { wheyMacrosFromDoses } from "@/lib/nutrition/whey";
+import {
+  nutritionWhyLines,
+  postLogProteinFeedback,
+  weekNutritionSummary,
+} from "@/lib/nutrition/week-summary";
+import { wheyMacrosFromDoses, WHEY_PROTEIN_G } from "@/lib/nutrition/whey";
+import { livingPlanForDate } from "@/lib/engine/living-plan";
 import { useStore } from "@/lib/store";
 import {
   MEAL_SLOT_LABEL,
@@ -135,6 +143,7 @@ function NutritionPage() {
     toggleFavoriteMeal,
     saveMealTemplate,
     removeSavedMeal,
+    logSupplementDose,
   } = useStore();
   const [pickerSlot, setPickerSlot] = useState<MealSlot | null>(null);
   const [pickerDate, setPickerDate] = useState(todayKey());
@@ -144,11 +153,23 @@ function NutritionPage() {
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [servingsBySlot, setServingsBySlot] = useState<Partial<Record<MealSlot, number>>>({});
   const [libSlot, setLibSlot] = useState<MealSlot>("almoco");
+  const [dosesHighlight, setDosesHighlight] = useState(false);
+  const dosesRef = useRef<HTMLElement | null>(null);
   const lesson = lessonForToday(
     new Date(),
     null,
     state.profile ? { goal: state.profile.goal, level: state.profile.level } : null,
   );
+
+  useEffect(() => {
+    if (tab !== "doses") return;
+    const t = window.setTimeout(() => {
+      dosesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setDosesHighlight(true);
+      window.setTimeout(() => setDosesHighlight(false), 2200);
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [tab]);
 
   if (!hydrated || !state.profile) {
     return (
@@ -164,20 +185,30 @@ function NutritionPage() {
   const goals = nutritionGoals(state.profile, insights, engine);
   const totals = dayNutritionTotalsFromState(state);
   const mealPlan = buildDailyMealPlan(state.profile, state, todayKey(), insights, engine);
-  const weekPlan = buildMultiDayMealPlan(state.profile, state, todayKey(), 7, insights);
+  const weekPlan = buildMultiDayMealPlan(state.profile, state, todayKey(), 7, insights, engine);
   const library = nutritionLibrary(
     state.meals ?? [],
     state.favoriteMealPresetIds ?? [],
     state.savedMeals ?? [],
   );
   const metrics = state.days[todayKey()] ?? { date: todayKey(), waterMl: 0, meals: 0 };
-  const whey = wheyMacrosFromDoses(
-    state.supplementDoseLogs,
-    todayKey(),
-    state.profile.nutritionProfile?.countWheyInMacros === true,
-  );
+  const wheyOptIn = state.profile.nutritionProfile?.countWheyInMacros === true;
+  const whey = wheyMacrosFromDoses(state.supplementDoseLogs, todayKey(), wheyOptIn);
   const nextEmpty = mealPlan.slots.find((s) => s.status === "suggested")?.slot;
+  const nextSuggested = nextSuggestedMeal(mealPlan);
   const gap = proteinGapLine(totals.proteinG, goals.proteinG, nextEmpty);
+  const proteinMissing = Math.round(goals.proteinG - totals.proteinG);
+  const gapOpen = proteinMissing > 0;
+  const proof = nutritionProofLine(state.meals ?? [], goals.proteinG);
+  const living = livingPlanForDate(state, todayKey());
+  const whyNutri = nutritionWhyLines(living?.whyByChange);
+  const weekSummary = weekNutritionSummary(state, {
+    kcalTrend: decisionCtx?.context.nutrition.kcalTrend ?? 0,
+    reasonSeeds: decisionCtx?.context.reasonSeeds ?? [],
+  });
+  const hasWheyInRoutine = (state.supplementRoutine ?? []).some(
+    (id) => id === "whey-protein" || id === "beef-protein",
+  );
   const todayMeals = (state.meals ?? []).filter((m) => m.date.slice(0, 10) === todayKey());
   const micros = dayPerformanceMicros(todayMeals);
   const kcalTrend = decisionCtx?.context.nutrition.kcalTrend ?? 0;
@@ -206,9 +237,15 @@ function NutritionPage() {
     .reverse();
 
   const addPreset = (preset: MealPreset, slot: MealSlot, servings = 1, date = todayKey()) => {
+    const scaled = scalePreset(preset, servings);
     addMealEntry({ ...addMealFromPreset(preset, slot, servings), date });
     setPickerSlot(null);
-    toast.success(`${preset.label} registrado`);
+    if (date === todayKey()) {
+      const nextP = totals.proteinG + scaled.proteinG;
+      toast.success(postLogProteinFeedback(scaled.proteinG, nextP, goals.proteinG));
+    } else {
+      toast.success(`${preset.label} registrado`);
+    }
   };
 
   const openPicker = (slot: MealSlot, date = todayKey()) => {
@@ -234,7 +271,11 @@ function NutritionPage() {
     if (meal.items) entry.items = meal.items;
     if (meal.nutrientSnapshot) entry.nutrientSnapshot = meal.nutrientSnapshot;
     addMealEntry(entry);
-    toast.success(`${saved.label} registrado`);
+    if (date === todayKey()) {
+      toast.success(postLogProteinFeedback(meal.proteinG, totals.proteinG + meal.proteinG, goals.proteinG));
+    } else {
+      toast.success(`${saved.label} registrado`);
+    }
   };
 
   const skipSlot = (slot: MealSlot) => {
@@ -287,6 +328,25 @@ function NutritionPage() {
         </TabsList>
 
         <TabsContent value="hoje" className="mt-4">
+          {proof ? (
+            <p className="mb-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+              {proof}
+            </p>
+          ) : null}
+
+          {whyNutri.length ? (
+            <div className="surface-glass mb-3 space-y-1.5 p-3">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                Por que o plano mudou
+              </p>
+              {whyNutri.map((w) => (
+                <p key={w.key} className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{w.label}:</span> {w.reason}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
           {insights?.reasons[0] ? (
             <p className="surface-glass mb-3 p-3 text-xs text-muted-foreground">
               {insights.reasons[0]}
@@ -294,10 +354,66 @@ function NutritionPage() {
           ) : null}
 
           {gap ? (
-            <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-              {gap}
-              {whey.scoops ? ` · ${whey.scoops} scoop whey` : ""}
-            </p>
+            <div className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2.5">
+              <p className="text-sm font-semibold text-primary">
+                {gap}
+                {whey.scoops ? ` · ${whey.scoops} scoop whey` : ""}
+              </p>
+              {gapOpen ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    onClick={() => openPicker(nextEmpty ?? nextSuggested?.slot ?? "lanche")}
+                  >
+                    Registrar agora
+                  </Button>
+                  {nextSuggested?.preset ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8"
+                      onClick={() =>
+                        addPreset(
+                          nextSuggested.preset!,
+                          nextSuggested.slot,
+                          nextSuggested.suggestedServings ?? 1,
+                        )
+                      }
+                    >
+                      Aplicar sugerida
+                    </Button>
+                  ) : null}
+                  {wheyOptIn && hasWheyInRoutine ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      onClick={() => {
+                        const productId = (state.supplementRoutine ?? []).includes("whey-protein")
+                          ? "whey-protein"
+                          : "beef-protein";
+                        logSupplementDose({
+                          productId,
+                          dose: 1,
+                          unit: "scoop",
+                          frequency: "1x_day",
+                        });
+                        toast.success(
+                          postLogProteinFeedback(
+                            WHEY_PROTEIN_G,
+                            totals.proteinG + WHEY_PROTEIN_G,
+                            goals.proteinG,
+                          ),
+                        );
+                      }}
+                    >
+                      Contar scoop (+{WHEY_PROTEIN_G} g)
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           ) : null}
           {weeklyKcalHint ? (
             <p className="mb-3 text-xs text-muted-foreground">{weeklyKcalHint}</p>
@@ -641,13 +757,51 @@ function NutritionPage() {
             </Link>
           </section>
 
-          <section className="mt-4">
+          <section
+            ref={dosesRef}
+            id="doses"
+            className={cn(
+              "mt-4 scroll-mt-24 rounded-2xl transition-shadow",
+              dosesHighlight ? "ring-2 ring-primary/60 shadow-[0_0_24px_var(--glow-primary)]" : "",
+            )}
+          >
             <h2 className="mb-2 px-1 text-sm font-semibold">Doses</h2>
             <SupplementsPanel />
           </section>
         </TabsContent>
 
         <TabsContent value="semana" className="mt-4 space-y-3">
+          {weekSummary ? (
+            <section className="surface-glass space-y-2 p-4">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                Sua semana
+              </p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-display text-lg text-primary">
+                    {weekSummary.daysLogged}/{weekSummary.daysWindow}
+                  </p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">Dias logados</p>
+                </div>
+                <div>
+                  <p className="text-display text-lg text-primary">{weekSummary.proteinHitDays}</p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">Proteína ok</p>
+                </div>
+                <div>
+                  <p className="text-display text-lg text-primary">{weekSummary.proteinHitPct}%</p>
+                  <p className="text-[0.65rem] uppercase text-muted-foreground">Hit rate</p>
+                </div>
+              </div>
+              {weekSummary.kcalCopy ? (
+                <p className="text-xs text-muted-foreground">{weekSummary.kcalCopy}</p>
+              ) : null}
+              {weekSummary.gateCopy ? (
+                <p className="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-muted-foreground">
+                  {weekSummary.gateCopy}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
           <div className="flex items-start justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               Sugestões dos próximos 7 dias. O diário continua no dia escolhido.
@@ -848,13 +1002,31 @@ function NutritionPage() {
             <h2 className="px-1 text-sm font-semibold">Histórico</h2>
             {history.map((d) => {
               const meals = (state.meals ?? []).filter((m) => m.date.slice(0, 10) === d.date);
+              const isToday = d.date === todayKey();
               return (
                 <article key={d.date} className="surface-glass p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold">{d.label}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {d.proteinG} g P · {d.kcal} kcal · {d.meals} ref
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {d.proteinG} g P · {d.kcal} kcal · {d.meals} ref
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        onClick={() => {
+                          if (isToday) {
+                            void navigate({ search: {} });
+                            openPicker(nextEmpty ?? "lanche", d.date);
+                          } else {
+                            openPicker("lanche", d.date);
+                          }
+                        }}
+                      >
+                        {isToday ? "Registrar" : "Completar"}
+                      </Button>
+                    </div>
                   </div>
                   {meals.length ? (
                     <ul className="mt-2 space-y-1">
@@ -866,6 +1038,13 @@ function NutritionPage() {
                           <span>
                             {MEAL_SLOT_LABEL[m.slot]} · {m.label}
                           </span>
+                          <button
+                            type="button"
+                            className="shrink-0 font-semibold text-primary"
+                            onClick={() => setEditing(m)}
+                          >
+                            Editar
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -905,7 +1084,17 @@ function NutritionPage() {
             if (meal.nutrientSnapshot) entry.nutrientSnapshot = meal.nutrientSnapshot;
             addMealEntry(entry);
             setPickerSlot(null);
-            toast.success("Refeição adicionada");
+            if (pickerDate === todayKey()) {
+              toast.success(
+                postLogProteinFeedback(
+                  meal.proteinG,
+                  totals.proteinG + meal.proteinG,
+                  goals.proteinG,
+                ),
+              );
+            } else {
+              toast.success("Refeição adicionada");
+            }
           }}
         />
       ) : null}

@@ -27,17 +27,23 @@ function parseEmail(input: unknown): { email: string } {
 
 function parseEntitlementManual(input: unknown): {
   email: string;
-  action: "grant" | "revoke";
+  action: "grant" | "revoke" | "grant_trial";
   tier: AccessTier;
+  reason: string | null;
 } {
-  const raw = input as { email?: string; action?: string; tier?: string } | null;
+  const raw = input as { email?: string; action?: string; tier?: string; reason?: string } | null;
   const email = String(raw?.email ?? "")
     .trim()
     .toLowerCase();
   if (!email.includes("@")) throw new Error("E-mail inválido");
-  const action = raw?.action === "revoke" ? "revoke" : "grant";
+  const action =
+    raw?.action === "revoke" ? "revoke" : raw?.action === "grant_trial" ? "grant_trial" : "grant";
   const tier: AccessTier = raw?.tier === "performance" ? "performance" : "base";
-  return { email, action, tier };
+  const reason =
+    typeof raw?.reason === "string" && raw.reason.trim()
+      ? raw.reason.trim().slice(0, 200)
+      : null;
+  return { email, action, tier, reason };
 }
 
 /** Public read — app hydrate (service_role via server). Production media only. */
@@ -89,6 +95,7 @@ export const setEntitlementManual = createServerFn({ method: "POST" })
       email: data.email,
       action: data.action,
       tier: data.tier,
+      reason: data.reason,
     });
   });
 

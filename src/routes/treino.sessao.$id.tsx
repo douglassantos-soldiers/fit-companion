@@ -187,6 +187,8 @@ function SessionPage() {
     streak: 0,
     questsDone: 0,
     questsTotal: 0,
+    title: "" as string,
+    rpe: null as string | null,
   });
   const [prBanner, setPrBanner] = useState<string | null>(null);
   const [nextHint, setNextHint] = useState<string | null>(null);
@@ -535,6 +537,8 @@ function SessionPage() {
       streak: streak(nextSessions, { freezeUsedDates: state.freezeUsedDates }),
       questsDone,
       questsTotal: questIds.length,
+      title: session.title,
+      rpe: session.rpe ?? null,
     });
     setSummaryOpen(false);
     setRitualOpen(true);
@@ -964,6 +968,9 @@ function SessionPage() {
             >
               <Share2 className="size-4" /> Compartilhar
             </Button>
+            <p className="mt-1 text-center text-[0.65rem] text-muted-foreground">
+              Clube/feed · WhatsApp · salvar imagem
+            </p>
             <Link to="/progresso" className="mt-2 block">
               <Button variant="secondary" className="h-11 w-full">
                 Ver meu progresso
@@ -1042,6 +1049,9 @@ function SessionPage() {
         unlocked={achievementTitles(finishUnlocked)}
         rankLabel={finishRank}
         upsell={upsell}
+        showCoachCta
+        coachSeedTitle={ritual.title || day?.title || null}
+        coachSeedRpe={ritual.rpe}
         onUpsellClick={() => {
           markUpsellShown();
           const deviceId = getDeviceId();
@@ -1086,6 +1096,14 @@ function SessionPage() {
         shareFirst={firstShare}
         onShareFirst={() => {
           setFirstShare(false);
+          setRitualOpen(false);
+          setSummaryOpen(true);
+          setSharePanel(true);
+        }}
+        onPublishFeed={() => {
+          setFirstShare(false);
+          setRitualOpen(false);
+          setSummaryOpen(true);
           setSharePanel(true);
         }}
       />

@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, getRouteApi } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -56,11 +56,11 @@ import type { ContentCollection, ContentProgram, Expert } from "@/lib/content/ty
 import type { TrainingRules } from "@/lib/training/training-rules";
 import type { ContentReportRow } from "@/lib/moderation.server";
 import {
-  ALL_ADMIN_TABS,
   ADMIN_CATALOG_TABS,
   ADMIN_OPS_TABS,
   type AdminTabId,
 } from "@/features/admin/nav";
+import { buildAdminSearch } from "@/features/admin/admin-search";
 import { DashboardTab } from "@/features/admin/dashboard-tab";
 import { UsersTab } from "@/features/admin/users-tab";
 import { ExercisesTab } from "@/features/admin/exercises-tab";
@@ -73,26 +73,49 @@ import { CollectionsTab } from "@/features/admin/collections-tab";
 import { MediaTab } from "@/features/admin/media-tab";
 import { ModerationTab } from "@/features/admin/moderation-tab";
 import { SystemTab } from "@/features/admin/system-tab";
+import { adminErrorMessage } from "@/features/admin/admin-errors";
 import { cn } from "@/lib/utils";
 
+const adminRouteApi = getRouteApi("/admin");
+
+function askReason(actionLabel: string): string | null {
+  const raw = window.prompt(`Motivo (${actionLabel}) — aparece no audit:`, "");
+  if (raw == null) return null;
+  const t = raw.trim();
+  if (!t) {
+    toast.error("Informe um motivo para o audit");
+    return null;
+  }
+  return t.slice(0, 200);
+}
+
 export function AdminPage() {
+  const navigate = useNavigate();
+  const search = adminRouteApi.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [tab, setTab] = useState<AdminTabId>("dashboard");
-  const [cms, setCms] = useState<CmsState>(() => emptyCms());
+  const [tab, setTab] = useState<AdminTabId>(search.tab ?? "dashboard");
+  const [catalogOpen, setCatalogOpen] = useState(
+    () => Boolean(search.tab && ADMIN_CATALOG_TABS.some((t) => t.id === search.tab)),
+  );
+  const [cms, setCms] = useState<CmsState>(() => emptyCmsState());
   const [saving, setSaving] = useState(false);
-  const [lookupEmail, setLookupEmail] = useState("");
+  const [lookupEmail, setLookupEmail] = useState(search.email ?? "");
   const [lookup, setLookup] = useState<AdminUserLookup | null>(null);
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lastMagicUrl, setLastMagicUrl] = useState<string | null>(null);
   const [ops, setOps] = useState<ShopifyOpsSnapshot | null>(null);
   const [opsBusy, setOpsBusy] = useState(false);
+  const [opsError, setOpsError] = useState<string | null>(null);
   const [importRunning, setImportRunning] = useState(false);
   const [importTotals, setImportTotals] = useState<ShopifyCustomerImportTotals | null>(null);
   const importAbortRef = useRef(false);
   const [analytics, setAnalytics] = useState<ProductAnalytics | null>(null);
   const [analyticsBusy, setAnalyticsBusy] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [exercises, setExercises] = useState<ResolvedLibraryExercise[]>([]);
   const [challenges, setChallenges] = useState<AdminChallengeRow[]>([]);
   const [content, setContent] = useState<PublicContentItem[]>([]);
@@ -101,9 +124,11 @@ export function AdminPage() {
   const [collections, setCollections] = useState<ContentCollection[]>([]);
   const [rules, setRules] = useState<TrainingRules | null>(null);
   const [reports, setReports] = useState<ContentReportRow[]>([]);
+  const [reportsError, setReportsError] = useState<string | null>(null);
   const [catalogBusy, setCatalogBusy] = useState(false);
   const [mediaPackages, setMediaPackages] = useState<SoldiersMediaAsset[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const autoLookupDone = useRef(false);
 
   const doLogin = useServerFn(loginAdmin);
   const doCheck = useServerFn(checkAdminSession);
@@ -182,16 +207,56 @@ export function AdminPage() {
 
   const loadAnalytics = () => {
     setAnalyticsBusy(true);
+    setAnalyticsError(null);
     void doAnalytics()
       .then((r) => setAnalytics(r))
-      .catch(() => toast.error("Falha ao carregar métricas"))
+      .catch((e) => {
+        setAnalyticsError(adminErrorMessage(e, "Falha ao carregar métricas"));
+        toast.error("Falha ao carregar métricas");
+      })
       .finally(() => setAnalyticsBusy(false));
   };
 
+  const loadOps = () => {
+    setOpsBusy(true);
+    setOpsError(null);
+    void doListOps()
+      .then((r) => setOps(r))
+      .catch((e) => {
+        setOpsError(adminErrorMessage(e, "Falha ao carregar ops Shopify"));
+        toast.error("Falha ao carregar ops");
+      })
+      .finally(() => setOpsBusy(false));
+  };
+
   useEffect(() => {
-    if (authed && tab === "dashboard" && !analytics) loadAnalytics();
+    if (authed && tab === "dashboard") {
+      if (!analytics) loadAnalytics();
+      if (!ops) loadOps();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per tab
   }, [authed, tab]);
+
+  useEffect(() => {
+    if (!authed || !search.email || autoLookupDone.current) return;
+    autoLookupDone.current = true;
+    setLookupEmail(search.email);
+    setLookupBusy(true);
+    setLookupError(null);
+    void doLookup({ data: { email: search.email } })
+      .then((r) => setLookup(r))
+      .catch((e) => {
+        setLookupError(adminErrorMessage(e, "Falha no lookup"));
+        toast.error("Falha no lookup");
+      })
+      .finally(() => setLookupBusy(false));
+  }, [authed, search.email, doLookup]);
+
+  useEffect(() => {
+    if (search.tab && search.tab !== tab) setTab(search.tab);
+    if (search.email && search.email !== lookupEmail) setLookupEmail(search.email);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.tab, search.email]);
 
   if (checking) {
     return (
@@ -295,9 +360,18 @@ export function AdminPage() {
       return;
     }
     setLookupBusy(true);
+    setLookupError(null);
+    void navigate({
+      to: "/admin",
+      search: buildAdminSearch({ tab: "usuarios", email: next }),
+      replace: true,
+    });
     void doLookup({ data: { email: next } })
       .then((r) => setLookup(r))
-      .catch(() => toast.error("Falha no lookup"))
+      .catch((e) => {
+        setLookupError(adminErrorMessage(e, "Falha no lookup"));
+        toast.error("Falha no lookup");
+      })
       .finally(() => setLookupBusy(false));
   };
 
@@ -315,37 +389,81 @@ export function AdminPage() {
           );
         }
       })
-      .catch(() => toast.error("Falha no resync"))
+      .catch((e) => toast.error(adminErrorMessage(e, "Falha no resync")))
       .finally(() => setLookupBusy(false));
   };
 
   const runGrant = (tier: "base" | "performance") => {
     if (!lookup?.email) return;
     if (!window.confirm(`Liberar acesso ${tier} para ${lookup.email}?`)) return;
+    const reason = askReason(`grant ${tier}`);
+    if (reason == null) return;
     setLookupBusy(true);
-    void doSetEntitlement({ data: { email: lookup.email, action: "grant", tier } })
+    void doSetEntitlement({ data: { email: lookup.email, action: "grant", tier, reason } })
       .then((r) => {
         if (r.ok) {
           setLookup(r.lookup);
+          if (r.magicUrl) setLastMagicUrl(r.magicUrl);
           toast.success(`Acesso ${tier} liberado`);
-        } else toast.error("Falha ao liberar");
+        } else {
+          toast.error(
+            r.reason === "db_unavailable" ? "DB indisponível" : "Falha ao liberar",
+          );
+        }
       })
-      .catch(() => toast.error("Falha ao liberar"))
+      .catch((e) => toast.error(adminErrorMessage(e, "Falha ao liberar")))
+      .finally(() => setLookupBusy(false));
+  };
+
+  const runGrantTrial = () => {
+    if (!lookup?.email) return;
+    if (
+      !window.confirm(
+        `Liberar trial de 7 dias (base) para ${lookup.email}?\n\nA pessoa entra/cria conta com o mesmo e-mail e usa o magic link.`,
+      )
+    ) {
+      return;
+    }
+    const reason = askReason("grant trial 7d");
+    if (reason == null) return;
+    setLookupBusy(true);
+    void doSetEntitlement({
+      data: { email: lookup.email, action: "grant_trial", tier: "base", reason },
+    })
+      .then((r) => {
+        if (r.ok) {
+          setLookup(r.lookup);
+          if (r.magicUrl) setLastMagicUrl(r.magicUrl);
+          toast.success("Trial 7 dias liberado");
+        } else {
+          toast.error(
+            r.reason === "db_unavailable" ? "DB indisponível" : "Falha ao liberar trial",
+          );
+        }
+      })
+      .catch((e) => toast.error(adminErrorMessage(e, "Falha ao liberar trial")))
       .finally(() => setLookupBusy(false));
   };
 
   const runRevoke = () => {
     if (!lookup?.email) return;
     if (!window.confirm(`Revogar acesso de ${lookup.email}?`)) return;
+    const reason = askReason("revoke");
+    if (reason == null) return;
     setLookupBusy(true);
-    void doSetEntitlement({ data: { email: lookup.email, action: "revoke", tier: "base" } })
+    void doSetEntitlement({
+      data: { email: lookup.email, action: "revoke", tier: "base", reason },
+    })
       .then((r) => {
         if (r.ok) {
           setLookup(r.lookup);
+          setLastMagicUrl(null);
           toast.success("Acesso revogado");
-        } else toast.error("Falha ao revogar");
+        } else {
+          toast.error(r.reason === "db_unavailable" ? "DB indisponível" : "Falha ao revogar");
+        }
       })
-      .catch(() => toast.error("Falha ao revogar"))
+      .catch((e) => toast.error(adminErrorMessage(e, "Falha ao revogar")))
       .finally(() => setLookupBusy(false));
   };
 
@@ -370,14 +488,6 @@ export function AdminPage() {
       })
       .catch(() => toast.error("Falha no status"))
       .finally(() => setLookupBusy(false));
-  };
-
-  const loadOps = () => {
-    setOpsBusy(true);
-    void doListOps()
-      .then((r) => setOps(r))
-      .catch(() => toast.error("Falha ao carregar ops"))
-      .finally(() => setOpsBusy(false));
   };
 
   const runCustomerImport = (reset: boolean) => {
@@ -468,15 +578,31 @@ export function AdminPage() {
 
   const loadReports = () => {
     setCatalogBusy(true);
+    setReportsError(null);
     void doListReports()
       .then((r) => setReports(r))
-      .catch(() => toast.error("Falha ao carregar denúncias"))
+      .catch((e) => {
+        setReportsError(adminErrorMessage(e, "Falha ao carregar denúncias"));
+        toast.error("Falha ao carregar denúncias");
+      })
       .finally(() => setCatalogBusy(false));
   };
 
   const selectTab = (next: AdminTabId) => {
     setTab(next);
-    if (next === "dashboard" && !analytics) loadAnalytics();
+    if (ADMIN_CATALOG_TABS.some((t) => t.id === next)) setCatalogOpen(true);
+    void navigate({
+      to: "/admin",
+      search: buildAdminSearch({
+        tab: next,
+        email: next === "usuarios" ? lookupEmail || search.email : undefined,
+      }),
+      replace: true,
+    });
+    if (next === "dashboard") {
+      if (!analytics) loadAnalytics();
+      if (!ops) loadOps();
+    }
     if (next === "sistema" && !ops) loadOps();
     if (next === "exercicios" && !exercises.length) loadExercises();
     if (next === "desafios" && !challenges.length) loadChallenges();
@@ -504,6 +630,12 @@ export function AdminPage() {
             Backoffice de produto · sem dados de saúde
           </p>
         </div>
+        <Link
+          to="/governance"
+          className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
+        >
+          AI Governance
+        </Link>
         <Button
           variant="secondary"
           size="sm"
@@ -526,17 +658,26 @@ export function AdminPage() {
           value={tab}
           onChange={(e) => selectTab(e.target.value as AdminTabId)}
         >
-          {ALL_ADMIN_TABS.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
+          <optgroup label="Operação">
+            {ADMIN_OPS_TABS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Catálogo">
+            {ADMIN_CATALOG_TABS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </div>
 
       <div className="mt-6 flex gap-6">
         <nav className="hidden w-44 shrink-0 md:block">
-          <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
             Operação
           </p>
           <ul className="mt-1 space-y-1">
@@ -545,7 +686,7 @@ export function AdminPage() {
                 <button
                   type="button"
                   className={cn(
-                    "w-full rounded-lg px-2 py-1.5 text-left text-sm",
+                    "w-full rounded-lg px-2 py-1.5 text-left text-sm font-medium",
                     tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground",
                   )}
                   onClick={() => selectTab(t.id)}
@@ -555,30 +696,51 @@ export function AdminPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-4 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
+          <button
+            type="button"
+            className="mt-4 flex w-full items-center gap-1 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground"
+            onClick={() => setCatalogOpen((v) => !v)}
+          >
+            {catalogOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
             Catálogo
-          </p>
-          <ul className="mt-1 space-y-1">
-            {ADMIN_CATALOG_TABS.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    "w-full rounded-lg px-2 py-1.5 text-left text-sm",
-                    tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground",
-                  )}
-                  onClick={() => selectTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              </li>
-            ))}
-          </ul>
+          </button>
+          {catalogOpen ? (
+            <ul className="mt-1 space-y-1">
+              {ADMIN_CATALOG_TABS.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "w-full rounded-lg px-2 py-1.5 text-left text-sm",
+                      tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground",
+                    )}
+                    onClick={() => selectTab(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <Link
+            to="/governance"
+            className="mt-6 block px-2 text-xs font-semibold text-primary"
+          >
+            AI Governance →
+          </Link>
         </nav>
 
         <div className="min-w-0 flex-1">
           {tab === "dashboard" ? (
-            <DashboardTab analytics={analytics} busy={analyticsBusy} onRefresh={loadAnalytics} />
+            <DashboardTab
+              analytics={analytics}
+              busy={analyticsBusy}
+              onRefresh={loadAnalytics}
+              ops={ops}
+              opsBusy={opsBusy}
+              onOpenSistema={() => selectTab("sistema")}
+              loadError={analyticsError}
+            />
           ) : null}
           {tab === "usuarios" ? (
             <UsersTab
@@ -586,9 +748,12 @@ export function AdminPage() {
               setLookupEmail={setLookupEmail}
               lookup={lookup}
               busy={lookupBusy}
+              lastMagicUrl={lastMagicUrl}
+              lastError={lookupError}
               onLookup={runLookup}
               onResync={runResync}
               onGrant={runGrant}
+              onGrantTrial={runGrantTrial}
               onRevoke={runRevoke}
               onStatus={runStatus}
             />
@@ -858,6 +1023,7 @@ export function AdminPage() {
             <ModerationTab
               reports={reports}
               busy={catalogBusy}
+              loadError={reportsError}
               onReload={loadReports}
               onResolve={(reportId, status, hideEvent) => {
                 setCatalogBusy(true);
@@ -892,7 +1058,7 @@ export function AdminPage() {
                   .finally(() => setCatalogBusy(false));
               }}
             />
-              ) : null}
+          ) : null}
           {tab === "sistema" ? (
             <SystemTab
               ops={ops}
@@ -904,8 +1070,9 @@ export function AdminPage() {
               onImportStop={() => {
                 importAbortRef.current = true;
               }}
+              loadError={opsError}
             />
-                        ) : null}
+          ) : null}
               </div>
             </div>
     </div>

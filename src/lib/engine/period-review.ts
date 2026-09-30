@@ -6,7 +6,7 @@ import { exerciseById } from "@/data/exercises";
 import { sessionsInLastDays, streak, weekOverWeek } from "@/lib/engine/dimensions";
 import { trainingAdherence7d } from "@/lib/engine/behavior/adherence";
 import { consecutiveHardRpeStreak } from "@/lib/engine/recovery";
-import { dayNutritionTotals, nutritionGoals } from "@/lib/engine/nutrition";
+import { dayNutritionTotals, nutritionGoals, weeklyNutritionSeries } from "@/lib/engine/nutrition";
 import { computeLearningInsights } from "@/lib/engine/learning";
 import { isoWeekDateKeys } from "@/lib/engine/xp";
 import { hitsForExercise, listExercisesWithHistory } from "@/lib/engine/exercise-history";
@@ -272,6 +272,19 @@ export function periodReview(state: AppState, kind: PeriodKind, now = new Date()
   const strength = computeStrengthScore(state.sessions, state.profile, now);
   const sundayRitual = kind === "week" && isSunday(now);
 
+  const wins = [...(coach.wins ?? [])];
+  const risks = [...(coach.risks ?? [])];
+  if (kind === "week" && state.profile) {
+    const goals = nutritionGoals(state.profile);
+    const series = weeklyNutritionSeries(state.meals ?? [], 7);
+    const hitDays = series.filter((d) => d.proteinG >= goals.proteinG * 0.9).length;
+    if (hitDays >= 4) wins.push(`Proteína ok ${hitDays}/7 dias`);
+    else if (hitDays > 0 && hitDays < 3) risks.push(`Proteína fraca ${hitDays}/7 dias — feche o gap`);
+    else if (hitDays === 0 && series.some((d) => d.meals > 0)) {
+      risks.push("Nenhum dia na meta de proteína nos últimos 7");
+    }
+  }
+
   return {
     kind,
     label: range.label,
@@ -286,9 +299,9 @@ export function periodReview(state: AppState, kind: PeriodKind, now = new Date()
     nextBlock: kind === "week" ? nextWeekPlan(state, now) : null,
     isSundayRitual: sundayRitual,
     bestEvolution: best,
-    coachLine: coach.nextFocus ?? coach.wins?.[0] ?? "Continue registrando.",
-    wins: coach.wins ?? [],
-    risks: coach.risks ?? [],
+    coachLine: coach.nextFocus ?? wins[0] ?? "Continue registrando.",
+    wins,
+    risks,
     start: range.start,
     end: range.end,
   };

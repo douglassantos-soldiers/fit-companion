@@ -30,6 +30,17 @@ export async function resetPassword(email: string) {
   if (error) throw error;
 }
 
+/** Resend signup confirmation e-mail (cadastro awaiting screen). */
+export async function resendSignupConfirmation(email: string) {
+  const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/entrar` : undefined;
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim().toLowerCase(),
+    ...(redirectTo ? { options: { emailRedirectTo: redirectTo } } : {}),
+  });
+  if (error) throw error;
+}
+
 /** Kept for compatibility — not used as an entry path. */
 export async function signInWithMagicLink(email: string) {
   const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/perfil` : undefined;

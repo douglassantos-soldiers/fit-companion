@@ -1,4 +1,5 @@
 import { RefreshCw, Square, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { ShopifyOpsSnapshot } from "@/lib/admin.server";
 import { CUSTOMERS_LIST_CURSOR_ID, type ShopifyCustomerImportTotals } from "@/lib/shopify-customers";
@@ -11,6 +12,7 @@ export function SystemTab({
   importTotals,
   onImport,
   onImportStop,
+  loadError,
 }: {
   ops: ShopifyOpsSnapshot | null;
   busy: boolean;
@@ -19,14 +21,28 @@ export function SystemTab({
   importTotals: ShopifyCustomerImportTotals | null;
   onImport: (reset: boolean) => void;
   onImportStop: () => void;
+  loadError: string | null;
 }) {
   const listCursor = ops?.cursors.find((c) => c.id === CUSTOMERS_LIST_CURSOR_ID);
 
   return (
     <div className="space-y-4">
-      <Button variant="secondary" className="gap-2" onClick={onReload} disabled={busy || importRunning}>
-        <RefreshCw className="size-4" /> {busy ? "Carregando…" : "Atualizar"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" className="gap-2" onClick={onReload} disabled={busy || importRunning}>
+          <RefreshCw className="size-4" /> {busy ? "Carregando…" : "Atualizar"}
+        </Button>
+        <Link to="/admin" search={{ tab: "usuarios" }}>
+          <Button variant="outline" className="gap-2">
+            <Users className="size-4" /> Abrir Usuários
+          </Button>
+        </Link>
+      </div>
+
+      {loadError ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {loadError}
+        </p>
+      ) : null}
 
       <div className="surface-glass space-y-3 p-4">
         <p className="text-sm font-semibold">Clientes Shopify</p>
@@ -89,6 +105,12 @@ export function SystemTab({
 
       <div className="surface-glass p-4">
         <p className="text-sm font-semibold">Webhooks recentes</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Sem e-mail no evento — use Usuários com o e-mail do ticket.{" "}
+          <Link to="/admin" search={{ tab: "usuarios" }} className="font-semibold text-primary">
+            Abrir lookup
+          </Link>
+        </p>
         {!ops?.webhooks.length ? (
           <p className="mt-2 text-xs text-muted-foreground">Nenhum evento ainda.</p>
         ) : (

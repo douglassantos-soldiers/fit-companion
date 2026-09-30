@@ -1,17 +1,29 @@
 // @ts-nocheck
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Bot, Send, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askAiCoach, type CoachStructuredReply } from "@/lib/coach.functions";
+import { coachAction } from "@/lib/coach/actions";
 import { acceptCoachProposal, proposalAcceptLabel } from "@/lib/coach/apply-proposal";
+import { contextualCoachPrompts } from "@/lib/coach/contextual-prompts";
 import { makeProposal } from "@/lib/coach/proposals";
+import {
+  buildProposalFollowUp,
+  proposalFollowUpQuestion,
+  shouldShowProposalFollowUp,
+} from "@/lib/coach/proposal-followup";
+import {
+  consumeCoachSeedWithSearch,
+  normalizeCoachSearchSeed,
+  volumeRecoveryNudgeSeed,
+} from "@/lib/coach/seed";
 import type { CoachProposal } from "@/lib/coach/types";
 import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
-import { COACH_PROMPTS, coachFreeform, coachReply } from "@/lib/engine/coach";
+import { coachFreeform, coachReply } from "@/lib/engine/coach";
 import { decisionContextForUi } from "@/lib/engine/assemble-decision-context";
 import { selectNutritionOpts } from "@/lib/engine/decision-context-snapshot";
 import { buildDailyMealPlan } from "@/lib/engine/nutrition";
@@ -22,6 +34,12 @@ import { todayKey } from "@/lib/types";
 import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/coach")({
+  validateSearch: (search: Record<string, unknown>): { q?: string } => {
+    if (typeof search.q === "string" && search.q.trim()) {
+      return { q: search.q.trim().slice(0, 280) };
+    }
+    return {};
+  },
   head: () => ({
     meta: [
       { title: "Coach — Soldiers Training" },
@@ -112,11 +130,23 @@ function formatCoachReply(text: string, structured?: CoachStructuredReply | null
     if (e.trainingMode) bits.push(`modo ${e.trainingMode}`);
     if (bits.length) parts.push(`\n\nEvidências: ${bits.join(" · ")}`);
   }
+  const topProposal = structured.proposals?.[0];
+  const conf =
+    typeof topProposal?.confidence === "number"
+      ? topProposal.confidence
+      : structured.evidence
+        ? 0.7
+        : null;
+  if (conf != null) {
+    const label = conf >= 0.8 ? "alta" : conf >= 0.55 ? "média" : "baixa";
+    parts.push(`\n\nBase Soldiers · confiança ${label}`);
+  }
   return parts.join("");
 }
 
 function CoachPage() {
   const navigate = useNavigate();
+  const { q: searchQ } = Route.useSearch();
   const {
     state,
     hydrated,
@@ -126,6 +156,8 @@ function CoachPage() {
     refreshLivingPlan,
     addWater,
     addMealEntry,
+    setCoachProposalFollowUp,
+    answerCoachProposalFollowUp,
   } = useStore();
   const askAi = useServerFn(askAiCoach);
   const [text, setText] = useState("");
@@ -136,8 +168,14 @@ function CoachPage() {
   >([]);
   const endRef = useRef<HTMLDivElement>(null);
   const offlineToastShown = useRef(false);
+  const seededQ = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const promptChips = contextualCoachPrompts(state);
+  const primaryProposal = lastProposals[0] ?? null;
+  const secondaryProposals = lastProposals.slice(1);
+  const followUpPending = shouldShowProposalFollowUp(state.coachProposalFollowUp);
 
   useEffect(() => {
     window.localStorage.removeItem(ENGINE_KEY);
@@ -228,6 +266,7 @@ function CoachPage() {
     pushChat("user", label);
     setBusy(true);
     setLastProposals([]);
+    setLastActions([]);
     void runAi(snapshot, label, coachReply(promptId, snapshot)).then(
       ({ text: reply, offline, reason }) => {
         pushChat("coach", reply);
@@ -237,19 +276,25 @@ function CoachPage() {
           const local = localProposalForPrompt(promptId);
           return local ? [local] : [];
         });
+        if (promptId === "progresso") {
+          setLastActions((prev) => {
+            const open = coachAction("open_progress");
+            if (prev.some((a) => a.id === "open_progress")) return prev;
+            return [...prev, open];
+          });
+        }
         setBusy(false);
       },
     );
   };
 
-  const send = () => {
-    const value = text.trim();
-    if (!value || busy) return;
+  const askFreeformMessage = (value: string) => {
+    if (!value.trim() || busy) return;
     const snapshot = stateRef.current;
     pushChat("user", value);
-    setText("");
     setBusy(true);
     setLastProposals([]);
+    setLastActions([]);
     void runAi(snapshot, value, coachFreeform(value, snapshot)).then(
       ({ text: reply, offline, reason }) => {
         pushChat("coach", reply);
@@ -264,7 +309,72 @@ function CoachPage() {
     );
   };
 
+  const send = () => {
+    const value = text.trim();
+    if (!value || busy) return;
+    setText("");
+    askFreeformMessage(value);
+  };
+
+  useEffect(() => {
+    if (!hydrated || busy || seededQ.current) return;
+    const seedQuestion = consumeCoachSeedWithSearch(searchQ);
+    if (!seedQuestion) return;
+    seededQ.current = true;
+    if (normalizeCoachSearchSeed(searchQ)) {
+      void navigate({ to: "/coach", search: {}, replace: true });
+    }
+    askFreeformMessage(seedQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once per mount
+  }, [hydrated, busy, searchQ]);
+
+  const applyProposal = (p: CoachProposal) => {
+    const todayCheck = state.dayCheckIns?.[todayKey()];
+    const decisionCtx = decisionContextForUi(state, todayKey());
+    const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
+    const mealPlan = state.profile
+      ? buildDailyMealPlan(state.profile, state, todayKey(), undefined, engine)
+      : null;
+    const result = acceptCoachProposal(p, {
+      ...(todayCheck ? { checkIn: todayCheck } : {}),
+      mealPlan,
+    });
+    if (result.kind !== "none") {
+      setCoachProposalFollowUp(buildProposalFollowUp(p));
+    }
+    if (result.kind === "water") {
+      addWater(result.ml);
+      toast.success(`${result.ml} ml de água registrados`);
+      setLastProposals([]);
+      return;
+    }
+    if (result.kind === "meal") {
+      addMealEntry(result.entry);
+      toast.success(`${result.label} registrado`);
+      setLastProposals([]);
+      return;
+    }
+    if (result.kind === "navigate") {
+      void navigate({ to: "/nutricao" });
+      return;
+    }
+    if (result.kind === "checkin") {
+      saveDayCheckIn(result.patch);
+      refreshLivingPlan();
+      toast.success("Proposta aceita — plano de hoje atualizado");
+      setLastProposals([]);
+      return;
+    }
+    toast.message("Essa proposta abre o treino de hoje.");
+    void navigate({ to: "/" });
+  };
+
   const hasUserMessage = state.chat.some((m) => m.role === "user");
+  const volumeNudge = coachNudgeFromState({
+    ...state,
+    coachNudgeDismissedAt: null,
+    coachNudgeShownAt: null,
+  });
 
   return (
     <AppShell
@@ -292,18 +402,39 @@ function CoachPage() {
         </div>
       }
     >
-      {coachNudgeFromState({
-        ...state,
-        coachNudgeDismissedAt: null,
-        coachNudgeShownAt: null,
-      }).show ? (
-        <Link
-          to="/progresso/resumo"
-          search={{ period: "week" }}
-          className="mb-3 inline-flex rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
+      <Link
+        to="/"
+        className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary"
+      >
+        <ArrowLeft className="size-3.5" />
+        Hoje
+      </Link>
+
+      {followUpPending && state.coachProposalFollowUp ? (
+        <button
+          type="button"
+          disabled={busy}
+          className="mb-3 w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-left text-xs font-semibold text-primary disabled:opacity-50"
+          onClick={() => {
+            const q = proposalFollowUpQuestion(state.coachProposalFollowUp!);
+            answerCoachProposalFollowUp();
+            askFreeformMessage(q);
+          }}
         >
-          Volume subiu — ver análise
-        </Link>
+          Como foi “{state.coachProposalFollowUp.label}”? Toque para contar ao Coach
+        </button>
+      ) : null}
+
+      {volumeNudge.show ? (
+        <button
+          type="button"
+          className="mb-3 inline-flex rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
+          onClick={() => {
+            askFreeformMessage(volumeRecoveryNudgeSeed(volumeNudge.volumeDeltaPct));
+          }}
+        >
+          Volume subiu — perguntar ao Coach
+        </button>
       ) : null}
 
       {!hasUserMessage ? (
@@ -318,7 +449,7 @@ function CoachPage() {
           </p>
           <p className="eyebrow mt-6 mb-2 text-left">Sugestões rápidas</p>
           <div className="grid grid-cols-2 gap-2 text-left">
-            {COACH_PROMPTS.slice(0, 4).map((p) => (
+            {promptChips.slice(0, 4).map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -356,58 +487,40 @@ function CoachPage() {
         <div ref={endRef} />
       </div>
 
-      {lastProposals.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {lastProposals.map((p, i) => (
-            <button
-              key={`${p.type}-${i}`}
-              type="button"
-              className="rounded-full border border-primary bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary"
-              onClick={() => {
-                const todayCheck = state.dayCheckIns?.[todayKey()];
-                const decisionCtx = decisionContextForUi(state, todayKey());
-                const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
-                const mealPlan = state.profile
-                  ? buildDailyMealPlan(state.profile, state, todayKey(), undefined, engine)
-                  : null;
-                const result = acceptCoachProposal(p, {
-                  ...(todayCheck ? { checkIn: todayCheck } : {}),
-                  mealPlan,
-                });
-                if (result.kind === "water") {
-                  addWater(result.ml);
-                  toast.success(`${result.ml} ml de água registrados`);
-                  setLastProposals([]);
-                  return;
-                }
-                if (result.kind === "meal") {
-                  addMealEntry(result.entry);
-                  toast.success(`${result.label} registrado`);
-                  setLastProposals([]);
-                  return;
-                }
-                if (result.kind === "navigate") {
-                  void navigate({ to: "/nutricao" });
-                  return;
-                }
-                if (result.kind === "checkin") {
-                  saveDayCheckIn(result.patch);
-                  refreshLivingPlan();
-                  toast.success("Proposta aceita — plano de hoje atualizado");
-                  setLastProposals([]);
-                  return;
-                }
-                toast.message("Essa proposta abre o treino de hoje.");
-                void navigate({ to: "/" });
-              }}
-            >
-              {proposalAcceptLabel(p)}
-            </button>
-          ))}
+      {primaryProposal ? (
+        <div className="mt-3 space-y-2">
+          <button
+            type="button"
+            className="flex h-11 w-full items-center justify-center rounded-full border border-primary bg-primary px-4 text-sm font-bold uppercase tracking-wide text-primary-foreground glow-primary"
+            onClick={() => applyProposal(primaryProposal)}
+          >
+            {proposalAcceptLabel(primaryProposal)}
+          </button>
+          {secondaryProposals.length || lastActions.length ? (
+            <div className="flex flex-wrap gap-2">
+              {secondaryProposals.map((p, i) => (
+                <button
+                  key={`${p.type}-sec-${i}`}
+                  type="button"
+                  className="rounded-full border border-primary/40 bg-card/40 px-3 py-1.5 text-xs font-semibold text-primary"
+                  onClick={() => applyProposal(p)}
+                >
+                  {proposalAcceptLabel(p)}
+                </button>
+              ))}
+              {lastActions.map((a) => (
+                <Link
+                  key={a.id}
+                  to={a.href}
+                  className="rounded-full border border-white/15 bg-card/30 px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                >
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-
-      {lastActions.length ? (
+      ) : lastActions.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {lastActions.map((a) => (
             <Link
@@ -423,7 +536,7 @@ function CoachPage() {
 
       {hasUserMessage ? (
         <div className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
-          {COACH_PROMPTS.map((p) => (
+          {promptChips.map((p) => (
             <button
               key={p.id}
               disabled={busy}

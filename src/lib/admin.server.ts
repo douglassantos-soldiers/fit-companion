@@ -63,6 +63,8 @@ export type AdminUserLookup = {
     customerId: string | null;
     lastOrderAt: string | null;
     updatedAt: string | null;
+    isTrial: boolean;
+    windowDays: number;
   } | null;
   devices: Array<{ deviceId: string; lastSeenAt: string | null }>;
   orders: Array<{
@@ -335,25 +337,34 @@ export async function lookupUserByEmail(email: string): Promise<AdminUserLookup>
 
     const { data: emailRow } = await db
       .from("app_entitlement_emails")
-      .select("access_tier, product_ids, shopify_customer_id, last_order_at, updated_at")
+      .select("access_tier, product_ids, shopify_customer_id, last_order_at, updated_at, order_snapshot")
       .eq("email", normalized)
       .maybeSingle();
 
     if (emailRow) {
+      const snap = (emailRow.order_snapshot as { tags?: string[] } | null) ?? null;
+      const tags = snap?.tags ?? [];
+      const { windowDaysFromEntitlementTags, isAdminTrialTags } = await import("@/lib/access-window");
       entitlementMeta = {
         accessTier: emailRow.access_tier === "performance" ? "performance" : "base",
         productIds: (emailRow.product_ids as string[]) ?? [],
         customerId: (emailRow.shopify_customer_id as string | null) ?? null,
         lastOrderAt: (emailRow.last_order_at as string | null) ?? null,
         updatedAt: (emailRow.updated_at as string | null) ?? null,
+        isTrial: isAdminTrialTags(tags),
+        windowDays: windowDaysFromEntitlementTags(tags),
       };
     } else if (ent) {
+      const tags = ent.snapshot?.tags ?? [];
+      const { windowDaysFromEntitlementTags, isAdminTrialTags } = await import("@/lib/access-window");
       entitlementMeta = {
         accessTier: ent.accessTier,
         productIds: ent.productIds,
         customerId: ent.customerId,
         lastOrderAt: ent.snapshot?.orderedAt ?? null,
         updatedAt: null,
+        isTrial: isAdminTrialTags(tags),
+        windowDays: windowDaysFromEntitlementTags(tags),
       };
     }
   }
@@ -406,8 +417,9 @@ export async function resyncEntitlementForEmail(
   };
 
   const magicToken = crypto.randomUUID();
+  const { ACCESS_PURCHASE_WINDOW_DAYS } = await import("@/lib/access-window");
   const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
+  expires.setDate(expires.getDate() + ACCESS_PURCHASE_WINDOW_DAYS);
   await upsertEntitlementEmail({
     snapshot,
     magicTokenPlain: magicToken,
@@ -451,9 +463,13 @@ export async function resyncEntitlementForEmail(
 
 export async function setEntitlementManual(opts: {
   email: string;
-  action: "grant" | "revoke";
+  action: "grant" | "revoke" | "grant_trial";
   tier?: AccessTier;
-}): Promise<{ ok: true; lookup: AdminUserLookup } | { ok: false; reason: string }> {
+  reason?: string | null;
+}): Promise<
+  | { ok: true; lookup: AdminUserLookup; magicUrl?: string }
+  | { ok: false; reason: string }
+> {
   const normalized = opts.email.trim().toLowerCase();
   if (!normalized.includes("@")) return { ok: false, reason: "invalid_email" };
 
@@ -461,8 +477,16 @@ export async function setEntitlementManual(opts: {
   if (!db) return { ok: false, reason: "db_unavailable" };
 
   const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
-  const { upsertEntitlementEmail, upsertDeviceEntitlementAdmin } =
+  const { upsertEntitlementEmail, upsertDeviceEntitlementAdmin, appOriginFromEnv } =
     await import("@/lib/shopify.server");
+  const {
+    ACCESS_PURCHASE_WINDOW_DAYS,
+    ACCESS_TRIAL_WINDOW_DAYS,
+    ADMIN_TRIAL_TAG,
+  } = await import("@/lib/access-window");
+
+  const auditReason = opts.reason?.trim().slice(0, 200) || null;
+  const isTrial = opts.action === "grant_trial";
 
   if (opts.action === "revoke") {
     const { data: user } = await db
@@ -480,12 +504,17 @@ export async function setEntitlementManual(opts: {
     await db.from("app_entitlement_emails").delete().eq("email", normalized);
     await db.from("app_entitlements").delete().eq("email", normalized);
 
-    await writeAudit("entitlement_revoke", { email: normalized });
+    await writeAudit("entitlement_revoke", {
+      email: normalized,
+      ...(auditReason ? { reason: auditReason } : {}),
+    });
     const lookup = await lookupUserByEmail(normalized);
     return { ok: true, lookup };
   }
 
-  const tier: AccessTier = opts.tier === "performance" ? "performance" : "base";
+  const tier: AccessTier =
+    isTrial ? "base" : opts.tier === "performance" ? "performance" : "base";
+  const windowDays = isTrial ? ACCESS_TRIAL_WINDOW_DAYS : ACCESS_PURCHASE_WINDOW_DAYS;
   const appUser = await resolveOrCreateUserByEmail(normalized);
   const userId = appUser?.id ?? null;
 
@@ -494,7 +523,7 @@ export async function setEntitlementManual(opts: {
     orderId: null,
     email: normalized,
     customerId: null,
-    tags: ["admin_manual"],
+    tags: isTrial ? ["admin_manual", ADMIN_TRIAL_TAG] : ["admin_manual"],
     lineItems: [],
     productIds: [],
     accessTier: tier,
@@ -504,7 +533,7 @@ export async function setEntitlementManual(opts: {
 
   const magicToken = crypto.randomUUID();
   const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
+  expires.setDate(expires.getDate() + windowDays);
   await upsertEntitlementEmail({
     snapshot,
     magicTokenPlain: magicToken,
@@ -525,9 +554,17 @@ export async function setEntitlementManual(opts: {
     }
   }
 
-  await writeAudit("entitlement_grant", { email: normalized, accessTier: tier });
+  const origin = appOriginFromEnv();
+  const magicUrl = `${origin}/acesso?token=${encodeURIComponent(magicToken)}`;
+
+  await writeAudit("entitlement_grant", {
+    email: normalized,
+    accessTier: tier,
+    ...(isTrial ? { trial: true, days: ACCESS_TRIAL_WINDOW_DAYS } : {}),
+    ...(auditReason ? { reason: auditReason } : {}),
+  });
   const lookup = await lookupUserByEmail(normalized);
-  return { ok: true, lookup };
+  return { ok: true, lookup, magicUrl };
 }
 
 export async function importShopifyCustomersBatch(opts?: {

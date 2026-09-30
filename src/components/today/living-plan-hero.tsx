@@ -1,6 +1,17 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, HelpCircle, Moon, Pill, Play, ThumbsDown, ThumbsUp, Utensils, Zap } from "lucide-react";
+import {
+  BookOpen,
+  HelpCircle,
+  MessageSquare,
+  Moon,
+  Pill,
+  Play,
+  ThumbsDown,
+  ThumbsUp,
+  Utensils,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MetricRing } from "@/components/metric-ring";
 import { SoldiersMediaFrame } from "@/components/soldiers-media-frame";
@@ -60,6 +71,9 @@ export function LivingPlanHero({
   feedback,
   onFeedback,
   cover,
+  muscleTeaser,
+  onCheckInOpened,
+  onCoachClick,
 }: {
   plan: LivingPlanSnapshot;
   doneToday: boolean;
@@ -72,6 +86,10 @@ export function LivingPlanHero({
   feedback?: LivingPlanFeedback | null;
   onFeedback?: (vote: LivingPlanFeedbackVote, reason?: LivingPlanFeedbackReason) => void;
   cover?: ResolvedMedia | null;
+  /** Compact muscle recovery line linking to /treino */
+  muscleTeaser?: string | null;
+  onCheckInOpened?: () => void;
+  onCoachClick?: () => void;
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
@@ -186,13 +204,37 @@ export function LivingPlanHero({
             </p>
           ) : null}
 
-          <button
-            type="button"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary"
-            onClick={() => setWhyOpen(true)}
-          >
-            <HelpCircle className="size-3.5" /> Por quê?
-          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+              onClick={() => setWhyOpen(true)}
+            >
+              <HelpCircle className="size-3.5" /> Por quê?
+            </button>
+            <Link
+              to="/coach"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+              onClick={() => onCoachClick?.()}
+            >
+              <MessageSquare className="size-3.5" /> Perguntar ao coach
+            </Link>
+          </div>
+
+          {muscleTeaser ? (
+            <Link
+              to="/treino"
+              className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-background/40 px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Recuperação muscular
+                </p>
+                <p className="truncate text-xs text-foreground">{muscleTeaser}</p>
+              </div>
+              <span className="shrink-0 text-xs font-semibold text-primary">Ver mapa</span>
+            </Link>
+          ) : null}
 
           {(() => {
             const showTrain = !doneToday && Boolean(workoutDayId) && plan.workout.mode !== "rest";
@@ -295,6 +337,33 @@ export function LivingPlanHero({
 
           <div className="mt-4">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Como está a energia?
+            </p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(
+                [
+                  ["baixa", "Baixa"],
+                  ["ok", "Ok"],
+                  ["alta", "Alta"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setEnergy(k);
+                    persistCheck({ energy: k });
+                  }}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                    energy === k ? "border-primary bg-primary/15 text-primary" : "border-white/10",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Quanto tempo você tem?
             </p>
             <div className="flex flex-wrap gap-2">
@@ -327,11 +396,17 @@ export function LivingPlanHero({
             <button
               type="button"
               className="mt-2 text-left text-xs font-semibold text-primary"
-              onClick={() => setCheckOpen((v) => !v)}
+              onClick={() => {
+                setCheckOpen((v) => {
+                  const next = !v;
+                  if (next) onCheckInOpened?.();
+                  return next;
+                });
+              }}
             >
               {checkIn
-                ? `Ajustar check-in (${checkIn.sleepHours}h · ${checkIn.energy})`
-                : "Sono e energia (opcional)"}
+                ? `Ajustar sono e detalhes (${checkIn.sleepHours}h · ${checkIn.energy})`
+                : "Sono e detalhes (opcional)"}
             </button>
             {checkOpen ? (
               <div className="mt-3 space-y-3 rounded-xl border border-white/10 bg-white/5 p-3">
@@ -600,7 +675,14 @@ export function LivingPlanHero({
             </div>
           ) : null}
         </div>
-        <Link to="/coach" className="mt-4 block" onClick={() => setWhyOpen(false)}>
+        <Link
+          to="/coach"
+          className="mt-4 block"
+          onClick={() => {
+            onCoachClick?.();
+            setWhyOpen(false);
+          }}
+        >
           <Button className="w-full">Perguntar ao coach</Button>
         </Link>
       </SoldiersOverlay>

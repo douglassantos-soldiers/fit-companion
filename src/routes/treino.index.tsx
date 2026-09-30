@@ -9,12 +9,13 @@ import {
   Play,
   Settings2,
   X,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, EmptyState } from "@/components/app-shell";
 import { ExercisePlanRow } from "@/components/training/exercise-plan-row";
 import { ExerciseSwapPicker } from "@/components/training/exercise-swap-picker";
-import { MuscleHeatmap } from "@/components/session/muscle-heatmap";
+import { MuscleRecoveryCard } from "@/components/session/muscle-recovery-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
@@ -43,6 +44,10 @@ import { GYM_GEAR_OPTIONS, matchesInventory } from "@/lib/training/inventory";
 import { isStickyPlanActive } from "@/lib/training/saved-training-plans";
 import { blockDisplayWeek } from "@/lib/training/training-block";
 import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
+import {
+  bestStimulusDayId,
+  trainNowLabel,
+} from "@/lib/training/recovery-ui";
 import { WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import {
   FOCUS_MUSCLE_LABEL,
@@ -53,7 +58,7 @@ import {
   type FocusMuscle,
   type GymGear,
 } from "@/lib/types";
-
+import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/treino/")({
   head: () => ({
     meta: [
@@ -96,6 +101,8 @@ function TrainingPage() {
   );
   const [ajustesOpen, setAjustesOpen] = useState(false);
   const [swapFor, setSwapFor] = useState<{ dayId: string; exerciseId: string } | null>(null);
+  const [planTab, setPlanTab] = useState("semana");
+  const [highlightDayId, setHighlightDayId] = useState<string | null>(null);
 
   const recoveryCtx = useMemo(
     () => ({
@@ -158,6 +165,25 @@ function TrainingPage() {
       ...(trainingMode === "express" ? { acceptedTrainingMode: "express" as const } : {}),
     });
   };
+  const todayExpress = todayDay ? expressForDay(todayDay.id) : false;
+  const primaryTrainLabel = trainNowLabel({
+    express: todayExpress,
+    recoveryScore: todayDay?.recoveryScore,
+    trainingMode,
+  });
+  const bestDayId = bestStimulusDayId(plan, state.sessions, recoveryCtx);
+
+  const focusPlanDay = (dayId: string) => {
+    setPlanTab("semana");
+    setHighlightDayId(dayId);
+    window.setTimeout(() => {
+      document.getElementById(`plan-day-${dayId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  };
+
   const activeEquip = equipOverride ?? todayCheck?.equipment ?? profile.equipment;
   const weekdays = profile.trainingWeekdays ?? plan.map((d) => d.weekday);
   const swapSource = swapFor
@@ -197,11 +223,16 @@ function TrainingPage() {
         <Link
           to="/treino/sessao/$id"
           params={{ id: todayDay.id }}
-          search={{ express: expressForDay(todayDay.id), from: "treino" }}
+          search={{ express: todayExpress, from: "treino" }}
           className="mb-4 block"
         >
           <Button className="glow-primary h-14 w-full font-bold uppercase tracking-wide">
-            <Play className="size-4" /> Treinar agora
+            {todayExpress || trainingMode === "express" ? (
+              <Zap className="size-4" />
+            ) : (
+              <Play className="size-4" />
+            )}{" "}
+            {primaryTrainLabel}
           </Button>
         </Link>
       ) : null}
@@ -278,28 +309,15 @@ function TrainingPage() {
         </div>
       ) : null}
 
-      <section className="surface-card mb-4 p-5">
-        <h2 className="text-lg">Recuperação muscular</h2>
-        <p className="text-xs text-muted-foreground">
-          Heatmap por grupo — volume e carga muscular (7d) influenciam a recuperação
-        </p>
-        <div className="mt-4">
-          <MuscleHeatmap recovery={recovery} />
-        </div>
-        <ul className="mt-3 grid grid-cols-2 gap-1.5 text-[0.65rem] text-muted-foreground">
-          {recoverySnaps
-            .filter((s) => s.muscle !== "cardio")
-            .map((s) => (
-              <li key={s.muscle} className="flex justify-between gap-2">
-                <span>{s.label}</span>
-                <span>
-                  load7d {s.load7d}
-                  {s.reasonCodes.includes("excessive_muscle_load") ? " · alta" : ""}
-                </span>
-              </li>
-            ))}
-        </ul>
-      </section>
+      <MuscleRecoveryCard
+        recovery={recovery}
+        recoverySnaps={recoverySnaps}
+        plan={plan}
+        todayDay={todayDay}
+        express={todayExpress}
+        trainingMode={trainingMode}
+        onFocusDay={focusPlanDay}
+      />
 
       <div className="mb-4 flex gap-2">
         {(["academia", "casa"] as Equipment[]).map((eq) => (
@@ -318,7 +336,7 @@ function TrainingPage() {
         ))}
       </div>
 
-      <Tabs defaultValue="semana">
+      <Tabs value={planTab} onValueChange={setPlanTab}>
         <TabsList className="w-full">
           <TabsTrigger value="semana" className="flex-1">
             <CalendarDays className="size-4" /> Semana
@@ -364,17 +382,30 @@ function TrainingPage() {
             </Button>
           </div>
           {plan.map((day) => (
-            <article key={day.id} className="surface-card p-5">
+            <article
+              key={day.id}
+              id={`plan-day-${day.id}`}
+              className={cn(
+                "surface-card scroll-mt-24 p-5",
+                highlightDayId === day.id && "ring-2 ring-primary/60",
+              )}
+            >
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-primary">
                     {WEEKDAY_LABELS[day.weekday]}
                     {day.recoveryScore !== undefined && day.recoveryScore < 35 ? " · leve" : ""}
+                    {bestDayId === day.id ? " · melhor estímulo" : ""}
                   </p>
                   <h2 className="mt-1 text-xl">{day.title}</h2>
                   <p className="text-xs text-muted-foreground">
                     {day.focus} · ~{day.estimatedMin} min
                   </p>
+                  {bestDayId === day.id ? (
+                    <span className="mt-1.5 inline-flex rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold text-primary">
+                      Melhor estímulo hoje
+                    </span>
+                  ) : null}
                 </div>
                 <Button
                   type="button"

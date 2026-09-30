@@ -638,6 +638,24 @@ export async function fetchForYouFeed(
   }));
 }
 
+export async function fetchFollowingFeed(deviceId: string, limit = 30): Promise<ActivityEvent[]> {
+  const { getFollowingFeedFn } = await import("@/lib/social/graph.functions");
+  const res = await getFollowingFeedFn({ data: { deviceId, limit } });
+  return (res.events ?? []).map((e) => ({
+    id: e.id,
+    deviceId: e.deviceId,
+    userId: e.userId,
+    displayName: e.displayName,
+    kind: e.kind as ActivityKind,
+    payload: e.payload,
+    kudosCount: e.kudosCount,
+    createdAt: e.createdAt,
+    reactionCounts: e.reactionCounts,
+    myReaction: e.myReaction,
+    commentCount: e.commentCount,
+  }));
+}
+
 export async function followUser(deviceId: string, targetUserId: string, displayName: string) {
   await socialWriteFn({ data: { op: "follow", deviceId, targetUserId, displayName } });
 }

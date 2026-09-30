@@ -2,7 +2,7 @@ import { brandLevel, isWarriorPlus } from "@/lib/engine/brand-level";
 import { todayKey } from "@/lib/types";
 import type { AppState } from "@/lib/types";
 
-export type HomePersona = "novo" | "consistente" | "inativo" | "avancado";
+export type HomePersona = "novo" | "consistente" | "inativo" | "avancado" | "em_risco";
 
 function daysBetween(fromKey: string, toKey: string): number {
   const a = new Date(`${fromKey}T12:00:00`);
@@ -37,7 +37,8 @@ function trainedThisIsoWeek(state: AppState, now = new Date()): boolean {
 }
 
 /**
- * Home layout persona. Priority: inativo > novo > avancado > consistente.
+ * Home layout persona. Priority: inativo > novo > avancado > consistente > em_risco.
+ * `em_risco` = active (<8d) but still not trained this ISO week.
  */
 export function homePersona(state: AppState, now = new Date()): HomePersona {
   const sessions = state.sessions.length;
@@ -53,5 +54,5 @@ export function homePersona(state: AppState, now = new Date()): HomePersona {
   if (sessions >= 20 && (level === "avancado" || isWarriorPlus(rank))) return "avancado";
 
   if (trainedThisIsoWeek(state, now)) return "consistente";
-  return "consistente";
+  return "em_risco";
 }

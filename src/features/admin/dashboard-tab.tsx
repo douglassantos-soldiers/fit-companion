@@ -1,6 +1,9 @@
 import { RefreshCw } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { ProductAnalytics } from "@/lib/analytics.server";
+import type { ShopifyOpsSnapshot } from "@/lib/admin.server";
+import { cn } from "@/lib/utils";
 
 export function MetricCard({ label, value }: { label: string; value: number }) {
   return (
@@ -11,20 +14,88 @@ export function MetricCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+const STALE_WEBHOOK_MS = 24 * 60 * 60 * 1000;
+
 export function DashboardTab({
   analytics,
   busy,
   onRefresh,
+  ops,
+  opsBusy,
+  onOpenSistema,
+  loadError,
 }: {
   analytics: ProductAnalytics | null;
   busy: boolean;
   onRefresh: () => void;
+  ops: ShopifyOpsSnapshot | null;
+  opsBusy: boolean;
+  onOpenSistema: () => void;
+  loadError: string | null;
 }) {
+  const lastWebhook = ops?.webhooks[0] ?? null;
+  const lastWebhookMs = lastWebhook ? Date.parse(lastWebhook.processedAt) : NaN;
+  const webhookStale =
+    !lastWebhook ||
+    !Number.isFinite(lastWebhookMs) ||
+    Date.now() - lastWebhookMs > STALE_WEBHOOK_MS;
+  const lastCursor = ops?.cursors[0] ?? null;
+
   return (
     <div className="space-y-4">
-      <Button variant="secondary" className="gap-2" onClick={onRefresh} disabled={busy}>
-        <RefreshCw className="size-4" /> {busy ? "Carregando…" : "Atualizar"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" className="gap-2" onClick={onRefresh} disabled={busy}>
+          <RefreshCw className="size-4" /> {busy ? "Carregando…" : "Atualizar métricas"}
+        </Button>
+      </div>
+
+      {loadError ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {loadError}
+        </p>
+      ) : null}
+
+      <div className="surface-glass space-y-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold">Saúde Shopify</p>
+          <Button size="sm" variant="outline" onClick={onOpenSistema} disabled={opsBusy}>
+            Ver Sistema
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span
+            className={cn(
+              "rounded-full border px-2.5 py-1 font-semibold",
+              webhookStale
+                ? "border-destructive/40 text-destructive"
+                : "border-primary/40 text-primary",
+            )}
+          >
+            {opsBusy
+              ? "Webhooks…"
+              : lastWebhook
+                ? webhookStale
+                  ? `Webhook stale · ${lastWebhook.topic}`
+                  : `Webhook ok · ${lastWebhook.topic}`
+                : "Sem webhooks"}
+          </span>
+          <span className="rounded-full border border-white/10 px-2.5 py-1 text-muted-foreground">
+            {lastWebhook
+              ? new Date(lastWebhook.processedAt).toLocaleString("pt-BR")
+              : "—"}
+          </span>
+          <span className="rounded-full border border-white/10 px-2.5 py-1 text-muted-foreground">
+            Cursor: {lastCursor?.id ?? "—"}
+          </span>
+        </div>
+        <p className="text-[0.65rem] text-muted-foreground">
+          Chip vermelho se o último webhook tiver mais de 24h.{" "}
+          <Link to="/admin" search={{ tab: "sistema" }} className="font-semibold text-primary">
+            Abrir Sistema
+          </Link>
+        </p>
+      </div>
+
       {analytics ? (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -80,7 +151,9 @@ export function DashboardTab({
           </div>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">Abra o dashboard para carregar as métricas (sem PII).</p>
+        <p className="text-sm text-muted-foreground">
+          {busy ? "Carregando métricas…" : "Abra o dashboard para carregar as métricas (sem PII)."}
+        </p>
       )}
     </div>
   );

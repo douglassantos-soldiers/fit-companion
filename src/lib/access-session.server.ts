@@ -7,7 +7,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getCookie, setCookie, deleteCookie, getRequest } from "@tanstack/react-start/server";
 
-import { ACCESS_WINDOW_SEC, accessCookieExpSec, isPurchaseWithinWindow } from "@/lib/access-window";
+import { ACCESS_PURCHASE_WINDOW_DAYS, ACCESS_WINDOW_SEC, accessCookieExpSec, isPurchaseWithinWindow } from "@/lib/access-window";
 
 export const ACCESS_COOKIE = "soldiers_access";
 const MAX_AGE_SEC = ACCESS_WINDOW_SEC;
@@ -25,6 +25,8 @@ export type AccessSessionPayload = {
   userId?: string;
   /** ISO timestamp of last paid Shopify order — used to revalidate the 40-day window */
   lastPaidAt?: string;
+  /** Access window in days (7 for admin trial, 40 for purchase). Defaults to 40 when absent. */
+  windowDays?: number;
   exp: number;
 };
 
@@ -193,14 +195,19 @@ function parseAdminRole(raw: unknown): AdminRole | null {
 export function encodeAccessToken(
   payload: Omit<AccessSessionPayload, "exp"> & { exp?: number },
 ): string {
+  const windowDays =
+    typeof payload.windowDays === "number" && payload.windowDays > 0
+      ? Math.floor(payload.windowDays)
+      : undefined;
   const body: AccessSessionPayload & { kind: "access" } = {
     kind: "access",
     email: payload.email.trim().toLowerCase(),
     tier: payload.tier === "performance" ? "performance" : "base",
-    exp: payload.exp ?? accessCookieExpSec(payload.lastPaidAt ?? null),
+    exp: payload.exp ?? accessCookieExpSec(payload.lastPaidAt ?? null, Date.now(), windowDays ?? ACCESS_PURCHASE_WINDOW_DAYS),
   };
   if (payload.userId) body.userId = payload.userId;
   if (payload.lastPaidAt) body.lastPaidAt = payload.lastPaidAt;
+  if (windowDays != null) body.windowDays = windowDays;
   const data = b64url(JSON.stringify(body));
   const sig = signAccessRaw(data);
   return `${data}.${sig}`;
@@ -235,7 +242,11 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
       typeof json.lastPaidAt === "string" && json.lastPaidAt.length > 8
         ? json.lastPaidAt
         : undefined;
-    if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt)) return null;
+    const windowDays =
+      typeof json.windowDays === "number" && json.windowDays > 0
+        ? Math.floor(json.windowDays)
+        : ACCESS_PURCHASE_WINDOW_DAYS;
+    if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt, Date.now(), windowDays)) return null;
     return {
       email: String(json.email).toLowerCase(),
       tier: json.tier,
@@ -244,6 +255,7 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
         ? { userId: json.userId }
         : {}),
       ...(lastPaidAt ? { lastPaidAt } : {}),
+      ...(windowDays !== ACCESS_PURCHASE_WINDOW_DAYS ? { windowDays } : {}),
     };
   } catch {
     return null;

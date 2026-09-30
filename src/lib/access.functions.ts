@@ -117,7 +117,8 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       await import("@/lib/shopify.server");
     const { resolveOrCreateUserByEmail, linkDeviceToShopifyUser } = await import("@/lib/identity");
     const { upsertOrdersFromPaidList } = await import("@/lib/orders.server");
-    const { accessExpiresAtIso } = await import("@/lib/access-window");
+    const { accessExpiresAtIso, windowDaysFromEntitlementTags, ACCESS_PURCHASE_WINDOW_DAYS } =
+      await import("@/lib/access-window");
     const { shopifyDisplayName } = await import("@/lib/shopify-orders.server");
 
     // P0-10: client cannot create entitlement — require pre-existing email grant (webhook/admin)
@@ -131,6 +132,10 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       return { ok: false as const, reason: inspected.reason };
     }
     const profile = inspected;
+    const windowDays =
+      !profile.customerId
+        ? windowDaysFromEntitlementTags(prior.snapshot?.tags)
+        : ACCESS_PURCHASE_WINDOW_DAYS;
 
     const appUser = await resolveOrCreateUserByEmail(data.email);
     if (!appUser) {
@@ -209,6 +214,7 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       tier: profile.accessTier,
       userId,
       lastPaidAt: profile.lastPaidAt,
+      windowDays,
     });
 
     try {
@@ -232,7 +238,7 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       restockEstimates: profile.restockEstimates,
       userId,
       lastPaidAt: profile.lastPaidAt,
-      accessExpiresAt: accessExpiresAtIso(profile.lastPaidAt),
+      accessExpiresAt: accessExpiresAtIso(profile.lastPaidAt, Date.now(), windowDays),
       shopifyDisplayName: displayName,
     };
   });
@@ -311,19 +317,24 @@ export const completeAccountAccess = createServerFn({ method: "POST" })
       });
     }
 
-    const { accessExpiresAtIso } = await import("@/lib/access-window");
+    const { accessExpiresAtIso, windowDaysFromEntitlementTags, ACCESS_PURCHASE_WINDOW_DAYS } =
+      await import("@/lib/access-window");
     const { shopifyDisplayName } = await import("@/lib/shopify-orders.server");
     const displayName = shopifyDisplayName({
       firstName: inspected.customerFirstName,
       lastName: inspected.customerLastName,
     });
+    const windowDays =
+      !inspected.customerId
+        ? windowDaysFromEntitlementTags(prior.snapshot?.tags)
+        : ACCESS_PURCHASE_WINDOW_DAYS;
 
     void trackUserEvent({
       deviceId: data.deviceId || null,
       resolvedUserId: appUser.id,
       eventType: "access_granted",
       source: "access",
-      metadata: { via: data.isNewUser ? "signup" : "signin", windowDays: 40 },
+      metadata: { via: data.isNewUser ? "signup" : "signin", windowDays },
     });
 
     return {
@@ -336,7 +347,7 @@ export const completeAccountAccess = createServerFn({ method: "POST" })
       restockEstimates: inspected.restockEstimates,
       userId: appUser.id,
       lastPaidAt: inspected.lastPaidAt,
-      accessExpiresAt: accessExpiresAtIso(inspected.lastPaidAt),
+      accessExpiresAt: accessExpiresAtIso(inspected.lastPaidAt, Date.now(), windowDays),
       shopifyDisplayName: displayName,
     };
   });

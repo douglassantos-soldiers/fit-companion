@@ -7,11 +7,12 @@ export interface OnboardingTip {
   minDay: number;
 }
 
+/** D0 tips prioritize first workout then first meal; Coach after activation. */
 export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: "tip-first-session",
     title: "Primeiro treino",
-    body: "Abra Treino e complete pelo menos uma série. O streak começa hoje.",
+    body: "Abra o plano de hoje e complete pelo menos uma série. O streak começa agora.",
     ctaLabel: "Ir treinar",
     ctaTo: "/treino",
     minDay: 0,
@@ -19,10 +20,10 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
   {
     id: "tip-log-meal",
     title: "Registre uma refeição",
-    body: "A proteína do dia aparece no Resumo. Use Registrar refeição na Home.",
+    body: "Abra Nutrição → Hoje e toque Aplicar ou Outro no próximo slot. A proteína do dia aparece no diário.",
     ctaLabel: "Nutrição",
     ctaTo: "/nutricao",
-    minDay: 1,
+    minDay: 0,
   },
   {
     id: "tip-water",
@@ -33,19 +34,19 @@ export const ONBOARDING_TIPS: OnboardingTip[] = [
     minDay: 1,
   },
   {
-    id: "tip-supplements",
-    title: "Monte a rotina",
-    body: "Pelo Perfil → Suplementos, marque as doses do dia.",
-    ctaLabel: "Suplementos",
-    ctaTo: "/suplementos",
-    minDay: 2,
-  },
-  {
     id: "tip-coach",
     title: "Fale com o Coach",
-    body: "Na aba Coach pergunte o treino de hoje ou ajuste de volume — respostas com base nos seus dados.",
+    body: "Depois do treino, pergunte o próximo passo ou ajuste de volume — com base nos seus dados.",
     ctaLabel: "Abrir Coach",
     ctaTo: "/coach",
+    minDay: 1,
+  },
+  {
+    id: "tip-supplements",
+    title: "Monte a rotina",
+    body: "Em Nutrição → Doses, marque as doses do dia (whey conta na proteína se ativado nos Ajustes).",
+    ctaLabel: "Doses",
+    ctaTo: "/suplementos",
     minDay: 2,
   },
   {

@@ -72,8 +72,12 @@ export function nextOnboardingTip(profile: Profile, state: AppState): Onboarding
   for (const tip of ONBOARDING_TIPS) {
     if (seen.has(tip.id)) continue;
     if (day < tip.minDay) continue;
+    // First workout before meal tip on day 0
+    if (tip.id === "tip-log-meal" && !hasSession && day < 1) continue;
     if (tip.id === "tip-first-session" && hasSession) continue;
     if (tip.id === "tip-log-meal" && hasMeal) continue;
+    // Coach only after at least one session
+    if (tip.id === "tip-coach" && !hasSession) continue;
     if (tip.id === "tip-supplements" && hasRoutine) continue;
     if (tip.id === "tip-reminders" && remindersOn) continue;
     if (tip.id === "tip-club" && day < 5) continue;

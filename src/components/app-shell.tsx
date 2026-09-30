@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   Dumbbell,
   Flame,
+  MessageSquare,
   TrendingUp,
   User,
   Users,
@@ -12,6 +13,9 @@ import {
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { SoldiersLogo } from "@/components/soldiers-logo";
+import { shouldShowProposalFollowUp } from "@/lib/coach/proposal-followup";
+import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { resolveTabKey } from "@/lib/ui/app-nav";
 
@@ -44,6 +48,11 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const selected = resolveTabKey(pathname);
   const showAccess = headerAccessDays != null && headerAccessDays <= 7;
+  const { state, hydrated } = useStore();
+  const coachPending =
+    hydrated &&
+    (coachNudgeFromState(state).show ||
+      shouldShowProposalFollowUp(state.coachProposalFollowUp));
 
   return (
     <div
@@ -70,6 +79,19 @@ export function AppShell({
                 {headerBadge}
               </span>
             ) : null}
+            <Link
+              to="/coach"
+              className="relative flex size-10 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-primary/20 to-white/5 text-primary transition-colors hover:border-primary/40"
+              aria-label={coachPending ? "Coach — novidade" : "Coach"}
+            >
+              <MessageSquare className="size-4" />
+              {coachPending ? (
+                <span
+                  className="absolute right-1 top-1 size-2 rounded-full bg-primary shadow-[0_0_8px_var(--glow-primary)]"
+                  aria-hidden
+                />
+              ) : null}
+            </Link>
             <Link
               to="/perfil"
               className="flex size-10 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-gradient-to-br from-primary/30 to-white/5 text-primary transition-colors hover:border-primary/40"

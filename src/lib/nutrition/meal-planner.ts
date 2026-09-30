@@ -310,6 +310,7 @@ export function buildMultiDayMealPlan(
   startDate = todayKey(),
   days = 7,
   insights?: LearningInsights | null,
+  decisionOpts?: MealPlanEngineOpts,
 ): DailyMealPlan[] {
   const n = Math.max(1, Math.min(14, Math.round(days)));
   const out: DailyMealPlan[] = [];
@@ -317,7 +318,7 @@ export function buildMultiDayMealPlan(
     const date = shiftDateKey(startDate, i);
     const check = state.dayCheckIns?.[date];
     const living = state.livingPlans?.[date];
-    const engine: MealPlanEngineOpts = {};
+    const engine: MealPlanEngineOpts = { ...(decisionOpts ?? {}) };
     if (check?.lunchOutToday) engine.lunchOutToday = true;
     if (check?.skippedSlots?.length) engine.skippedSlots = check.skippedSlots;
     if (state.favoriteMealPresetIds?.length) engine.favoritePresetIds = state.favoriteMealPresetIds;

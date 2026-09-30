@@ -123,6 +123,10 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     coachNudgeDismissedAt:
       typeof r["coachNudgeDismissedAt"] === "string" ? r["coachNudgeDismissedAt"] : null,
     coachNudgeShownAt: typeof r["coachNudgeShownAt"] === "string" ? r["coachNudgeShownAt"] : null,
+    coachProposalFollowUp:
+      r["coachProposalFollowUp"] && typeof r["coachProposalFollowUp"] === "object"
+        ? (r["coachProposalFollowUp"] as AppState["coachProposalFollowUp"])
+        : null,
     reminderHour: typeof r["reminderHour"] === "number" ? r["reminderHour"] : 18,
     ...(r["pushPrefs"] && typeof r["pushPrefs"] === "object"
       ? { pushPrefs: r["pushPrefs"] as AppState["pushPrefs"] }

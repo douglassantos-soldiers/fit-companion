@@ -1,6 +1,8 @@
 import { ExternalLink } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { AccessUrgency } from "@/lib/access-window";
+import { ACCESS_STATUS_LINK } from "@/lib/ui/platform-copy";
 
 export function AccessWindowBanner({
   daysRemaining,
@@ -31,6 +33,15 @@ export function AccessWindowBanner({
           <ExternalLink className="size-4" />
         </Button>
       </a>
+      {daysRemaining <= 3 ? (
+        <Link
+          to="/acesso"
+          search={{ next: "/" }}
+          className="mt-2 block text-center text-xs font-semibold text-primary"
+        >
+          {ACCESS_STATUS_LINK} →
+        </Link>
+      ) : null}
     </div>
   );
 }

@@ -96,6 +96,8 @@ export async function notifyUserPush(opts: {
   category: PushCategory;
   title: string;
   body: string;
+  /** Deep-link path opened on notification click (e.g. /coach?q=...). */
+  url?: string;
   /** Immediate social sends skip quiet hours; scheduled respects them. */
   respectQuietHours?: boolean;
 }): Promise<{ sent: number; skipped: string | null }> {
@@ -115,6 +117,13 @@ export async function notifyUserPush(opts: {
   const webpush = await import("web-push");
   webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
 
+  const payload = JSON.stringify({
+    title: opts.title,
+    body: opts.body,
+    tag: `soldiers-${opts.category}`,
+    url: opts.url && opts.url.startsWith("/") ? opts.url.slice(0, 280) : "/",
+  });
+
   let sent = 0;
   for (const sub of subs) {
     try {
@@ -123,7 +132,7 @@ export async function notifyUserPush(opts: {
           endpoint: sub.endpoint as string,
           keys: { p256dh: sub.p256dh as string, auth: sub.auth as string },
         },
-        JSON.stringify({ title: opts.title, body: opts.body, tag: `soldiers-${opts.category}` }),
+        payload,
       );
       sent += 1;
     } catch (e) {
@@ -179,11 +188,15 @@ export async function sendDailyPushes(now = new Date()): Promise<{ sent: number;
     }
 
     if (hour === 20 && prefs.streak !== false) {
+      const coachQ = encodeURIComponent(
+        "Meu streak está em risco. Monta um plano express realista para treinar hoje.",
+      );
       const r = await notifyUserPush({
         userId,
         category: "streak",
         title: "Streak em risco",
-        body: "Treine hoje para não quebrar a sequência.",
+        body: "Treine hoje — o Coach monta um express se o tempo estiver curto.",
+        url: `/coach?q=${coachQ}`,
         respectQuietHours: true,
       });
       sent += r.sent;
@@ -191,11 +204,151 @@ export async function sendDailyPushes(now = new Date()): Promise<{ sent: number;
     }
 
     if (hour === reminderHour && prefs.workout !== false) {
+      const coachQ = encodeURIComponent("Qual é o treino de hoje e por que o plano está assim?");
       const r = await notifyUserPush({
         userId,
         category: "workout",
         title: "Hora do treino",
-        body: "Seu plano do dia está pronto.",
+        body: "Seu plano do dia está pronto — abra o Coach se quiser o porquê.",
+        url: `/coach?q=${coachQ}`,
+        respectQuietHours: true,
+      });
+      sent += r.sent;
+      if (!r.sent) skipped += 1;
+    }
+  }
+
+  if (hour === 12 && keys) {
+    const digest = await sendClubDigestPushes(db, now);
+    sent += digest.sent;
+    skipped += digest.skipped;
+  }
+
+  return { sent, skipped };
+}
+
+/** Notify followers + clubmates (cap) when someone posts a session/proof. */
+export async function fanOutSocialActivityPush(opts: {
+  actorUserId: string;
+  title: string;
+  body: string;
+}): Promise<{ sent: number }> {
+  const db = await adminDbLoose();
+  if (!db) return { sent: 0 };
+
+  const recipientIds = new Set<string>();
+
+  const { data: followers } = await db
+    .from("social_follows")
+    .select("follower_id")
+    .eq("following_id", opts.actorUserId)
+    .limit(40);
+  for (const row of (followers ?? []) as Array<{ follower_id?: string }>) {
+    const id = String(row.follower_id ?? "");
+    if (id && id !== opts.actorUserId) recipientIds.add(id);
+  }
+
+  const { data: memberships } = await db
+    .from("club_members")
+    .select("club_id")
+    .eq("user_id", opts.actorUserId)
+    .limit(5);
+  const clubIds = ((memberships ?? []) as Array<{ club_id?: string }>)
+    .map((m) => String(m.club_id ?? ""))
+    .filter(Boolean);
+  if (clubIds.length) {
+    const { data: mates } = await db
+      .from("club_members")
+      .select("user_id")
+      .in("club_id", clubIds)
+      .limit(80);
+    for (const row of (mates ?? []) as Array<{ user_id?: string | null }>) {
+      const id = String(row.user_id ?? "");
+      if (id && id !== opts.actorUserId) recipientIds.add(id);
+    }
+  }
+
+  let sent = 0;
+  let n = 0;
+  for (const userId of recipientIds) {
+    if (n >= 25) break;
+    n += 1;
+    const { data: stateRow } = await db
+      .from("app_state")
+      .select("retention")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const retention = ((stateRow as { retention?: RetentionBlob } | null)?.retention ??
+      {}) as RetentionBlob;
+    if (retention.pushPrefs?.kudos === false) continue;
+    const r = await notifyUserPush({
+      userId,
+      category: "kudos",
+      title: opts.title,
+      body: opts.body,
+      respectQuietHours: true,
+    });
+    sent += r.sent;
+  }
+  return { sent };
+}
+
+async function sendClubDigestPushes(
+  db: NonNullable<Awaited<ReturnType<typeof adminDbLoose>>>,
+  now: Date,
+): Promise<{ sent: number; skipped: number }> {
+  const day = saoPauloDateKey(now);
+  const startIso = `${day}T00:00:00.000-03:00`;
+  let sent = 0;
+  let skipped = 0;
+
+  const { data: clubs } = await db.from("clubs").select("id, name").limit(100);
+  for (const club of (clubs ?? []) as Array<{ id?: string; name?: string }>) {
+    const clubId = String(club.id ?? "");
+    if (!clubId) continue;
+    const { data: members } = await db
+      .from("club_members")
+      .select("user_id, device_id")
+      .eq("club_id", clubId)
+      .limit(60);
+    const memberUserIds = [
+      ...new Set(
+        ((members ?? []) as Array<{ user_id?: string | null }>)
+          .map((m) => String(m.user_id ?? ""))
+          .filter((id) => id.length >= 8),
+      ),
+    ];
+    if (memberUserIds.length < 2) continue;
+
+    const { count } = await db
+      .from("activity_events")
+      .select("id", { count: "exact", head: true })
+      .in("user_id", memberUserIds)
+      .in("kind", ["session", "proof"])
+      .gte("created_at", startIso);
+    const workouts = count ?? 0;
+    if (workouts < 1) {
+      skipped += 1;
+      continue;
+    }
+
+    for (const userId of memberUserIds) {
+      const { data: stateRow } = await db
+        .from("app_state")
+        .select("retention")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const retention = ((stateRow as { retention?: RetentionBlob } | null)?.retention ??
+        {}) as RetentionBlob;
+      if (retention.pushPrefs?.kudos === false) {
+        skipped += 1;
+        continue;
+      }
+      const r = await notifyUserPush({
+        userId,
+        category: "kudos",
+        title: "Seu clube treinou",
+        body: `${workouts} treino${workouts === 1 ? "" : "s"} hoje em ${club.name ?? "seu clube"} — veja o feed.`,
         respectQuietHours: true,
       });
       sent += r.sent;

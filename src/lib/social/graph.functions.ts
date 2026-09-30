@@ -26,6 +26,20 @@ export const getForYouFeedFn = createServerFn({ method: "POST" })
     return getForYouFeedServer(data.deviceId, data.limit, { goal: data.goal, level: data.level });
   });
 
+export const getFollowingFeedFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => {
+    const base = parseDevice(input);
+    const limit = Number((input as { limit?: number } | null)?.limit ?? 30);
+    return {
+      ...base,
+      limit: Number.isFinite(limit) ? Math.min(50, Math.max(1, limit)) : 30,
+    };
+  })
+  .handler(async ({ data }) => {
+    const { getFollowingFeedServer } = await import("@/lib/social/graph.server");
+    return getFollowingFeedServer(data.deviceId, data.limit);
+  });
+
 export const getSocialProfileFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
     const base = parseDevice(input);

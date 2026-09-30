@@ -129,8 +129,9 @@ export const Route = createFileRoute("/api/shopify/webhook")({
 
         if (isPaid) {
           const magicToken = crypto.randomUUID();
+          const { ACCESS_PURCHASE_WINDOW_DAYS } = await import("@/lib/access-window");
           const expires = new Date();
-          expires.setDate(expires.getDate() + 30);
+          expires.setDate(expires.getDate() + ACCESS_PURCHASE_WINDOW_DAYS);
 
           try {
             await upsertEntitlementEmail({
@@ -182,6 +183,8 @@ export const Route = createFileRoute("/api/shopify/webhook")({
               orderId: snapshot.orderId,
               productIds: snapshot.productIds,
               topic,
+              accessLinkReady: true,
+              magicExpiresAt: expires.toISOString(),
             },
             idempotencyKey: `purchase:${snapshot.orderId ?? payloadHash}`,
           });
@@ -243,23 +246,36 @@ async function stampOrderMagicUrl(orderId: string, magicUrl: string): Promise<vo
   const version = process.env["SHOPIFY_API_VERSION"] ?? "2025-01";
   if (!domain || !token) return;
 
-  // Fetch existing note_attributes to avoid wiping other attrs
+  // Fetch existing note_attributes / note to avoid wiping other attrs
   let existing: Array<{ name: string; value: string }> = [];
+  let existingNote = "";
   try {
     const getRes = await fetch(`https://${domain}/admin/api/${version}/orders/${orderId}.json`, {
       headers: { "X-Shopify-Access-Token": token },
     });
     if (getRes.ok) {
       const json = (await getRes.json()) as {
-        order?: { note_attributes?: Array<{ name?: string; value?: string }> };
+        order?: {
+          note?: string | null;
+          note_attributes?: Array<{ name?: string; value?: string }>;
+        };
       };
       existing = (json.order?.note_attributes ?? [])
-        .filter((a) => a.name && a.name !== "companion_access_url")
+        .filter((a) => a.name && a.name !== "companion_access_url" && a.name !== "soldiers_app_url")
         .map((a) => ({ name: String(a.name), value: String(a.value ?? "") }));
+      existingNote = String(json.order?.note ?? "");
     }
   } catch {
     /* best-effort */
   }
+
+  const noteLine = `Soldiers Training — liberar acesso: ${magicUrl}`;
+  const noteWithoutOld = existingNote
+    .split("\n")
+    .filter((l) => !l.includes("/acesso?token=") && !l.includes("Soldiers Training — liberar acesso"))
+    .join("\n")
+    .trim();
+  const nextNote = noteWithoutOld ? `${noteWithoutOld}\n${noteLine}` : noteLine;
 
   const res = await fetch(`https://${domain}/admin/api/${version}/orders/${orderId}.json`, {
     method: "PUT",
@@ -270,9 +286,11 @@ async function stampOrderMagicUrl(orderId: string, magicUrl: string): Promise<vo
     body: JSON.stringify({
       order: {
         id: orderId,
+        note: nextNote,
         note_attributes: [
           ...existing,
           { name: "companion_access_url", value: magicUrl },
+          { name: "soldiers_app_url", value: magicUrl },
         ],
       },
     }),

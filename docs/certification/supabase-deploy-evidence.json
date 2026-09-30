@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-09-30T00:20:16.000Z",
+  "checked_at": "2026-09-30T04:46:30.015Z",
   "project_ref": "zphtvrsxlhfgltwgbreu",
   "project_name": "APP",
   "cli_linked": true,
@@ -8,27 +8,28 @@
   "db_push_dry_run": "upToDate",
   "db_push": "upToDate",
   "bundles_executed": [],
+  "edge_functions": [],
+  "storage_buckets": ["soldiers-media", "progress-photos", "checkins"],
   "rag_seed": {
     "ok": true,
     "documents": 85,
     "chunks": 430,
     "store_id": "supabase_pgvector_v1",
-    "env": "production"
+    "env": "production",
+    "idempotent_reseed_ok": true
   },
   "database_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-09-30T00:18:35.409Z"
+    "checked_at": "2026-09-30T04:45:26.763Z"
   },
   "rate_limit_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-09-30T00:20:29.524Z"
+    "checked_at": "2026-09-30T04:46:30.015Z"
   },
   "service_role_smoke": {
     "ai_schema_inventory_probe": {
-      "tables": 11,
-      "extensions": ["vector"],
       "ok": true
     },
     "ai_rate_limit_consume": {

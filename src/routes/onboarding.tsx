@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SoldiersLogo } from "@/components/soldiers-logo";
-import { EXERCISES, type Joint } from "@/data/exercises";
+import { type Joint } from "@/data/exercises";
 import {
   GOAL_LABEL,
   GYM_GEAR_LABEL,
@@ -20,6 +20,11 @@ import {
   type Profile,
 } from "@/lib/types";
 import { SESSION_DURATION_LABEL, SESSION_DURATION_OPTIONS } from "@/lib/engine/session-time";
+import {
+  buildNutritionProfileFromFlags,
+  FOOD_RESTRICTION_OPTIONS,
+} from "@/lib/engine/nutrition-profile";
+import { isBodyValidForSave, isOnboardingFullyComplete } from "@/lib/profile-readiness";
 import { defaultInventory, GYM_GEAR_OPTIONS } from "@/lib/training/inventory";
 import { resolveTrainingWeekdays, WEEKDAY_LABELS } from "@/lib/training/weekdays";
 import { useStore } from "@/lib/store";
@@ -31,7 +36,7 @@ export const Route = createFileRoute("/onboarding")({
       { title: "Monte seu treino — Soldiers Training" },
       {
         name: "description",
-        content: "Objetivo, rotina, equipamentos, preferências e corpo — monte seu treino.",
+        content: "Objetivo, rotina, equipamentos, corpo e nutrição — monte seu plano.",
       },
       { property: "og:title", content: "Monte seu treino de performance" },
       { property: "og:description", content: "Poucos passos e o plano do dia está pronto." },
@@ -40,7 +45,9 @@ export const Route = createFileRoute("/onboarding")({
   component: Onboarding,
 });
 
-const STEPS = ["Objetivo", "Rotina", "Equipamentos", "Preferências", "Corpo", "Resumo"] as const;
+const STEPS = ["Objetivo", "Equipamentos", "Corpo e Nutri", "Resumo"] as const;
+const BODY_STEP = 2;
+const SUMMARY_STEP = 3;
 
 const JOINT_OPTIONS: { id: Joint; label: string }[] = [
   { id: "joelho", label: "Joelho" },
@@ -49,11 +56,9 @@ const JOINT_OPTIONS: { id: Joint; label: string }[] = [
   { id: "punho", label: "Punho" },
 ];
 
-const ONBOARDING_EXERCISE_POOL = EXERCISES.filter((e) => e.unit === "kg").slice(0, 12);
-
 function Onboarding() {
   const navigate = useNavigate();
-  const { state, setProfile, acceptLegal, setExercisePreference } = useStore();
+  const { state, setProfile, acceptLegal } = useStore();
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
   const [name, setName] = useState(state.shopifyDisplayName || state.profile?.name || "");
@@ -66,6 +71,10 @@ function Onboarding() {
     if (ids.includes("multivitaminico") || ids.includes("omega-3")) return "saude" as Goal;
     return "massa" as Goal;
   }, [state.purchaseProductIds]);
+  const seedCountWhey = useMemo(() => {
+    const ids = state.purchaseProductIds ?? [];
+    return ids.includes("whey-protein") || ids.includes("beef-protein");
+  }, [state.purchaseProductIds]);
   const [goal, setGoal] = useState<Goal>(suggestedGoal);
   const [level, setLevel] = useState<Level>("iniciante");
   const [daysPerWeek, setDays] = useState(3);
@@ -73,13 +82,16 @@ function Onboarding() {
   const [typicalSessionMin, setTypicalSessionMin] = useState<number>(60);
   const [equipment, setEquipment] = useState<Equipment>("academia");
   const [inventory, setInventory] = useState<GymGear[]>(() => defaultInventory("academia"));
-  const [likedIds, setLikedIds] = useState<string[]>([]);
-  const [avoidIds, setAvoidIds] = useState<string[]>([]);
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [age, setAge] = useState(0);
   const [heightCm, setHeightCm] = useState(0);
   const [weightKg, setWeightKg] = useState(0);
   const [sex, setSex] = useState<BiologicalSex | "">("");
+  const [healthAck, setHealthAck] = useState(Boolean(state.healthPurposeAckAt));
+  const [skipBreakfast, setSkipBreakfast] = useState(false);
+  const [lunchOutOften, setLunchOutOften] = useState(false);
+  const [foodRestrictions, setFoodRestrictions] = useState<string[]>([]);
+  const legalAlreadyOk = Boolean(state.termsAcceptedAt && state.privacyAcceptedAt);
   const [termsAck, setTermsAck] = useState(Boolean(state.termsAcceptedAt));
   const [privacyAck, setPrivacyAck] = useState(Boolean(state.privacyAcceptedAt));
 
@@ -88,49 +100,64 @@ function Onboarding() {
   }, [equipment]);
 
   const lastStep = step === STEPS.length - 1;
+  const bodyValid = isBodyValidForSave(age, heightCm, weightKg);
 
-  const buildProfile = (): Profile => ({
-    name: name.trim(),
-    goal,
-    level,
-    daysPerWeek: trainingWeekdays.length >= 2 ? trainingWeekdays.length : daysPerWeek,
-    age: age > 0 ? age : 0,
-    heightCm: heightCm > 0 ? heightCm : 0,
-    weightKg: weightKg > 0 ? weightKg : 0,
-    ...(sex ? { sex } : {}),
-    equipment,
-    restrictions,
-    trainingWeekdays: resolveTrainingWeekdays({
-      daysPerWeek,
-      trainingWeekdays,
-    }),
-    equipmentInventory: inventory.length ? inventory : defaultInventory(equipment),
-    typicalSessionMin,
-    timezone: detectClientTimezone(),
-    onboardingComplete: age > 0 || heightCm > 0 || weightKg > 0 || Boolean(sex),
-    createdAt: new Date().toISOString(),
-  });
+  const buildProfile = (): Profile => {
+    const nutritionProfile = buildNutritionProfileFromFlags({
+      skipBreakfast,
+      lunchOutOften,
+      existing: {
+        foodPreferences: [],
+        foodRestrictions,
+        ...(seedCountWhey ? { countWheyInMacros: true } : {}),
+      },
+    });
+    const profile: Profile = {
+      name: name.trim(),
+      goal,
+      level,
+      daysPerWeek: trainingWeekdays.length >= 2 ? trainingWeekdays.length : daysPerWeek,
+      age: age > 0 ? age : 0,
+      heightCm: heightCm > 0 ? heightCm : 0,
+      weightKg: weightKg > 0 ? weightKg : 0,
+      ...(sex ? { sex } : {}),
+      equipment,
+      restrictions,
+      trainingWeekdays: resolveTrainingWeekdays({
+        daysPerWeek,
+        trainingWeekdays,
+      }),
+      equipmentInventory: inventory.length ? inventory : defaultInventory(equipment),
+      typicalSessionMin,
+      timezone: detectClientTimezone(),
+      skipBreakfast,
+      lunchOutOften,
+      nutritionProfile,
+      createdAt: new Date().toISOString(),
+    };
+    profile.onboardingComplete = isOnboardingFullyComplete(profile);
+    return profile;
+  };
 
   const finish = () => {
-    if (!name.trim() || !termsAck || !privacyAck) return;
+    if (!name.trim() || !termsAck || !privacyAck || !bodyValid || !healthAck) return;
     acceptLegal("terms");
     acceptLegal("privacy");
+    acceptLegal("health");
     setProfile(buildProfile());
-    for (const id of likedIds) setExercisePreference(id, "preferred");
-    for (const id of avoidIds) setExercisePreference(id, "avoided");
     navigate({ to: "/" });
   };
 
   const canContinue =
     step === 0
       ? name.trim().length >= 2
-      : step === 2
+      : step === 1
         ? inventory.length > 0
-        : step === 5
-          ? termsAck && privacyAck
-          : true;
+        : step === BODY_STEP
+          ? bodyValid && healthAck
+          : termsAck && privacyAck;
 
-  const startWithDefaults = () => {
+  const applyTrainingDefaults = () => {
     setGoal(suggestedGoal);
     setLevel("iniciante");
     setDays(3);
@@ -138,26 +165,17 @@ function Onboarding() {
     setTypicalSessionMin(60);
     setEquipment("academia");
     setInventory(defaultInventory("academia"));
+    setRestrictions([]);
+    setSkipBreakfast(false);
+    setLunchOutOften(false);
+    setFoodRestrictions([]);
+  };
+
+  /** Fast-path: skip to Corpo+Nutri — still need body for calibrated macros. */
+  const startWithDefaults = () => {
+    applyTrainingDefaults();
     setStarted(true);
-    setStep(STEPS.length - 1);
-  };
-
-  const toggleLike = (id: string) => {
-    setLikedIds((prev) => {
-      const on = prev.includes(id);
-      const next = on ? prev.filter((x) => x !== id) : [...prev, id];
-      if (!on) setAvoidIds((a) => a.filter((x) => x !== id));
-      return next;
-    });
-  };
-
-  const toggleAvoid = (id: string) => {
-    setAvoidIds((prev) => {
-      const on = prev.includes(id);
-      const next = on ? prev.filter((x) => x !== id) : [...prev, id];
-      if (!on) setLikedIds((a) => a.filter((x) => x !== id));
-      return next;
-    });
+    setStep(BODY_STEP);
   };
 
   if (!started) {
@@ -171,11 +189,11 @@ function Onboarding() {
           <div className="pb-8">
             <p className="eyebrow">Soldiers Training</p>
             <h1 className="mt-3 text-display text-4xl leading-none">
-              Seu treino do dia em
+              Seu plano do dia em
               <span className="text-glow block text-primary"> poucos passos</span>
             </h1>
             <p className="mt-4 text-sm text-muted-foreground">
-              Objetivo, rotina, equipamentos, preferências e corpo (opcional). Depois: Montar meu treino.
+              Treino, equipamentos, corpo e nutrição. Depois: Montar meu treino.
             </p>
             <Button
               size="lg"
@@ -224,11 +242,11 @@ function Onboarding() {
 
         {step === 0 && (
           <section className="mt-3">
-            <h1 className="text-3xl">Qual é o seu objetivo?</h1>
+            <h1 className="text-3xl">Objetivo e rotina</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {state.purchaseProductIds?.length
                 ? `Sugerimos ${GOAL_LABEL[suggestedGoal]} com base na sua compra Soldiers — você pode mudar.`
-                : "Isso define o volume, as repetições e a progressão do seu plano."}
+                : "Isso define volume, dias e a duração do treino do dia."}
             </p>
             <div className="mt-5 space-y-2">
               {(Object.keys(GOAL_LABEL) as Goal[]).map((g) => (
@@ -251,14 +269,8 @@ function Onboarding() {
                 <p className="mt-1 text-xs text-destructive">Use pelo menos 2 caracteres</p>
               ) : null}
             </div>
-          </section>
-        )}
-
-        {step === 1 && (
-          <section className="mt-3">
-            <h1 className="text-3xl">Sua rotina</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Nível, dias, tempo e onde você treina — o plano segue isso.</p>
-            <div className="mt-5 space-y-2">
+            <h2 className="mt-8 text-xl">Nível</h2>
+            <div className="mt-3 space-y-2">
               {(Object.keys(LEVEL_LABEL) as Level[]).map((l) => (
                 <OptionCard
                   key={l}
@@ -330,11 +342,11 @@ function Onboarding() {
           </section>
         )}
 
-        {step === 2 && (
+        {step === 1 && (
           <section className="mt-3">
-            <h1 className="text-3xl">Quais equipamentos?</h1>
+            <h1 className="text-3xl">Equipamentos</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Confirmamos o que você tem — o plano só usa o que está marcado.
+              O plano só usa o que está marcado. Restrições articulares são opcionais.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               {GYM_GEAR_OPTIONS.map((g) => {
@@ -358,54 +370,7 @@ function Onboarding() {
             {inventory.length === 0 ? (
               <p className="mt-3 text-xs text-destructive">Marque pelo menos um equipamento.</p>
             ) : null}
-          </section>
-        )}
-
-        {step === 3 && (
-          <section className="mt-3">
-            <h1 className="text-3xl">Preferências</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Favoritos, o que evitar e restrições articulares — opcional, ajustável depois.
-            </p>
-            <h2 className="mt-6 text-lg">Exercícios favoritos</h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {ONBOARDING_EXERCISE_POOL.map((ex) => {
-                const on = likedIds.includes(ex.id);
-                return (
-                  <button
-                    key={`like-${ex.id}`}
-                    type="button"
-                    onClick={() => toggleLike(ex.id)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground"
-                    }`}
-                  >
-                    {ex.name}
-                  </button>
-                );
-              })}
-            </div>
-            <h2 className="mt-6 text-lg">Prefiro evitar</h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {ONBOARDING_EXERCISE_POOL.map((ex) => {
-                const on = avoidIds.includes(ex.id);
-                return (
-                  <button
-                    key={`avoid-${ex.id}`}
-                    type="button"
-                    onClick={() => toggleAvoid(ex.id)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      on
-                        ? "border-destructive/60 bg-destructive/15 text-destructive"
-                        : "border-border bg-card text-muted-foreground"
-                    }`}
-                  >
-                    {ex.name}
-                  </button>
-                );
-              })}
-            </div>
-            <h2 className="mt-6 text-lg">Restrições (articulações)</h2>
+            <h2 className="mt-8 text-lg">Restrições (articulações)</h2>
             <div className="mt-2 flex flex-wrap gap-2">
               {JOINT_OPTIONS.map((j) => {
                 const on = restrictions.includes(j.id);
@@ -428,51 +393,58 @@ function Onboarding() {
           </section>
         )}
 
-        {step === 4 && (
+        {step === BODY_STEP && (
           <section className="mt-3">
-            <h1 className="text-3xl">Seu corpo</h1>
+            <h1 className="text-3xl">Corpo e nutrição</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Opcional — melhora metas nutricionais e estimativas. Dados sensíveis ficam privados por padrão.
+              {goal === "gordura"
+                ? "Déficit alinhado ao seu objetivo — idade, altura e peso calibram proteína e calorias."
+                : "Idade, altura e peso calibram proteína, água e refeições. Dados ficam privados."}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Idade</Label>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Idade *</Label>
                 <Input
                   type="number"
-                  min={0}
-                  max={120}
+                  min={16}
+                  max={80}
                   value={age || ""}
                   onChange={(e) => setAge(Number(e.target.value) || 0)}
-                  placeholder="—"
+                  placeholder="anos"
                   className="mt-1.5 h-12"
                 />
               </div>
               <div>
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Altura (cm)</Label>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Altura (cm) *</Label>
                 <Input
                   type="number"
-                  min={0}
-                  max={250}
+                  min={130}
+                  max={220}
                   value={heightCm || ""}
                   onChange={(e) => setHeightCm(Number(e.target.value) || 0)}
-                  placeholder="—"
+                  placeholder="cm"
                   className="mt-1.5 h-12"
                 />
               </div>
               <div>
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Peso (kg)</Label>
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Peso (kg) *</Label>
                 <Input
                   type="number"
-                  min={0}
-                  max={400}
+                  min={35}
+                  max={250}
                   step={0.1}
                   value={weightKg || ""}
                   onChange={(e) => setWeightKg(Number(e.target.value) || 0)}
-                  placeholder="—"
+                  placeholder="kg"
                   className="mt-1.5 h-12"
                 />
               </div>
             </div>
+            {(age > 0 || heightCm > 0 || weightKg > 0) && !bodyValid ? (
+              <p className="mt-2 text-xs text-destructive">
+                Idade 16–80, altura 130–220 cm, peso 35–250 kg.
+              </p>
+            ) : null}
             <h2 className="mt-6 text-lg">Sexo (opcional)</h2>
             <div className="mt-2 space-y-2">
               {(Object.keys(SEX_LABEL) as BiologicalSex[]).map((s) => (
@@ -484,13 +456,71 @@ function Onboarding() {
                 />
               ))}
             </div>
+            <label className="mt-4 flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-primary"
+                checked={healthAck}
+                onChange={(e) => setHealthAck(e.target.checked)}
+              />
+              <span className="text-muted-foreground">
+                Entendo que peso e medidas servem só para nutrição e água no app. Não saem no social e
+                não são dado clínico.
+              </span>
+            </label>
+
+            <h2 className="mt-8 text-xl">Hábitos alimentares</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ajusta slots de refeição e presets práticos.
+              {seedCountWhey ? " Whey/beef da compra entra na proteína do dia." : ""}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSkipBreakfast((v) => !v)}
+              className={`mt-4 w-full rounded-xl border px-3 py-3 text-left text-sm ${
+                skipBreakfast ? "border-primary bg-primary/10" : "border-white/10"
+              }`}
+            >
+              Pulo o café da manhã
+            </button>
+            <button
+              type="button"
+              onClick={() => setLunchOutOften((v) => !v)}
+              className={`mt-2 w-full rounded-xl border px-3 py-3 text-left text-sm ${
+                lunchOutOften ? "border-primary bg-primary/10" : "border-white/10"
+              }`}
+            >
+              Almoço fora com frequência
+            </button>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Restrições alimentares
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {FOOD_RESTRICTION_OPTIONS.map((r) => {
+                const on = foodRestrictions.includes(r);
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() =>
+                      setFoodRestrictions((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      on ? "border-primary bg-primary/15 text-primary" : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
           </section>
         )}
 
-        {step === 5 && (
+        {step === SUMMARY_STEP && (
           <section className="mt-3">
             <h1 className="text-3xl">Seu perfil está pronto</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Confira o resumo e monte seu treino.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Confira treino e nutrição — depois montamos o plano do dia.</p>
             <dl className="mt-6 space-y-3">
               <ReadyRow label="Objetivo" value={GOAL_LABEL[goal]} />
               <ReadyRow label="Nível" value={LEVEL_LABEL[level]} />
@@ -500,56 +530,65 @@ function Onboarding() {
                 value={SESSION_DURATION_LABEL[(typicalSessionMin as 30 | 45 | 60 | 90) ?? 60]}
               />
               <ReadyRow label="Local" value={equipment === "academia" ? "Academia" : "Casa"} />
-              {likedIds.length ? (
-                <ReadyRow label="Favoritos" value={`${likedIds.length} exercício(s)`} />
-              ) : null}
-              {avoidIds.length ? <ReadyRow label="Evitar" value={`${avoidIds.length} exercício(s)`} /> : null}
-              {age > 0 || heightCm > 0 || weightKg > 0 || sex ? (
-                <ReadyRow
-                  label="Corpo"
-                  value={[
-                    age > 0 ? `${age} anos` : null,
-                    heightCm > 0 ? `${heightCm} cm` : null,
-                    weightKg > 0 ? `${weightKg} kg` : null,
-                    sex ? SEX_LABEL[sex] : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                />
-              ) : null}
+              <ReadyRow
+                label="Corpo"
+                value={[
+                  `${age} anos`,
+                  `${heightCm} cm`,
+                  `${weightKg} kg`,
+                  sex ? SEX_LABEL[sex] : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
+              <ReadyRow
+                label="Nutrição"
+                value={[
+                  skipBreakfast ? "Sem café" : "Com café",
+                  lunchOutOften ? "Almoço fora" : null,
+                  foodRestrictions.length ? foodRestrictions.join(", ") : "Sem restrições",
+                  seedCountWhey ? "Whey na proteína" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
             </dl>
-            <div className="mt-6 space-y-3">
-              <label className="flex items-start gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4 accent-primary"
-                  checked={termsAck}
-                  onChange={(e) => setTermsAck(e.target.checked)}
-                />
-                <span>
-                  Aceito os{" "}
-                  <Link to="/termos" className="text-primary underline">
-                    Termos de uso
-                  </Link>
-                  .
-                </span>
-              </label>
-              <label className="flex items-start gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4 accent-primary"
-                  checked={privacyAck}
-                  onChange={(e) => setPrivacyAck(e.target.checked)}
-                />
-                <span>
-                  Li a{" "}
-                  <Link to="/privacidade" className="text-primary underline">
-                    Política de privacidade
-                  </Link>
-                  .
-                </span>
-              </label>
-            </div>
+            {!legalAlreadyOk ? (
+              <div className="mt-6 space-y-3">
+                <label className="flex items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 accent-primary"
+                    checked={termsAck}
+                    onChange={(e) => setTermsAck(e.target.checked)}
+                  />
+                  <span>
+                    Aceito os{" "}
+                    <Link to="/termos" className="text-primary underline">
+                      Termos de uso
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 accent-primary"
+                    checked={privacyAck}
+                    onChange={(e) => setPrivacyAck(e.target.checked)}
+                  />
+                  <span>
+                    Li a{" "}
+                    <Link to="/privacidade" className="text-primary underline">
+                      Política de privacidade
+                    </Link>
+                    .
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <p className="mt-6 text-xs text-muted-foreground">Termos e privacidade já aceitos no cadastro.</p>
+            )}
           </section>
         )}
 
@@ -623,6 +662,3 @@ function OptionCard({
     </button>
   );
 }
-
-// Silence unused type if tree-shaken oddly in some builds
-void (0 as unknown as ExercisePreferenceValue);

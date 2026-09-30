@@ -47,6 +47,9 @@ export type LegacyEventAlias = keyof typeof LEGACY_EVENT_ALIASES;
 export const EXTENDED_EVENT_TYPES = [
   "user_created",
   "onboarding_completed",
+  "activation_ready",
+  "nutrition_ready",
+  "profile_enriched",
   "goal_changed",
   "access_granted",
   "access_denied",
@@ -59,6 +62,11 @@ export const EXTENDED_EVENT_TYPES = [
   "deload_applied",
   "measurements_logged",
   "progress_photo_uploaded",
+  "home_block_impression",
+  "home_block_click",
+  "mais_aberto",
+  "checkin_opened",
+  "coach_teaser_click",
 ] as const;
 
 export type ExtendedEventType = (typeof EXTENDED_EVENT_TYPES)[number];

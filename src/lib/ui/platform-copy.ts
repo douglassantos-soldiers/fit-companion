@@ -45,15 +45,30 @@ export const BARCODE_EMPTY_INVALID = "Digite um EAN-8 ou EAN-13 da embalagem.";
 
 export const ACCESS_PAYWALL_TITLE_STALE = "Sua janela de 40 dias acabou";
 export const ACCESS_PAYWALL_TITLE_NONE = "Libere o treino do dia";
+export const ACCESS_PAYWALL_TITLE_NEED_AUTH = "Quase lá — entre com o e-mail da compra";
+export const ACCESS_PAYWALL_TITLE_CONFIG =
+  "Não foi possível conferir a loja agora";
 export const ACCESS_PAYWALL_BODY_STALE =
   "Conta e progresso continuam guardados. Uma nova compra no mesmo e-mail reabre o app.";
 export const ACCESS_PAYWALL_BODY_NONE =
   "Treino do dia, proteína, coach e streak — inclusos na sua compra Soldiers.";
+export const ACCESS_PAYWALL_BODY_NEED_AUTH =
+  "Use exatamente o e-mail da loja Soldiers. Depois liberamos o treino do dia.";
+export const ACCESS_PAYWALL_BODY_CONFIG =
+  "Tente de novo em instantes. Se continuar, fale com o suporte Soldiers.";
 export const ACCESS_PAYWALL_BENEFITS = [
   "Treino do dia (incluindo Express)",
   "Coach e plano vivo",
   "Streak, missões e ranking",
 ] as const;
+export const ACCESS_SUPPORT_MAILTO = "mailto:privacy@soldiersnutrition.com.br?subject=Acesso%20Soldiers%20Training";
+export const ACCESS_SUPPORT_LABEL = "Falar com o suporte";
+export const ACCESS_SWITCH_EMAIL_LABEL = "Trocar e-mail / sair";
+export const ACCESS_STATUS_LINK = "Ver status do acesso";
+export const ACCESS_NOT_CONFIGURED =
+  "A conferência da loja está indisponível no momento — não é um problema do seu e-mail.";
+export const ACCESS_VERIFY_PRIMARY = "Já comprei — verificar agora";
+export const ACCESS_VERIFY_RETURN = "Voltei da loja — verificar agora";
 
 export const PERFORMANCE_LOCK_TITLE = "Desafios da liga Performance";
 export const PERFORMANCE_LOCK_BENEFITS = [

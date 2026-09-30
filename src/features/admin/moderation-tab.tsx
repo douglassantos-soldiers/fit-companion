@@ -6,6 +6,7 @@ import type { ContentReportRow } from "@/lib/moderation.server";
 export function ModerationTab({
   reports,
   busy,
+  loadError,
   onReload,
   onResolve,
   onHide,
@@ -13,6 +14,7 @@ export function ModerationTab({
 }: {
   reports: ContentReportRow[];
   busy: boolean;
+  loadError: string | null;
   onReload: () => void;
   onResolve: (reportId: string, status: "resolved" | "dismissed", hideEvent: boolean) => void;
   onHide: (eventId: string) => void;
@@ -25,11 +27,16 @@ export function ModerationTab({
       <Button variant="secondary" onClick={onReload} disabled={busy}>
         Recarregar fila
       </Button>
+      {loadError ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {loadError}
+        </p>
+      ) : null}
       <div className="flex gap-2">
         <Input
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
-          placeholder="Ocultar por event id"
+          placeholder="Ocultar por event id (fallback)"
         />
         <Button
           variant="outline"
@@ -43,7 +50,7 @@ export function ModerationTab({
         <Input
           value={commentId}
           onChange={(e) => setCommentId(e.target.value)}
-          placeholder="Ocultar por comment id"
+          placeholder="Ocultar por comment id (fallback)"
         />
         <Button
           variant="outline"
@@ -65,6 +72,7 @@ export function ModerationTab({
                 {r.reason} · {new Date(r.createdAt).toLocaleString("pt-BR")}
                 {r.hiddenAt ? " · já oculto" : ""}
               </p>
+              <p className="truncate text-[0.65rem] text-muted-foreground">id: {r.targetId}</p>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy} onClick={() => onResolve(r.id, "resolved", true)}>
                   Ocultar + resolver
@@ -77,6 +85,26 @@ export function ModerationTab({
                 >
                   Dispensar
                 </Button>
+                {r.targetKind === "activity_event" && !r.hiddenAt ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => onHide(r.targetId)}
+                  >
+                    Ocultar evento
+                  </Button>
+                ) : null}
+                {r.targetKind === "comment" && onHideComment ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => onHideComment(r.targetId)}
+                  >
+                    Ocultar comentário
+                  </Button>
+                ) : null}
               </div>
             </li>
           ))}
@@ -85,4 +113,3 @@ export function ModerationTab({
     </div>
   );
 }
-

@@ -111,7 +111,10 @@ export interface Profile {
   equipmentInventory?: GymGear[];
   /** Habitual session length in minutes (30/45/60/90). Seeds check-in availableMin. */
   typicalSessionMin?: number;
-  /** False after fast-path onboarding until body/sleep/blocker are filled */
+  /**
+   * True when activationReady + nutritionReady (body + nutritionProfile/flags).
+   * Sleep/blocker remain progressive (recoveryReady) and do not gate this flag.
+   */
   onboardingComplete?: boolean;
 }
 
@@ -621,6 +624,8 @@ export interface AppState {
   coachNudgeDismissedAt: string | null;
   /** Last Coach overlay shown (ISO). Cap 1/day. */
   coachNudgeShownAt: string | null;
+  /** Pending D+1 follow-up after accepting a coach proposal. */
+  coachProposalFollowUp: import("@/lib/coach/proposal-followup").CoachProposalFollowUp | null;
 }
 
 export const emptyState: AppState = {
@@ -708,6 +713,7 @@ export const emptyState: AppState = {
   hasFollowedSomeone: false,
   coachNudgeDismissedAt: null,
   coachNudgeShownAt: null,
+  coachProposalFollowUp: null,
 };
 
 export const DAILY_XP_GOAL = 20;

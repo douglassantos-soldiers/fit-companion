@@ -11,7 +11,9 @@ export type QuestKind =
   | "coach"
   | "meals2"
   | "supplements"
-  | "xp_goal";
+  | "xp_goal"
+  | "share"
+  | "follow";
 
 export interface DailyQuest {
   id: string;
@@ -25,6 +27,8 @@ export const DAILY_QUEST_POOL: DailyQuest[] = [
   { id: "q-protein", kind: "protein80", title: "Bata 80% da proteína", target: 1 },
   { id: "q-water", kind: "water", title: "Bata a meta de água", target: 1 },
   { id: "q-kudos", kind: "kudos", title: "Dê 1 kudos no clube", target: 1 },
+  { id: "q-share", kind: "share", title: "Publique 1 card no feed", target: 1 },
+  { id: "q-follow", kind: "follow", title: "Siga 1 pessoa", target: 1 },
   { id: "q-coach", kind: "coach", title: "Abra o Coach", target: 1 },
   { id: "q-meals", kind: "meals2", title: "Logue 2 refeições", target: 2 },
   { id: "q-supp", kind: "supplements", title: "Complete os suplementos", target: 1 },
@@ -62,6 +66,7 @@ export function pickDailyQuests(
   date: string,
   deviceId: string,
   behaviorCtx?: BehaviorSelectContext | null,
+  opts?: { preferSocialOnboarding?: boolean },
 ): DailyQuest[] {
   const triggerSeed = behaviorCtx?.triggers
     .filter((t) => t.active)
@@ -81,11 +86,15 @@ export function pickDailyQuests(
   }
 
   const prefer = preferredKinds(behaviorCtx);
+  if (opts?.preferSocialOnboarding) {
+    prefer.push("follow", "share", "kudos");
+  }
   if (prefer.length) {
+    const preferSet = new Set(prefer);
     const boosted: DailyQuest[] = [];
     const rest: DailyQuest[] = [];
     for (const q of pool) {
-      if (prefer.includes(q.kind)) boosted.push(q);
+      if (preferSet.has(q.kind)) boosted.push(q);
       else rest.push(q);
     }
     const merged = [...boosted, ...rest];
@@ -101,7 +110,9 @@ export function ensureDailyQuests(
   behaviorCtx?: BehaviorSelectContext | null,
 ): AppState {
   if (state.dailyQuestDate === date && (state.dailyQuestIds?.length ?? 0) === 3) return state;
-  const picked = pickDailyQuests(date, deviceId, behaviorCtx);
+  const picked = pickDailyQuests(date, deviceId, behaviorCtx, {
+    preferSocialOnboarding: !state.hasFollowedSomeone,
+  });
   return {
     ...state,
     dailyQuestDate: date,
@@ -135,6 +146,8 @@ export function questProgressValue(state: AppState, quest: DailyQuest, date = to
       return (state.xpByDate?.[date] ?? 0) >= 20 ? 1 : 0;
     case "kudos":
     case "coach":
+    case "share":
+    case "follow":
       return Math.min(quest.target, manual);
     default:
       return manual;

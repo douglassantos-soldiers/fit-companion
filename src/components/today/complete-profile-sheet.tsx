@@ -9,6 +9,14 @@ import {
   type Profile,
 } from "@/lib/types";
 import { buildNutritionProfileFromFlags, FOOD_RESTRICTION_OPTIONS } from "@/lib/engine/nutrition-profile";
+import {
+  enrichmentPriority,
+  isActivationReady,
+  isBodyValidForSave,
+  isNutritionReady,
+  isOnboardingFullyComplete,
+  isRecoveryReady,
+} from "@/lib/profile-readiness";
 import { useStore } from "@/lib/store";
 
 const BLOCKERS = Object.keys(BLOCKER_LABEL) as PrimaryBlocker[];
@@ -25,6 +33,11 @@ function parseWeight(raw: string): number | null {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * Progressive enrichment after onboarding.
+ * New users usually only need recovery (sleep/blocker).
+ * Legacy users missing body/nutrition still see those fields.
+ */
 export function CompleteProfileSheet({
   open,
   profile,
@@ -37,7 +50,11 @@ export function CompleteProfileSheet({
   onSave: (patch: Partial<Profile>) => void;
 }) {
   const { acceptLegal } = useStore();
-  const needsBody = !(profile.age >= 16 && profile.heightCm >= 130 && profile.weightKg >= 35);
+  const priority = enrichmentPriority(profile);
+  const needsBody = !isActivationReady(profile);
+  const needsNutrition = !isNutritionReady(profile);
+  const needsRecovery = !isRecoveryReady(profile);
+
   const [ageStr, setAgeStr] = useState(profile.age >= 16 ? String(profile.age) : "");
   const [heightStr, setHeightStr] = useState(profile.heightCm >= 130 ? String(profile.heightCm) : "");
   const [weightStr, setWeightStr] = useState(profile.weightKg >= 35 ? String(profile.weightKg) : "");
@@ -46,22 +63,37 @@ export function CompleteProfileSheet({
   const [primaryBlocker, setBlocker] = useState<PrimaryBlocker>(profile.primaryBlocker ?? "consistencia");
   const [skipBreakfast, setSkipBreakfast] = useState(profile.skipBreakfast === true);
   const [lunchOutOften, setLunchOutOften] = useState(profile.lunchOutOften === true);
-  const [foodRestrictions, setFoodRestrictions] = useState<string[]>(profile.nutritionProfile?.foodRestrictions ?? []);
+  const [foodRestrictions, setFoodRestrictions] = useState<string[]>(
+    profile.nutritionProfile?.foodRestrictions ?? [],
+  );
 
   const age = parseIntField(ageStr);
   const heightCm = parseIntField(heightStr);
   const weightKg = parseWeight(weightStr);
   const bodyValid =
-    age != null && age >= 16 && age <= 80 && heightCm != null && heightCm >= 130 && heightCm <= 220 && weightKg != null && weightKg >= 35 && weightKg <= 250;
+    age != null &&
+    heightCm != null &&
+    weightKg != null &&
+    isBodyValidForSave(age, heightCm, weightKg);
   const canSave = needsBody ? bodyValid && healthAck : true;
 
+  const title =
+    priority === "body"
+      ? "Completar corpo"
+      : priority === "nutrition"
+        ? "Completar nutrição"
+        : "Sono e bloqueio";
+
+  const blurb =
+    priority === "body"
+      ? "Idade, altura e peso calibram nutrição e água. Sem chute."
+      : priority === "nutrition"
+        ? "Hábitos alimentares ajustam refeições do plano."
+        : "Sono e o que mais te impede — o plano fica mais preciso.";
+
   return (
-    <SoldiersOverlay open={open} onClose={onClose} title="Completar perfil">
-      <p className="mb-4 text-sm text-muted-foreground">
-        {needsBody
-          ? "Idade, altura e peso calibram nutrição e cargas. Sem chute."
-          : "Sono e o que mais te impede — o corpo já está no perfil."}
-      </p>
+    <SoldiersOverlay open={open} onClose={onClose} title={title}>
+      <p className="mb-4 text-sm text-muted-foreground">{blurb}</p>
       <div className="space-y-3">
         {needsBody ? (
           <>
@@ -101,70 +133,82 @@ export function CompleteProfileSheet({
                 onChange={(e) => setHealthAck(e.target.checked)}
               />
               <span className="text-muted-foreground">
-                Entendo que peso e medidas servem só para nutrição e cargas no app. Não saem no social e
+                Entendo que peso e medidas servem só para nutrição e água no app. Não saem no social e
                 não são dado clínico.
               </span>
             </label>
           </>
         ) : null}
-        <NumberRow
-          label="Sono típico"
-          value={typicalSleepHours}
-          onChange={(n) => setSleep(Math.min(12, Math.max(4, n)))}
-          unit="h"
-        />
-        <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">O que mais te impede?</p>
-        <div className="flex flex-wrap gap-2">
-          {BLOCKERS.map((b) => (
+
+        {needsNutrition ? (
+          <>
             <button
-              key={b}
               type="button"
-              onClick={() => setBlocker(b)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                primaryBlocker === b ? "border-primary bg-primary/15 text-primary" : "border-white/10"
+              onClick={() => setSkipBreakfast((v) => !v)}
+              className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${
+                skipBreakfast ? "border-primary bg-primary/10" : "border-white/10"
               }`}
             >
-              {BLOCKER_LABEL[b]}
+              Pulo o café da manhã
             </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setSkipBreakfast((v) => !v)}
-          className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${
-            skipBreakfast ? "border-primary bg-primary/10" : "border-white/10"
-          }`}
-        >
-          Pulo o café da manhã
-        </button>
-        <button
-          type="button"
-          onClick={() => setLunchOutOften((v) => !v)}
-          className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${
-            lunchOutOften ? "border-primary bg-primary/10" : "border-white/10"
-          }`}
-        >
-          Almoço fora com frequência
-        </button>
-        <div className="flex flex-wrap gap-2">
-          {FOOD_RESTRICTION_OPTIONS.map((r) => {
-            const on = foodRestrictions.includes(r);
-            return (
-              <button
-                key={r}
-                type="button"
-                onClick={() =>
-                  setFoodRestrictions((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
-                }
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  on ? "border-primary bg-primary/15 text-primary" : "border-white/10"
-                }`}
-              >
-                {r}
-              </button>
-            );
-          })}
-        </div>
+            <button
+              type="button"
+              onClick={() => setLunchOutOften((v) => !v)}
+              className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${
+                lunchOutOften ? "border-primary bg-primary/10" : "border-white/10"
+              }`}
+            >
+              Almoço fora com frequência
+            </button>
+            <div className="flex flex-wrap gap-2">
+              {FOOD_RESTRICTION_OPTIONS.map((r) => {
+                const on = foodRestrictions.includes(r);
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() =>
+                      setFoodRestrictions((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      on ? "border-primary bg-primary/15 text-primary" : "border-white/10"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {needsRecovery || (!needsBody && !needsNutrition) ? (
+          <>
+            <NumberRow
+              label="Sono típico"
+              value={typicalSleepHours}
+              onChange={(n) => setSleep(Math.min(12, Math.max(4, n)))}
+              unit="h"
+            />
+            <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              O que mais te impede?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {BLOCKERS.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBlocker(b)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    primaryBlocker === b ? "border-primary bg-primary/15 text-primary" : "border-white/10"
+                  }`}
+                >
+                  {BLOCKER_LABEL[b]}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
       <Button
         className="mt-5 h-12 w-full font-bold uppercase tracking-wide"
@@ -172,15 +216,16 @@ export function CompleteProfileSheet({
         onClick={() => {
           if (!canSave) return;
           if (needsBody) acceptLegal("health");
-          onSave({
-            ...(needsBody && bodyValid
-              ? { age: age as number, heightCm: heightCm as number, weightKg: weightKg as number }
-              : {}),
-            typicalSleepHours,
-            primaryBlocker,
-            skipBreakfast,
-            lunchOutOften,
-            nutritionProfile: buildNutritionProfileFromFlags({
+          const patch: Partial<Profile> = {};
+          if (needsBody && bodyValid) {
+            patch.age = age as number;
+            patch.heightCm = heightCm as number;
+            patch.weightKg = weightKg as number;
+          }
+          if (needsNutrition) {
+            patch.skipBreakfast = skipBreakfast;
+            patch.lunchOutOften = lunchOutOften;
+            patch.nutritionProfile = buildNutritionProfileFromFlags({
               skipBreakfast,
               lunchOutOften,
               existing: {
@@ -188,9 +233,15 @@ export function CompleteProfileSheet({
                 foodRestrictions,
                 ...(profile.nutritionProfile?.countWheyInMacros ? { countWheyInMacros: true } : {}),
               },
-            }),
-            onboardingComplete: true,
-          });
+            });
+          }
+          if (needsRecovery || (!needsBody && !needsNutrition)) {
+            patch.typicalSleepHours = typicalSleepHours;
+            patch.primaryBlocker = primaryBlocker;
+          }
+          const merged = { ...profile, ...patch };
+          patch.onboardingComplete = isOnboardingFullyComplete(merged);
+          onSave(patch);
           onClose();
         }}
       >
@@ -222,11 +273,11 @@ function NumberField({
       </Label>
       <Input
         id={id}
-        inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 h-12"
+        className="mt-1.5 h-12"
+        inputMode="decimal"
       />
       {hint ? <p className="mt-1 text-xs text-destructive">{hint}</p> : null}
     </div>
@@ -245,17 +296,17 @@ function NumberRow({
   unit: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2">
-      <div>
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-[0.65rem] text-muted-foreground">{unit}</p>
-      </div>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
+      <span className="text-sm font-semibold">{label}</span>
       <div className="flex items-center gap-2">
-        <Button size="icon" variant="secondary" className="size-8" onClick={() => onChange(Math.max(1, value - 1))}>
+        <Button type="button" size="sm" variant="secondary" onClick={() => onChange(value - 1)}>
           −
         </Button>
-        <span className="text-display w-10 text-center text-lg">{value}</span>
-        <Button size="icon" variant="secondary" className="size-8" onClick={() => onChange(value + 1)}>
+        <span className="min-w-[3rem] text-center text-sm font-bold">
+          {value}
+          {unit}
+        </span>
+        <Button type="button" size="sm" variant="secondary" onClick={() => onChange(value + 1)}>
           +
         </Button>
       </div>

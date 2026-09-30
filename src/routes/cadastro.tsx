@@ -8,12 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { completeAccountAccess } from "@/lib/access.functions";
-import { signUpWithEmail } from "@/lib/auth";
+import { parseAccessEmail, parseAccessNext, peekAccessPrefillEmail } from "@/lib/access-funnel";
+import { resendSignupConfirmation, signUpWithEmail } from "@/lib/auth";
 import { getDeviceId } from "@/lib/sync";
 import { useStore } from "@/lib/store";
 import { MIN_PASSWORD_LENGTH, CADASTRO_CONFIRM_BODY, CADASTRO_CONFIRM_TITLE } from "@/lib/ui/platform-copy";
 
 export const Route = createFileRoute("/cadastro")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const email = parseAccessEmail(search["email"]);
+    const next = parseAccessNext(search["next"]);
+    const out: { email?: string; next?: "/" | "/onboarding" } = {};
+    if (email) out.email = email;
+    if (next) out.next = next;
+    return out;
+  },
   head: () => ({
     meta: [
       { title: "Criar conta — Soldiers Training" },
@@ -28,15 +37,27 @@ export const Route = createFileRoute("/cadastro")({
 
 function CadastroPage() {
   const navigate = useNavigate();
+  const { email: searchEmail, next } = Route.useSearch();
   const { state, setAccessGranted, setAuthUserId, acceptLegal } = useStore();
   const complete = useServerFn(completeAccountAccess);
+  const lockedEmail = Boolean(searchEmail);
   const [name, setName] = useState(state.shopifyDisplayName ?? state.profile?.name ?? "");
-  const [email, setEmail] = useState(state.accessEmail ?? "");
+  const [email, setEmail] = useState(
+    () => searchEmail ?? peekAccessPrefillEmail() ?? state.accessEmail ?? "",
+  );
   const [password, setPassword] = useState("");
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [awaitingEmail, setAwaitingEmail] = useState(false);
+
+  const postPath = () => next ?? (state.profile ? "/" : "/onboarding");
+  const acessoSearch = () => {
+    const out: { next?: "/" | "/onboarding" } = {};
+    const n = next ?? (state.profile ? ("/" as const) : ("/onboarding" as const));
+    out.next = n;
+    return out;
+  };
 
   const submit = async () => {
     setError(null);
@@ -82,9 +103,11 @@ function CadastroPage() {
         toast.error(
           result.reason === "no_purchase"
             ? "Não achamos compra neste e-mail. Use o endereço da loja."
-            : "Acesso ainda bloqueado — confira a compra.",
+            : result.reason === "not_configured"
+              ? "Loja indisponível agora — tente de novo em instantes."
+              : "Acesso ainda bloqueado — confira a compra.",
         );
-        navigate({ to: "/acesso", search: { token: undefined } });
+        navigate({ to: "/acesso", search: acessoSearch() });
         return;
       }
       const grant = await setAccessGranted({
@@ -105,9 +128,23 @@ function CadastroPage() {
         return;
       }
       toast.success("Conta criada");
-      navigate({ to: state.profile ? "/" : "/onboarding" });
+      navigate({ to: postPath() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível criar a conta");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendConfirm = async () => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed.includes("@")) return;
+    setBusy(true);
+    try {
+      await resendSignupConfirmation(trimmed);
+      toast.success("Reenviamos o e-mail de confirmação");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível reenviar");
     } finally {
       setBusy(false);
     }
@@ -124,11 +161,25 @@ function CadastroPage() {
           <p className="mt-2 text-sm">
             Enviamos para <span className="font-semibold">{email.trim().toLowerCase()}</span>
           </p>
-          <Link to="/entrar" className="mt-8 block">
+          <Link
+            to="/entrar"
+            {...(email.trim() || next
+              ? { search: { email: email.trim().toLowerCase(), next } }
+              : {})}
+            className="mt-8 block"
+          >
             <Button className="h-14 w-full glow-primary font-bold uppercase tracking-wide">
               Já confirmei — entrar <ArrowRight className="size-4" />
             </Button>
           </Link>
+          <Button
+            variant="secondary"
+            className="mt-3 h-12 w-full font-bold uppercase tracking-wide"
+            disabled={busy}
+            onClick={() => void resendConfirm()}
+          >
+            {busy ? "Enviando…" : "Reenviar e-mail"}
+          </Button>
         </div>
       </div>
     );
@@ -145,8 +196,9 @@ function CadastroPage() {
           <span className="mt-1 block text-primary text-glow">com o e-mail da loja</span>
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Usamos este e-mail para achar sua compra na Soldiers. O acesso vale 40 dias a partir da última
-          compra paga.
+          {lockedEmail
+            ? "E-mail travado no endereço da compra — não troque para liberar o app."
+            : "Usamos este e-mail para achar sua compra na Soldiers. O acesso vale 40 dias a partir da última compra paga."}
         </p>
 
         <div className="mt-8 space-y-4">
@@ -169,6 +221,8 @@ function CadastroPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@email.com"
               autoComplete="email"
+              readOnly={lockedEmail}
+              className={lockedEmail ? "opacity-90" : undefined}
             />
           </div>
           <div>
@@ -212,7 +266,13 @@ function CadastroPage() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Já tem conta?{" "}
-            <Link to="/entrar" className="font-semibold text-primary">
+            <Link
+              to="/entrar"
+              {...(searchEmail || next
+                ? { search: { email: searchEmail, next } }
+                : {})}
+              className="font-semibold text-primary"
+            >
               Entrar
             </Link>
           </p>

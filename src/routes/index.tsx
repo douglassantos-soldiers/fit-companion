@@ -1,32 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NumberInput, Modal } from "@mantine/core";
-import { Chip } from "@heroui/react";
 import {
   ChevronDown,
   ChevronUp,
-  Droplets,
-  Flame,
-  Pill,
   Plus,
-  Scale,
   Sparkles,
   TrendingUp,
-  Users,
-  Utensils,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { MealPickerSheet } from "@/components/meal-picker-sheet";
 import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
-import { MetricRing } from "@/components/metric-ring";
 import { Spinner } from "@/components/kibo-ui/spinner";
-import { NumberTicker } from "@/components/ui/number-ticker";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ActivityFeed } from "@/components/social/activity-feed";
 import { DailyQuestsCard, XpBar } from "@/components/today/engagement-cards";
 import {
   LivingPlanHero,
@@ -38,6 +26,19 @@ import { CoachNudgeOverlay } from "@/components/coach-nudge-overlay";
 import { AccessWindowBanner } from "@/components/today/access-window-banner";
 import { WeekPath } from "@/components/today/week-path";
 import { HomeProgressCard } from "@/components/today/home-progress-card";
+import { HomeFallbackHero } from "@/components/today/home-fallback-hero";
+import { HomeQuickHabits } from "@/components/today/home-quick-habits";
+import {
+  HomeActionFeedback,
+  type HomeActionFeedbackData,
+} from "@/components/today/home-action-feedback";
+import { HomeBlocks } from "@/components/today/home-blocks";
+import { HomeFriendQuestCard, HomeMaisDoDia } from "@/components/today/home-mais-do-dia";
+import {
+  isActivationReady,
+  isNutritionReady,
+  needsProfileEnrichment,
+} from "@/lib/profile-readiness";
 import { PRODUCTS } from "@/data/products";
 import { resolveExerciseMedia, resolveProductMedia } from "@/lib/soldiers-media";
 import {
@@ -54,6 +55,8 @@ import {
   performanceScore,
   adherenceScore,
   streak,
+  weekOverWeek,
+  prsInCurrentWeek,
 } from "@/lib/engine/dimensions";
 import { computeLearningInsights, topLearningInsight } from "@/lib/engine/learning";
 import { buildUserContext } from "@/lib/engine/context";
@@ -65,7 +68,13 @@ import {
   selectWhyPanel,
   shouldRefreshDecisionContextForToday,
 } from "@/lib/engine/decision-context-snapshot";
+import {
+  consecutiveHardRpeStreak,
+  buildMuscleRecoverySnapshots,
+} from "@/lib/engine/recovery";
+import { muscleRecoveryTeaser } from "@/lib/training/recovery-ui";
 import { trackOutcome } from "@/lib/outcome";
+import { trackHomeSurface } from "@/lib/home/track-home-surface";
 import {
   buildDailyMealPlan,
   dayNutritionTotalsFromState,
@@ -98,6 +107,7 @@ import {
   type FriendQuest,
   type LeagueRow,
 } from "@/lib/social";
+import { listFollowingForInviteFn } from "@/lib/social/graph.functions";
 import { useClubSocialFeed } from "@/hooks/use-club-social-feed";
 import { todayMetrics, todaySupplements, useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
@@ -106,16 +116,20 @@ import { computeStrengthScore } from "@/lib/training/strength-score";
 import { resolveTrainingPlanDays } from "@/lib/training/resolve-plan-days";
 import { blockDisplayWeek } from "@/lib/training/training-block";
 import { DAILY_XP_GOAL, todayKey, type MealQuality, type MealSlot } from "@/lib/types";
-import { PeriodReviewCard } from "@/components/progress/period-review-card";
 import { brandLevel } from "@/lib/engine/brand-level";
 import { homePersona } from "@/lib/engine/home-persona";
 import { periodReview } from "@/lib/engine/period-review";
 import { resolvedAvailableMin } from "@/lib/engine/session-time";
-import { weekOverWeek } from "@/lib/engine/dimensions";
-import { prsInCurrentWeek } from "@/lib/engine/dimensions";
-import { orderHomeBlocks, type HomeBlockId } from "@/lib/engine/home-layout";
+import { orderHomeBlocks } from "@/lib/engine/home-layout";
 import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
 import { accessDaysRemaining, accessUrgencyLevel } from "@/lib/access-window";
+import {
+  morningNarrationFromLiving,
+  proposalFollowUpQuestion,
+  shouldShowProposalFollowUp,
+} from "@/lib/coach/proposal-followup";
+import { morningCheckinCoachSeed, nutritionReviewCoachSeed, seedCoachQuestion } from "@/lib/coach/seed";
+import { weekNutritionSummary } from "@/lib/nutrition/week-summary";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -167,6 +181,7 @@ function Today() {
     dismissCoachNudge,
     markCoachNudgeShown,
     leaveTrainingBlock,
+    answerCoachProposalFollowUp,
   } = useStore();
   const [mealSlot, setMealSlot] = useState<MealSlot | null>(null);
   const [eatServings, setEatServings] = useState<number | null>(null);
@@ -175,9 +190,12 @@ function Today() {
   const [leagueMe, setLeagueMe] = useState<LeagueRow | null>(null);
   const [friendQuest, setFriendQuest] = useState<FriendQuest | null>(null);
   const [stories, setStories] = useState<ClubStory[]>([]);
+  const [followingCount, setFollowingCount] = useState(0);
   const [maisAberto, setMaisAberto] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [nudgeOpen, setNudgeOpen] = useState(false);
+  const [morningHint, setMorningHint] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<HomeActionFeedbackData | null>(null);
   const requestedServerContextFor = useRef<string | null>(null);
   const days = useMemo(() => weekDays(), []);
   const deviceId = getDeviceId();
@@ -282,12 +300,43 @@ function Today() {
     };
   }, [club, deviceId, state.profile?.name, state.sessions.length]);
 
+  useEffect(() => {
+    if (!hydrated || !deviceId) return;
+    let cancelled = false;
+    void listFollowingForInviteFn({ data: { deviceId } })
+      .then((res) => {
+        if (cancelled) return;
+        const n = (res.people ?? []).length;
+        setFollowingCount(
+          n > 0 ? n : state.hasFollowedSomeone ? 1 : 0,
+        );
+      })
+      .catch(() => {
+        if (!cancelled && state.hasFollowedSomeone) setFollowingCount(1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, deviceId, state.hasFollowedSomeone, state.sessions.length]);
+
   const nudge = coachNudgeFromState(state);
   useEffect(() => {
     if (!hydrated || !nudge.show) return;
     setNudgeOpen(true);
     markCoachNudgeShown();
   }, [hydrated, nudge.show, markCoachNudgeShown]);
+
+  const todayCheckInPreview = state.dayCheckIns?.[todayKey()];
+  const muscleTeaser = useMemo(() => {
+    const recoveryCtx = {
+      ...(todayCheckInPreview?.sleepHours != null
+        ? { sleepHours: todayCheckInPreview.sleepHours }
+        : {}),
+      ...(todayCheckInPreview?.energy ? { energy: todayCheckInPreview.energy } : {}),
+      sessionRpeHardStreak: consecutiveHardRpeStreak(state.sessions),
+    };
+    return muscleRecoveryTeaser(buildMuscleRecoverySnapshots(state.sessions, recoveryCtx));
+  }, [state.sessions, todayCheckInPreview?.sleepHours, todayCheckInPreview?.energy]);
 
   if (!hydrated || !state.profile) {
     return (
@@ -326,20 +375,25 @@ function Today() {
   const persona = homePersona(state);
   const brand = brandLevel(state);
   const weekReview =
-    persona === "consistente" || persona === "avancado" || new Date().getDay() === 0
+    persona === "consistente" ||
+    persona === "avancado" ||
+    persona === "em_risco" ||
+    new Date().getDay() === 0
       ? periodReview(state, "week")
       : null;
   const wow = persona === "avancado" ? weekOverWeek(state.sessions) : null;
   const weekPrs =
-    persona === "consistente" || persona === "avancado" ? prsInCurrentWeek(state.sessions) : [];
+    persona === "consistente" || persona === "avancado" || persona === "em_risco"
+      ? prsInCurrentWeek(state.sessions)
+      : [];
   const strengthScore =
-    persona === "consistente" || persona === "avancado"
+    persona === "consistente" || persona === "avancado" || persona === "em_risco"
       ? computeStrengthScore(state.sessions, profile)
       : null;
   const showLeague = persona !== "novo" && persona !== "inativo";
-  const needsRecovery = !profile.typicalSleepHours || !profile.primaryBlocker;
-  const bodyIncomplete = !(profile.age >= 16 && profile.heightCm >= 130 && profile.weightKg >= 35);
-  const profileIncomplete = bodyIncomplete || needsRecovery || profile.onboardingComplete === false;
+  const profileNeedsEnrichment = needsProfileEnrichment(profile);
+  const bodyIncomplete = !isActivationReady(profile);
+  const nutritionIncomplete = !isNutritionReady(profile);
   const livingBundle = decisionCtx
     ? {
         plan: decisionCtx.livingPlan,
@@ -355,6 +409,13 @@ function Today() {
   const xp = dailyXp(state);
   const gap = proteinGapLine(nutrition.proteinG, goals.proteinG, nextMeal?.slot);
   const nutProof = nutritionProofLine(state.meals ?? [], goals.proteinG);
+  const weekNut = weekNutritionSummary(state, {
+    kcalTrend: decisionCtx?.context.nutrition.kcalTrend ?? 0,
+    reasonSeeds: decisionCtx?.context.reasonSeeds ?? [],
+  });
+  const showNutritionReview =
+    Boolean(weekNut) &&
+    (weekNut!.proteinHitDays < 3 || nutrition.proteinG < goals.proteinG * 0.85);
   const lastSameSlot = nextMeal ? lastMealForSlot(state.meals ?? [], nextMeal.slot) : null;
   const servingsNow = clampServings(eatServings ?? nextMeal?.suggestedServings ?? 1);
 
@@ -369,57 +430,6 @@ function Today() {
     taken,
   );
   const pathStates = weekPathStates(state, days);
-
-  const onPickMeal = (preset: MealPreset, servings = 1) => {
-    const slot = mealSlot ?? suggestSlot();
-    addMealEntry(addMealFromPreset(preset, slot, servings));
-    setMealSlot(null);
-    toast.success(`${preset.label} registrado`);
-  };
-
-  const onPickMealCustom = (meal: {
-    label: string;
-    proteinG: number;
-    kcal: number;
-    carbG?: number;
-    fatG?: number;
-    fiberG?: number;
-    quality: MealQuality;
-    sourceKind?: "informed" | "estimated";
-    confidence?: number;
-    aiMode?: "photo" | "voice" | "text";
-    correctedFromAi?: boolean;
-    items?: import("@/lib/types").MealItemEntry[];
-    foodSource?: import("@/lib/types").FoodLineageSource;
-  }) => {
-    const slot = mealSlot ?? suggestSlot();
-    const entry: Parameters<typeof addMealEntry>[0] = {
-      slot,
-      label: meal.label,
-      proteinG: meal.proteinG,
-      kcal: meal.kcal,
-      quality: meal.quality,
-      sourceKind: meal.sourceKind ?? "estimated",
-    };
-    if (meal.carbG != null) entry.carbG = meal.carbG;
-    if (meal.fatG != null) entry.fatG = meal.fatG;
-    if (meal.fiberG != null) entry.fiberG = meal.fiberG;
-    if (meal.confidence != null) entry.confidence = meal.confidence;
-    if (meal.aiMode) entry.aiMode = meal.aiMode;
-    if (meal.correctedFromAi != null) entry.correctedFromAi = meal.correctedFromAi;
-    if (meal.items) entry.items = meal.items;
-    if (meal.foodSource) entry.foodSource = meal.foodSource;
-    addMealEntry(entry);
-    setMealSlot(null);
-    toast.success(`${meal.label} registrado`);
-  };
-
-  const applySuggestedMeal = (servings = servingsNow) => {
-    if (!nextMeal?.preset) return;
-    addMealEntry(addMealFromPreset(nextMeal.preset, nextMeal.slot, servings));
-    setEatServings(null);
-    toast.success(`${nextMeal.preset.label} registrado`);
-  };
 
   const openWeight = () => {
     setWeightKg(profile.weightKg);
@@ -467,9 +477,10 @@ function Today() {
 
   const homeBlocks = orderHomeBlocks(state, behaviorLoop.profile, {
     hasClub: Boolean(club),
-    followingCount: 0,
+    followingCount,
     level: profile.level,
     isSunday: new Date().getDay() === 0,
+    isMonday: new Date().getDay() === 1,
   });
   const daysLeft = accessDaysRemaining(state.accessExpiresAt);
   const urgency = accessUrgencyLevel(daysLeft);
@@ -494,6 +505,135 @@ function Today() {
     if (!product || !url) return null;
     return { soon, product, url };
   })();
+
+  const showWeightQuick = !state.weights.some((w) => w.date.slice(0, 10) === todayKey());
+  const hasWaterQuest = (state.dailyQuestIds ?? []).some((id) => questById(id)?.kind === "water");
+  const showUrgentAccess = Boolean(urgency && daysLeft != null && daysLeft <= 3 && windowReorderUrl);
+  const showRetomar =
+    (persona === "inativo" || persona === "em_risco") && Boolean(workoutDayId) && !doneToday;
+
+  const showActionFeedback = (title: string, proteinDelta = 0) => {
+    const proteinNow = nutrition.proteinG + proteinDelta;
+    const proteinLine =
+      proteinGapLine(proteinNow, goals.proteinG, nextMeal?.slot) ??
+      `${Math.round(proteinNow)}/${goals.proteinG} g proteína`;
+    const incomplete = (state.dailyQuestIds ?? [])
+      .map((id) => questById(id))
+      .filter((q): q is NonNullable<ReturnType<typeof questById>> => {
+        if (!q) return false;
+        return !isQuestComplete(state, q);
+      });
+    const nextQ = incomplete[0];
+    setActionFeedback({
+      title,
+      proteinLine,
+      streakDays: st,
+      questsDone,
+      questsTarget: 3,
+      nextHint: nextQ
+        ? `Próxima missão: ${nextQ.title}`
+        : doneToday
+          ? null
+          : "Treine para fechar o dia",
+      nextCtaLabel: nextQ
+        ? nextQ.kind === "water"
+          ? "+500 ml"
+          : nextQ.kind === "train"
+            ? "Treinar"
+            : nextQ.kind === "coach"
+              ? "Abrir Coach"
+              : "Continuar"
+        : doneToday
+          ? null
+          : "Treinar",
+      onNext: () => {
+        if (nextQ?.kind === "water") {
+          addWater(500);
+          toast.success("Hidratação registrada");
+          return;
+        }
+        if (nextQ?.kind === "train" || !nextQ) {
+          if (workoutDayId) {
+            void navigate({
+              to: "/treino/sessao/$id",
+              params: { id: workoutDayId },
+              search: { express: expressToday, from: "hoje" },
+            });
+          } else void navigate({ to: "/treino" });
+          return;
+        }
+        if (nextQ.kind === "coach") void navigate({ to: "/coach" });
+        else if (nextQ.kind === "protein80" || nextQ.kind === "meals2") setMealSlot(suggestSlot());
+        else if (nextQ.kind === "supplements")
+          void navigate({ to: "/nutricao", search: { tab: "doses" } });
+        else if (nextQ.kind === "kudos" || nextQ.kind === "share" || nextQ.kind === "follow")
+          void navigate({ to: "/social", search: { tab: "feed" } });
+      },
+    });
+  };
+
+  const onPickMealNow = (preset: MealPreset, servings = 1) => {
+    const slot = mealSlot ?? suggestSlot();
+    addMealEntry(addMealFromPreset(preset, slot, servings));
+    setMealSlot(null);
+    toast.success(`${preset.label} registrado`);
+    showActionFeedback(`${preset.label} registrado`, preset.proteinG * servings);
+  };
+
+  const onPickMealCustomNow = (meal: {
+    label: string;
+    proteinG: number;
+    kcal: number;
+    carbG?: number;
+    fatG?: number;
+    fiberG?: number;
+    quality: MealQuality;
+    sourceKind?: "informed" | "estimated";
+    confidence?: number;
+    aiMode?: "photo" | "voice" | "text";
+    correctedFromAi?: boolean;
+    items?: import("@/lib/types").MealItemEntry[];
+    foodSource?: import("@/lib/types").FoodLineageSource;
+  }) => {
+    const slot = mealSlot ?? suggestSlot();
+    const entry: Parameters<typeof addMealEntry>[0] = {
+      slot,
+      label: meal.label,
+      proteinG: meal.proteinG,
+      kcal: meal.kcal,
+      quality: meal.quality,
+      sourceKind: meal.sourceKind ?? "estimated",
+    };
+    if (meal.carbG != null) entry.carbG = meal.carbG;
+    if (meal.fatG != null) entry.fatG = meal.fatG;
+    if (meal.fiberG != null) entry.fiberG = meal.fiberG;
+    if (meal.confidence != null) entry.confidence = meal.confidence;
+    if (meal.aiMode) entry.aiMode = meal.aiMode;
+    if (meal.correctedFromAi != null) entry.correctedFromAi = meal.correctedFromAi;
+    if (meal.items) entry.items = meal.items;
+    if (meal.foodSource) entry.foodSource = meal.foodSource;
+    addMealEntry(entry);
+    setMealSlot(null);
+    toast.success(`${meal.label} registrado`);
+    showActionFeedback(`${meal.label} registrado`, meal.proteinG);
+  };
+
+  const applySuggestedMealNow = (servings = servingsNow) => {
+    if (!nextMeal?.preset) return;
+    addMealEntry(addMealFromPreset(nextMeal.preset, nextMeal.slot, servings));
+    setEatServings(null);
+    toast.success(`${nextMeal.preset.label} registrado`);
+    showActionFeedback(
+      `${nextMeal.preset.label} registrado`,
+      nextMeal.preset.proteinG * servings,
+    );
+  };
+
+  const onAddWaterQuick = () => {
+    addWater(500);
+    toast.success("Hidratação registrada");
+    showActionFeedback("+500 ml de água");
+  };
 
   return (
     <AppShell
@@ -524,75 +664,135 @@ function Today() {
 
       <WeekPath days={days} states={pathStates} />
 
-      <HomeProgressCard
-        score={score}
-        exerciseMin={living?.workout.estimatedMin ?? dayCandidates?.estimatedMin ?? 0}
-        questsDone={questsDone}
-        questsTarget={3}
-        streakDays={st}
+      {living ? (
+        <LivingPlanHero
+          plan={living}
+          doneToday={doneToday}
+          cover={workoutCoverId ? resolveExerciseMedia(workoutCoverId) : null}
+          checkIn={todayCheckIn}
+          muscleTeaser={muscleTeaser}
+          defaultAvailableMin={
+            decisionCtx?.context.availableTimeMin ?? resolvedAvailableMin(todayCheckIn, profile)
+          }
+          feedback={state.livingPlanFeedback?.[todayKey()] ?? null}
+          onCheckInOpened={() => trackHomeSurface("checkin_opened")}
+          onCoachClick={() => trackHomeSurface("coach_teaser_click", { source: "hero" })}
+          onFeedback={(vote, reason) => {
+            saveLivingPlanFeedback(todayKey(), vote, reason);
+            void trackOutcome(
+              getDeviceId(),
+              vote === "up" ? "living_plan_followed" : "living_plan_skipped",
+              { reason: reason ?? null },
+            );
+            toast.success(vote === "up" ? "Obrigado — o plano segue" : "Anotado — vamos ajustar");
+          }}
+          onSaveCheckIn={(c) => {
+            saveDayCheckIn(c);
+            // Refresh plan then narrate from next tick's living snapshot via current living + check-in.
+            refreshLivingPlan();
+            const mode =
+              state.livingPlans?.[todayKey()]?.workout.mode ?? c.acceptedTrainingMode ?? null;
+            const title = state.livingPlans?.[todayKey()]?.workout.title ?? null;
+            const estimatedMin = state.livingPlans?.[todayKey()]?.workout.estimatedMin ?? null;
+            const line = morningNarrationFromLiving({
+              mode,
+              title,
+              estimatedMin,
+              energy: c.energy,
+              sleepHours: c.sleepHours,
+            });
+            setMorningHint(line);
+            toast.success("Plano de hoje atualizado");
+          }}
+          primaryAction={(() => {
+            if (!topRec) return null;
+            const action: LivingPlanPrimaryAction = {
+              id: topRec.id,
+              title: topRec.title,
+              reason: whyPanel?.explanations[0] ?? topRec.reason,
+            };
+            if (topRec.href) action.href = topRec.href;
+            if (primaryFromDecision === "rest" || primaryFromDecision === "sleep") {
+              action.reason = whyPanel?.reason_aliases.slice(0, 3).join(" · ") || action.reason;
+            }
+            return action;
+          })()}
+          onPrimaryAction={() => {
+            if (!topRec) return;
+            void trackOutcome(getDeviceId(), "living_plan_followed", {
+              recommendationId: topRec.id,
+              kind: topRec.kind,
+            });
+          }}
+          eatAction={(() => {
+            const eat: LivingPlanEatAction = {
+              title: nextMeal?.preset?.label ?? "Registrar refeição",
+              hint:
+                gap ??
+                (nextMeal?.preset
+                  ? `${nextMeal.preset.proteinG} g proteína`
+                  : "Slots do dia preenchidos"),
+              servings: servingsNow,
+              onServings: (n) => setEatServings(clampServings(n)),
+              onApply: () => {
+                if (nextMeal?.preset) applySuggestedMealNow(servingsNow);
+                else setMealSlot(suggestSlot());
+              },
+              onRegister: () => setMealSlot(nextMeal?.slot ?? suggestSlot()),
+            };
+            if (lastSameSlot) {
+              eat.onRepeatLast = () => {
+                addMealEntry(copyMealToSlot(lastSameSlot, nextMeal?.slot ?? lastSameSlot.slot));
+                toast.success("Igual ontem");
+                showActionFeedback("Igual ontem", lastSameSlot.proteinG);
+              };
+              eat.repeatLabel = "Igual ontem";
+            }
+            return eat;
+          })()}
+        />
+      ) : (
+        <HomeFallbackHero
+          workoutDayId={workoutDayId}
+          express={expressToday || true}
+          estimatedMin={dayCandidates?.estimatedMin ?? null}
+          onRegisterMeal={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}
+        />
+      )}
+
+      <HomeQuickHabits
+        showWeight={showWeightQuick || hasWaterQuest}
+        waterMl={metrics.waterMl}
+        waterGoalMl={goals.waterMl}
+        onAddWater={onAddWaterQuick}
+        onOpenWeight={openWeight}
       />
 
-      {urgency && daysLeft != null && windowReorderUrl ? (
+      {actionFeedback ? (
+        <HomeActionFeedback data={actionFeedback} onDismiss={() => setActionFeedback(null)} />
+      ) : null}
+
+      {showUrgentAccess && daysLeft != null && windowReorderUrl ? (
         <AccessWindowBanner
           daysRemaining={daysLeft}
-          urgency={urgency}
+          urgency={urgency!}
           reorderUrl={windowReorderUrl}
           productName={windowProductName}
         />
       ) : null}
 
-      {persona !== "novo" &&
-        (() => {
-          const proof = trainingProofLine(state);
-          if (!proof) return null;
-          return proof.exerciseId ? (
-            <Link
-              to="/treino/exercicio/$id"
-              params={{ id: proof.exerciseId }}
-              className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
-            >
-              {proof.text}
-            </Link>
-          ) : (
-            <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-              {proof.text}
-            </p>
-          );
-        })()}
-
-      {profileIncomplete ? (
-        <button
-          type="button"
-          className="mb-3 w-full rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-left"
-          onClick={() => setProfileOpen(true)}
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Completar perfil
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {bodyIncomplete
-              ? "Idade, altura e peso calibram proteína e cargas — 30 segundos."
-              : "Sono e o que mais te impede — o plano fica mais preciso."}
-          </p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/60">
-            <div
-              className="h-1.5 rounded-full bg-primary"
-              style={{ width: bodyIncomplete ? "40%" : "75%" }}
-            />
-          </div>
-        </button>
-      ) : null}
-
-      {persona === "inativo" && workoutDayId && !doneToday ? (
+      {showRetomar ? (
         <div className="surface-glass mb-4 border-primary/30 p-4">
           <p className="eyebrow">Retomar</p>
           <p className="mt-1 text-sm font-semibold">
-            Volte com pouca fricção — Express protege o hábito.
+            {persona === "em_risco"
+              ? "Ainda dá tempo esta semana — Express protege o hábito."
+              : "Volte com pouca fricção — Express protege o hábito."}
           </p>
           <Link
             to="/treino/sessao/$id"
-            params={{ id: workoutDayId }}
-            search={{ express: expressToday, from: "hoje" }}
+            params={{ id: workoutDayId! }}
+            search={{ express: true, from: "hoje" }}
           >
             <Button className="mt-3 h-11 w-full font-bold uppercase">Retomar treino</Button>
           </Link>
@@ -630,138 +830,164 @@ function Today() {
         </div>
       ) : null}
 
-      {living ? (
-        <LivingPlanHero
-          plan={living}
-          doneToday={doneToday}
-          cover={workoutCoverId ? resolveExerciseMedia(workoutCoverId) : null}
-          checkIn={todayCheckIn}
-          defaultAvailableMin={
-            decisionCtx?.context.availableTimeMin ?? resolvedAvailableMin(todayCheckIn, profile)
-          }
-          feedback={state.livingPlanFeedback?.[todayKey()] ?? null}
-          onFeedback={(vote, reason) => {
-            saveLivingPlanFeedback(todayKey(), vote, reason);
-            void trackOutcome(
-              getDeviceId(),
-              vote === "up" ? "living_plan_followed" : "living_plan_skipped",
-              {
-                reason: reason ?? null,
-              },
-            );
-            toast.success(vote === "up" ? "Obrigado — o plano segue" : "Anotado — vamos ajustar");
-          }}
-          onSaveCheckIn={(c) => {
-            saveDayCheckIn(c);
-            toast.success("Plano de hoje atualizado");
-          }}
-          primaryAction={(() => {
-            if (!topRec) return null;
-            const action: LivingPlanPrimaryAction = {
-              id: topRec.id,
-              title: topRec.title,
-              reason: whyPanel?.explanations[0] ?? topRec.reason,
-            };
-            if (topRec.href) action.href = topRec.href;
-            if (primaryFromDecision === "rest" || primaryFromDecision === "sleep") {
-              action.reason = whyPanel?.reason_aliases.slice(0, 3).join(" · ") || action.reason;
-            }
-            return action;
-          })()}
-          onPrimaryAction={() => {
-            if (!topRec) return;
-            void trackOutcome(getDeviceId(), "living_plan_followed", {
-              recommendationId: topRec.id,
-              kind: topRec.kind,
-            });
-          }}
-          eatAction={(() => {
-            const eat: LivingPlanEatAction = {
-              title: nextMeal?.preset?.label ?? "Registrar refeição",
-              hint:
-                gap ??
-                (nextMeal?.preset
-                  ? `${nextMeal.preset.proteinG} g proteína`
-                  : "Slots do dia preenchidos"),
-              servings: servingsNow,
-              onServings: (n) => setEatServings(clampServings(n)),
-              onApply: () => {
-                if (nextMeal?.preset) applySuggestedMeal(servingsNow);
-                else setMealSlot(suggestSlot());
-              },
-              onRegister: () => setMealSlot(nextMeal?.slot ?? suggestSlot()),
-            };
-            if (lastSameSlot) {
-              eat.onRepeatLast = () => {
-                addMealEntry(copyMealToSlot(lastSameSlot, nextMeal?.slot ?? lastSameSlot.slot));
-                toast.success("Igual ontem");
-              };
-              eat.repeatLabel = "Igual ontem";
-            }
-            return eat;
-          })()}
-        />
+      <HomeProgressCard
+        score={score}
+        exerciseMin={living?.workout.estimatedMin ?? dayCandidates?.estimatedMin ?? 0}
+        questsDone={questsDone}
+        questsTarget={3}
+        streakDays={st}
+      />
+
+      {persona !== "novo" &&
+        (() => {
+          const proof = trainingProofLine(state);
+          if (!proof) return null;
+          return proof.exerciseId ? (
+            <Link
+              to="/treino/exercicio/$id"
+              params={{ id: proof.exerciseId }}
+              className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+            >
+              {proof.text}
+            </Link>
+          ) : (
+            <p className="mb-3 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+              {proof.text}
+            </p>
+          );
+        })()}
+
+      {profileNeedsEnrichment && (bodyIncomplete || nutritionIncomplete) ? (
+        <button
+          type="button"
+          className="mb-3 w-full rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-left"
+          onClick={() => setProfileOpen(true)}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Completar perfil
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {bodyIncomplete
+              ? "Idade, altura e peso calibram proteína e água — 30 segundos."
+              : "Hábitos alimentares calibram as refeições do plano."}
+          </p>
+        </button>
       ) : null}
 
-      <Link
-        to="/coach"
-        className="surface-glass mb-4 flex items-start gap-3 p-4 transition-colors hover:border-primary/40"
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-          <Sparkles className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="eyebrow">Coach IA</p>
-          <p className="mt-1 text-sm font-semibold leading-snug">
-            {living?.narrative
-              ? living.narrative.slice(0, 110) + (living.narrative.length > 110 ? "…" : "")
-              : "Pergunte qualquer coisa — treino, comida ou recuperação."}
+      {showNutritionReview && weekNut ? (
+        <div className="mb-3 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Revisão de nutrição
           </p>
+          <p className="mt-1 text-sm font-semibold">
+            Proteína ok {weekNut.proteinHitDays}/{weekNut.daysWindow} dias · hoje{" "}
+            {Math.round(nutrition.proteinG)}/{goals.proteinG} g
+          </p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            <Link to="/nutricao" className="text-xs font-semibold text-primary">
+              Abrir Nutri →
+            </Link>
+            <Link
+              to="/coach"
+              className="text-xs font-semibold text-muted-foreground"
+              onClick={() =>
+                seedCoachQuestion(
+                  nutritionReviewCoachSeed({
+                    proteinG: nutrition.proteinG,
+                    proteinTarget: goals.proteinG,
+                    adherence7d: weekNut.proteinHitDays / weekNut.daysWindow,
+                  }),
+                )
+              }
+            >
+              Revisar com Coach
+            </Link>
+          </div>
         </div>
-      </Link>
+      ) : null}
+
+      {shouldShowProposalFollowUp(state.coachProposalFollowUp) && state.coachProposalFollowUp ? (
+        <Link
+          to="/coach"
+          className="mb-3 block rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5"
+          onClick={() => {
+            seedCoachQuestion(proposalFollowUpQuestion(state.coachProposalFollowUp!));
+            answerCoachProposalFollowUp();
+          }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Feedback do Coach
+          </p>
+          <p className="mt-0.5 text-sm font-semibold">
+            Como foi “{state.coachProposalFollowUp.label}”? Conta pro Coach
+          </p>
+        </Link>
+      ) : null}
+
+      {morningHint ? (
+        <div className="mb-3 rounded-xl border border-white/10 bg-card/40 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Após o check-in
+          </p>
+          <p className="mt-1 text-sm text-foreground">{morningHint}</p>
+          <div className="mt-2 flex gap-2">
+            <Link
+              to="/coach"
+              className="text-xs font-semibold text-primary"
+              onClick={() => {
+                seedCoachQuestion(morningCheckinCoachSeed(morningHint));
+                setMorningHint(null);
+              }}
+            >
+              Detalhar no Coach →
+            </Link>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground"
+              onClick={() => setMorningHint(null)}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {state.sessions.length > 0 || persona !== "novo" ? (
+        <Link
+          to="/coach"
+          className="surface-glass mb-4 flex items-start gap-3 p-4 transition-colors hover:border-primary/40"
+          onClick={() => trackHomeSurface("coach_teaser_click", { source: "card" })}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Sparkles className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">Coach IA</p>
+            <p className="mt-1 text-sm font-semibold leading-snug">
+              {living?.narrative
+                ? living.narrative.slice(0, 110) + (living.narrative.length > 110 ? "…" : "")
+                : "Pergunte qualquer coisa — treino, comida ou recuperação."}
+            </p>
+          </div>
+        </Link>
+      ) : null}
 
       {persona !== "inativo" ? (
         <div className="mb-4 space-y-3">
           <XpBar xp={xp} />
-          <DailyQuestsCard state={state} />
+          <DailyQuestsCard state={state} onWaterQuest={onAddWaterQuick} />
         </div>
       ) : null}
 
-      {atRisk ? (
-        <div className="surface-glass mb-4 flex flex-col gap-3 border-primary/30 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Flame className="size-5 shrink-0 text-primary text-glow" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">Não perca o streak de {st}d</p>
-              <p className="text-xs text-muted-foreground">
-                Treine, faça Express ou use um freeze.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {workoutDayId ? (
-              <Link
-                to="/treino/sessao/$id"
-                params={{ id: workoutDayId }}
-                search={{ express: expressToday, from: "hoje" }}
-              >
-                <Button size="sm">Treinar</Button>
-              </Link>
-            ) : null}
-            {(state.streakFreezes ?? 0) > 0 ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  if (useStreakFreeze()) toast.success("Freeze usado — streak salvo");
-                  else toast.error("Não foi possível usar o freeze");
-                }}
-              >
-                Freeze ({state.streakFreezes})
-              </Button>
-            ) : null}
-          </div>
-        </div>
+      {showLeague && friendQuest ? <HomeFriendQuestCard quest={friendQuest} /> : null}
+
+      {urgency && !showUrgentAccess && daysLeft != null && windowReorderUrl ? (
+        <AccessWindowBanner
+          daysRemaining={daysLeft}
+          urgency={urgency}
+          reorderUrl={windowReorderUrl}
+          productName={windowProductName}
+        />
       ) : null}
 
       {restockSoon ? (
@@ -807,226 +1033,61 @@ function Today() {
         </div>
       ) : null}
 
-      {homeBlocks.map((blockId: HomeBlockId) => {
-        if (blockId === "wow" && persona === "avancado" && wow) {
-          return (
-            <div key="wow" className="mb-4 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                  <p className="text-display text-lg text-primary">
-                    {wow.volumeDeltaPct != null
-                      ? `${wow.volumeDeltaPct > 0 ? "+" : ""}${wow.volumeDeltaPct}%`
-                      : "—"}
-                  </p>
-                  <p className="text-[0.65rem] uppercase text-muted-foreground">Volume</p>
-                </div>
-                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                  <p className="text-display text-lg text-primary">
-                    {living?.traffic.recovery ?? "—"}
-                  </p>
-                  <p className="text-[0.65rem] uppercase text-muted-foreground">Recuperação</p>
-                </div>
-                <div className="rounded-xl border border-white/10 px-3 py-2 text-center">
-                  <p className="text-display text-lg text-primary">{weekPrs.length}</p>
-                  <p className="text-[0.65rem] uppercase text-muted-foreground">PRs sem.</p>
-                </div>
-              </div>
-              {strengthScore ? (
-                <Link
-                  to="/progresso"
-                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">Strength Score</span>
-                    <span className="text-[0.65rem] uppercase text-muted-foreground">
-                      {strengthScore.coldStart
-                        ? "Estimativa"
-                        : `${strengthScore.evidenceCount} lifts`}
-                      {strengthScore.delta28d != null
-                        ? ` · ${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d`
-                        : ""}
-                    </span>
-                  </span>
-                  <span className="text-display text-xl text-primary">{strengthScore.score}</span>
-                </Link>
-              ) : null}
-            </div>
+      <HomeBlocks
+        homeBlocks={homeBlocks}
+        persona={persona}
+        wow={wow}
+        livingRecovery={living?.traffic.recovery ?? null}
+        weekPrs={weekPrs}
+        strengthScore={strengthScore}
+        weekReview={weekReview}
+        atRisk={atRisk}
+        streakDays={st}
+        workoutDayId={workoutDayId}
+        expressToday={expressToday}
+        freezes={state.streakFreezes ?? 0}
+        onFreeze={() => {
+          if (useStreakFreeze()) toast.success("Freeze usado — streak salvo");
+          else toast.error("Não foi possível usar o freeze");
+        }}
+        nutProof={nutProof}
+        living={living}
+        gap={gap}
+        onRegisterMeal={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}
+        nowSuggestion={nowSuggestion}
+        taken={taken}
+        onToggleSupplement={toggleSupplement}
+        insightLine={insightLine}
+        whyExtra={userCtx.why}
+        adhere={adhere}
+        tip={tip}
+        onMarkTipSeen={markTipSeen}
+        club={club}
+        followingCount={followingCount}
+        leagueRank={leagueMe?.rank ?? null}
+        clubFeed={clubFeed}
+        deviceId={deviceId}
+        kudosGiven={kudosGiven}
+        onKudos={(id) => {
+          setClubFeed((prev) =>
+            prev.map((x) => (x.id === id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
           );
-        }
-        if (
-          blockId === "weekPrs" &&
-          persona === "consistente" &&
-          (weekPrs.length || strengthScore)
-        ) {
-          return (
-            <div key="weekPrs" className="mb-3 space-y-1">
-              {weekPrs.length ? (
-                <p className="text-sm font-semibold text-primary">
-                  {weekPrs.length} PR{weekPrs.length === 1 ? "" : "s"} esta semana
-                </p>
-              ) : null}
-              {strengthScore ? (
-                <Link
-                  to="/progresso"
-                  className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">Strength Score</span>
-                    <span className="text-[0.65rem] uppercase text-muted-foreground">
-                      {strengthScore.coldStart
-                        ? "Estimativa"
-                        : `${strengthScore.evidenceCount} lifts`}
-                      {strengthScore.delta28d != null
-                        ? ` · ${strengthScore.delta28d > 0 ? "+" : ""}${strengthScore.delta28d} 28d`
-                        : ""}
-                    </span>
-                  </span>
-                  <span className="text-display text-xl text-primary">{strengthScore.score}</span>
-                </Link>
-              ) : null}
-            </div>
-          );
-        }
-        if (
-          blockId === "periodReview" &&
-          weekReview &&
-          (weekReview.sessions > 0 || weekReview.isSundayRitual)
-        ) {
-          return <PeriodReviewCard key="periodReview" review={weekReview} />;
-        }
-        if (blockId === "streakRisk") return null;
-        if (blockId === "nutritionProof" && nutProof) {
-          return (
-            <Link
-              key="nutritionProof"
-              to="/nutricao"
-              className="mb-3 block rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
-            >
-              {nutProof}
-            </Link>
-          );
-        }
-        if (blockId === "registerMeal") {
-          if (living) return null;
-          return (
-            <div key="registerMeal" className="mb-4 space-y-2">
-              {gap ? (
-                <p className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-                  {gap}
-                </p>
-              ) : null}
-              <Button
-                variant="secondary"
-                className="h-11 w-full"
-                onClick={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}
-              >
-                <Utensils className="size-4" /> Registrar refeição
-              </Button>
-            </div>
-          );
-        }
-        if (blockId === "supplement" && nowSuggestion) {
-          return (
-            <section key="supplement" className="surface-glass mb-4 space-y-3 p-4">
-              <p className="eyebrow">Suplemento</p>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <SoldiersMediaThumb
-                    media={resolveProductMedia(nowSuggestion.id)}
-                    alt={nowSuggestion.name}
-                    className="size-12 rounded-xl"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold">{nowSuggestion.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {nowSuggestion.timing} · {nowSuggestion.serving}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (!taken.includes(nowSuggestion.id)) toggleSupplement(nowSuggestion.id);
-                    toast.success(`${nowSuggestion.name} marcado`);
-                  }}
-                >
-                  <Pill className="size-3.5" />
-                  {taken.includes(nowSuggestion.id) ? "Tomado" : "Marcar"}
-                </Button>
-              </div>
-            </section>
-          );
-        }
-        if (blockId === "insights") {
-          if (!insightLine && userCtx.why.length <= 1) return null;
-          return (
-            <div key="insights">
-              {insightLine ? (
-                <p className="mb-3 px-1 text-xs text-muted-foreground">{insightLine}</p>
-              ) : null}
-              {userCtx.why.length > 1 ? (
-                <p className="mb-3 px-1 text-[11px] text-muted-foreground/80">
-                  {userCtx.why.slice(1, 3).join(" · ")}
-                  {adhere > 0 ? ` · Aderência ${adhere}` : ""}
-                </p>
-              ) : null}
-            </div>
-          );
-        }
-        if (blockId === "habitTip" && persona === "novo" && tip) {
-          return (
-            <div key="habitTip" className="surface-glass mb-4 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="eyebrow">Hábito</p>
-                  <p className="mt-1 text-sm font-semibold">{tip.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{tip.body}</p>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground"
-                  aria-label="Dispensar"
-                  onClick={() => markTipSeen(tip.id)}
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-              <Link to={tip.ctaTo} className="mt-3 block">
-                <Button size="sm" className="w-full" onClick={() => markTipSeen(tip.id)}>
-                  {tip.ctaLabel}
-                </Button>
-              </Link>
-            </div>
-          );
-        }
-        if (blockId === "socialTeaser" && showLeague) {
-          return (
-            <Link
-              key="socialTeaser"
-              to="/social"
-              search={{ tab: "feed" }}
-              className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2"
-            >
-              <Users className="size-4 text-primary" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">
-                  {club ? `Clube · ${club.name}` : "Para você"}
-                </p>
-                <p className="text-[0.65rem] text-muted-foreground">
-                  Feed, desafios e pressão saudável
-                </p>
-              </div>
-            </Link>
-          );
-        }
-        return null;
-      })}
+          setKudosGiven((g) => ({ ...g, [id]: true }));
+        }}
+        onKudosQuest={markQuestKudos}
+      />
 
       <div className="mt-4">
         <button
           type="button"
           className="flex w-full items-center justify-between px-1 py-2 text-left"
-          onClick={() => setMaisAberto((v) => !v)}
+          onClick={() => {
+            setMaisAberto((v) => {
+              const next = !v;
+              if (next) trackHomeSurface("mais_aberto");
+              return next;
+            });
+          }}
           aria-expanded={maisAberto}
         >
           <span className="text-sm font-semibold">Mais do dia</span>
@@ -1038,251 +1099,38 @@ function Today() {
         </button>
 
         {maisAberto ? (
-          <div className="space-y-4">
-            {showLeague && friendQuest ? (
-              <section className="surface-glass p-4">
-                <p className="eyebrow">Missão em dupla</p>
-                <p className="mt-1 text-sm font-semibold">
-                  {friendQuest.nameA} + {friendQuest.nameB}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {friendQuest.progressA + friendQuest.progressB}/{friendQuest.target} treinos esta
-                  semana
-                </p>
-              </section>
-            ) : null}
-
-            {showLeague && stories.length ? (
-              <Link
-                to="/social"
-                search={{ tab: "clubes" }}
-                className="mb-0 flex gap-2 overflow-x-auto pb-1"
-              >
-                {stories.map((s) => (
-                  <div key={s.id} className="shrink-0 text-center">
-                    <img
-                      src={s.imageUrl}
-                      alt={s.displayName}
-                      className="size-14 rounded-full border-2 border-primary object-cover"
-                    />
-                    <p className="mt-1 max-w-14 truncate text-[0.6rem] text-muted-foreground">
-                      {s.displayName}
-                    </p>
-                  </div>
-                ))}
-              </Link>
-            ) : null}
-
-            {showLeague ? (
-              <section>
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <p className="text-sm font-semibold">{club ? `Clube · ${club.name}` : "Clube"}</p>
-                  <Link to="/social" search={{ tab: "feed" }} className="text-xs text-primary">
-                    Ver mais
-                  </Link>
-                </div>
-                {club ? (
-                  <ActivityFeed
-                    events={clubFeed}
-                    deviceId={deviceId}
-                    kudosGiven={kudosGiven}
-                    compact
-                    onKudos={(id) => {
-                      setClubFeed((prev) =>
-                        prev.map((x) => (x.id === id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
-                      );
-                      setKudosGiven((g) => ({ ...g, [id]: true }));
-                    }}
-                    onKudosQuest={markQuestKudos}
-                  />
-                ) : (
-                  <Link
-                    to="/social"
-                    search={{ tab: "clubes" }}
-                    className="surface-glass flex items-center gap-3 p-4"
-                  >
-                    <Users className="size-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-bold">Entre num clube</p>
-                      <p className="text-xs text-muted-foreground">Feed, liga e pressão saudável</p>
-                    </div>
-                  </Link>
-                )}
-              </section>
-            ) : null}
-
-            {persona !== "novo" && tip ? (
-              <div className="surface-glass p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="eyebrow">Dica</p>
-                    <p className="mt-1 text-sm font-semibold">{tip.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{tip.body}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground"
-                    aria-label="Dispensar"
-                    onClick={() => markTipSeen(tip.id)}
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <Link to={tip.ctaTo} className="flex-1">
-                    <Button size="sm" className="w-full" onClick={() => markTipSeen(tip.id)}>
-                      {tip.ctaLabel}
-                    </Button>
-                  </Link>
-                  <Button size="sm" variant="secondary" onClick={() => markTipSeen(tip.id)}>
-                    Entendi
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            <Tabs defaultValue="status">
-              <TabsList className="w-full rounded-full bg-muted/40 p-1">
-                <TabsTrigger value="status" className="flex-1 rounded-full">
-                  Status
-                </TabsTrigger>
-                <TabsTrigger value="rotina" className="flex-1 rounded-full">
-                  Rotina
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="status" className="mt-4 space-y-4">
-                <section className="surface-glass p-4">
-                  <p className="eyebrow">Resumo do dia</p>
-                  <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-                    <div>
-                      <p className="text-display text-lg text-primary text-glow">
-                        {summary.trained ? "OK" : "—"}
-                      </p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
-                        Treino
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-display text-lg text-primary">{summary.proteinPct}%</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
-                        Proteína
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-display text-lg text-primary">{summary.waterPct}%</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
-                        Água
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-display text-lg text-primary">{questsDone}/3</p>
-                      <p className="text-[0.6rem] uppercase tracking-wider text-muted-foreground">
-                        Missões
-                      </p>
-                    </div>
-                  </div>
-                </section>
-
-                <div className="flex items-baseline justify-between px-1">
-                  <span className="text-sm text-muted-foreground">Score</span>
-                  <span className="text-display text-2xl text-primary text-glow">
-                    <NumberTicker value={score} />
-                    <span className="ml-1 text-sm text-muted-foreground">/ 100</span>
-                  </span>
-                </div>
-
-                <section className="surface-glass grid grid-cols-4 gap-1 p-4">
-                  <MetricRing value={metrics.waterMl} max={goals.waterMl} label="Água" unit="ml" />
-                  <MetricRing
-                    value={nutrition.proteinG}
-                    max={goals.proteinG}
-                    label="Proteína"
-                    unit="g"
-                  />
-                  <MetricRing
-                    value={taken.length}
-                    max={Math.max(1, routine.length)}
-                    label="Suplementos"
-                  />
-                  <MetricRing value={doneToday ? 1 : 0} max={1} label="Treino" />
-                </section>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    variant="outline"
-                    className="h-11"
-                    onClick={() => {
-                      addWater(500);
-                      toast.success("Hidratação registrada");
-                    }}
-                  >
-                    <Droplets className="size-4" /> Água
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-11"
-                    onClick={() => setMealSlot(suggestSlot())}
-                  >
-                    <Utensils className="size-4" /> Refeição
-                  </Button>
-                  <Button variant="outline" className="h-11" onClick={openWeight}>
-                    <Scale className="size-4" /> Peso
-                  </Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="rotina" className="mt-4">
-                <ul className="space-y-2">
-                  {routine.map((p) => {
-                    const done = taken.includes(p.id);
-                    const highlight = nowSuggestion?.id === p.id;
-                    return (
-                      <li
-                        key={p.id}
-                        className={`surface-glass flex items-center justify-between gap-3 px-3 py-3 ${
-                          highlight ? "border-primary/40" : ""
-                        }`}
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <SoldiersMediaThumb
-                            media={resolveProductMedia(p.id)}
-                            alt={p.name}
-                            className="size-10 rounded-lg"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold">{p.name}</p>
-                              {highlight ? (
-                                <Chip
-                                  color="accent"
-                                  size="sm"
-                                  variant="soft"
-                                  className="text-primary"
-                                >
-                                  <Chip.Label>Agora</Chip.Label>
-                                </Chip>
-                              ) : null}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {p.timing} · {p.serving}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant={done ? "default" : "secondary"}
-                          onClick={() => toggleSupplement(p.id)}
-                        >
-                          {done ? "Tomado" : "Marcar"}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <HomeMaisDoDia
+            persona={persona}
+            showLeague={showLeague}
+            stories={stories}
+            club={club}
+            clubFeed={clubFeed}
+            deviceId={deviceId}
+            kudosGiven={kudosGiven}
+            onKudos={(id) => {
+              setClubFeed((prev) =>
+                prev.map((x) => (x.id === id ? { ...x, kudosCount: x.kudosCount + 1 } : x)),
+              );
+              setKudosGiven((g) => ({ ...g, [id]: true }));
+            }}
+            onKudosQuest={markQuestKudos}
+            tip={tip}
+            onMarkTipSeen={markTipSeen}
+            summary={summary}
+            questsDone={questsDone}
+            score={score}
+            metricsWaterMl={metrics.waterMl}
+            waterGoalMl={goals.waterMl}
+            proteinG={nutrition.proteinG}
+            proteinGoalG={goals.proteinG}
+            takenCount={taken.length}
+            routineMax={routine.length}
+            doneToday={doneToday}
+            routine={routine}
+            takenIds={taken}
+            nowSuggestionId={nowSuggestion?.id ?? null}
+            onToggleSupplement={toggleSupplement}
+          />
         ) : null}
       </div>
 
@@ -1290,8 +1138,8 @@ function Today() {
         <MealPickerSheet
           slot={mealSlot}
           onClose={() => setMealSlot(null)}
-          onPick={onPickMeal}
-          onPickCustom={onPickMealCustom}
+          onPick={onPickMealNow}
+          onPickCustom={onPickMealCustomNow}
         />
       ) : null}
 

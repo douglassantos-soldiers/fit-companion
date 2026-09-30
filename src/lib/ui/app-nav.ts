@@ -2,6 +2,8 @@
 
 export function resolveTabKey(pathname: string): string {
   if (pathname === "/" || pathname === "") return "/";
+  // Coach is a Hoje satellite — keep "Hoje" highlighted to avoid nav limbo.
+  if (pathname.startsWith("/coach")) return "/";
   if (pathname.startsWith("/social") || pathname.startsWith("/desafios") || pathname.startsWith("/hubs")) {
     return "/social";
   }

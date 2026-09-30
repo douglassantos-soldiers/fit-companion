@@ -73,6 +73,7 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
       challengeInvitesSent: 0,
       coachNudgeDismissedAt: null,
       coachNudgeShownAt: null,
+      coachProposalFollowUp: null,
     };
   }
   const r = raw as Record<string, unknown>;
@@ -160,6 +161,10 @@ function retentionFromRow(raw: unknown): Partial<AppState> {
     coachNudgeDismissedAt:
       typeof r["coachNudgeDismissedAt"] === "string" ? r["coachNudgeDismissedAt"] : null,
     coachNudgeShownAt: typeof r["coachNudgeShownAt"] === "string" ? r["coachNudgeShownAt"] : null,
+    coachProposalFollowUp:
+      r["coachProposalFollowUp"] && typeof r["coachProposalFollowUp"] === "object"
+        ? (r["coachProposalFollowUp"] as AppState["coachProposalFollowUp"])
+        : null,
     favoriteMealPresetIds: Array.isArray(r["favoriteMealPresetIds"])
       ? (r["favoriteMealPresetIds"] as string[])
       : [],
@@ -230,6 +235,7 @@ function retentionPayload(state: AppState) {
     challengeInvitesSent: state.challengeInvitesSent ?? 0,
     coachNudgeDismissedAt: state.coachNudgeDismissedAt ?? null,
     coachNudgeShownAt: state.coachNudgeShownAt ?? null,
+    coachProposalFollowUp: state.coachProposalFollowUp ?? null,
     reminderHour: state.reminderHour ?? 18,
     remindersEnabled: state.remindersEnabled === true,
     pushPrefs: state.pushPrefs ?? { workout: true, streak: true, challenge: true, kudos: true },
