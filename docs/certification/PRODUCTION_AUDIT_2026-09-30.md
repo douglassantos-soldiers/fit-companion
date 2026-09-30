@@ -1,11 +1,14 @@
 # PRODUCTION AUDIT — FINAL REPORT
 
 **PROJECT:** Fit Companion / Soldiers Performance  
-**CERTIFIED HEAD SHA:** _(filled after gap-close commit)_  
+**CERTIFIED HEAD SHA:** `355852494db4903fcf57bbdb0a15affcdec02e55`  
 **AUDIT START HEAD:** `4119cfc409aec5e8aab3e8cd7075d031b6920273`  
 **GAP-CLOSE COMMIT 1:** `cac1a1653ba1a0e5d1ec40258af9242a3772a9cb`  
+**GAP-CLOSE COMMIT 2:** `355852494db4903fcf57bbdb0a15affcdec02e55` (P1-9/10/13 + operator gate)  
 **DATE:** 2026-09-30  
 **ENVIRONMENT:** local / CI (no production destructive ops)  
+
+> Note: a follow-up docs-only commit may advance HEAD slightly after this SHA was recorded; re-run `npm run gate:operator` and update this field to match `git rev-parse HEAD` before release.  
 
 ## 1. VERDICT
 
