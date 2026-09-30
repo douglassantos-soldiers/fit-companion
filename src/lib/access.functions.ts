@@ -283,10 +283,12 @@ export const completeAccountAccess = createServerFn({ method: "POST" })
     void data.authUserId;
     try {
       const { createClient } = await import("@supabase/supabase-js");
-      const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "";
+      const url =
+        process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || import.meta.env["VITE_SUPABASE_URL"] || "";
       const anon =
         process.env["SUPABASE_PUBLISHABLE_KEY"] ||
         process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+        import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
         "";
       if (url && anon) {
         const { getCookie } = await import("@tanstack/react-start/server");
