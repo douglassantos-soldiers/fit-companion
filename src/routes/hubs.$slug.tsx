@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Trophy, Users } from "lucide-react";
@@ -11,6 +10,7 @@ import { challengeById, isRelativeChallenge } from "@/data/challenges";
 import { hubBySlug } from "@/data/hubs";
 import { performanceUpgradeUrl } from "@/data/shopify-product-map";
 import { ProofStatusBadge } from "@/components/social/proof-status-badge";
+import { formatActivityEvent } from "@/components/social/activity-card";
 import {
   fetchHubLeaderboard,
   getHub,

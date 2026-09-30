@@ -14,6 +14,22 @@ import type { PhotoPose, PhotoVisibility, ProgressPhotoEntry } from "@/lib/types
 
 type Row = Record<string, unknown>;
 
+/** Allowed storage folder owners for this app user: userId and optional auth_user_id. */
+async function allowedPhotoOwners(userId: string): Promise<string[]> {
+  const owners = [userId];
+  const db = await adminDbLoose();
+  if (!db) return owners;
+  const { data } = await db.from("users").select("auth_user_id").eq("id", userId).maybeSingle();
+  const authId = data ? String((data as Row)["auth_user_id"] ?? "") : "";
+  if (authId) owners.push(authId);
+  return owners;
+}
+
+function pathOwnedBy(storagePath: string, owners: string[]): boolean {
+  const folder = String(storagePath).replace(/^\/+/, "").split("/")[0] ?? "";
+  return owners.includes(folder) && isValidProgressPhotoPath(storagePath, folder);
+}
+
 export async function saveProgressPhotoServer(
   deviceId: string,
   input: {
@@ -27,7 +43,8 @@ export async function saveProgressPhotoServer(
   const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
   if (!identity) return { ok: false };
   if (!isPhotoPose(input.pose)) return { ok: false };
-  if (!isValidProgressPhotoPath(input.storagePath)) return { ok: false };
+  const owners = await allowedPhotoOwners(identity.userId);
+  if (!pathOwnedBy(input.storagePath, owners)) return { ok: false };
   const visibility = isPhotoVisibility(input.visibility) ? input.visibility : DEFAULT_PHOTO_VISIBILITY;
   const db = await adminDbLoose();
   if (!db) return { ok: false };
@@ -63,6 +80,86 @@ export async function saveProgressPhotoServer(
   };
   if (!photo) return { ok: false };
   return { ok: true, photo };
+}
+
+/**
+ * Upload via service_role under app userId folder.
+ * Works for access-session users without Supabase Auth JWT (P1-13).
+ */
+export async function uploadProgressPhotoBytesServer(
+  deviceId: string,
+  input: {
+    id: string;
+    takenOn: string;
+    pose: PhotoPose;
+    bytesBase64: string;
+    contentType?: string;
+  },
+): Promise<{ ok: boolean; photo?: ProgressPhotoEntry; error?: string }> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity) return { ok: false, error: "unauthorized" };
+  if (!isPhotoPose(input.pose)) return { ok: false, error: "invalid_pose" };
+
+  const buf = Buffer.from(input.bytesBase64, "base64");
+  if (!buf.length || buf.length > 5 * 1024 * 1024) {
+    return { ok: false, error: "invalid_size" };
+  }
+
+  const { buildProgressPhotoPath, PROGRESS_PHOTOS_BUCKET, DEFAULT_PHOTO_VISIBILITY: vis } =
+    await import("@/lib/progress/body");
+  const takenOn = input.takenOn.slice(0, 10);
+  const storagePath = buildProgressPhotoPath({
+    ownerId: identity.userId,
+    takenOn,
+    pose: input.pose,
+    id: input.id,
+  });
+
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.storage.from(PROGRESS_PHOTOS_BUCKET).upload(storagePath, buf, {
+      contentType: input.contentType || "image/jpeg",
+      upsert: true,
+    });
+    if (error) {
+      console.error("uploadProgressPhotoBytesServer failed", error);
+      return { ok: false, error: "upload_failed" };
+    }
+  } catch (e) {
+    console.error("uploadProgressPhotoBytesServer exception", e);
+    return { ok: false, error: "upload_failed" };
+  }
+
+  const saved = await saveProgressPhotoServer(deviceId, {
+    id: input.id,
+    takenOn,
+    pose: input.pose,
+    storagePath,
+    visibility: vis,
+  });
+  if (!saved.ok) return { ok: false, error: "metadata_failed" };
+  return { ok: true, photo: saved.photo };
+}
+
+export async function signedProgressPhotoUrlServer(
+  deviceId: string,
+  storagePath: string,
+): Promise<string | null> {
+  const identity = await resolveTrustedIdentity({ deviceId, requireAccess: true });
+  if (!identity) return null;
+  const owners = await allowedPhotoOwners(identity.userId);
+  if (!pathOwnedBy(storagePath, owners)) return null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { PROGRESS_PHOTOS_BUCKET, SIGNED_URL_TTL_SEC } = await import("@/lib/progress/body");
+    const { data, error } = await supabaseAdmin.storage
+      .from(PROGRESS_PHOTOS_BUCKET)
+      .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteProgressPhotoServer(

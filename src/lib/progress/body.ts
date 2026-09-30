@@ -110,12 +110,13 @@ export function isPhotoVisibility(value: unknown): value is PhotoVisibility {
 }
 
 export function buildProgressPhotoPath(opts: {
-  authUserId: string;
+  /** Folder owner: app `userId` (canonical) or auth.uid() when JWT upload path is used. */
+  ownerId: string;
   takenOn: string;
   pose: PhotoPose;
   id: string;
 }): string {
-  return `${opts.authUserId}/${opts.takenOn}/${opts.pose}-${opts.id}.jpg`;
+  return `${opts.ownerId}/${opts.takenOn}/${opts.pose}-${opts.id}.jpg`;
 }
 
 /** Original body photos must never live under the public checkins bucket. */
@@ -126,7 +127,7 @@ export function isPrivateProgressPhotoPath(path: string): boolean {
   return !p.toLowerCase().startsWith("checkins");
 }
 
-export function isValidProgressPhotoPath(path: string, authUserId?: string): boolean {
+export function isValidProgressPhotoPath(path: string, ownerId?: string): boolean {
   const p = String(path ?? "").replace(/^\/+/, "");
   if (!isPrivateProgressPhotoPath(p)) return false;
   const parts = p.split("/");
@@ -135,7 +136,7 @@ export function isValidProgressPhotoPath(path: string, authUserId?: string): boo
   const date = parts[1] ?? "";
   const file = parts[2] ?? "";
   if (!folder || folder === "checkins") return false;
-  if (authUserId && folder !== authUserId) return false;
+  if (ownerId && folder !== ownerId) return false;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   if (!/^(front|side|back)-[a-zA-Z0-9-]+\.jpe?g$/i.test(file)) return false;
   return true;

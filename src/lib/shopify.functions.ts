@@ -55,9 +55,6 @@ export type StorefrontProduct = {
 
 const DENY_MSG = "Não encontramos compra paga com este e-mail";
 
-/** Simple in-memory rate limit: max 8 attempts / email / 15 min */
-const rateHits = new Map<string, { n: number; resetAt: number }>();
-
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
@@ -72,16 +69,18 @@ function maskEmail(email: string): string {
   return `${user.slice(0, 2)}***@${domain}`;
 }
 
-function rateLimit(email: string): boolean {
-  const now = Date.now();
-  const cur = rateHits.get(email);
-  if (!cur || cur.resetAt < now) {
-    rateHits.set(email, { n: 1, resetAt: now + 15 * 60_000 });
-    return true;
-  }
-  if (cur.n >= 8) return false;
-  cur.n += 1;
-  return true;
+/** Distributed-capable rate limit (same store as access/AI — not process-local Map). */
+async function allowVerifyPurchaseAttempt(email: string): Promise<boolean> {
+  const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+  if (isAiRateLimitDisabled()) return true;
+  const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
+  const store = await resolveAiRateLimitStore();
+  const burst = await store.consume({
+    key: `shopify:verify:${email}`,
+    limit: 8,
+    windowMs: 15 * 60_000,
+  });
+  return burst.allowed;
 }
 
 function parseEmailInput(input: unknown): { email: string } {
@@ -215,7 +214,7 @@ export const verifyShopifyPurchase = createServerFn({ method: "POST" })
       return { ok: false, reason: "not_configured" };
     }
 
-    if (!rateLimit(data.email)) {
+    if (!(await allowVerifyPurchaseAttempt(data.email))) {
       console.warn("Shopify verify rate limited", maskEmail(data.email));
       return { ok: false, reason: "no_purchase" };
     }

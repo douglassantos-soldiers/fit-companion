@@ -690,33 +690,34 @@ export async function pushStateServer(
         clientUpdatedAt: new Date().toISOString(),
       })
     ) {
+      const profile = state.profile;
       tasks.push({
         table: "profiles",
         run: () => db.from("profiles").upsert(
           {
             ...channel,
-            name: state.profile.name,
-            goal: state.profile.goal,
-            level: state.profile.level,
-            days_per_week: state.profile.daysPerWeek,
-            age: state.profile.age,
-            height_cm: state.profile.heightCm,
-            weight_kg: state.profile.weightKg,
-            equipment: state.profile.equipment,
-            restrictions: state.profile.restrictions,
-            timezone: state.profile.timezone ?? "America/Sao_Paulo",
+            name: profile.name,
+            goal: profile.goal,
+            level: profile.level,
+            days_per_week: profile.daysPerWeek,
+            age: profile.age,
+            height_cm: profile.heightCm,
+            weight_kg: profile.weightKg,
+            equipment: profile.equipment,
+            restrictions: profile.restrictions,
+            timezone: profile.timezone ?? "America/Sao_Paulo",
             prefs: {
-              skipBreakfast: state.profile.skipBreakfast === true,
-              lunchOutOften: state.profile.lunchOutOften === true,
-              typicalSleepHours: state.profile.typicalSleepHours,
-              primaryBlocker: state.profile.primaryBlocker,
-              nutritionProfile: state.profile.nutritionProfile,
-              trainingWeekdays: state.profile.trainingWeekdays,
-              focusMuscles: state.profile.focusMuscles,
-              equipmentInventory: state.profile.equipmentInventory,
-              typicalSessionMin: state.profile.typicalSessionMin,
-              onboardingComplete: state.profile.onboardingComplete === true,
-              timezone: state.profile.timezone ?? "America/Sao_Paulo",
+              skipBreakfast: profile.skipBreakfast === true,
+              lunchOutOften: profile.lunchOutOften === true,
+              typicalSleepHours: profile.typicalSleepHours,
+              primaryBlocker: profile.primaryBlocker,
+              nutritionProfile: profile.nutritionProfile,
+              trainingWeekdays: profile.trainingWeekdays,
+              focusMuscles: profile.focusMuscles,
+              equipmentInventory: profile.equipmentInventory,
+              typicalSessionMin: profile.typicalSessionMin,
+              onboardingComplete: profile.onboardingComplete === true,
+              timezone: profile.timezone ?? "America/Sao_Paulo",
             },
             version: nextVersion((remoteProfile as { version?: number } | null)?.version),
             updated_at: new Date().toISOString(),
@@ -730,7 +731,7 @@ export async function pushStateServer(
           db
             .from("users")
             .update({
-              timezone: state.profile.timezone ?? "America/Sao_Paulo",
+              timezone: profile.timezone ?? "America/Sao_Paulo",
               updated_at: new Date().toISOString(),
             })
             .eq("id", userId),

@@ -63,6 +63,60 @@ export const saveProgressPhotoFn = createServerFn({ method: "POST" })
     });
   });
 
+function parseUpload(input: unknown) {
+  const base = parseDevice(input);
+  const v = input as {
+    id?: string;
+    takenOn?: string;
+    pose?: string;
+    bytesBase64?: string;
+    contentType?: string;
+  } | null;
+  const id = String(v?.id ?? "").trim();
+  const takenOn = String(v?.takenOn ?? "").slice(0, 10);
+  const pose = v?.pose;
+  const bytesBase64 = String(v?.bytesBase64 ?? "");
+  if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(takenOn) || !isPhotoPose(pose) || bytesBase64.length < 32) {
+    throw new Error("upload inválido");
+  }
+  return {
+    ...base,
+    id,
+    takenOn,
+    pose: pose as PhotoPose,
+    bytesBase64,
+    contentType: String(v?.contentType ?? "image/jpeg"),
+  };
+}
+
+export const uploadProgressPhotoFn = createServerFn({ method: "POST" })
+  .inputValidator(parseUpload)
+  .handler(async ({ data }) => {
+    const { uploadProgressPhotoBytesServer } = await import("@/lib/progress/photos.server");
+    return uploadProgressPhotoBytesServer(data.deviceId, {
+      id: data.id,
+      takenOn: data.takenOn,
+      pose: data.pose,
+      bytesBase64: data.bytesBase64,
+      contentType: data.contentType,
+    });
+  });
+
+function parseSignedUrl(input: unknown) {
+  const base = parseDevice(input);
+  const storagePath = String((input as { storagePath?: string } | null)?.storagePath ?? "").trim();
+  if (!storagePath) throw new Error("storagePath inválido");
+  return { ...base, storagePath };
+}
+
+export const signedProgressPhotoUrlFn = createServerFn({ method: "POST" })
+  .inputValidator(parseSignedUrl)
+  .handler(async ({ data }) => {
+    const { signedProgressPhotoUrlServer } = await import("@/lib/progress/photos.server");
+    const url = await signedProgressPhotoUrlServer(data.deviceId, data.storagePath);
+    return { ok: Boolean(url), url };
+  });
+
 export const deleteProgressPhotoFn = createServerFn({ method: "POST" })
   .inputValidator(parseDelete)
   .handler(async ({ data }) => {

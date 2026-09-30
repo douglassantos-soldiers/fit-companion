@@ -32,7 +32,7 @@ function photo(partial: Partial<ProgressPhotoEntry> & { id: string; takenOn: str
     storagePath:
       partial.storagePath ??
       buildProgressPhotoPath({
-        authUserId: "auth-user-1",
+        ownerId: "auth-user-1",
         takenOn: partial.takenOn,
         pose,
         id: partial.id,
@@ -69,7 +69,7 @@ describe("Fase 11 photo privacy", () => {
 
   it("accepts private progress-photos path shape", () => {
     const path = buildProgressPhotoPath({
-      authUserId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      ownerId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       takenOn: "2026-09-19",
       pose: "side",
       id: "photo-1",

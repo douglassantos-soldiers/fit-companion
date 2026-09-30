@@ -1,9 +1,13 @@
 /**
  * Client-side progress photo bytes: compress, signed URL, upload/delete.
  * Originals never go to the public checkins bucket.
+ *
+ * Ownership: prefer app userId via server upload (access cookie).
+ * Auth JWT path remains for users with Supabase Auth linked.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthUser } from "@/lib/auth";
+import { getDeviceId } from "@/lib/sync";
 import {
   buildProgressPhotoPath,
   DEFAULT_PHOTO_VISIBILITY,
@@ -53,8 +57,26 @@ async function loadImage(file: File): Promise<HTMLImageElement | null> {
   }
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]!);
+  return btoa(binary);
+}
+
 export async function signedProgressPhotoUrl(storagePath: string): Promise<string | null> {
   if (!isValidProgressPhotoPath(storagePath)) return null;
+  const deviceId = getDeviceId();
+  if (deviceId) {
+    try {
+      const { signedProgressPhotoUrlFn } = await import("@/lib/progress/photos.functions");
+      const res = await signedProgressPhotoUrlFn({ data: { deviceId, storagePath } });
+      if (res?.url) return res.url;
+    } catch {
+      /* fall through to client signed URL */
+    }
+  }
   const { data, error } = await supabase.storage
     .from(PROGRESS_PHOTOS_BUCKET)
     .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
@@ -68,12 +90,40 @@ export async function uploadProgressPhotoFile(opts: {
   pose: PhotoPose;
   id?: string;
 }): Promise<{ photo: ProgressPhotoEntry } | { error: string }> {
-  const user = await getAuthUser();
-  if (!user) return { error: "Entre na conta para enviar fotos privadas." };
   const id = opts.id ?? crypto.randomUUID();
   const takenOn = opts.takenOn.slice(0, 10);
+  const blob = await compressProgressPhoto(opts.file);
+  const deviceId = getDeviceId();
+
+  // Canonical path for access-session users: server upload under app userId (service_role).
+  if (deviceId) {
+    try {
+      const { uploadProgressPhotoFn } = await import("@/lib/progress/photos.functions");
+      const bytesBase64 = await blobToBase64(blob);
+      const res = await uploadProgressPhotoFn({
+        data: {
+          deviceId,
+          id,
+          takenOn,
+          pose: opts.pose,
+          bytesBase64,
+          contentType: "image/jpeg",
+        },
+      });
+      if (res?.ok && res.photo) return { photo: res.photo };
+      if (res && !res.ok && res.error === "unauthorized") {
+        return { error: "Entre na conta para enviar fotos privadas." };
+      }
+    } catch (e) {
+      console.warn("server progress photo upload failed, trying auth path", e);
+    }
+  }
+
+  // Legacy JWT path (storage policies keyed by auth.uid())
+  const user = await getAuthUser();
+  if (!user) return { error: "Entre na conta para enviar fotos privadas." };
   const path = buildProgressPhotoPath({
-    authUserId: user.id,
+    ownerId: user.id,
     takenOn,
     pose: opts.pose,
     id,
@@ -81,7 +131,6 @@ export async function uploadProgressPhotoFile(opts: {
   if (!isValidProgressPhotoPath(path, user.id)) {
     return { error: "Caminho de foto inválido." };
   }
-  const blob = await compressProgressPhoto(opts.file);
   const { error } = await supabase.storage.from(PROGRESS_PHOTOS_BUCKET).upload(path, blob, {
     upsert: true,
     contentType: "image/jpeg",

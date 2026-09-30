@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 
 /** Build session search from the Decision Engine express flag — never force express. */
 export function homeFallbackSessionSearch(express: boolean): {
-  express?: true;
+  express: boolean;
   from: "hoje";
 } {
-  return express ? { express: true, from: "hoje" } : { from: "hoje" };
+  return { express: Boolean(express), from: "hoje" };
 }
 
 export function homeFallbackCtaLabel(express: boolean): string {

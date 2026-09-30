@@ -1,0 +1,51 @@
+{
+  "at": "2026-09-30T22:39:14.855Z",
+  "head": "cac1a1653ba1a0e5d1ec40258af9242a3772a9cb",
+  "checks": [
+    {
+      "name": "local_vitest_operator_suite",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "name": "rls_migration_scan",
+      "status": "pass",
+      "detail": "harden present"
+    },
+    {
+      "name": "rls_remote_probe",
+      "status": "pending_operator",
+      "detail": "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY absent in this environment | Cannot prove remote policies match FASE1/FASE2 harden | Operator must run scripts/validate-rls-remote.mjs against production"
+    },
+    {
+      "name": "rag_local_allowlist",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "name": "rag_remote_probe",
+      "status": "pending_operator",
+      "detail": "SUPABASE credentials absent — cannot prove ai_knowledge_* population | Run npm run rag:seed against production after credentials are available"
+    },
+    {
+      "name": "e2e_authenticated",
+      "status": "pending_operator",
+      "detail": "E2E_ACCESS_EMAIL absent — authenticated flows skipped"
+    },
+    {
+      "name": "account_deletion_live",
+      "status": "pending_operator",
+      "detail": "Requires controlled test user + service_role; unit BEFORE/AFTER already PASS"
+    },
+    {
+      "name": "backup_restore_drill",
+      "status": "pending_operator",
+      "detail": "See docs/backup-dr.md — restore not executed in this environment"
+    },
+    {
+      "name": "wearables_integration",
+      "status": "pending_operator",
+      "detail": "Credentials present check only — full OAuth still operator-owned"
+    }
+  ]
+}

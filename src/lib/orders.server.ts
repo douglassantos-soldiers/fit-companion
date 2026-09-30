@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Persist Shopify orders + items. Server-only. Idempotent on shopify_order_id.
  */
@@ -159,7 +158,7 @@ export async function markOrderRefunded(shopifyOrderId: string): Promise<void> {
     .select("id, financial_status")
     .eq("user_id", userId);
 
-  const stillPaid = (paid ?? []).some((o) => {
+  const stillPaid = (paid ?? []).some((o: { financial_status?: string | null }) => {
     const s = String(o.financial_status ?? "").toLowerCase();
     return s === "paid" || s === "partially_paid";
   });

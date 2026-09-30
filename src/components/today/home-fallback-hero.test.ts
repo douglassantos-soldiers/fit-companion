@@ -6,8 +6,7 @@ import {
 
 describe("homeFallbackSessionSearch", () => {
   it("does not force express when Decision Engine says false", () => {
-    expect(homeFallbackSessionSearch(false)).toEqual({ from: "hoje" });
-    expect(homeFallbackSessionSearch(false)).not.toHaveProperty("express");
+    expect(homeFallbackSessionSearch(false)).toEqual({ express: false, from: "hoje" });
   });
 
   it("passes express only when explicitly true", () => {
