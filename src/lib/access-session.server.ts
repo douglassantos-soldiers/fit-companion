@@ -438,7 +438,6 @@ export async function authenticateAdminWithRole(
   if (envOk) return { ok: true, role: "admin" };
   const authRole = await verifyAdminAuthUser(email, password);
   if (authRole) return { ok: true, role: authRole };
-  if (!envConfigured) return { ok: false, reason: "not_configured" };
   return { ok: false, reason: "invalid" };
 }
 
