@@ -1,4 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "node:crypto";
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 export const Route = createFileRoute("/api/cron/daily-pushes")({
   server: {
@@ -7,7 +15,7 @@ export const Route = createFileRoute("/api/cron/daily-pushes")({
         const secret = process.env["CRON_SECRET"]?.trim() ?? "";
         const header = request.headers.get("authorization") ?? "";
         const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-        if (!secret || token !== secret) {
+        if (!secret || !timingSafeEqualString(token, secret)) {
           return new Response(JSON.stringify({ ok: false, reason: "unauthorized" }), {
             status: 401,
             headers: { "content-type": "application/json" },

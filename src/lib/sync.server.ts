@@ -661,6 +661,7 @@ export async function pushStateServer(
 ): Promise<{
   ok: boolean;
   partial?: boolean;
+  persistentFailed?: boolean;
   userId: string | null;
   conflicts?: string[];
   errors?: Array<{ table: string; code: string }>;
@@ -673,7 +674,7 @@ export async function pushStateServer(
 
   const userId = identity.userId;
   const channel = { user_id: userId, device_id: deviceId };
-  const tasks: Array<{ table: string; run: PromiseLike<unknown> }> = [];
+  const tasks: Array<{ table: string; run: () => PromiseLike<unknown> }> = [];
   const conflicts: string[] = [];
 
   if (state.profile) {
@@ -691,7 +692,7 @@ export async function pushStateServer(
     ) {
       tasks.push({
         table: "profiles",
-        run: db.from("profiles").upsert(
+        run: () => db.from("profiles").upsert(
           {
             ...channel,
             name: state.profile.name,
@@ -725,13 +726,14 @@ export async function pushStateServer(
       });
       tasks.push({
         table: "users",
-        run: db
-          .from("users")
-          .update({
-            timezone: state.profile.timezone ?? "America/Sao_Paulo",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", userId),
+        run: () =>
+          db
+            .from("users")
+            .update({
+              timezone: state.profile.timezone ?? "America/Sao_Paulo",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", userId),
       });
     } else {
       conflicts.push("profile");
@@ -740,7 +742,7 @@ export async function pushStateServer(
 
   tasks.push({
     table: "app_state",
-    run: (async () => {
+    run: () => (async () => {
       const { data: remoteApp } = await db
         .from("app_state")
         .select("version, updated_at")
@@ -799,7 +801,7 @@ export async function pushStateServer(
     if (accepted.length) {
       tasks.push({
         table: "sessions",
-        run: db.from("sessions").upsert(
+        run: () => db.from("sessions").upsert(
           accepted.map((s) => {
             const remote = remoteById.get(s.id);
             return {
@@ -826,7 +828,7 @@ export async function pushStateServer(
   if (state.weights.length) {
     tasks.push({
       table: "weights",
-      run: db.from("weights").upsert(
+      run: () => db.from("weights").upsert(
         state.weights.map((w) => ({
           ...channel,
           date: w.date,
@@ -846,7 +848,7 @@ export async function pushStateServer(
     if (!measProbe.error) {
       tasks.push({
         table: "body_measurements",
-        run: db.from("body_measurements").upsert(
+        run: () => db.from("body_measurements").upsert(
           state.measurements.map((m) => ({
             ...channel,
             ...measurementToRow(m),
@@ -863,7 +865,7 @@ export async function pushStateServer(
     if (!photoProbe.error) {
       tasks.push({
         table: "progress_photos",
-        run: db.from("progress_photos").upsert(
+        run: () => db.from("progress_photos").upsert(
           state.progressPhotos.map((p) => ({
             ...channel,
             id: p.id,
@@ -883,7 +885,7 @@ export async function pushStateServer(
   if (days.length) {
     tasks.push({
       table: "daily_metrics",
-      run: db.from("daily_metrics").upsert(
+      run: () => db.from("daily_metrics").upsert(
         days.map((d) => ({
           ...channel,
           date: d.date,
@@ -899,7 +901,7 @@ export async function pushStateServer(
   if (supplementDays.length) {
     tasks.push({
       table: "supplement_logs",
-      run: db.from("supplement_logs").upsert(
+      run: () => db.from("supplement_logs").upsert(
         supplementDays.map(([date, ids]) => ({
           ...channel,
           date,
@@ -933,7 +935,7 @@ export async function pushStateServer(
     if (accepted.length) {
       tasks.push({
         table: "meal_entries",
-        run: db.from("meal_entries").upsert(
+        run: () => db.from("meal_entries").upsert(
           accepted.map((m) => {
             const remote = remoteById.get(m.id);
             return {
@@ -959,7 +961,7 @@ export async function pushStateServer(
       if (itemRows.length) {
         tasks.push({
           table: "meal_items",
-          run: db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }),
+          run: () => db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }),
         });
       }
     }
@@ -991,7 +993,7 @@ export async function pushStateServer(
       if (accepted.length) {
         tasks.push({
           table: "supplement_dose_logs",
-          run: db.from("supplement_dose_logs").upsert(
+          run: () => db.from("supplement_dose_logs").upsert(
             accepted.map((d) => {
               const remote = remoteById.get(d.id);
               return {
@@ -1039,7 +1041,7 @@ export async function pushStateServer(
     if (accepted.length) {
       tasks.push({
         table: "day_checkins",
-        run: db.from("day_checkins").upsert(
+        run: () => db.from("day_checkins").upsert(
           accepted.map((c) => {
             const remote = remoteByDate.get(c.date.slice(0, 10));
             return dayCheckInToRow(
@@ -1054,26 +1056,16 @@ export async function pushStateServer(
     }
   }
 
-  const results = await Promise.all(
-    tasks.map(async (t) => {
-      try {
-        const r = (await t.run) as { error?: { message?: string; code?: string } | null };
-        return { table: t.table, error: r?.error ?? null };
-      } catch (e) {
-        return { table: t.table, error: e as { message?: string; code?: string } };
-      }
-    }),
-  );
+  const { runClassifiedPushTasks } = await import("@/lib/sync/critical");
+  const { results, criticalFailed } = await runClassifiedPushTasks(tasks);
 
   const { logSyncOp } = await import("@/lib/engine/observability");
   const errors: Array<{ table: string; code: string }> = [];
-  let criticalFailed = false;
 
   for (const r of results) {
     const error = r?.error;
     if (!error) continue;
     const code = String(error.code ?? "write_failed");
-    criticalFailed = true;
     errors.push({ table: r.table, code });
     logSyncOp({
       userId,
@@ -1085,6 +1077,7 @@ export async function pushStateServer(
   }
 
   for (const s of state.sessions) {
+    if (criticalFailed) break;
     if (s.rpe == null && !s.express) continue;
     try {
       const { error } = await db
@@ -1115,6 +1108,7 @@ export async function pushStateServer(
     return {
       ok: false,
       partial: errors.length < results.length,
+      persistentFailed: true,
       userId,
       errors,
       ...(conflicts.length ? { conflicts } : {}),
@@ -1197,31 +1191,9 @@ export async function clearRemoteStateServer(deviceId: string): Promise<{
   return { ok: true, mode: "noop_use_clearUserData" };
 }
 
-/** Core + analytics domain tables owned by user_id (never Shopify external). */
-const CLEAR_USER_CORE_TABLES = [
-  "sessions",
-  "weights",
-  "body_measurements",
-  "progress_photos",
-  "daily_metrics",
-  "supplement_logs",
-  "supplement_dose_logs",
-  "app_state",
-  "profiles",
-  "meal_entries",
-  "day_checkins",
-  "customer_profiles",
-  "decision_outcomes",
-  "decision_actions",
-  "recommendation_decisions",
-  "user_patterns",
-  "user_events",
-  "push_subscriptions",
-  "push_sends",
-] as const;
-
 /**
- * Explicit account data wipe (internal domain only — never Shopify orders/identities external).
+ * Explicit account data wipe (internal domain only — never Shopify orders external).
+ * See `account-deletion.ts` for DELETE / ANONYMIZE / RETAIN inventory.
  */
 export async function clearUserDataServer(deviceId: string): Promise<{
   ok: boolean;
@@ -1235,7 +1207,20 @@ export async function clearUserDataServer(deviceId: string): Promise<{
   if (!db) return { ok: false, userId: identity.userId };
 
   const { logSyncOp } = await import("@/lib/engine/observability");
+  const { executeAccountWipe } = await import("@/lib/account-deletion");
   const errors: Array<{ table: string; code: string }> = [];
+
+  // Resolve device ids before row wipe (needed for checkins storage + legacy device rows)
+  let deviceIds: string[] = [deviceId].filter(Boolean);
+  try {
+    const { data } = await db.from("devices").select("device_id").eq("user_id", identity.userId);
+    const fromDb = ((data ?? []) as Array<{ device_id?: string }>)
+      .map((r) => String(r.device_id ?? ""))
+      .filter(Boolean);
+    deviceIds = [...new Set([...deviceIds, ...fromDb])];
+  } catch {
+    // keep calling deviceId
+  }
 
   try {
     const { removeProgressPhotosForUser } = await import("@/lib/progress/photos.server");
@@ -1247,37 +1232,41 @@ export async function clearUserDataServer(deviceId: string): Promise<{
     });
   }
 
-  for (const table of CLEAR_USER_CORE_TABLES) {
-    try {
-      const { error } = await db.from(table).delete().eq("user_id", identity.userId);
-      if (error) {
-        // decision_outcomes / optional tables may not exist yet
-        if (String(error.message ?? "").includes("does not exist")) continue;
-        errors.push({ table, code: String(error.code ?? "delete_failed") });
-        logSyncOp({
-          userId: identity.userId,
-          operation: "clearUserData",
-          table,
-          status: "error",
-          errorCode: String(error.code ?? "delete_failed"),
-        });
-      } else {
-        logSyncOp({
-          userId: identity.userId,
-          operation: "clearUserData",
-          table,
-          status: "ok",
-        });
-      }
-    } catch (e) {
-      errors.push({
-        table,
-        code: e instanceof Error ? e.message.slice(0, 40) : "exception",
-      });
-    }
+  try {
+    const { removeCheckinsForDevices } = await import("@/lib/account-deletion.storage");
+    await removeCheckinsForDevices(deviceIds);
+  } catch (e) {
+    errors.push({
+      table: "checkins",
+      code: e instanceof Error ? e.message.slice(0, 40) : "storage_wipe",
+    });
   }
 
-  if (errors.length === CLEAR_USER_CORE_TABLES.length) {
+  const wipe = await executeAccountWipe(db, {
+    userId: identity.userId,
+    deviceIds,
+    onError: (table, code) => {
+      logSyncOp({
+        userId: identity.userId,
+        operation: "clearUserData",
+        table,
+        status: "error",
+        errorCode: code,
+      });
+    },
+    onOk: (table) => {
+      logSyncOp({
+        userId: identity.userId,
+        operation: "clearUserData",
+        table,
+        status: "ok",
+      });
+    },
+  });
+
+  errors.push(...wipe.errors);
+
+  if (!wipe.ok && !wipe.partial && !wipe.deletedTables.length) {
     return { ok: false, userId: identity.userId, errors };
   }
   if (errors.length) {
@@ -1286,7 +1275,7 @@ export async function clearUserDataServer(deviceId: string): Promise<{
   return { ok: true, userId: identity.userId };
 }
 
-/** LGPD export — profile, sessions, weights, meals, events, prefs. No Shopify PII dump. */
+/** LGPD export — profile, training, nutrition, progress, prefs. See export-policy.ts. */
 export async function exportUserDataServer(deviceId: string): Promise<{
   ok: boolean;
   json: string;
@@ -1296,52 +1285,109 @@ export async function exportUserDataServer(deviceId: string): Promise<{
   const db = await adminDbLoose();
   if (!db) return { ok: false, json: "" };
 
-  const [profile, sessions, weights, meals, events, stateRow, measurements, photos] =
-    await Promise.all([
-      db.from("profiles").select("*").eq("user_id", identity.userId).maybeSingle(),
-      db
-        .from("sessions")
-        .select("client_id, date, title, duration_min, volume_kg, rpe")
-        .eq("user_id", identity.userId),
-      db.from("weights").select("date, weight_kg").eq("user_id", identity.userId),
-      db.from("meal_entries").select("client_id, date, slot, items").eq("user_id", identity.userId),
-      db
-        .from("user_events")
-        .select("event_type, occurred_at, entity_type, entity_id, metadata")
-        .eq("user_id", identity.userId)
-        .order("occurred_at", { ascending: false })
-        .limit(500),
-      db.from("app_state").select("retention").eq("user_id", identity.userId).maybeSingle(),
-      db
-        .from("body_measurements")
-        .select("date, waist_cm, arm_cm, chest_cm, hip_cm, thigh_cm")
-        .eq("user_id", identity.userId),
-      db
-        .from("progress_photos")
-        .select("taken_on, pose, visibility, storage_path")
-        .eq("user_id", identity.userId),
-    ]);
+  const { EXPORT_EXCLUDED, EXPORT_INCLUDED, EXPORT_PARTIAL } = await import("@/lib/export-policy");
+
+  const [
+    profile,
+    sessions,
+    weights,
+    meals,
+    mealItems,
+    events,
+    stateRow,
+    measurements,
+    photos,
+    metrics,
+    supplements,
+    doses,
+    devices,
+    wearables,
+    activity,
+    aiMemory,
+  ] = await Promise.all([
+    db.from("profiles").select("*").eq("user_id", identity.userId).maybeSingle(),
+    db
+      .from("sessions")
+      .select("client_id, date, title, duration_min, volume_kg, rpe")
+      .eq("user_id", identity.userId),
+    db.from("weights").select("date, weight_kg").eq("user_id", identity.userId),
+    db.from("meal_entries").select("client_id, date, slot, items").eq("user_id", identity.userId),
+    db
+      .from("meal_items")
+      .select("client_id, meal_client_id, food_id, food_name, quantity, unit, grams, nutrient_snapshot")
+      .eq("user_id", identity.userId),
+    db
+      .from("user_events")
+      .select("event_type, occurred_at, entity_type, entity_id, metadata")
+      .eq("user_id", identity.userId)
+      .order("occurred_at", { ascending: false })
+      .limit(500),
+    db.from("app_state").select("retention").eq("user_id", identity.userId).maybeSingle(),
+    db
+      .from("body_measurements")
+      .select("date, waist_cm, arm_cm, chest_cm, hip_cm, thigh_cm")
+      .eq("user_id", identity.userId),
+    db
+      .from("progress_photos")
+      .select("taken_on, pose, visibility, storage_path")
+      .eq("user_id", identity.userId),
+    db.from("daily_metrics").select("date, water_ml, sleep_hours, steps").eq("user_id", identity.userId),
+    db.from("supplement_logs").select("date, items").eq("user_id", identity.userId),
+    db
+      .from("supplement_dose_logs")
+      .select("client_id, product_id, dose, unit, frequency, taken_at, source")
+      .eq("user_id", identity.userId),
+    db.from("devices").select("device_id, created_at, last_seen_at").eq("user_id", identity.userId),
+    db
+      .from("wearable_connections")
+      .select("provider, status, connected_at, last_sync_at")
+      .eq("user_id", identity.userId),
+    db
+      .from("activity_events")
+      .select("id, type, visibility, created_at, payload")
+      .eq("user_id", identity.userId)
+      .limit(200),
+    db
+      .from("ai_user_memory")
+      .select("id, type, key, data, source, confidence, status, updated_at")
+      .eq("user_id", identity.userId)
+      .limit(100),
+  ]);
 
   const retention = (stateRow.data?.retention as Record<string, unknown> | null) ?? {};
+  const omitIfError = <T,>(res: { data: T | null; error: unknown }, fallback: T): T =>
+    res.error ? fallback : ((res.data as T) ?? fallback);
+
   return {
     ok: true,
     json: JSON.stringify({
       exportedAt: new Date().toISOString(),
       userId: identity.userId,
       email: identity.email,
+      policy: {
+        included: EXPORT_INCLUDED,
+        excluded: EXPORT_EXCLUDED,
+        partial: EXPORT_PARTIAL,
+      },
       profile: profile.data ?? null,
       sessions: sessions.data ?? [],
       weights: weights.data ?? [],
-      measurements: measurements.error ? [] : (measurements.data ?? []),
-      progressPhotos: photos.error
-        ? []
-        : (photos.data ?? []).map((p: Record<string, unknown>) => ({
-            takenOn: p["taken_on"],
-            pose: p["pose"],
-            visibility: p["visibility"],
-            storagePath: p["storage_path"],
-          })),
+      measurements: omitIfError(measurements, []),
+      progressPhotos: omitIfError(photos, []).map((p: Record<string, unknown>) => ({
+        takenOn: p["taken_on"],
+        pose: p["pose"],
+        visibility: p["visibility"],
+        storagePath: p["storage_path"],
+      })),
       meals: meals.data ?? [],
+      mealItems: omitIfError(mealItems, []),
+      dailyMetrics: omitIfError(metrics, []),
+      supplementLogs: omitIfError(supplements, []),
+      supplementDoseLogs: omitIfError(doses, []),
+      devices: omitIfError(devices, []),
+      wearables: omitIfError(wearables, []),
+      activityEvents: omitIfError(activity, []),
+      aiUserMemory: omitIfError(aiMemory, []),
       events: events.data ?? [],
       prefs: {
         reminderHour: retention["reminderHour"] ?? 18,

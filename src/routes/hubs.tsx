@@ -1,8 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-/** List entry consolidated under Social tab — detail stays at /hubs/$slug. */
+/** Layout for hub detail; list entry lives under Social (`/hubs/` redirects). */
 export const Route = createFileRoute("/hubs")({
-  beforeLoad: () => {
-    throw redirect({ to: "/social", search: { tab: "hubs" } });
-  },
+  component: HubsLayout,
 });
+
+function HubsLayout() {
+  return <Outlet />;
+}

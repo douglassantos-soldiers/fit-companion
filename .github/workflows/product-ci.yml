@@ -1,0 +1,52 @@
+# Product CI — typecheck, lint, unit, build, e2e smoke
+name: Product CI Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  product-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit / integration (full Vitest)
+        run: npm test
+
+      - name: RLS migration scan
+        run: npx vitest run src/lib/security/rls-validation.test.ts
+
+      - name: RAG readiness (local)
+        run: npx vitest run src/ai/rag/rag-readiness.test.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke
+        run: npm run test:e2e
+        env:
+          CI: "1"

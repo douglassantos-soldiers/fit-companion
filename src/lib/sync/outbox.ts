@@ -5,7 +5,9 @@
 import { trackAppUserEvent } from "@/lib/events.functions";
 
 const OUTBOX_KEY = "soldiers-outbox-v1";
+const OUTBOX_FAILED_KEY = "soldiers-outbox-failed-v1";
 const MAX_OPS = 200;
+const MAX_FAILED = 50;
 const MAX_ATTEMPTS = 8;
 
 export type OutboxEventOp = {
@@ -93,6 +95,60 @@ export function enqueueEntity(op: OutboxEntityOp): void {
   ensureOutboxListeners();
 }
 
+export type FailedOutboxOp = OutboxOp & {
+  failedAt: string;
+  finalAttempts: number;
+  lastError?: string;
+};
+
+function readFailed(): FailedOutboxOp[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(OUTBOX_FAILED_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as FailedOutboxOp[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFailed(ops: FailedOutboxOp[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OUTBOX_FAILED_KEY, JSON.stringify(ops.slice(-MAX_FAILED)));
+  } catch {
+    /* quota */
+  }
+}
+
+export function peekFailedOutbox(): FailedOutboxOp[] {
+  return readFailed();
+}
+
+export function clearFailedOutbox(): void {
+  writeFailed([]);
+}
+
+/** Move exhausted ops to persistent failed state (never silent drop). */
+export function recordFailedOutboxOp(op: OutboxOp, lastError?: string): void {
+  const failed = readFailed().filter((x) => x.opId !== op.opId);
+  failed.push({
+    ...op,
+    failedAt: new Date().toISOString(),
+    finalAttempts: op.attempts ?? MAX_ATTEMPTS,
+    ...(lastError ? { lastError } : {}),
+  });
+  writeFailed(failed);
+  if (typeof console !== "undefined") {
+    console.error("Outbox op moved to persistent failed state", {
+      opId: op.opId,
+      kind: op.kind,
+      lastError,
+    });
+  }
+}
+
 export function peekOutbox(): OutboxOp[] {
   return readQueue();
 }
@@ -172,7 +228,7 @@ export async function flushOutbox(): Promise<{ flushed: number; remaining: numbe
 
       const nextAttempts = attempts + 1;
       if (nextAttempts >= MAX_ATTEMPTS) {
-        // Drop after max attempts to avoid infinite poison
+        recordFailedOutboxOp({ ...op, attempts: nextAttempts }, "max_attempts");
         continue;
       }
       keep.push({

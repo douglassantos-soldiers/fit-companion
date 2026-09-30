@@ -754,7 +754,7 @@ function Today() {
       ) : (
         <HomeFallbackHero
           workoutDayId={workoutDayId}
-          express={expressToday || true}
+          express={expressToday}
           estimatedMin={dayCandidates?.estimatedMin ?? null}
           onRegisterMeal={() => setMealSlot(nextMeal?.slot ?? suggestSlot())}
         />

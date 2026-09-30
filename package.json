@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "test:eval": "vitest run src/ai/governance/evaluation.test.ts src/ai/governance/eval-v2.test.ts",
     "test:ai-unit": "vitest run src/ai/governance/evaluation.test.ts src/ai/certification/certification-integrity.test.ts src/ai/certification/runtime-controls.test.ts",
     "test:ai-integration": "vitest run src/ai/e2e/e2e-pipeline.test.ts src/ai/governance/audit-durability.test.ts src/ai/rag/rag-hardening.test.ts src/ai/memory/memory-hardening.test.ts src/ai/gateway/llm-hardening.test.ts",
@@ -119,6 +121,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.23.1",
+    "@playwright/test": "^1.55.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

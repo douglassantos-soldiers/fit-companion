@@ -1,9 +1,20 @@
 /**
  * User account status (block/suspend) — no health columns.
+ * Status checks fail closed when the database is unavailable.
  */
 import { adminDbLoose } from "@/lib/db-admin";
 import { isAccountBlocked, normalizeAccountStatus, type AccountStatus } from "@/lib/account-status";
 import { ADMIN_ACTOR, writeAudit, lookupUserByEmail, type AdminUserLookup } from "@/lib/admin.server";
+
+export type BlockCheckResult = {
+  /** True when the account is banned/suspended in-window. */
+  blocked: boolean;
+  /**
+   * False when we could not load status (DB down). Callers with requireAccess
+   * must deny — never treat unknown as allowed.
+   */
+  statusKnown: boolean;
+};
 
 export async function loadAccountStatus(opts: {
   userId?: string | null;
@@ -13,18 +24,20 @@ export async function loadAccountStatus(opts: {
   if (!db) return null;
   let row: { status?: unknown; status_until?: unknown; status_reason?: unknown } | null = null;
   if (opts.userId) {
-    const { data } = await db
+    const { data, error } = await db
       .from("users")
       .select("status, status_until, status_reason")
       .eq("id", opts.userId)
       .maybeSingle();
+    if (error) throw new Error(`account_status_query:${error.code ?? "error"}`);
     row = data;
   } else if (opts.email) {
-    const { data } = await db
+    const { data, error } = await db
       .from("users")
       .select("status, status_until, status_reason")
       .ilike("email", opts.email.trim().toLowerCase())
       .maybeSingle();
+    if (error) throw new Error(`account_status_query:${error.code ?? "error"}`);
     row = data;
   }
   if (!row) return null;
@@ -35,13 +48,42 @@ export async function loadAccountStatus(opts: {
   };
 }
 
+/**
+ * Prefer `checkUserBlocked` for AuthZ. This wrapper remains for simple boolean site;
+ * on DB failure it returns **true** (fail-closed) so callers that only check boolean deny access.
+ */
 export async function isUserBlocked(opts: {
   userId?: string | null;
   email?: string | null;
 }): Promise<boolean> {
-  const row = await loadAccountStatus(opts);
-  if (!row) return false;
-  return isAccountBlocked({ status: row.status, statusUntil: row.statusUntil });
+  const result = await checkUserBlocked(opts);
+  if (!result.statusKnown) return true;
+  return result.blocked;
+}
+
+export async function checkUserBlocked(opts: {
+  userId?: string | null;
+  email?: string | null;
+}): Promise<BlockCheckResult> {
+  try {
+    const db = await adminDbLoose();
+    if (!db) {
+      return { blocked: true, statusKnown: false };
+    }
+    void db;
+    const row = await loadAccountStatus(opts);
+    if (!row) {
+      // No users row — not blocked, but status is known (absent).
+      return { blocked: false, statusKnown: true };
+    }
+    return {
+      blocked: isAccountBlocked({ status: row.status, statusUntil: row.statusUntil }),
+      statusKnown: true,
+    };
+  } catch (e) {
+    console.error("checkUserBlocked failed closed", e);
+    return { blocked: true, statusKnown: false };
+  }
 }
 
 export async function setUserAccountStatus(opts: {

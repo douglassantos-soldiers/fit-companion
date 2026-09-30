@@ -30,27 +30,29 @@ export const checkAccessSession = createServerFn({ method: "GET" }).handler(asyn
   if (!session) {
     const admin = readAppAccessSession();
     if (admin) {
+      // Admin cookie alone must NOT mint app access without Shopify entitlement.
       try {
-        const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
-        const user = await resolveOrCreateUserByEmail(admin.email);
-        if (user) {
-          setAccessSessionCookie({
-            email: admin.email,
-            tier: "performance",
-            userId: user.id,
-          });
-          session = {
-            email: admin.email,
-            tier: "performance",
-            exp: admin.exp,
-            userId: user.id,
-          };
-        } else {
-          session = admin;
+        const { findEntitlementByEmail } = await import("@/lib/shopify.server");
+        const entitlement = await findEntitlementByEmail(admin.email);
+        if (entitlement) {
+          const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
+          const user = await resolveOrCreateUserByEmail(admin.email);
+          if (user) {
+            setAccessSessionCookie({
+              email: admin.email,
+              tier: "performance",
+              userId: user.id,
+            });
+            session = {
+              email: admin.email,
+              tier: "performance",
+              exp: admin.exp,
+              userId: user.id,
+            };
+          }
         }
       } catch (e) {
-        console.warn("admin access bootstrap failed", e);
-        session = admin;
+        console.warn("admin access bootstrap skipped (no entitlement or error)", e);
       }
     }
   }
@@ -63,14 +65,17 @@ export const checkAccessSession = createServerFn({ method: "GET" }).handler(asyn
     }
   }
   try {
-    const { isUserBlocked } = await import("@/lib/account-status.server");
-    const blocked = await isUserBlocked({
+    const { checkUserBlocked } = await import("@/lib/account-status.server");
+    const status = await checkUserBlocked({
       userId: session.userId ?? null,
       email: session.email,
     });
-    if (blocked) return { ok: false as const, reason: "account_blocked" as const };
+    if (!status.statusKnown || status.blocked) {
+      return { ok: false as const, reason: "account_blocked" as const };
+    }
   } catch (e) {
-    console.warn("account status check failed", e);
+    console.warn("account status check failed closed", e);
+    return { ok: false as const, reason: "account_blocked" as const };
   }
   return {
     ok: true as const,
@@ -373,18 +378,23 @@ export const loginAdmin = createServerFn({ method: "POST" })
     const result = await authenticateAdminWithRole(data.email, data.password);
     if (result.ok) {
       setAdminSessionCookie(data.email, result.role);
+      // App access cookie only when Shopify entitlement exists (admin ≠ entitlement bypass).
       try {
-        const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
-        const user = await resolveOrCreateUserByEmail(data.email);
-        if (user) {
-          setAccessSessionCookie({
-            email: data.email,
-            tier: "performance",
-            userId: user.id,
-          });
+        const { findEntitlementByEmail } = await import("@/lib/shopify.server");
+        const entitlement = await findEntitlementByEmail(data.email);
+        if (entitlement) {
+          const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
+          const user = await resolveOrCreateUserByEmail(data.email);
+          if (user) {
+            setAccessSessionCookie({
+              email: data.email,
+              tier: "performance",
+              userId: user.id,
+            });
+          }
         }
       } catch (e) {
-        console.warn("admin app access cookie skipped", e);
+        console.warn("admin app access cookie skipped (no entitlement)", e);
       }
       return {
         ok: true as const,

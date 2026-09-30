@@ -187,10 +187,12 @@ export async function resolveTrustedIdentity(opts: {
     }
 
     try {
-      const { isUserBlocked } = await import("@/lib/account-status.server");
-      if (await isUserBlocked({ userId, email })) return null;
+      const { checkUserBlocked } = await import("@/lib/account-status.server");
+      const status = await checkUserBlocked({ userId, email });
+      if (!status.statusKnown || status.blocked) return null;
     } catch (e) {
-      console.warn("trusted identity status check failed", e);
+      console.warn("trusted identity status check failed closed", e);
+      return null;
     }
 
     const { role, tier: resolvedTier } = resolveAppRole(true, email, tier);
@@ -219,10 +221,12 @@ export async function resolveTrustedIdentity(opts: {
   const user = await ensureUserForDevice(deviceId);
   if (!user) return null;
   try {
-    const { isUserBlocked } = await import("@/lib/account-status.server");
-    if (await isUserBlocked({ userId: user.id, email: user.email })) return null;
+    const { checkUserBlocked } = await import("@/lib/account-status.server");
+    const status = await checkUserBlocked({ userId: user.id, email: user.email });
+    if (!status.statusKnown || status.blocked) return null;
   } catch (e) {
-    console.warn("trusted identity status check failed", e);
+    console.warn("trusted identity status check failed closed", e);
+    return null;
   }
 
   const identity: TrustedIdentity = {

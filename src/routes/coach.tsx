@@ -215,6 +215,7 @@ function CoachPage() {
   };
 
   const runAi = async (snapshot: AppState, userText: string, offlineReply: string) => {
+    let outcomeOffline = true;
     try {
       const history = mapChat(snapshot.chat);
       const messages = [...history, { role: "user" as const, content: userText }];
@@ -233,6 +234,7 @@ function CoachPage() {
         setLastProposals(result.structured.proposals);
       }
       if (result?.error) {
+        outcomeOffline = true;
         return {
           text: formatCoachReply(offlineReply, result.structured),
           offline: true,
@@ -240,19 +242,23 @@ function CoachPage() {
         };
       }
       if (result?.text?.trim()) {
+        outcomeOffline = false;
         return {
           text: formatCoachReply(result.text.trim(), result.structured),
           offline: false as const,
         };
       }
+      outcomeOffline = true;
       return { text: offlineReply, offline: true as const };
     } catch (e) {
       console.warn("askAiCoach failed", e);
+      outcomeOffline = true;
       return { text: offlineReply, offline: true as const, reason: "upstream" };
     } finally {
+      const offline = outcomeOffline;
       void import("@/lib/outcome").then(({ trackOutcome }) =>
         trackOutcome(getDeviceId(), "coach_interaction", {
-          offline: false,
+          offline,
           entityType: "coach",
           entityId: "chat",
         }),

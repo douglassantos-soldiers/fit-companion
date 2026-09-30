@@ -39,6 +39,7 @@ import { Route as GovernanceOverviewRouteImport } from './routes/governance.over
 import { Route as GovernanceRagRouteImport } from './routes/governance.rag'
 import { Route as GovernanceRunsRouteImport } from './routes/governance.runs'
 import { Route as GovernanceSafetyRouteImport } from './routes/governance.safety'
+import { Route as HubsIndexRouteImport } from './routes/hubs.index'
 import { Route as HubsSlugRouteImport } from './routes/hubs.$slug'
 import { Route as ProgressoIndexRouteImport } from './routes/progresso.index'
 import { Route as ProgressoCorpoRouteImport } from './routes/progresso.corpo'
@@ -204,6 +205,11 @@ const GovernanceSafetyRoute = GovernanceSafetyRouteImport.update({
   path: '/safety',
   getParentRoute: () => GovernanceRoute,
 } as any)
+const HubsIndexRoute = HubsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HubsRoute,
+} as any)
 const HubsSlugRoute = HubsSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo/': typeof ConteudoIndexRoute
   '/governance/': typeof GovernanceIndexRoute
+  '/hubs/': typeof HubsIndexRoute
   '/progresso/': typeof ProgressoIndexRoute
   '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
@@ -331,7 +338,6 @@ export interface FileRoutesByTo {
   '/coach': typeof CoachRoute
   '/desafios': typeof DesafiosRoute
   '/entrar': typeof EntrarRoute
-  '/hubs': typeof HubsRouteWithChildren
   '/nutricao': typeof NutricaoRoute
   '/onboarding': typeof OnboardingRoute
   '/perfil': typeof PerfilRoute
@@ -356,6 +362,7 @@ export interface FileRoutesByTo {
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo': typeof ConteudoIndexRoute
   '/governance': typeof GovernanceIndexRoute
+  '/hubs': typeof HubsIndexRoute
   '/progresso': typeof ProgressoIndexRoute
   '/social': typeof SocialIndexRoute
   '/treino': typeof TreinoIndexRoute
@@ -403,6 +410,7 @@ export interface FileRoutesById {
   '/wearables/callback': typeof WearablesCallbackRoute
   '/conteudo/': typeof ConteudoIndexRoute
   '/governance/': typeof GovernanceIndexRoute
+  '/hubs/': typeof HubsIndexRoute
   '/progresso/': typeof ProgressoIndexRoute
   '/social/': typeof SocialIndexRoute
   '/treino/': typeof TreinoIndexRoute
@@ -451,6 +459,7 @@ export interface FileRouteTypes {
     | '/wearables/callback'
     | '/conteudo/'
     | '/governance/'
+    | '/hubs/'
     | '/progresso/'
     | '/social/'
     | '/treino/'
@@ -469,7 +478,6 @@ export interface FileRouteTypes {
     | '/coach'
     | '/desafios'
     | '/entrar'
-    | '/hubs'
     | '/nutricao'
     | '/onboarding'
     | '/perfil'
@@ -494,6 +502,7 @@ export interface FileRouteTypes {
     | '/wearables/callback'
     | '/conteudo'
     | '/governance'
+    | '/hubs'
     | '/progresso'
     | '/social'
     | '/treino'
@@ -540,6 +549,7 @@ export interface FileRouteTypes {
     | '/wearables/callback'
     | '/conteudo/'
     | '/governance/'
+    | '/hubs/'
     | '/progresso/'
     | '/social/'
     | '/treino/'
@@ -793,6 +803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GovernanceSafetyRouteImport
       parentRoute: typeof GovernanceRoute
     }
+    '/hubs/': {
+      id: '/hubs/'
+      path: '/'
+      fullPath: '/hubs/'
+      preLoaderRoute: typeof HubsIndexRouteImport
+      parentRoute: typeof HubsRoute
+    }
     '/hubs/$slug': {
       id: '/hubs/$slug'
       path: '/$slug'
@@ -924,10 +941,12 @@ const GovernanceRouteWithChildren = GovernanceRoute._addFileChildren(
 
 interface HubsRouteChildren {
   HubsSlugRoute: typeof HubsSlugRoute
+  HubsIndexRoute: typeof HubsIndexRoute
 }
 
 const HubsRouteChildren: HubsRouteChildren = {
   HubsSlugRoute: HubsSlugRoute,
+  HubsIndexRoute: HubsIndexRoute,
 }
 
 const HubsRouteWithChildren = HubsRoute._addFileChildren(HubsRouteChildren)

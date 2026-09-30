@@ -1,6 +1,25 @@
-# Welcome to your Lovable project
+# Fit Companion / Soldiers Performance
 
 This project was built with [Lovable](https://lovable.dev).
+
+## Production readiness
+
+Latest audit: [`docs/certification/PRODUCTION_AUDIT_2026-09-30.md`](docs/certification/PRODUCTION_AUDIT_2026-09-30.md).
+
+- Deterministic AI is the default; OpenAI/Anthropic keys are **intentionally deferred**.
+- Account deletion: [`docs/account-deletion.md`](docs/account-deletion.md)
+- Export policy: [`docs/data-export.md`](docs/data-export.md)
+- RLS validation: [`docs/rls-validation.md`](docs/rls-validation.md)
+- Backup/DR: [`docs/backup-dr.md`](docs/backup-dr.md)
+
+```sh
+npm test
+npm run build
+npm run test:e2e:install
+npm run test:e2e
+```
+
+Product CI: `.github/workflows/product-ci.yml` (lint, typecheck, vitest, build, Playwright smoke).
 
 ## Build with Lovable
 

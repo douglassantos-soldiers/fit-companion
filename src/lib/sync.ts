@@ -10,6 +10,7 @@ const DEVICE_KEY = "soldiers-device-id";
 export type PushStateResult = {
   ok: boolean;
   partial?: boolean;
+  persistentFailed?: boolean;
   userId: string | null;
   conflicts?: string[];
   errors?: Array<{ table: string; code: string }>;
@@ -17,7 +18,7 @@ export type PushStateResult = {
 
 /** Full ACK only when every critical write succeeded (no partial / failed push). */
 export function shouldAckPushAndFlushOutbox(result: PushStateResult): boolean {
-  return result.ok === true && result.partial !== true;
+  return result.ok === true && result.partial !== true && result.persistentFailed !== true;
 }
 
 export function getDeviceId(): string {
@@ -45,6 +46,7 @@ export async function pullState(deviceId: string): Promise<AppState | null> {
 /**
  * Push state; server stamps trusted user_id (ignores client userId claim).
  * Returns server result. Does not flush outbox on ok=false or partial writes.
+ * Critical failures are persisted locally so the UI can surface "not saved".
  */
 export async function pushState(deviceId: string, state: AppState): Promise<PushStateResult> {
   if (!deviceId) return { ok: false, userId: null };
@@ -54,18 +56,36 @@ export async function pushState(deviceId: string, state: AppState): Promise<Push
       console.error("Falha parcial ao sincronizar dados", {
         ok: result.ok,
         partial: result.partial,
+        persistentFailed: result.persistentFailed,
         errors: result.errors,
         conflicts: result.conflicts,
       });
+      if (result.persistentFailed || result.ok === false) {
+        const { recordPersistentSyncFailure } = await import("@/lib/sync/critical");
+        recordPersistentSyncFailure({
+          at: new Date().toISOString(),
+          deviceId,
+          errors: result.errors ?? [{ table: "push", code: "failed" }],
+        });
+      }
       return result;
     }
+    const { clearPersistentSyncFailure } = await import("@/lib/sync/critical");
+    clearPersistentSyncFailure();
     const { flushOutbox } = await import("@/lib/sync/outbox");
     void flushOutbox().catch(() => undefined);
     return result;
   } catch (e) {
     console.error("Falha ao sincronizar dados", e);
+    const { recordPersistentSyncFailure } = await import("@/lib/sync/critical");
+    recordPersistentSyncFailure({
+      at: new Date().toISOString(),
+      deviceId,
+      errors: [{ table: "client", code: "push_exception" }],
+    });
     return {
       ok: false,
+      persistentFailed: true,
       userId: null,
       errors: [{ table: "client", code: "push_exception" }],
     };

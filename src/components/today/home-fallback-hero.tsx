@@ -2,6 +2,18 @@ import { Link } from "@tanstack/react-router";
 import { Play, Utensils, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+/** Build session search from the Decision Engine express flag — never force express. */
+export function homeFallbackSessionSearch(express: boolean): {
+  express?: true;
+  from: "hoje";
+} {
+  return express ? { express: true, from: "hoje" } : { from: "hoje" };
+}
+
+export function homeFallbackCtaLabel(express: boolean): string {
+  return express ? "Começar Express" : "Treinar agora";
+}
+
 /** Degraded hero when Decision/Living Plan is missing — never leave Hoje without a primary action. */
 export function HomeFallbackHero({
   workoutDayId,
@@ -28,12 +40,12 @@ export function HomeFallbackHero({
         <Link
           to="/treino/sessao/$id"
           params={{ id: workoutDayId }}
-          search={{ express: true, from: "hoje" }}
+          search={homeFallbackSessionSearch(express)}
           className="mt-4 block"
         >
           <Button className="glow-primary h-14 w-full font-bold uppercase tracking-wide">
             {express ? <Zap className="size-4" /> : <Play className="size-4" />}
-            Começar Express
+            {homeFallbackCtaLabel(express)}
             {estimatedMin ? (
               <span className="ml-1 font-normal normal-case tracking-normal opacity-80">
                 · {estimatedMin} min
