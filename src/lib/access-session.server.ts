@@ -35,6 +35,18 @@ export class SecurityConfigurationError extends Error {
   }
 }
 
+/** https (preview iframe + published) needs SameSite=None; Secure or the browser drops the cookie. */
+function cookieFlags(): { secure: boolean; sameSite: "none" | "lax" } {
+  try {
+    const req = getRequest();
+    const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
+    if (proto.split(",")[0]?.trim() === "https") return { secure: true, sameSite: "none" };
+  } catch {
+    /* no request */
+  }
+  return { secure: isProduction(), sameSite: "lax" };
+}
+
 function isProduction(): boolean {
   return process.env["NODE_ENV"] === "production";
 }
@@ -150,8 +162,7 @@ export function setAccessSessionCookie(
   const maxAge = decoded ? Math.max(60, decoded.exp - Math.floor(Date.now() / 1000)) : MAX_AGE_SEC;
   setCookie(ACCESS_COOKIE, value, {
     httpOnly: true,
-    secure: isProduction(),
-    sameSite: "lax",
+    ...cookieFlags(),
     path: "/",
     maxAge,
   });
@@ -240,7 +251,7 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
 }
 
 export function clearAccessSessionCookie() {
-  deleteCookie(ACCESS_COOKIE, { path: "/" });
+  deleteCookie(ACCESS_COOKIE, { path: "/", ...cookieFlags() });
 }
 
 export function readAccessSession(): AccessSessionPayload | null {
@@ -363,15 +374,14 @@ export function setAdminSessionCookie(email: string, role: AdminRole = "admin") 
   assertSecurityConfiguration();
   setCookie("soldiers_admin", encodeAdminToken(email, role), {
     httpOnly: true,
-    secure: isProduction(),
-    sameSite: "lax",
+    ...cookieFlags(),
     path: "/",
     maxAge: 60 * 60 * 12,
   });
 }
 
 export function clearAdminSessionCookie() {
-  deleteCookie("soldiers_admin", { path: "/" });
+  deleteCookie("soldiers_admin", { path: "/", ...cookieFlags() });
 }
 
 function secretEqual(a: string, b: string) {

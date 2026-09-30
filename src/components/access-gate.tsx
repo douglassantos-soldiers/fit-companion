@@ -28,6 +28,8 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const [shopifyOk, setShopifyOk] = useState(false);
   const [accountBlocked, setAccountBlocked] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
+  const adminGrantedRef = useRef(false);
+  const [adminCookieLost, setAdminCookieLost] = useState(false);
   const shopifyOkRef = useRef(shopifyOk);
   shopifyOkRef.current = shopifyOk;
 
@@ -55,7 +57,11 @@ export function AccessGate({ children }: { children: ReactNode }) {
           const s = await getAuthSession();
           if (s?.access_token) {
             const g = await grantAdmin({ data: { accessToken: s.access_token } }).catch(() => null);
-            if (g?.ok) res = await checkSession();
+            if (g?.ok) {
+              adminGrantedRef.current = true;
+              res = await checkSession();
+              if (!res.ok) setAdminCookieLost(true);
+            }
           }
         }
         if (cancelled) return;
@@ -97,6 +103,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
       return;
     }
     if (hasAuth && !shopifyOk && !accountBlocked && !isPublic) {
+      if (adminCookieLost) return;
       void navigate({ to: "/acesso", search: { token: undefined } });
       return;
     }
@@ -107,7 +114,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
     if (hasAuth && !shopifyOk && pathname === "/welcome") {
       void navigate({ to: "/acesso", search: { token: undefined } });
     }
-  }, [hydrated, ready, hasAuth, shopifyOk, accountBlocked, state.profile, pathname, navigate]);
+  }, [hydrated, ready, hasAuth, shopifyOk, accountBlocked, adminCookieLost, state.profile, pathname, navigate]);
 
   const splashStatus = (): SplashStatus => {
     if (connectionError) return "connection_error";
@@ -128,6 +135,16 @@ export function AccessGate({ children }: { children: ReactNode }) {
         <h1 className="text-display text-2xl">Conta suspensa</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Esta conta está bloqueada. O progresso é mantido; o acesso volta quando a suspensão terminar.
+        </p>
+      </div>
+    );
+  }
+  if (adminCookieLost && !shopifyOk && !isPublic) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 text-center">
+        <h1 className="text-display text-2xl">Acesso de admin não guardado</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Não foi possível guardar o acesso neste navegador. Abra o app em uma nova aba e entre de novo.
         </p>
       </div>
     );
