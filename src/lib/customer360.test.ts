@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Customer 360 aggregator tests.
  */

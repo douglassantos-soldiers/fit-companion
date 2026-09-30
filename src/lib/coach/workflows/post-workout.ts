@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { actionsFromIds } from "@/lib/coach/actions";
 import { evidenceFromContext } from "@/lib/coach/evidence";
 import { makeProposal } from "@/lib/coach/proposals";

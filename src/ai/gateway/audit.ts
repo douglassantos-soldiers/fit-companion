@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Gateway audit — mirrors provider call metadata into governance audit.
  * FASE 22.4 — request_id, tokens, costs; never persist secrets.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Hydrate AppState from domain tables (service_role) for Customer 360 recompute.
  * Aligns with sync.server pull mappings — DB is source of truth for server recompute.

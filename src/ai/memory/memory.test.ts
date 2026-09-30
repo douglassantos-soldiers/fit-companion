@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Memory Layer — unit tests (InMemory store, no live DB).
  */

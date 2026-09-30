@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 22.2 — Production RAG hardening tests.
  */

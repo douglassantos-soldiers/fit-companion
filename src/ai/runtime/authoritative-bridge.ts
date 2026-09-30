@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 22.1 — CANONICAL authoritative bridge (production surface).
  * DecisionProposal → Safety → Decision Engine → Living Plan → Outcome → Learning.

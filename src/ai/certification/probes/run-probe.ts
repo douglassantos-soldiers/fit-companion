@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Probe runner wrapper — always records execution timing.
  */

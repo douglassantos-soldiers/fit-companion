@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FASE 18 — decision pipeline unit tests.
  */

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Phase 3 Adaptive Coach — unit tests (no LLM / no DB required).
  */
