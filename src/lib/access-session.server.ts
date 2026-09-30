@@ -381,9 +381,16 @@ function secretEqual(a: string, b: string) {
 }
 
 async function verifyAdminAuthUser(email: string, password: string): Promise<AdminRole | false> {
-  const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "";
+  const url =
+    process.env["SUPABASE_URL"] ||
+    process.env["VITE_SUPABASE_URL"] ||
+    import.meta.env["VITE_SUPABASE_URL"] ||
+    "";
   const anon =
-    process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || "";
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    "";
   if (!url || !anon) return false;
   const { createClient } = await import("@supabase/supabase-js");
   const client = createClient(url, anon, {
