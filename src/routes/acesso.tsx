@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ExternalLink, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -60,6 +60,7 @@ function AccessPage() {
   const complete = useServerFn(completeAccountAccess);
   const redeem = useServerFn(redeemMagicToken);
   const grantAdmin = useServerFn(grantAdminAppAccess);
+  const adminTried = useRef(false);
   const [busy, setBusy] = useState(false);
   const [checked, setChecked] = useState(false);
   const [tokenError, setTokenError] = useState(false);
@@ -104,12 +105,13 @@ function AccessPage() {
   };
 
   const verifyPurchase = async (email: string, authUserId: string) => {
-    const session = await getAuthSession().catch(() => null);
+    const session = adminTried.current ? null : await getAuthSession().catch(() => null);
     if (session?.access_token) {
+      adminTried.current = true;
       const admin = await grantAdmin({ data: { accessToken: session.access_token } }).catch(() => null);
       if (admin?.ok) {
         toast.success("Acesso de admin liberado");
-        window.location.assign(state.profile ? "/" : "/onboarding");
+        navigate({ to: state.profile ? "/" : "/onboarding" });
         return true;
       }
     }
