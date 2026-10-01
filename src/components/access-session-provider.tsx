@@ -123,7 +123,8 @@ export function AccessSessionProvider({ children }: { children: ReactNode }) {
           if (g?.ok) {
             adminGrantedRef.current = true;
             res = await checkSession();
-            if (!res.ok) setAdminCookieLost(true);
+          } else if (g && !g.ok && g.reason === "account_blocked") {
+            res = { ok: false, reason: "account_blocked" };
           }
         }
       }
@@ -147,9 +148,7 @@ export function AccessSessionProvider({ children }: { children: ReactNode }) {
         setEmail(null);
         setTier(null);
         setLastPaidAt(null);
-        if (adminGrantedRef.current) {
-          setAdminCookieLost(true);
-        }
+        setAdminCookieLost(adminGrantedRef.current && res.reason === "no_session");
         // revokeAccessLocal is path-aware — AccessGate decides (onboarding heldAccess).
       }
     } catch (e) {

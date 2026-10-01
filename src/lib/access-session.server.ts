@@ -83,12 +83,17 @@ export class SecurityConfigurationError extends Error {
   }
 }
 
-/** https (preview iframe + published) needs SameSite=None; Secure or the browser drops the cookie. */
-function cookieFlags(): { secure: boolean; sameSite: "none" | "lax" } {
+/**
+ * https (preview iframe + published) needs SameSite=None; Secure; Partitioned
+ * or Chrome drops the cookie in a cross-site iframe. Local http stays Lax.
+ */
+function cookieFlags(): { secure: boolean; sameSite: "none" | "lax"; partitioned?: boolean } {
   try {
     const req = getRequest();
     const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
-    if (proto.split(",")[0]?.trim() === "https") return { secure: true, sameSite: "none" };
+    if (proto.split(",")[0]?.trim() === "https") {
+      return { secure: true, sameSite: "none", partitioned: true };
+    }
   } catch {
     /* no request */
   }

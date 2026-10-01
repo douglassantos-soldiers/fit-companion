@@ -45,41 +45,69 @@ async function loadAccountStatusStamp(opts: {
   }
 }
 
+type AdminAppMintResult =
+  | {
+      ok: true;
+      email: string;
+      tier: "performance";
+      userId: string;
+      exp: number;
+      stamp: AccessAccountStatusStamp;
+    }
+  | { ok: false; reason: "account_blocked" | "user_unavailable" };
+
+/**
+ * Verified Supabase app_metadata.role === "admin" mints app access without Shopify.
+ * Account blocked or unknown status does not mint.
+ * Without that role, Shopify entitlement stays required.
+ */
+async function mintVerifiedAdminAppAccess(email: string): Promise<AdminAppMintResult> {
+  const normalized = email.trim().toLowerCase();
+  try {
+    const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
+    const user = await resolveOrCreateUserByEmail(normalized);
+    if (!user) return { ok: false, reason: "user_unavailable" };
+    const stamp = await loadAccountStatusStamp({ userId: user.id, email: normalized });
+    if (!stamp || !stamp.statusKnown || stamp.accountBlocked) {
+      return { ok: false, reason: "account_blocked" };
+    }
+    const { accessCookieExpSec } = await import("@/lib/access-window");
+    setAdminSessionCookie(normalized, "admin");
+    setAccessSessionCookie({
+      email: normalized,
+      tier: "performance",
+      userId: user.id,
+      ...stamp,
+    });
+    return {
+      ok: true,
+      email: normalized,
+      tier: "performance",
+      userId: user.id,
+      exp: accessCookieExpSec(null),
+      stamp,
+    };
+  } catch (e) {
+    console.warn("admin app access mint failed", e);
+    return { ok: false, reason: "user_unavailable" };
+  }
+}
+
 export const checkAccessSession = createServerFn({ method: "GET" }).handler(async () => {
   let session = readAccessSession();
   if (!session) {
     const admin = readAppAccessSession();
-    if (admin) {
-      // Admin cookie alone must NOT mint app access without Shopify entitlement.
-      try {
-        const { findEntitlementByEmail } = await import("@/lib/shopify.server");
-        const entitlement = await findEntitlementByEmail(admin.email);
-        if (entitlement) {
-          const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
-          const user = await resolveOrCreateUserByEmail(admin.email);
-          if (user) {
-            const stamp = await loadAccountStatusStamp({ userId: user.id, email: admin.email });
-            setAccessSessionCookie({
-              email: admin.email,
-              tier: "performance",
-              userId: user.id,
-              ...(stamp ?? {}),
-            });
-            session = {
-              email: admin.email,
-              tier: "performance",
-              exp: admin.exp,
-              userId: user.id,
-              ...(stamp ?? {}),
-            };
-          }
-        }
-      } catch (e) {
-        console.warn("admin access bootstrap skipped (no entitlement or error)", e);
-      }
-    }
+    if (!admin) return { ok: false as const, reason: "no_session" as const };
+    const minted = await mintVerifiedAdminAppAccess(admin.email);
+    if (!minted.ok) return { ok: false as const, reason: minted.reason };
+    session = {
+      email: minted.email,
+      tier: minted.tier,
+      exp: minted.exp,
+      userId: minted.userId,
+      ...minted.stamp,
+    };
   }
-  if (!session) return { ok: false as const };
   if (session.lastPaidAt) {
     const { isPurchaseWithinWindow } = await import("@/lib/access-window");
     if (!isPurchaseWithinWindow(session.lastPaidAt)) {
@@ -472,13 +500,14 @@ export const grantAdminAppAccess = createServerFn({ method: "POST" })
       process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
       import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
       "";
-    if (!url || !anon) return { ok: false as const };
+    if (!url || !anon) return { ok: false as const, reason: "not_configured" as const };
     const { createClient } = await import("@supabase/supabase-js");
     const client = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: u, error } = await client.auth.getUser(data.accessToken);
-    if (error || !u.user?.email) return { ok: false as const };
+    if (error || !u.user?.email) return { ok: false as const, reason: "not_admin" as const };
     const role = (u.user.app_metadata as { role?: string } | undefined)?.role;
-    if (role !== "admin") return { ok: false as const };
-    setAdminSessionCookie(u.user.email.toLowerCase(), "admin");
+    if (role !== "admin") return { ok: false as const, reason: "not_admin" as const };
+    const minted = await mintVerifiedAdminAppAccess(u.user.email);
+    if (!minted.ok) return { ok: false as const, reason: minted.reason };
     return { ok: true as const };
   });

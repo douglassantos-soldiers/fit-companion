@@ -33,11 +33,14 @@ describe("cron secret timing-safe compare", () => {
 });
 
 describe("admin access mint policy", () => {
-  it("documents that entitlement is required before access cookie", async () => {
+  it("documents verified admin mint and blocked-account denial", async () => {
     const src = await import("node:fs").then((fs) =>
       fs.readFileSync("src/lib/access.functions.ts", "utf8"),
     );
+    expect(src).toMatch(/app_metadata\.role === "admin" mints app access without Shopify/);
+    expect(src).toMatch(/Account blocked or unknown status does not mint/);
+    expect(src).toMatch(/Without that role, Shopify entitlement stays required/);
     expect(src).toContain("findEntitlementByEmail");
-    expect(src).toMatch(/Admin cookie alone must NOT mint|no entitlement/i);
+    expect(src).not.toMatch(/must NOT mint/i);
   });
 });

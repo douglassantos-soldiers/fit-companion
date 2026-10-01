@@ -1,18 +1,13 @@
 {
-  "checked_at": "2026-10-01T15:06:10.000Z",
+  "checked_at": "2026-10-01T16:50:00.000Z",
   "project_ref": "zphtvrsxlhfgltwgbreu",
   "project_name": "APP",
   "cli_linked": true,
-  "cli_management_api": {
-    "ok": true
-  },
-  "migrations": "pushed",
+  "cli_management_api": { "ok": true },
+  "migrations": "already_in_sync",
   "migration_count": 55,
-  "migrations_applied_this_deploy": [
-    "20261102120000_soldiers_rls_audit_rpc.sql"
-  ],
-  "db_push_dry_run": "pending_one",
-  "db_push": "applied",
+  "db_push_dry_run": "upToDate",
+  "db_push": "upToDate",
   "bundles_executed": [],
   "edge_functions": [],
   "storage_buckets": ["soldiers-media", "progress-photos", "checkins"],
@@ -23,40 +18,21 @@
     "store_id": "supabase_pgvector_v1",
     "env": "production",
     "idempotent_reseed_ok": true,
-    "seeded_at": "2026-10-01T15:05:36.000Z"
+    "seeded_at": "2026-10-01T16:49:33.562Z"
   },
   "database_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-10-01T15:05:58.000Z"
+    "checked_at": "2026-10-01T16:49:46.000Z"
   },
   "rate_limit_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-10-01T15:06:07.000Z"
+    "checked_at": "2026-10-01T16:50:00.000Z"
   },
   "service_role_smoke": {
-    "ai_schema_inventory_probe": {
-      "ok": true
-    },
-    "ai_rate_limit_consume": {
-      "allowed": true,
-      "ok": true
-    },
-    "soldiers_rls_audit": {
-      "ok": true,
-      "open_policies": []
-    },
-    "ai_tables_http_200": [
-      "ai_audit_events",
-      "ai_user_memory",
-      "ai_decision_memory",
-      "ai_outcome_memory",
-      "ai_learning_events",
-      "ai_knowledge_sources",
-      "ai_knowledge_documents",
-      "ai_knowledge_chunks"
-    ]
+    "ai_rate_limit_consume": { "allowed": true, "ok": true },
+    "soldiers_rls_audit": { "ok": true, "open_policies": [] }
   },
   "advisors": {
     "blocking": false,
