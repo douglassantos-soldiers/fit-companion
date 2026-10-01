@@ -1,12 +1,14 @@
 /**
  * Shared meal_entries ↔ MealEntry mapping (Phase 2 macros + items).
  */
+import type { NutrientKey } from "@/lib/nutrition/types";
 import type {
   FoodLineageSource,
   MealEntry,
   MealItemEntry,
   MealNutrientSnapshot,
   MealQuality,
+  MealServingUnit,
   MealSlot,
   MealSourceKind,
 } from "@/lib/types";
@@ -14,11 +16,40 @@ import type {
 type Row = Record<string, unknown>;
 
 const LINEAGE: FoodLineageSource[] = ["taco", "user", "imported", "ai_estimate", "internal"];
+const SERVING_UNITS: MealServingUnit[] = [
+  "g",
+  "ml",
+  "caps",
+  "scoop",
+  "serving",
+  "un",
+  "unidade",
+  "100 g",
+  "slice",
+  "cup",
+  "tbsp",
+  "tsp",
+  "piece",
+  "bowl",
+];
 
 function asLineage(v: unknown): FoodLineageSource | undefined {
   return typeof v === "string" && LINEAGE.includes(v as FoodLineageSource)
     ? (v as FoodLineageSource)
     : undefined;
+}
+
+/** Boundary: persisted extras keys may extend the closed NutrientKey set. */
+function asNutrientKey(raw: string): NutrientKey {
+  return raw as NutrientKey;
+}
+
+function asServingUnit(raw: unknown): MealServingUnit {
+  const s = typeof raw === "string" ? raw.trim() : "g";
+  if ((SERVING_UNITS as string[]).includes(s)) return s as MealServingUnit;
+  if (s === "unid" || s === "unidade") return "unidade";
+  if (s === "100g") return "100 g";
+  return "g";
 }
 
 function mapNutrientSnapshot(raw: unknown): MealNutrientSnapshot | undefined {
@@ -56,7 +87,7 @@ function mapNutrientSnapshot(raw: unknown): MealNutrientSnapshot | undefined {
           ? e["kind"]
           : kind;
       extras[k] = {
-        key: typeof e["key"] === "string" ? e["key"] : k,
+        key: asNutrientKey(typeof e["key"] === "string" ? e["key"] : k),
         value,
         unit: typeof e["unit"] === "string" ? e["unit"] : "",
         source: src,
@@ -77,7 +108,7 @@ function mapMealItem(raw: unknown): MealItemEntry | null {
   const item: MealItemEntry = {
     foodId: i["foodId"],
     quantity: Number(i["quantity"] ?? 1),
-    unit: String(i["unit"] ?? "g"),
+    unit: asServingUnit(i["unit"]),
     grams: Number(i["grams"] ?? 0),
     nutrientSnapshot: snapshot,
     confidence: Number(i["confidence"] ?? 1),

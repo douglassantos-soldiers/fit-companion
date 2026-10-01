@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
+import { formatDateKeyPtBr, formatDayMonth } from "@/lib/format/date-pt";
 import { exerciseById } from "@/data/exercises";
 import { PRODUCTS } from "@/data/products";
 import { seedCoachQuestion } from "@/lib/coach/seed";
@@ -64,7 +65,7 @@ import {
 import { datesForPose } from "@/lib/progress/body";
 import { useStore } from "@/lib/store";
 import { getDeviceId } from "@/lib/sync";
-import { todayKey } from "@/lib/types";
+import { todayKey, type TrafficLight } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const PERF_DIM_KEYS = [
@@ -81,7 +82,7 @@ const ADHERE_DIM_KEYS = [
   { key: "habitos", label: "Hábitos", color: "var(--chart-3)" },
 ] as const;
 
-const TRAFFIC_LABEL: Record<string, string> = {
+const TRAFFIC_LABEL: Record<TrafficLight, string> = {
   green: "verde",
   yellow: "âmbar",
   red: "vermelho",
@@ -124,7 +125,41 @@ export function ProgressPage() {
     [state.sessions],
   );
 
-  if (!hydrated || !state.profile) {
+  const progressDerived = useMemo(() => {
+    if (!state.profile) return null;
+    const dims = performanceDimensions(state, state.profile);
+    const score = performanceScore(dims);
+    const adhere = adherenceScore(dims);
+    const blocker = primaryBlockerDimension(state, state.profile);
+    const strength = computeStrengthScore(state.sessions, state.profile);
+    const volume = weeklyVolumeSeries(state.sessions);
+    const wow = weekOverWeek(state.sessions);
+    const heat = frequencyHeatmap(state.sessions, 12);
+    const weekPrs = prsInCurrentWeek(state.sessions);
+    const weekReview = periodReview(state, "week");
+    const living = livingPlanForDate(state);
+    const decisionCtx = decisionContextForUi(state, todayKey());
+    const livingPrimary = decisionCtx ? selectPrimaryAction(decisionCtx) : null;
+    const currentStreak = streak(state.sessions);
+    return {
+      dims,
+      score,
+      adhere,
+      blocker,
+      strength,
+      volume,
+      wow,
+      heat,
+      weekPrs,
+      weekReview,
+      living,
+      decisionCtx,
+      livingPrimary,
+      currentStreak,
+    };
+  }, [state]);
+
+  if (!hydrated || !state.profile || !progressDerived) {
     return (
       <AppShell title="Progresso">
         <div className="surface-glass h-40 animate-pulse" />
@@ -132,19 +167,22 @@ export function ProgressPage() {
     );
   }
 
-  const dims = performanceDimensions(state, state.profile);
-  const score = performanceScore(dims);
-  const adhere = adherenceScore(dims);
-  const blocker = primaryBlockerDimension(state, state.profile);
-  const strength = computeStrengthScore(state.sessions, state.profile);
-  const volume = weeklyVolumeSeries(state.sessions);
-  const wow = weekOverWeek(state.sessions);
-  const heat = frequencyHeatmap(state.sessions, 12);
-  const weekPrs = prsInCurrentWeek(state.sessions);
-  const weekReview = periodReview(state, "week");
-  const living = livingPlanForDate(state);
-  const decisionCtx = decisionContextForUi(state, todayKey());
-  const livingPrimary = decisionCtx ? selectPrimaryAction(decisionCtx) : null;
+  const {
+    dims,
+    score,
+    adhere,
+    blocker,
+    strength,
+    volume,
+    wow,
+    heat,
+    weekPrs,
+    weekReview,
+    living,
+    decisionCtx,
+    livingPrimary,
+    currentStreak,
+  } = progressDerived;
   const dow = new Date().getDay();
   const isRitualDay = dow === 0 || dow === 1 || weekReview.isSundayRitual;
   const hasComparePose = (["front", "side", "back"] as const).some(
@@ -165,18 +203,14 @@ export function ProgressPage() {
       .slice(0, 12)
       .reverse()
       .map((h) => ({
-        label: new Date(h.date + "T12:00:00").toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-        }),
+        label: formatDateKeyPtBr(h.date),
         carga: h.maxWeightKg,
         volume: h.volumeKg,
         reps: h.avgReps,
       })) ?? [];
-  const currentStreak = streak(state.sessions);
 
   const weightData = state.weights.map((w) => ({
-    label: new Date(w.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    label: formatDayMonth(w.date),
     peso: w.weightKg,
   }));
 

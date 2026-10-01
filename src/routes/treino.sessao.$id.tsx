@@ -1,7 +1,5 @@
 import { Link, createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import ToggleButton from "@mui/material/ToggleButton";
-import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Camera, Check, PartyPopper, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -70,9 +68,9 @@ import {
   type SetLog,
 } from "@/lib/types";
 import { useStore } from "@/lib/store";
-import { requestNotificationPermission } from "@/lib/notifications";
-import { registerPushWorker, subscribePush } from "@/lib/push";
+import { enableRemindersWithPush } from "@/lib/notifications-push";
 import { SESSION_LEAVE_BODY, SESSION_LEAVE_TITLE } from "@/lib/ui/platform-copy";
+import { createRouteErrorComponent } from "@/components/route-error-fallback";
 
 export const Route = createFileRoute("/treino/sessao/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -91,6 +89,7 @@ export const Route = createFileRoute("/treino/sessao/$id")({
     ],
   }),
   component: SessionPage,
+  errorComponent: createRouteErrorComponent("treino_sessao_error"),
 });
 
 const RPE_OPTIONS: Array<{ id: SessionRpe; label: string; hint: string }> = [
@@ -101,7 +100,8 @@ const RPE_OPTIONS: Array<{ id: SessionRpe; label: string; hint: string }> = [
 
 type CelebrateKind = "set" | "exercise" | null;
 
-type RestState = { seconds: number; paused: boolean } | null;
+/** Rest overlay token — countdown lives inside RestTimer to avoid 1Hz parent re-renders. */
+type RestState = { seconds: number; id: number } | null;
 
 const EFFORT_KEY = "soldiers_session_effort_scale";
 
@@ -233,87 +233,23 @@ function SessionPage() {
   }, [day?.id]);
 
   useEffect(() => {
-    if (!rest || rest.paused) return;
-    if (rest.seconds <= 0) {
-      fxRestEnd(fxOn);
-      setRest(null);
-      return;
-    }
-    const t = setTimeout(() => {
-      setRest((r) => (r === null || r.paused ? r : { ...r, seconds: r.seconds - 1 }));
-    }, 1000);
-    return () => clearTimeout(t);
-  }, [rest, fxOn]);
-
-  useEffect(() => {
     if (!celebrate) return;
     const ms = celebrate === "exercise" ? 900 : 700;
     const t = setTimeout(() => setCelebrate(null), ms);
     return () => clearTimeout(t);
   }, [celebrate]);
 
-  if (!hydrated || !state.profile || !day) {
-    return (
-      <div className="mx-auto w-full max-w-md space-y-3 p-4">
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
-      </div>
-    );
-  }
+  const handleRestComplete = useCallback(() => {
+    fxRestEnd(fxOn);
+    setRest(null);
+  }, [fxOn]);
 
-  const profile = state.profile;
-  const totalSets = logs.reduce((s, l) => s + l.sets.length, 0);
-  const doneSets = logs.reduce((s, l) => s + l.sets.filter((x) => x.done).length, 0);
-  const volume = Math.round(sessionVolume(logs));
-  const durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
-  const progressPct = totalSets ? (doneSets / totalSets) * 100 : 0;
-  const draftSession: SessionLog = {
-    id: `draft-${day.id}`,
-    dayId: day.id,
-    title: day.title,
-    date: new Date().toISOString(),
-    durationMin,
-    exercises: logs,
-    volumeKg: volume,
-    ...(express ? { express: true as const } : {}),
-  };
-  const livePrs = prsAchievedInSession(
-    draftSession,
-    state.sessions.filter((s) => s.id !== draftSession.id),
-  );
-  const liveXp = (express ? XP.express : XP.session) + (livePrs.length ? XP.pr : 0);
-  const previewRank = brandLevel({ ...state, sessions: [draftSession, ...state.sessions] });
-  if (!summaryOpen) finishStatsRef.current = null;
-  else if (!finishStatsRef.current)
-    finishStatsRef.current = { prCount: livePrs.length, xp: liveXp };
-  const previewXp = finishStatsRef.current?.xp ?? liveXp;
-  const previewPrCount = finishStatsRef.current?.prCount ?? livePrs.length;
-  const dims = performanceDimensions(state, profile);
-  const score = performanceScore(dims);
-  const currentStreak = streak(state.sessions, { freezeUsedDates: state.freezeUsedDates });
+  const handleRestSkip = useCallback(() => {
+    fxRestEnd(fxOn);
+    setRest(null);
+  }, [fxOn]);
 
-  const safeExIdx = Math.min(activeExIdx, Math.max(0, planned.length - 1));
-  const activePlanned = planned[safeExIdx];
-  const activeLog = logs[safeExIdx];
-  const activeExercise = activePlanned ? exerciseById(activePlanned.exerciseId) : undefined;
-  const currentSetIdx = activeLog?.sets.findIndex((s) => !s.done) ?? -1;
-  const workingSetIdx =
-    currentSetIdx >= 0 ? currentSetIdx : Math.max(0, (activeLog?.sets.length ?? 1) - 1);
-  const workingSet = activeLog?.sets[workingSetIdx];
-
-  const partnerIdx = partnerIndex(planned, safeExIdx);
-  const partner = partnerIdx >= 0 ? planned[partnerIdx] : undefined;
-  const partnerDone =
-    partnerIdx >= 0 ? (logs[partnerIdx]?.sets.filter((s) => s.done).length ?? 0) : 0;
-  const myDoneCount = activeLog?.sets.filter((s) => s.done).length ?? 0;
-  const partnerPending = partnerIdx >= 0 && (logs[partnerIdx]?.sets.some((s) => !s.done) ?? false);
-  const restAfterThisSet = !(partnerPending && partnerDone < myDoneCount + 1);
-
-  const nextLabel = activePlanned
-    ? `${activePlanned.name} · série ${workingSetIdx + 1}`
-    : "Próxima série";
-
-  const updateSet = (exIdx: number, setIdx: number, patch: Partial<SetLog>) =>
+  const updateSet = useCallback((exIdx: number, setIdx: number, patch: Partial<SetLog>) => {
     setLogs((prev) =>
       prev.map((l, i) => {
         if (i !== exIdx) return l;
@@ -335,6 +271,100 @@ function SessionPage() {
         };
       }),
     );
+  }, []);
+
+  const sessionStats = useMemo(() => {
+    if (!day || !state.profile) return null;
+    const totalSets = logs.reduce((s, l) => s + l.sets.length, 0);
+    const doneSets = logs.reduce((s, l) => s + l.sets.filter((x) => x.done).length, 0);
+    const volume = Math.round(sessionVolume(logs));
+    const durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+    const progressPct = totalSets ? (doneSets / totalSets) * 100 : 0;
+    const draftSession: SessionLog = {
+      id: `draft-${day.id}`,
+      dayId: day.id,
+      title: day.title,
+      date: new Date().toISOString(),
+      durationMin,
+      exercises: logs,
+      volumeKg: volume,
+      ...(express ? { express: true as const } : {}),
+    };
+    const livePrs = prsAchievedInSession(
+      draftSession,
+      state.sessions.filter((s) => s.id !== draftSession.id),
+    );
+    const liveXp = (express ? XP.express : XP.session) + (livePrs.length ? XP.pr : 0);
+    const previewRank = brandLevel({ ...state, sessions: [draftSession, ...state.sessions] });
+    const dims = performanceDimensions(state, state.profile);
+    const score = performanceScore(dims);
+    const currentStreak = streak(state.sessions, { freezeUsedDates: state.freezeUsedDates });
+    return {
+      totalSets,
+      doneSets,
+      volume,
+      durationMin,
+      progressPct,
+      draftSession,
+      livePrs,
+      liveXp,
+      previewRank,
+      dims,
+      score,
+      currentStreak,
+    };
+  }, [day, state, logs, express, startedAt]);
+
+  if (!hydrated || !state.profile || !day || !sessionStats) {
+    return (
+      <div className="mx-auto w-full max-w-md space-y-3 p-4">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  const profile = state.profile;
+  const {
+    totalSets,
+    doneSets,
+    volume,
+    durationMin,
+    progressPct,
+    draftSession,
+    livePrs,
+    liveXp,
+    previewRank,
+    dims,
+    score,
+    currentStreak,
+  } = sessionStats;
+  if (!summaryOpen) finishStatsRef.current = null;
+  else if (!finishStatsRef.current)
+    finishStatsRef.current = { prCount: livePrs.length, xp: liveXp };
+  const previewXp = finishStatsRef.current?.xp ?? liveXp;
+  const previewPrCount = finishStatsRef.current?.prCount ?? livePrs.length;
+
+  const safeExIdx = Math.min(activeExIdx, Math.max(0, planned.length - 1));
+  const activePlanned = planned[safeExIdx];
+  const activeLog = logs[safeExIdx];
+  const activeExercise = activePlanned ? exerciseById(activePlanned.exerciseId) : undefined;
+  const currentSetIdx = activeLog?.sets.findIndex((s) => !s.done) ?? -1;
+  const workingSetIdx =
+    currentSetIdx >= 0 ? currentSetIdx : Math.max(0, (activeLog?.sets.length ?? 1) - 1);
+  const workingSet = activeLog?.sets[workingSetIdx];
+
+  const partnerIdx = partnerIndex(planned, safeExIdx);
+  const partner = partnerIdx >= 0 ? planned[partnerIdx] : undefined;
+  const partnerDone =
+    partnerIdx >= 0 ? (logs[partnerIdx]?.sets.filter((s) => s.done).length ?? 0) : 0;
+  const myDoneCount = activeLog?.sets.filter((s) => s.done).length ?? 0;
+  const partnerPending = partnerIdx >= 0 && (logs[partnerIdx]?.sets.some((s) => !s.done) ?? false);
+  const restAfterThisSet = !(partnerPending && partnerDone < myDoneCount + 1);
+
+  const nextLabel = activePlanned
+    ? `${activePlanned.name} · série ${workingSetIdx + 1}`
+    : "Próxima série";
 
   const skipSet = () => {
     if (!activeLog || workingSetIdx < 0) return;
@@ -544,7 +574,14 @@ function SessionPage() {
     setRitualOpen(true);
     setPushPrompt(firstWorkout && state.remindersEnabled !== true);
     setFirstShare(firstWorkout);
-    toast.success(`Treino salvo · ${volume.toLocaleString("pt-BR")} kg de volume`);
+    toast.success(`Salvo neste aparelho · ${volume.toLocaleString("pt-BR")} kg de volume`);
+    window.setTimeout(() => {
+      void import("@/lib/sync/critical").then(({ readPersistentSyncFailure }) => {
+        if (readPersistentSyncFailure()) {
+          toast.message("Ainda não sincronizou — os dados estão neste aparelho");
+        }
+      });
+    }, 1200);
     setSaving(false);
     const first = session.exercises.find((e) => e.sets.some((s) => s.done && !s.skipped));
     if (first) {
@@ -658,7 +695,7 @@ function SessionPage() {
         if (step.openRest) {
           setRest({
             seconds: step.betweenExercises ? Math.min(restSec, 45) : restSec,
-            paused: false,
+            id: Date.now(),
           });
         }
       },
@@ -819,15 +856,11 @@ function SessionPage() {
 
       {rest ? (
         <RestTimer
-          seconds={rest.seconds}
-          paused={rest.paused}
+          key={rest.id}
+          initialSeconds={rest.seconds}
           nextLabel={nextLabel}
-          onTogglePause={() => setRest((r) => (r ? { ...r, paused: !r.paused } : r))}
-          onAdd30={() => setRest((r) => (r ? { ...r, seconds: r.seconds + 30 } : r))}
-          onSkip={() => {
-            fxRestEnd(fxOn);
-            setRest(null);
-          }}
+          onComplete={handleRestComplete}
+          onSkip={handleRestSkip}
         />
       ) : null}
 
@@ -994,27 +1027,21 @@ function SessionPage() {
             <p className="mt-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary">
               <PartyPopper className="size-4" /> Como foi?
             </p>
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              disabled={saving}
-              className="mt-3"
-              onChange={(_e, value: SessionRpe | null) => {
-                if (value) save(value);
-              }}
-              aria-label="RPE da sessão"
-            >
+            <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="RPE da sessão">
               {RPE_OPTIONS.map((opt) => (
-                <ToggleButton
+                <Button
                   key={opt.id}
-                  value={opt.id}
-                  className="flex flex-col gap-0.5 py-3 normal-case"
+                  type="button"
+                  variant="outline"
+                  disabled={saving}
+                  className="flex h-auto flex-col gap-0.5 py-3"
+                  onClick={() => save(opt.id)}
                 >
                   <span className="text-display text-sm">{opt.label}</span>
-                  <span className="text-[0.65rem] opacity-70">{opt.hint}</span>
-                </ToggleButton>
+                  <span className="text-[0.65rem] text-muted-foreground">{opt.hint}</span>
+                </Button>
               ))}
-            </ToggleButtonGroup>
+            </div>
             <Button
               variant="secondary"
               className="mt-4 h-11 w-full"
@@ -1079,17 +1106,8 @@ function SessionPage() {
         onUpsellDismiss={() => markUpsellShown()}
         pushPrompt={pushPrompt}
         onEnablePush={() => {
-          void requestNotificationPermission().then((perm) => {
-            if (perm === "granted") {
-              setRemindersEnabled(true);
-              void registerPushWorker().then(() => subscribePush());
-              setPushPrompt(false);
-              toast.success("Lembrete ligado");
-            } else if (perm === "unsupported") {
-              toast.error("Notificações não suportadas neste aparelho");
-            } else {
-              toast.error("Permissão de notificação negada");
-            }
+          void enableRemindersWithPush({ setRemindersEnabled }).then((perm) => {
+            if (perm === "granted") setPushPrompt(false);
           });
         }}
         onDismissPush={() => setPushPrompt(false)}

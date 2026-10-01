@@ -3,7 +3,7 @@
  * Blob v2: { version: 2, legacy: UserPatterns, patterns: LearnedPattern[] }
  * Legacy flat UserPatterns still load via parsePatternsBlob.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asJson } from "@/lib/db-admin";
 import type { UserPatterns } from "@/lib/engine/learning";
 import { parsePatternsBlob, type PatternsBlobV2 } from "@/lib/engine/learned-patterns";
 
@@ -15,7 +15,7 @@ export async function savePatternsBlob(userId: string, blob: PatternsBlobV2): Pr
   const { error } = await db.from("user_patterns").upsert(
     {
       user_id: userId,
-      patterns: blob as unknown as Record<string, unknown>,
+      patterns: asJson(blob),
       updated_at: blob.legacy.updatedAt || new Date().toISOString(),
     },
     { onConflict: "user_id" },

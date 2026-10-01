@@ -13,9 +13,10 @@ import {
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { SoldiersLogo } from "@/components/soldiers-logo";
+import { SyncBanner } from "@/components/sync-banner";
 import { shouldShowProposalFollowUp } from "@/lib/coach/proposal-followup";
 import { coachNudgeFromState } from "@/lib/engine/coach-nudge";
-import { useStore } from "@/lib/store";
+import { useStoreState } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { resolveTabKey } from "@/lib/ui/app-nav";
 
@@ -48,7 +49,7 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const selected = resolveTabKey(pathname);
   const showAccess = headerAccessDays != null && headerAccessDays <= 7;
-  const { state, hydrated } = useStore();
+  const { state, hydrated } = useStoreState();
   const coachPending =
     hydrated &&
     (coachNudgeFromState(state).show ||
@@ -104,6 +105,7 @@ export function AppShell({
       </header>
 
       <main className="relative mx-auto w-full max-w-md px-4 pt-5">
+        <SyncBanner />
         {!hideTitle ? (
           <div className="mb-5">
             <h1 className="text-3xl font-black text-foreground">{title}</h1>

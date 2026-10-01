@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 19 — Governance Console server fns (admin/analyst read-only).
  * Never mutates Decision Engine / Living Plan / Learning.
@@ -18,6 +17,7 @@ import {
   filterSafetyFeed,
   groupAgentStats,
   redactAuditForConsole,
+  toConsoleJson,
   truncateUserId,
 } from "@/ai/governance/console-helpers";
 import { redactForAudit } from "@/ai/governance/redact";
@@ -179,7 +179,7 @@ export const getGovernanceRunTrace = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       run_id: runId,
-      diagnostic: redactForAudit(diagnostic) as Record<string, unknown>,
+      diagnostic: toConsoleJson(redactForAudit(diagnostic)),
       timeline,
       audits: audits.map(redactAuditForConsole),
     };
@@ -331,7 +331,7 @@ export const runGovernanceEvaluation = createServerFn({ method: "POST" })
     const report = runAiEvaluationV2();
     return {
       ok: true as const,
-      suite: redactForAudit(suite) as Record<string, unknown>,
-      report: redactForAudit(report) as Record<string, unknown>,
+      suite: toConsoleJson(redactForAudit(suite)),
+      report: toConsoleJson(redactForAudit(report)),
     };
   });

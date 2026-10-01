@@ -28,30 +28,35 @@ function WearableCallbackPage() {
     ran.current = true;
     const provider = state === "garmin" ? "garmin" : "strava";
     void (async () => {
-      if (!code) {
-        toast.error("Código de autorização ausente");
+      try {
+        if (!code) {
+          toast.error("Código de autorização ausente");
+          void navigate({ to: "/social", search: { tab: "desafios" } });
+          return;
+        }
+        const res = await sync({ data: { provider, code, deviceId: getDeviceId() } });
+        if (res.ok) {
+          ingestActivityLogs(res.logs);
+          setWearableConnection({
+            provider,
+            status: "connected",
+            connectedAt: new Date().toISOString(),
+          });
+          toast.success("Prova sincronizada");
+        } else {
+          toast.message(
+            res.reason === "not_configured"
+              ? "Provedor em configuração"
+              : res.reason === "unauthorized"
+                ? "Faça login para concluir"
+                : "Não foi possível sincronizar",
+          );
+        }
+      } catch {
+        toast.error("Falha ao conectar wearable. Tente de novo.");
+      } finally {
         void navigate({ to: "/social", search: { tab: "desafios" } });
-        return;
       }
-      const res = await sync({ data: { provider, code, deviceId: getDeviceId() } });
-      if (res.ok) {
-        ingestActivityLogs(res.logs);
-        setWearableConnection({
-          provider,
-          status: "connected",
-          connectedAt: new Date().toISOString(),
-        });
-        toast.success("Prova sincronizada");
-      } else {
-        toast.message(
-          res.reason === "not_configured"
-            ? "Provedor em configuração"
-            : res.reason === "unauthorized"
-              ? "Faça login para concluir"
-              : "Não foi possível sincronizar",
-        );
-      }
-      void navigate({ to: "/social", search: { tab: "desafios" } });
     })();
   }, [hydrated, code, state, ingestActivityLogs, navigate, setWearableConnection, sync]);
 

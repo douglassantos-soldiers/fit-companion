@@ -646,18 +646,16 @@ export async function getSocialProfileServer(
 
   const { data: stateRow } = await db
     .from("app_state")
-    .select("retention, challenges, earned_badges")
+    .select("retention, challenges")
     .eq("user_id", targetUserId)
     .maybeSingle();
   const retention =
     ((stateRow as Row | null)?.["retention"] as Record<string, unknown> | undefined) ?? {};
-  const earnedBadges = Array.isArray(stateRow?.["earned_badges"])
-    ? (stateRow!["earned_badges"] as string[])
-    : Array.isArray(retention["earnedBadges"])
-      ? (retention["earnedBadges"] as string[])
-      : [];
-  const challenges = Array.isArray(stateRow?.["challenges"])
-    ? (stateRow!["challenges"] as string[])
+  const earnedBadges = Array.isArray(retention["earnedBadges"])
+    ? (retention["earnedBadges"] as string[])
+    : [];
+  const challenges = Array.isArray(stateRow?.challenges)
+    ? stateRow.challenges
     : Array.isArray(retention["challenges"])
       ? (retention["challenges"] as string[])
       : [];

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -8,16 +7,25 @@ import {
   listGovernanceOutcomes,
 } from "@/lib/governance-console.functions";
 import { GovernanceShell } from "@/features/governance/shell";
+import type { ConsoleAuditRow } from "@/ai/governance/console-helpers";
+
+type DecisionTraceDetail = {
+  ok: true;
+  decision: ConsoleAuditRow | null;
+  outcomes: ConsoleAuditRow[];
+  learning: ConsoleAuditRow[];
+  related: ConsoleAuditRow[];
+};
 
 export function GovernanceDecisionsPage() {
   const listDec = useServerFn(listGovernanceDecisions);
   const getTrace = useServerFn(getGovernanceDecisionTrace);
   const listOut = useServerFn(listGovernanceOutcomes);
   const listLearn = useServerFn(listGovernanceLearning);
-  const [decisions, setDecisions] = useState<Record<string, unknown>[]>([]);
-  const [outcomes, setOutcomes] = useState<Record<string, unknown>[]>([]);
-  const [learning, setLearning] = useState<Record<string, unknown>[]>([]);
-  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
+  const [decisions, setDecisions] = useState<ConsoleAuditRow[]>([]);
+  const [outcomes, setOutcomes] = useState<ConsoleAuditRow[]>([]);
+  const [learning, setLearning] = useState<ConsoleAuditRow[]>([]);
+  const [detail, setDetail] = useState<DecisionTraceDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,21 +56,21 @@ export function GovernanceDecisionsPage() {
           <h2 className="text-sm text-zinc-300">Decisions</h2>
           <ul className="mt-2 divide-y divide-zinc-800 rounded border border-zinc-800">
             {decisions.map((d) => {
-              const id = String(d["decision_id"] ?? d["subject_id"] ?? "");
+              const id = d.decision_id ?? d.subject_id ?? "";
               return (
-                <li key={String(d["audit_id"])}>
+                <li key={d.audit_id}>
                   <button
                     type="button"
                     className="w-full px-3 py-2 text-left text-xs hover:bg-zinc-900"
                     onClick={() => {
                       void getTrace({ data: { decisionId: id } }).then((r) => {
-                        if (r.ok) setDetail(r as unknown as Record<string, unknown>);
+                        if (r.ok) setDetail(r);
                       });
                     }}
                   >
                     <span className="font-mono">{id || "—"}</span>
                     <span className="mt-0.5 block text-zinc-500">
-                      {String(d["status"] ?? "")} · {String(d["agent_id"] ?? "")}
+                      {d.status ?? ""} · {d.agent_id ?? ""}
                     </span>
                   </button>
                 </li>
@@ -72,18 +80,17 @@ export function GovernanceDecisionsPage() {
           <h2 className="mt-6 text-sm text-zinc-300">Outcomes</h2>
           <ul className="mt-2 space-y-1 text-xs text-zinc-400">
             {outcomes.slice(0, 15).map((o) => (
-              <li key={String(o["audit_id"])} className="font-mono">
-                {String(o["outcome_id"] ?? o["subject_id"])} → decision{" "}
-                {String(o["decision_id"] ?? "—")} · {String(o["status"] ?? "")}
+              <li key={o.audit_id} className="font-mono">
+                {o.outcome_id ?? o.subject_id} → decision {o.decision_id ?? "—"} ·{" "}
+                {o.status ?? ""}
               </li>
             ))}
           </ul>
           <h2 className="mt-6 text-sm text-zinc-300">Learning events</h2>
           <ul className="mt-2 space-y-1 text-xs text-zinc-400">
             {learning.slice(0, 15).map((e) => (
-              <li key={String(e["audit_id"])} className="font-mono">
-                {String(e["learning_event_id"] ?? e["subject_id"])} ·{" "}
-                {String(e["summary"] ?? e["status"] ?? "")}
+              <li key={e.audit_id} className="font-mono">
+                {e.learning_event_id ?? e.subject_id} · {e.summary ?? e.status ?? ""}
               </li>
             ))}
           </ul>

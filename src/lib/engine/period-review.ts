@@ -164,8 +164,10 @@ function buildPeriodCoachContext(state: AppState): CoachContext {
     profile: p
       ? {
           name: p.name,
-          goal: GOAL_LABEL[p.goal],
-          level: LEVEL_LABEL[p.level],
+          goal: p.goal,
+          level: p.level,
+          goalLabel: GOAL_LABEL[p.goal],
+          levelLabel: LEVEL_LABEL[p.level],
           weightKg: p.weightKg,
           daysPerWeek: p.daysPerWeek,
           equipment: p.equipment,

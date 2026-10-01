@@ -238,4 +238,6 @@ export function sanitizeCommentBody(raw: string): string {
     .slice(0, 280);
 }
 
+export { sanitizeDisplayName, sanitizeBio } from "@/lib/validation/common";
+
 export { PRIVACY_LEVELS };

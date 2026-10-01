@@ -1,7 +1,7 @@
 /**
  * Persist / hydrate Behavior Engine rows (service_role).
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asJson } from "@/lib/db-admin";
 import type {
   BehaviorExperiment,
   BehaviorIntervention,
@@ -21,7 +21,7 @@ export async function upsertBehaviorPatterns(
     user_id: userId,
     key: p.key,
     description: p.description,
-    evidence: p.evidence,
+    evidence: asJson(p.evidence),
     confidence: p.confidence,
     support_count: p.supportCount,
     first_observed_at: p.firstObservedAt,
@@ -158,7 +158,7 @@ export async function recordBehaviorOutcome(opts: {
     user_id: opts.userId,
     intervention_id: opts.interventionId ?? null,
     success: opts.success,
-    metrics: opts.metrics ?? {},
+    metrics: asJson(opts.metrics ?? {}),
   });
   if (error) {
     console.warn("recordBehaviorOutcome failed", error);

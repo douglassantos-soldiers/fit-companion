@@ -16,6 +16,7 @@ import { InviteFriendsButton } from "@/components/social/invite-friends";
 import { ProofStatusBadge } from "@/components/social/proof-status-badge";
 import { resolveChallengeMedia } from "@/lib/soldiers-media";
 import { useStore } from "@/lib/store";
+import { requireDisplayName } from "@/lib/social/require-display-name";
 import { getDeviceId } from "@/lib/sync";
 import { isProfileGeneratedChallenge } from "@/lib/engine/profile-challenges";
 import { filterLeaderboardByProof, isActivityProofMetric } from "@/lib/wearables/challenge-proof";
@@ -46,6 +47,7 @@ function ChallengeRankingPage() {
   const deviceId = getDeviceId();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   const challenge = challengeById(challengeId) ?? CHALLENGES[0];
@@ -61,12 +63,19 @@ function ChallengeRankingPage() {
     if (!hydrated || !challenge) return;
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     void fetchLeaderboard(challenge.id, deviceId)
       .then((data) => {
-        if (!cancelled) setRows(data);
+        if (!cancelled) {
+          setRows(data);
+          setLoadError(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) setRows(null);
+        if (!cancelled) {
+          setRows(null);
+          setLoadError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -151,6 +160,33 @@ function ChallengeRankingPage() {
 
       {loading ? (
         <LoadingPulse />
+      ) : loadError ? (
+        <EmptyState
+          variant="social"
+          title="Não foi possível carregar o ranking"
+          description="Verifique a conexão e tente de novo."
+          action={
+            <Button
+              className="h-12 w-full font-bold uppercase tracking-wide"
+              onClick={() => {
+                setLoading(true);
+                setLoadError(false);
+                void fetchLeaderboard(challenge.id, deviceId)
+                  .then((data) => {
+                    setRows(data);
+                    setLoadError(false);
+                  })
+                  .catch(() => {
+                    setRows(null);
+                    setLoadError(true);
+                  })
+                  .finally(() => setLoading(false));
+              }}
+            >
+              Tentar de novo
+            </Button>
+          }
+        />
       ) : visibleRows?.length ? (
         <ul className="space-y-2">
           {visibleRows.map((r) => (
@@ -193,10 +229,7 @@ function ChallengeRankingPage() {
               <Button
                 className="h-12 w-full font-bold uppercase tracking-wide"
                 onClick={() => {
-                  if (!state.profile?.name?.trim()) {
-                    toast.error("Defina seu nome no Perfil para participar");
-                    return;
-                  }
+                  if (!requireDisplayName(state.profile?.name, "participar")) return;
                   toggleChallenge(challenge.id);
                   toast.success("Entrou no desafio");
                 }}

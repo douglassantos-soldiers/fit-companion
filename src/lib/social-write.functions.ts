@@ -1,13 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SocialWriteOp } from "@/lib/social-write.server";
+import { parseSocialWriteOp } from "@/lib/validation/social-write";
 
-function parseOp(input: unknown): SocialWriteOp {
-  const v = input as SocialWriteOp | null;
-  if (!v || typeof v !== "object" || !("op" in v)) throw new Error("op obrigatória");
-  return v;
-}
-
-const create = createServerFn({ method: "POST" }).inputValidator(parseOp);
+const create = createServerFn({ method: "POST" }).inputValidator(parseSocialWriteOp);
 
 // Large SocialWriteOp union breaks TanStack Start ServerFn generic inference (pre-existing pattern).
 type SocialWriteCaller = (opts: { data: SocialWriteOp }) => Promise<Record<string, unknown>>;

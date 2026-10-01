@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 22.1 — CANONICAL production AI runtime.
  *
@@ -351,7 +350,7 @@ export async function runProductionAiRuntime(
         stageOk("agent", { skipped: reason, agent_count: "0" }, runId),
       );
       const merge = emptyMerge(reason);
-      stages.push(stageOk("merge", { proposals: "0", reason }, runId));
+      stages.push(stageOk("proposal", { proposals: "0", reason }, runId));
       return {
         ok: true,
         degraded: true,

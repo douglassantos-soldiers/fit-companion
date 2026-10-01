@@ -20,7 +20,7 @@ export type MicroKey =
   | "vitaminDUcg"
   | "vitaminB12Ucg";
 
-export type NutrientKey = MacroKey | MicroKey | string;
+export type NutrientKey = MacroKey | MicroKey;
 
 export interface NutrientValue {
   key: NutrientKey;

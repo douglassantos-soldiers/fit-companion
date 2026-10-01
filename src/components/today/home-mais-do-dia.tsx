@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Chip } from "@heroui/react";
 import { Users, X } from "lucide-react";
+import { AppImage } from "@/components/app-image";
 import { ActivityFeed } from "@/components/social/activity-feed";
 import { SoldiersMediaThumb } from "@/components/soldiers-media-frame";
 import { MetricRing } from "@/components/metric-ring";
@@ -12,6 +13,34 @@ import type { SupplementProduct } from "@/data/products";
 import type { HomePersona } from "@/lib/engine/home-persona";
 import { resolveProductMedia } from "@/lib/soldiers-media";
 import type { ActivityEvent, ClubStory, FriendQuest } from "@/lib/social";
+
+export type HomeMaisDoDiaProps = {
+  persona: HomePersona;
+  showLeague: boolean;
+  stories: ClubStory[];
+  club: { name: string } | null;
+  clubFeed: ActivityEvent[];
+  deviceId: string;
+  kudosGiven: Record<string, boolean>;
+  onKudos: (id: string) => void;
+  onKudosQuest: () => void;
+  tip: OnboardingTip | null;
+  onMarkTipSeen: (id: string) => void;
+  summary: { trained: boolean; proteinPct: number; waterPct: number };
+  questsDone: number;
+  score: number;
+  metricsWaterMl: number;
+  waterGoalMl: number;
+  proteinG: number;
+  proteinGoalG: number;
+  takenCount: number;
+  routineMax: number;
+  doneToday: boolean;
+  routine: SupplementProduct[];
+  takenIds: string[];
+  nowSuggestionId: string | null;
+  onToggleSupplement: (id: string) => void;
+};
 
 export function HomeMaisDoDia({
   persona,
@@ -39,33 +68,7 @@ export function HomeMaisDoDia({
   takenIds,
   nowSuggestionId,
   onToggleSupplement,
-}: {
-  persona: HomePersona;
-  showLeague: boolean;
-  stories: ClubStory[];
-  club: { name: string } | null;
-  clubFeed: ActivityEvent[];
-  deviceId: string;
-  kudosGiven: Record<string, boolean>;
-  onKudos: (id: string) => void;
-  onKudosQuest: () => void;
-  tip: OnboardingTip | null;
-  onMarkTipSeen: (id: string) => void;
-  summary: { trained: boolean; proteinPct: number; waterPct: number };
-  questsDone: number;
-  score: number;
-  metricsWaterMl: number;
-  waterGoalMl: number;
-  proteinG: number;
-  proteinGoalG: number;
-  takenCount: number;
-  routineMax: number;
-  doneToday: boolean;
-  routine: SupplementProduct[];
-  takenIds: string[];
-  nowSuggestionId: string | null;
-  onToggleSupplement: (id: string) => void;
-}) {
+}: HomeMaisDoDiaProps) {
   return (
     <div className="space-y-4">
       {showLeague && stories.length ? (
@@ -76,10 +79,12 @@ export function HomeMaisDoDia({
         >
           {stories.map((s) => (
             <div key={s.id} className="shrink-0 text-center">
-              <img
+              <AppImage
                 src={s.imageUrl}
                 alt={s.displayName}
                 className="size-14 rounded-full border-2 border-primary object-cover"
+                width={56}
+                height={56}
               />
               <p className="mt-1 max-w-14 truncate text-[0.6rem] text-muted-foreground">
                 {s.displayName}

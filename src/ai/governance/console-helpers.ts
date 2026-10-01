@@ -2,9 +2,48 @@
  * Pure helpers for Governance Console (FASE 19) — no Decision Engine changes.
  */
 
-import type { AiAuditEvent } from "@/ai/governance/audit";
-import { redactForAudit } from "@/ai/governance/redact";
+import type { AiAuditEvent, AiTokenUsage } from "@/ai/governance/audit";
+import { redactForAudit, redactMetadata, redactSummary } from "@/ai/governance/redact";
 import type { AgentRunDiagnosticView } from "@/ai/governance/diagnostics";
+
+/** Serializable JSON for TanStack Start server-fn payloads (no `unknown`). */
+export type ConsoleJson =
+  | string
+  | number
+  | boolean
+  | null
+  | ConsoleJson[]
+  | { [key: string]: ConsoleJson };
+
+export type ConsoleMeta = Record<string, string | number | boolean | null>;
+
+/** Redacted audit row safe for Governance Console UI / server fns. */
+export type ConsoleAuditRow = {
+  audit_id: string;
+  kind: string;
+  user_id: string;
+  created_at: string;
+  subject_id: string;
+  run_id: string | null;
+  parent_run_id: string | null;
+  agent_id: string | null;
+  agent_version: string | null;
+  skill_id: string | null;
+  tool_id: string | null;
+  retrieval_id: string | null;
+  decision_id: string | null;
+  outcome_id: string | null;
+  learning_event_id: string | null;
+  context_fingerprint: string | null;
+  status: string | null;
+  latency_ms: number | null;
+  model: string | null;
+  estimated_cost: number | null;
+  token_usage: AiTokenUsage | null;
+  summary: string | null;
+  metadata: ConsoleMeta | null;
+  governance_version: string;
+};
 
 export function truncateUserId(userId: string): string {
   const s = String(userId ?? "");
@@ -12,8 +51,40 @@ export function truncateUserId(userId: string): string {
   return `user_****${s.slice(-4)}`;
 }
 
-export function redactAuditForConsole(event: AiAuditEvent): Record<string, unknown> {
-  return redactForAudit({
+function asScalar(value: unknown): string | number | boolean | null {
+  if (value == null) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value).slice(0, 240);
+    } catch {
+      return "[unserializable]";
+    }
+  }
+  return String(value);
+}
+
+/** Map arbitrary values into serializable ConsoleJson (boundary mapper). */
+export function toConsoleJson(value: unknown): ConsoleJson {
+  if (value == null) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(toConsoleJson);
+  if (typeof value === "object") {
+    const out: { [key: string]: ConsoleJson } = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = toConsoleJson(v);
+    }
+    return out;
+  }
+  return String(value);
+}
+
+export function redactAuditForConsole(event: AiAuditEvent): ConsoleAuditRow {
+  return {
     audit_id: event.audit_id,
     kind: event.kind,
     user_id: truncateUserId(String(event.user_id)),
@@ -35,10 +106,10 @@ export function redactAuditForConsole(event: AiAuditEvent): Record<string, unkno
     model: event.model ?? null,
     estimated_cost: event.estimated_cost ?? null,
     token_usage: event.token_usage ?? null,
-    summary: event.summary ?? null,
-    metadata: event.metadata ?? null,
+    summary: redactSummary(event.summary) ?? null,
+    metadata: redactMetadata(event.metadata) ?? null,
     governance_version: event.governance_version,
-  }) as Record<string, unknown>;
+  };
 }
 
 export type TraceNode = {
@@ -47,7 +118,7 @@ export type TraceNode = {
   status: string | null;
   latency_ms: number | null;
   error_code: string | null;
-  detail: Record<string, unknown> | null;
+  detail: ConsoleMeta | null;
 };
 
 /** Build ordered timeline from diagnostic + audits (never invents missing stages). */
@@ -63,7 +134,10 @@ export function buildRunTraceTimeline(
     status: typeof agent["status"] === "string" ? agent["status"] : null,
     latency_ms: typeof agent["latency_ms"] === "number" ? agent["latency_ms"] : null,
     error_code: typeof agent["error_code"] === "string" ? agent["error_code"] : null,
-    detail: { agent_id: agent["agent_id"] ?? null, version: agent["agent_version"] ?? null },
+    detail: {
+      agent_id: asScalar(agent["agent_id"]),
+      version: asScalar(agent["agent_version"]),
+    },
   });
 
   for (const s of diagnostic.sections.skills) {
@@ -74,7 +148,7 @@ export function buildRunTraceTimeline(
       status: typeof row["status"] === "string" ? row["status"] : null,
       latency_ms: typeof row["latency_ms"] === "number" ? row["latency_ms"] : null,
       error_code: typeof row["error_code"] === "string" ? row["error_code"] : null,
-      detail: { skill_id: row["skill_id"] ?? null },
+      detail: { skill_id: asScalar(row["skill_id"]) },
     });
   }
 
@@ -86,7 +160,7 @@ export function buildRunTraceTimeline(
       status: typeof row["status"] === "string" ? row["status"] : null,
       latency_ms: typeof row["latency_ms"] === "number" ? row["latency_ms"] : null,
       error_code: typeof row["error_code"] === "string" ? row["error_code"] : null,
-      detail: { tool_id: row["tool_id"] ?? row["tool"] ?? null },
+      detail: { tool_id: asScalar(row["tool_id"] ?? row["tool"]) },
     });
   }
 
@@ -98,7 +172,10 @@ export function buildRunTraceTimeline(
       status: typeof row["status"] === "string" ? row["status"] : null,
       latency_ms: typeof row["latency_ms"] === "number" ? row["latency_ms"] : null,
       error_code: null,
-      detail: { hit_count: row["hit_count"] ?? null, top_score: row["top_score"] ?? null },
+      detail: {
+        hit_count: asScalar(row["hit_count"]),
+        top_score: asScalar(row["top_score"]),
+      },
     });
   }
 
@@ -115,7 +192,7 @@ export function buildRunTraceTimeline(
       latency_ms: null,
       error_code: null,
       detail: {
-        context_fingerprint: diagnostic.sections.context["fingerprint"] ?? null,
+        context_fingerprint: asScalar(diagnostic.sections.context["fingerprint"]),
         memory_refs: memAudits.length,
       },
     });
@@ -134,7 +211,7 @@ export function buildRunTraceTimeline(
     latency_ms: null,
     error_code: null,
     detail: {
-      proposal_id: diagnostic.sections.decision["proposal_id"] ?? null,
+      proposal_id: asScalar(diagnostic.sections.decision["proposal_id"]),
     },
   });
 
@@ -158,8 +235,8 @@ export function buildRunTraceTimeline(
     latency_ms: null,
     error_code: null,
     detail: {
-      reason_codes: dec["reason_codes"] ?? null,
-      engine_version: dec["engine_version"] ?? null,
+      reason_codes: asScalar(dec["reason_codes"]),
+      engine_version: asScalar(dec["engine_version"]),
     },
   });
 
@@ -172,16 +249,23 @@ export function buildRunTraceTimeline(
     error_code: null,
     detail: outcomeAudits[0]
       ? {
-          expected: outcomeAudits[0].metadata?.["expected"] ?? null,
-          quality: outcomeAudits[0].metadata?.["quality"] ?? null,
+          expected: asScalar(outcomeAudits[0].metadata?.["expected"]),
+          quality: asScalar(outcomeAudits[0].metadata?.["quality"]),
         }
       : null,
   });
 
-  return nodes.map((n) => ({
-    ...n,
-    detail: n.detail ? (redactForAudit(n.detail) as Record<string, unknown>) : null,
-  }));
+  return nodes.map((n) => {
+    if (!n.detail) return n;
+    const redacted = redactForAudit(n.detail);
+    const detail: ConsoleMeta = {};
+    if (redacted && typeof redacted === "object" && !Array.isArray(redacted)) {
+      for (const [k, v] of Object.entries(redacted as Record<string, unknown>)) {
+        detail[k] = asScalar(v);
+      }
+    }
+    return { ...n, detail };
+  });
 }
 
 export function filterSafetyFeed(audits: AiAuditEvent[]): AiAuditEvent[] {

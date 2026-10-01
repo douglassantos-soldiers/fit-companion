@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Flag, MessageCircle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -175,16 +175,7 @@ function formatFeedTime(iso: string): string {
 
 type CommentRow = { id: string; userId: string; displayName: string; body: string; createdAt: string };
 
-export function ActivityCard({
-  event: e,
-  deviceId,
-  kudosGiven,
-  onKudos,
-  onKudosQuest,
-  onDismissed,
-  compact,
-  interactive = true,
-}: {
+export type ActivityCardProps = {
   event: ActivityEvent;
   deviceId: string;
   kudosGiven: Record<string, boolean>;
@@ -193,7 +184,18 @@ export function ActivityCard({
   onDismissed?: (eventId: string) => void;
   compact?: boolean;
   interactive?: boolean;
-}) {
+};
+
+export const ActivityCard = memo(function ActivityCard({
+  event: e,
+  deviceId,
+  kudosGiven,
+  onKudos,
+  onKudosQuest,
+  onDismissed,
+  compact,
+  interactive = true,
+}: ActivityCardProps) {
   const [openComments, setOpenComments] = useState(false);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [draft, setDraft] = useState("");
@@ -508,4 +510,4 @@ export function ActivityCard({
       />
     </li>
   );
-}
+});

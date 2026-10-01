@@ -1,12 +1,20 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useEffect, type ReactNode } from "react";
 import { SoldiersSplash, type SplashStatus } from "@/components/soldiers-splash";
-import { checkAccessSession, grantAdminAppAccess } from "@/lib/access.functions";
-import { getAuthSession } from "@/lib/auth";
+import { useAccessSession } from "@/components/access-session-provider";
 import { useStore } from "@/lib/store";
 
-const PUBLIC_PATHS = ["/acesso", "/welcome", "/admin", "/governance", "/cadastro", "/entrar", "/termos", "/privacidade", "/wearables"];
+const PUBLIC_PATHS = [
+  "/acesso",
+  "/welcome",
+  "/admin",
+  "/governance",
+  "/cadastro",
+  "/entrar",
+  "/termos",
+  "/privacidade",
+  "/wearables",
+];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -14,98 +22,45 @@ function isPublicPath(pathname: string) {
 
 /**
  * Dual gate: Supabase Auth (identity) + Shopify paid window (cookie).
- * Device is a channel, not the person.
- * Brand splash while session/access resolve (OAuth social is out of scope).
+ * Auth/access bootstrap lives in AccessSessionProvider (once per session).
+ * This component only applies route policy from cached session state.
  *
  * Admin / iframe: SameSite=None cookies (access-session.server) + anti-loop —
  * if grantAdmin succeeds but the next checkSession fails, show a clear error
  * instead of bouncing /acesso ↔ /onboarding forever.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
-  const { state, hydrated, updateAccessFromSession, revokeAccessLocal } = useStore();
+  const { state, hydrated, revokeAccessLocal } = useStore();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const checkSession = useServerFn(checkAccessSession);
-  const grantAdmin = useServerFn(grantAdminAppAccess);
-  const [ready, setReady] = useState(false);
-  const [hasAuth, setHasAuth] = useState(false);
-  const [shopifyOk, setShopifyOk] = useState(false);
-  const [accountBlocked, setAccountBlocked] = useState(false);
-  const [connectionError, setConnectionError] = useState(false);
-  const adminGrantedRef = useRef(false);
-  const adminTriedRef = useRef(false);
-  const [adminCookieLost, setAdminCookieLost] = useState(false);
-  const shopifyOkRef = useRef(shopifyOk);
-  shopifyOkRef.current = shopifyOk;
-  /** Once access was OK this session, don't destroy mid-wizard UX on a flaky re-check. */
-  const heldAccessRef = useRef(false);
+  const {
+    ready,
+    hasAuth,
+    shopifyOk,
+    accountBlocked,
+    connectionError,
+    adminCookieLost,
+    heldAccess,
+  } = useAccessSession();
 
+  // Path-aware revoke: keep onboarding if access was held this session (transient cookie blip).
   useEffect(() => {
-    if (!hydrated) return;
-    let cancelled = false;
+    if (!hydrated || !ready) return;
+    if (shopifyOk || adminCookieLost) return;
+    if (!hasAuth) return;
     const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
-    if (!shopifyOkRef.current && !isPublicPath(pathname) && !(onOnboarding && heldAccessRef.current)) {
-      setReady(false);
-    }
-    void (async () => {
-      try {
-        const session = await getAuthSession();
-        if (cancelled) return;
-        setHasAuth(Boolean(session?.user));
-        setConnectionError(false);
-      } catch (e) {
-        if (cancelled) return;
-        console.warn("getAuthSession failed", e);
-        setHasAuth(false);
-        setConnectionError(true);
-      }
-      try {
-        let res = await checkSession();
-        if (!res.ok && res.reason !== "account_blocked" && !adminTriedRef.current) {
-          const s = await getAuthSession();
-          if (s?.access_token) {
-            adminTriedRef.current = true;
-            const g = await grantAdmin({ data: { accessToken: s.access_token } }).catch(() => null);
-            if (g?.ok) {
-              adminGrantedRef.current = true;
-              res = await checkSession();
-              if (!res.ok) setAdminCookieLost(true);
-            }
-          }
-        }
-        if (cancelled) return;
-        if (res.ok) {
-          setAccountBlocked(false);
-          setShopifyOk(true);
-          heldAccessRef.current = true;
-          setAdminCookieLost(false);
-          updateAccessFromSession({
-            email: res.email,
-            tier: res.tier,
-            lastPaidAt: res.lastPaidAt,
-          });
-        } else {
-          setShopifyOk(false);
-          setAccountBlocked(res.reason === "account_blocked");
-          if (adminGrantedRef.current) {
-            setAdminCookieLost(true);
-          } else if (!(onOnboarding && heldAccessRef.current)) {
-            revokeAccessLocal();
-          }
-        }
-      } catch (e) {
-        if (cancelled) return;
-        console.warn("checkAccessSession failed", e);
-        setShopifyOk(false);
-        setConnectionError(true);
-      } finally {
-        if (!cancelled) setReady(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hydrated, pathname, checkSession, grantAdmin, updateAccessFromSession, revokeAccessLocal]);
+    if (onOnboarding && heldAccess) return;
+    revokeAccessLocal();
+  }, [
+    hydrated,
+    ready,
+    hasAuth,
+    shopifyOk,
+    adminCookieLost,
+    heldAccess,
+    pathname,
+    revokeAccessLocal,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !ready) return;
@@ -121,7 +76,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
     if (hasAuth && !shopifyOk && !accountBlocked && !isPublic) {
       if (adminCookieLost) return;
       // Keep wizard if access was held this session (transient cookie blip)
-      if (onOnboarding && heldAccessRef.current) return;
+      if (onOnboarding && heldAccess) return;
       void navigate({
         to: "/acesso",
         search: {
@@ -130,7 +85,14 @@ export function AccessGate({ children }: { children: ReactNode }) {
       });
       return;
     }
-    if (hasAuth && shopifyOk && (pathname === "/acesso" || pathname === "/welcome" || pathname === "/cadastro" || pathname === "/entrar")) {
+    if (
+      hasAuth &&
+      shopifyOk &&
+      (pathname === "/acesso" ||
+        pathname === "/welcome" ||
+        pathname === "/cadastro" ||
+        pathname === "/entrar")
+    ) {
       void navigate({ to: state.profile ? "/" : "/onboarding" });
       return;
     }
@@ -142,7 +104,18 @@ export function AccessGate({ children }: { children: ReactNode }) {
         },
       });
     }
-  }, [hydrated, ready, hasAuth, shopifyOk, accountBlocked, adminCookieLost, state.profile, pathname, navigate]);
+  }, [
+    hydrated,
+    ready,
+    hasAuth,
+    shopifyOk,
+    accountBlocked,
+    adminCookieLost,
+    heldAccess,
+    state.profile,
+    pathname,
+    navigate,
+  ]);
 
   const splashStatus = (): SplashStatus => {
     if (connectionError) return "connection_error";
@@ -205,7 +178,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
   }
   const onOnboarding = pathname === "/onboarding" || pathname.startsWith("/onboarding/");
   const allowed =
-    isPublic || (hasAuth && shopifyOk) || (hasAuth && onOnboarding && heldAccessRef.current);
+    isPublic || (hasAuth && shopifyOk) || (hasAuth && onOnboarding && heldAccess);
   if (!allowed) {
     return <SoldiersSplash status={splashStatus()} />;
   }

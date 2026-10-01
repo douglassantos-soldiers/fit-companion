@@ -144,17 +144,17 @@ describe("executeAccountWipe BEFORE/AFTER", () => {
     // AFTER
     expect(result.ok).toBe(true);
     expect(result.usersRowDeleted).toBe(true);
-    expect(remaining().meal_items.every((r) => r.user_id !== userId)).toBe(true);
-    expect(remaining().meal_items).toHaveLength(1);
-    expect(remaining().ai_user_memory).toHaveLength(0);
-    expect(remaining().sessions).toHaveLength(0);
-    expect(remaining().social_follows.every((r) => r.follower_id !== userId)).toBe(true);
-    expect(remaining().activity_kudos.every((r) => r.device_id !== "dev-a")).toBe(true);
-    expect(remaining().users.find((u) => u.id === userId)).toBeUndefined();
-    expect(remaining().users.find((u) => u.id === other)).toBeDefined();
+    expect(remaining().meal_items?.every((r) => r.user_id !== userId)).toBe(true);
+    expect(remaining().meal_items ?? []).toHaveLength(1);
+    expect(remaining().ai_user_memory ?? []).toHaveLength(0);
+    expect(remaining().sessions ?? []).toHaveLength(0);
+    expect(remaining().social_follows?.every((r) => r.follower_id !== userId)).toBe(true);
+    expect(remaining().activity_kudos?.every((r) => r.device_id !== "dev-a")).toBe(true);
+    expect(remaining().users?.find((u) => u.id === userId)).toBeUndefined();
+    expect(remaining().users?.find((u) => u.id === other)).toBeDefined();
     // orders not in wipe path
     expect(deletedOps.some((o) => o.table === "orders")).toBe(false);
-    expect(remaining().orders).toHaveLength(1);
+    expect(remaining().orders ?? []).toHaveLength(1);
   });
 
   it("reports partial when a table delete fails", async () => {

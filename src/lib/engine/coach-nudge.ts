@@ -1,10 +1,9 @@
-// @ts-nocheck
 /**
  * Proactive Coach overlay detector (Fase 16). Rule-based, no LLM.
  * Fires when week-over-week volume is up ≥15% and recovery worsened.
  */
-import { trafficForScore, weekOverWeek, type TrafficLight } from "@/lib/engine/dimensions";
-import { todayKey, type AppState } from "@/lib/types";
+import { trafficForScore, weekOverWeek } from "@/lib/engine/dimensions";
+import { todayKey, type AppState, type TrafficLight } from "@/lib/types";
 
 const TRAFFIC_RANK: Record<TrafficLight, number> = { green: 2, yellow: 1, red: 0 };
 

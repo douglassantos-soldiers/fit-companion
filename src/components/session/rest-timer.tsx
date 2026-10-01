@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -9,23 +9,46 @@ function formatClock(total: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * Owns countdown state so the parent session page does not re-render every second.
+ * Remount (via key) when a new rest period starts.
+ */
 export function RestTimer({
-  seconds,
-  paused,
+  initialSeconds,
   nextLabel,
-  onTogglePause,
-  onAdd30,
+  onComplete,
   onSkip,
 }: {
-  seconds: number;
-  paused: boolean;
+  initialSeconds: number;
   nextLabel: string;
-  onTogglePause: () => void;
-  onAdd30: () => void;
+  onComplete: () => void;
   onSkip: () => void;
 }) {
-  const initialRef = useRef(Math.max(seconds, 1));
-  if (seconds > initialRef.current) initialRef.current = seconds;
+  const [seconds, setSeconds] = useState(() => Math.max(0, initialSeconds));
+  const [paused, setPaused] = useState(false);
+  const initialRef = useRef(Math.max(initialSeconds, 1));
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (paused || completedRef.current) return;
+    if (seconds <= 0) {
+      completedRef.current = true;
+      onComplete();
+      return;
+    }
+    const t = setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [seconds, paused, onComplete]);
+
+  const togglePause = useCallback(() => setPaused((p) => !p), []);
+  const add30 = useCallback(() => {
+    setSeconds((s) => {
+      const next = s + 30;
+      if (next > initialRef.current) initialRef.current = next;
+      return next;
+    });
+  }, []);
+
   const max = initialRef.current;
   const radius = 108;
   const circumference = 2 * Math.PI * radius;
@@ -74,12 +97,12 @@ export function RestTimer({
         <p className="mt-4 text-xs text-muted-foreground">Próximo · {nextLabel}</p>
 
         <div className="mt-10 w-full space-y-2">
-          <Button type="button" className="glow-primary h-14 w-full font-bold uppercase" onClick={onTogglePause}>
+          <Button type="button" className="glow-primary h-14 w-full font-bold uppercase" onClick={togglePause}>
             {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
             {paused ? "Continuar" : "Pausar"}
           </Button>
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="outline" className="h-12" onClick={onAdd30}>
+            <Button type="button" variant="outline" className="h-12" onClick={add30}>
               +30s
             </Button>
             <Button type="button" variant="secondary" className="h-12" onClick={onSkip}>

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, expect, it } from "vitest";
 import { emptyState, type Profile } from "@/lib/types";
 import { assembleDecisionContext } from "@/lib/engine/assemble-decision-context";
@@ -28,6 +27,7 @@ const profile: Profile = {
   age: 28,
   typicalSleepHours: 7,
   typicalSessionMin: 55,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 describe("hybrid block + living plan", () => {

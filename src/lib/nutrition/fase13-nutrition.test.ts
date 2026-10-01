@@ -193,7 +193,7 @@ describe("saved-meals", () => {
       {
         foodId: "frango-peito-grelhado",
         quantity: 1,
-        unit: "100 g",
+        unit: "g",
         grams: 150,
         nutrientSnapshot: {
           energyKcal: 240,
@@ -243,7 +243,7 @@ describe("micros", () => {
           {
             foodId: "ovo-cozido",
             quantity: 1,
-            unit: "unidade",
+            unit: "un",
             grams: 50,
             nutrientSnapshot: {
               energyKcal: 73,
@@ -278,7 +278,7 @@ describe("micros", () => {
           {
             foodId: "taco-feijao-test",
             quantity: 1,
-            unit: "100 g",
+            unit: "g",
             grams: 140,
             nutrientSnapshot: {
               energyKcal: 106,

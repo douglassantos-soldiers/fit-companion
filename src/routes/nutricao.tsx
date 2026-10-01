@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   BookmarkPlus,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { HydratedPageGate } from "@/components/hydrated-page-gate";
 import { MealEditSheet } from "@/components/meal-edit-sheet";
 import { MealPickerSheet } from "@/components/meal-picker-sheet";
 import { ShoppingWeekSheet } from "@/components/shopping-week-sheet";
@@ -66,6 +67,7 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SupplementsPanel } from "@/features/suplementos-panel";
+import { createRouteErrorComponent } from "@/components/route-error-fallback";
 
 type NutritionTab = "hoje" | "semana" | "biblioteca" | "historico" | "doses";
 
@@ -95,6 +97,7 @@ export const Route = createFileRoute("/nutricao")({
     ],
   }),
   component: NutritionPage,
+  errorComponent: createRouteErrorComponent("nutricao_error"),
 });
 
 const SLOTS: MealSlot[] = ["cafe", "almoco", "lanche", "jantar"];
@@ -171,70 +174,127 @@ function NutritionPage() {
     return () => window.clearTimeout(t);
   }, [tab]);
 
-  if (!hydrated || !state.profile) {
+  const derived = useMemo(() => {
+    if (!state.profile) return null;
+    const insights = computeLearningInsights(state);
+    const decisionCtx = decisionContextForUi(state, todayKey());
+    const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
+    const goals = nutritionGoals(state.profile, insights, engine);
+    const totals = dayNutritionTotalsFromState(state);
+    const mealPlan = buildDailyMealPlan(state.profile, state, todayKey(), insights, engine);
+    const weekPlan = buildMultiDayMealPlan(state.profile, state, todayKey(), 7, insights, engine);
+    const library = nutritionLibrary(
+      state.meals ?? [],
+      state.favoriteMealPresetIds ?? [],
+      state.savedMeals ?? [],
+    );
+    const metrics = state.days[todayKey()] ?? { date: todayKey(), waterMl: 0, meals: 0 };
+    const wheyOptIn = state.profile.nutritionProfile?.countWheyInMacros === true;
+    const whey = wheyMacrosFromDoses(state.supplementDoseLogs, todayKey(), wheyOptIn);
+    const nextEmpty = mealPlan.slots.find((s) => s.status === "suggested")?.slot;
+    const nextSuggested = nextSuggestedMeal(mealPlan);
+    const gap = proteinGapLine(totals.proteinG, goals.proteinG, nextEmpty);
+    const proteinMissing = Math.round(goals.proteinG - totals.proteinG);
+    const gapOpen = proteinMissing > 0;
+    const proof = nutritionProofLine(state.meals ?? [], goals.proteinG);
+    const living = livingPlanForDate(state, todayKey());
+    const whyNutri = nutritionWhyLines(living?.whyByChange);
+    const weekSummary = weekNutritionSummary(state, {
+      kcalTrend: decisionCtx?.context.nutrition.kcalTrend ?? 0,
+      reasonSeeds: decisionCtx?.context.reasonSeeds ?? [],
+    });
+    const hasWheyInRoutine = (state.supplementRoutine ?? []).some(
+      (id) => id === "whey-protein" || id === "beef-protein",
+    );
+    const todayMeals = (state.meals ?? []).filter((m) => m.date.slice(0, 10) === todayKey());
+    const micros = dayPerformanceMicros(todayMeals);
+    const kcalTrend = decisionCtx?.context.nutrition.kcalTrend ?? 0;
+    const weeklyKcalHint =
+      Math.abs(kcalTrend) >= 100
+        ? `Ajuste semanal: ${kcalTrend > 0 ? "+" : ""}${kcalTrend} kcal${
+            decisionCtx?.context.reasonSeeds.includes("weight_trend_up") ||
+            decisionCtx?.context.reasonSeeds.includes("weight_trend_down")
+              ? " (tendência de peso)"
+              : decisionCtx?.context.reasonSeeds.includes("adherence_gate") ||
+                  decisionCtx?.context.reasonSeeds.includes("incomplete_logging")
+                ? " (adesão/registro)"
+                : ""
+          }`
+        : null;
+    const qualityLine =
+      todayMeals.length > 0
+        ? `${todayMeals.filter((m) => m.quality === "verde").length} verdes · ${todayMeals.filter((m) => m.quality === "laranja").length} ocasionais`
+        : null;
+    const history = weeklyNutritionSeries(state.meals ?? [], 14)
+      .slice()
+      .reverse();
+    return {
+      insights,
+      decisionCtx,
+      engine,
+      goals,
+      totals,
+      mealPlan,
+      weekPlan,
+      library,
+      metrics,
+      whey,
+      nextEmpty,
+      nextSuggested,
+      gap,
+      proteinMissing,
+      gapOpen,
+      proof,
+      living,
+      whyNutri,
+      weekSummary,
+      hasWheyInRoutine,
+      todayMeals,
+      micros,
+      weeklyKcalHint,
+      qualityLine,
+      history,
+    };
+  }, [state]);
+
+  if (!hydrated || !state.profile || !derived) {
     return (
-      <AppShell title="Nutrição">
-        <div className="surface-glass h-40 animate-pulse" />
-      </AppShell>
+      <HydratedPageGate hydrated={hydrated} profile={state.profile} title="Nutrição" mode="glass">
+        {null}
+      </HydratedPageGate>
     );
   }
 
-  const insights = computeLearningInsights(state);
-  const decisionCtx = decisionContextForUi(state, todayKey());
-  const engine = decisionCtx ? selectNutritionOpts(decisionCtx, state) : {};
-  const goals = nutritionGoals(state.profile, insights, engine);
-  const totals = dayNutritionTotalsFromState(state);
-  const mealPlan = buildDailyMealPlan(state.profile, state, todayKey(), insights, engine);
-  const weekPlan = buildMultiDayMealPlan(state.profile, state, todayKey(), 7, insights, engine);
-  const library = nutritionLibrary(
-    state.meals ?? [],
-    state.favoriteMealPresetIds ?? [],
-    state.savedMeals ?? [],
-  );
-  const metrics = state.days[todayKey()] ?? { date: todayKey(), waterMl: 0, meals: 0 };
+  const {
+    insights,
+    goals,
+    totals,
+    mealPlan,
+    weekPlan,
+    library,
+    metrics,
+    whey,
+    nextEmpty,
+    nextSuggested,
+    gap,
+    proteinMissing,
+    gapOpen,
+    proof,
+    living,
+    whyNutri,
+    weekSummary,
+    hasWheyInRoutine,
+    todayMeals,
+    micros,
+    weeklyKcalHint,
+    qualityLine,
+    history,
+  } = derived;
   const wheyOptIn = state.profile.nutritionProfile?.countWheyInMacros === true;
-  const whey = wheyMacrosFromDoses(state.supplementDoseLogs, todayKey(), wheyOptIn);
-  const nextEmpty = mealPlan.slots.find((s) => s.status === "suggested")?.slot;
-  const nextSuggested = nextSuggestedMeal(mealPlan);
-  const gap = proteinGapLine(totals.proteinG, goals.proteinG, nextEmpty);
-  const proteinMissing = Math.round(goals.proteinG - totals.proteinG);
-  const gapOpen = proteinMissing > 0;
-  const proof = nutritionProofLine(state.meals ?? [], goals.proteinG);
-  const living = livingPlanForDate(state, todayKey());
-  const whyNutri = nutritionWhyLines(living?.whyByChange);
-  const weekSummary = weekNutritionSummary(state, {
-    kcalTrend: decisionCtx?.context.nutrition.kcalTrend ?? 0,
-    reasonSeeds: decisionCtx?.context.reasonSeeds ?? [],
-  });
-  const hasWheyInRoutine = (state.supplementRoutine ?? []).some(
-    (id) => id === "whey-protein" || id === "beef-protein",
-  );
-  const todayMeals = (state.meals ?? []).filter((m) => m.date.slice(0, 10) === todayKey());
-  const micros = dayPerformanceMicros(todayMeals);
-  const kcalTrend = decisionCtx?.context.nutrition.kcalTrend ?? 0;
-  const weeklyKcalHint =
-    Math.abs(kcalTrend) >= 100
-      ? `Ajuste semanal: ${kcalTrend > 0 ? "+" : ""}${kcalTrend} kcal${
-          decisionCtx?.context.reasonSeeds.includes("weight_trend_up") ||
-          decisionCtx?.context.reasonSeeds.includes("weight_trend_down")
-            ? " (tendência de peso)"
-            : decisionCtx?.context.reasonSeeds.includes("adherence_gate") ||
-                decisionCtx?.context.reasonSeeds.includes("incomplete_logging")
-              ? " (adesão/registro)"
-              : ""
-        }`
-      : null;
-  const qualityLine =
-    todayMeals.length > 0
-      ? `${todayMeals.filter((m) => m.quality === "verde").length} verdes · ${todayMeals.filter((m) => m.quality === "laranja").length} ocasionais`
-      : null;
   const visibleSlots =
     focusSlot === "todos"
       ? mealPlan.slots.filter((s) => s.status !== "skipped")
       : mealPlan.slots.filter((s) => s.slot === focusSlot && s.status !== "skipped");
-  const history = weeklyNutritionSeries(state.meals ?? [], 14)
-    .slice()
-    .reverse();
 
   const addPreset = (preset: MealPreset, slot: MealSlot, servings = 1, date = todayKey()) => {
     const scaled = scalePreset(preset, servings);

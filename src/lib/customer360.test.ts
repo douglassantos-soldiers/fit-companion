@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Customer 360 aggregator tests.
  */
@@ -71,7 +70,7 @@ describe("Customer 360 filled metrics", () => {
           label: "Frango",
           proteinG: 40,
           kcal: 500,
-          quality: "green" as const,
+          quality: "verde" as const,
         },
       ],
       supplementRoutine: ["whey-protein"],

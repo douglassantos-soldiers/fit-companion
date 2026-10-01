@@ -117,8 +117,13 @@ export async function uploadProgressPhotoBytesServer(
 
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { normalizeImageUpload } = await import("@/lib/validation/common");
+    const { contentType } = normalizeImageUpload({
+      contentType: input.contentType,
+      fileExt: "jpg",
+    });
     const { error } = await supabaseAdmin.storage.from(PROGRESS_PHOTOS_BUCKET).upload(storagePath, buf, {
-      contentType: input.contentType || "image/jpeg",
+      contentType,
       upsert: true,
     });
     if (error) {

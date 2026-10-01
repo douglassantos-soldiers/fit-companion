@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * runSpecialistAgent — thin single-agent runtime.
  * Uses Context (via tools/skills), MCP, Skills, RAG, Memory.
@@ -78,7 +77,7 @@ export async function runSpecialistAgent(
       user_id: input.trustedUserId ?? "",
       status: "cancelled",
       created_at,
-      completed_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
       metadata: { error_code: "specialists_disabled", model: "deterministic_runtime" },
       ...(input.parentRunId ? { parent_run_id: input.parentRunId } : {}),
     };
@@ -113,7 +112,7 @@ export async function runSpecialistAgent(
       user_id: input.trustedUserId ?? "",
       status: "failed",
       created_at,
-      completed_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
       metadata: {
         error_code: "rate_limited",
         model: "deterministic_runtime",

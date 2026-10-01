@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 22.1 — CANONICAL authoritative bridge (production surface).
  * DecisionProposal → Safety → Decision Engine → Living Plan → Outcome → Learning.
@@ -165,7 +164,7 @@ export async function runAuthoritativeBridge(
     });
 
     // Safety is the authoritative fail; still await critical audit (observability).
-    if (!safetyAudit.persisted && !("skipped" in safetyAudit && safetyAudit.skipped)) {
+    if (!safetyAudit.ok) {
       stages.push(
         stageFail("audit", AUDIT_FAIL, safetyAudit.error ?? AUDIT_FAIL, runId, {
           audit_id: safetyAudit.audit_id,

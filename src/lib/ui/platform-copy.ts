@@ -70,6 +70,13 @@ export const ACCESS_NOT_CONFIGURED =
 export const ACCESS_VERIFY_PRIMARY = "Já comprei — verificar agora";
 export const ACCESS_VERIFY_RETURN = "Voltei da loja — verificar agora";
 
+export const ACCESS_GRANT_RATE_LIMITED = "Muitas tentativas, aguarde alguns minutos";
+export const ACCESS_DENY_NO_PURCHASE =
+  "Não achamos compra neste e-mail. Use o endereço da loja.";
+export const ACCESS_DENY_NOT_CONFIGURED =
+  "Loja indisponível agora — tente de novo em instantes.";
+export const ACCESS_DENY_GENERIC = "Acesso ainda bloqueado — confira a compra.";
+
 export const PERFORMANCE_LOCK_TITLE = "Desafios da liga Performance";
 export const PERFORMANCE_LOCK_BENEFITS = [
   "Liga e ranking exclusivo",

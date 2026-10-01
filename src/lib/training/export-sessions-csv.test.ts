@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, expect, it } from "vitest";
 import { exportSessionsCsv, SESSIONS_CSV_HEADER } from "@/lib/training/export-sessions-csv";
 import type { SessionLog } from "@/lib/types";
@@ -13,7 +12,7 @@ describe("exportSessionsCsv", () => {
         date: "2026-09-20T12:00:00.000Z",
         durationMin: 45,
         volumeKg: 1000,
-        rpe: "medio",
+        rpe: "ok",
         exercises: [
           {
             exerciseId: "supino-reto",

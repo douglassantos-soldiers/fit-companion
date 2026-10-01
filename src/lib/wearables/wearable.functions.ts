@@ -87,17 +87,13 @@ export const connectWearableFn = createServerFn({ method: "POST" })
       if (!identity) return { ok: false, reason: "unauthorized" };
       const rlKey = identity.email ?? identity.userId;
       {
-        const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-        const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
-        if (!isAiRateLimitDisabled()) {
-          const store = await resolveAiRateLimitStore();
-          const burst = await store.consume({
-            key: `ai:wearable-connect:${rlKey}`,
-            limit: 20,
-            windowMs: 60 * 60_000,
-          });
-          if (!burst.allowed) return { ok: false, reason: "rate_limited" };
-        }
+        const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
+        const burst = await consumeNamedBurst({
+          key: `ai:wearable-connect:${rlKey}`,
+          limit: 20,
+          windowMs: 60 * 60_000,
+        });
+        if (!burst.ok) return { ok: false, reason: "rate_limited" };
       }
       const redirect = `${appOrigin()}/wearables/callback`;
       if (data.provider === "strava") {
@@ -173,17 +169,13 @@ export const syncWearableFn = createServerFn({ method: "POST" })
       if (!identity) return { ok: false, reason: "unauthorized" };
       const rlKey = identity.email ?? identity.userId;
       {
-        const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-        const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
-        if (!isAiRateLimitDisabled()) {
-          const store = await resolveAiRateLimitStore();
-          const burst = await store.consume({
-            key: `ai:wearable-sync:${rlKey}`,
-            limit: 30,
-            windowMs: 60 * 60_000,
-          });
-          if (!burst.allowed) return { ok: false, reason: "rate_limited" };
-        }
+        const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
+        const burst = await consumeNamedBurst({
+          key: `ai:wearable-sync:${rlKey}`,
+          limit: 30,
+          windowMs: 60 * 60_000,
+        });
+        if (!burst.ok) return { ok: false, reason: "rate_limited" };
       }
       const userId = identity.userId;
 

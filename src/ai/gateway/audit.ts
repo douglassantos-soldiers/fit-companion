@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Gateway audit — mirrors provider call metadata into governance audit.
  * FASE 22.4 — request_id, tokens, costs; never persist secrets.
@@ -31,15 +30,21 @@ export type GatewayAuditInput = {
 /** Strip secret-like keys from metadata objects (defensive). */
 export function redactGatewayMetadata(
   meta: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+): Record<string, string | number | boolean | null> {
+  const out: Record<string, string | number | boolean | null> = {};
   for (const [k, v] of Object.entries(meta)) {
     if (SECRET_KEY_RE.test(k)) continue;
     if (typeof v === "string" && /sk-[a-zA-Z0-9]{10,}|Bearer\s+\S+/i.test(v)) {
       out[k] = "[redacted]";
       continue;
     }
-    out[k] = v;
+    if (v == null) {
+      out[k] = null;
+      continue;
+    }
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      out[k] = v;
+    }
   }
   return out;
 }

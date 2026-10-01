@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { normalizeImageUpload } from "@/lib/validation/common";
 
 function parseLeaderboard(input: unknown): { challengeId: string; deviceId: string } {
   const v = input as { challengeId?: string; deviceId?: string } | null;
@@ -57,11 +58,15 @@ function parseUpload(input: unknown): {
   const deviceId = String(v?.deviceId ?? "").trim();
   const bytesBase64 = String(v?.bytesBase64 ?? "");
   if (deviceId.length < 8 || !bytesBase64) throw new Error("Upload inválido");
+  const normalized = normalizeImageUpload({
+    contentType: v?.contentType,
+    fileExt: v?.fileExt,
+  });
   return {
     deviceId,
     bytesBase64,
-    contentType: String(v?.contentType ?? "image/jpeg"),
-    fileExt: String(v?.fileExt ?? "jpg"),
+    contentType: normalized.contentType,
+    fileExt: normalized.fileExt,
   };
 }
 

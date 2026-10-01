@@ -35,7 +35,7 @@ export async function loadAccountStatus(opts: {
     const { data, error } = await db
       .from("users")
       .select("status, status_until, status_reason")
-      .ilike("email", opts.email.trim().toLowerCase())
+      .eq("email", opts.email.trim().toLowerCase())
       .maybeSingle();
     if (error) throw new Error(`account_status_query:${error.code ?? "error"}`);
     row = data;
@@ -97,7 +97,7 @@ export async function setUserAccountStatus(opts: {
   const db = await adminDbLoose();
   if (!db) return { ok: false, reason: "db_unavailable" };
 
-  const { data: user } = await db.from("users").select("id").ilike("email", email).maybeSingle();
+  const { data: user } = await db.from("users").select("id").eq("email", email).maybeSingle();
   if (!user?.id) return { ok: false, reason: "not_found" };
 
   const status = normalizeAccountStatus(opts.status);

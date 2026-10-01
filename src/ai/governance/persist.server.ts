@@ -4,7 +4,7 @@
  */
 import type { AiAuditEvent } from "@/ai/governance/audit";
 import { auditEventToRow, rowToAuditEvent, type AiAuditEventRow } from "@/ai/governance/serialize";
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, type AdminDb } from "@/lib/db-admin";
 import { logEngineError } from "@/lib/engine/observability";
 
 const TABLE = "ai_audit_events";
@@ -45,8 +45,8 @@ export function setAiAuditPersistDbForTests(
   persistDbOverride = getDb;
 }
 
-async function getDb() {
-  if (persistDbOverride) return persistDbOverride();
+async function getDb(): Promise<AdminDb | null> {
+  if (persistDbOverride) return (await persistDbOverride()) as AdminDb | null;
   return adminDbLoose();
 }
 
@@ -198,12 +198,21 @@ export async function loadAuditsByRunId(userId: string, runId: string): Promise<
   try {
     const db = await getDb();
     if (!db) return [];
-    const { data, error } = await db
-      .from(TABLE)
-      .select("*")
-      .eq("user_id", userId)
-      .or(`run_id.eq.${runId},parent_run_id.eq.${runId}`)
-      .order("created_at", { ascending: true });
+    const [byRun, byParent] = await Promise.all([
+      db
+        .from(TABLE)
+        .select("*")
+        .eq("user_id", userId)
+        .eq("run_id", runId)
+        .order("created_at", { ascending: true }),
+      db
+        .from(TABLE)
+        .select("*")
+        .eq("user_id", userId)
+        .eq("parent_run_id", runId)
+        .order("created_at", { ascending: true }),
+    ]);
+    const error = byRun.error ?? byParent.error;
     if (error) {
       logEngineError({
         userId,
@@ -214,7 +223,18 @@ export async function loadAuditsByRunId(userId: string, runId: string): Promise<
       });
       return [];
     }
-    return ((data ?? []) as Record<string, unknown>[]).map(rowToAuditEvent);
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of [...(byRun.data ?? []), ...(byParent.data ?? [])] as Record<
+      string,
+      unknown
+    >[]) {
+      const id = String(row["id"] ?? row["audit_id"] ?? "");
+      if (id) byId.set(id, row);
+      else byId.set(JSON.stringify(row), row);
+    }
+    return [...byId.values()]
+      .sort((a, b) => String(a["created_at"] ?? "").localeCompare(String(b["created_at"] ?? "")))
+      .map(rowToAuditEvent);
   } catch (e) {
     logEngineError({
       userId,

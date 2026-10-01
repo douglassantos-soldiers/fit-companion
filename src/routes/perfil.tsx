@@ -5,6 +5,7 @@ import { NumberInput } from "@mantine/core";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell, LoadingPulse } from "@/components/app-shell";
+import { AppImage } from "@/components/app-image";
 import { Button } from "@/components/ui/button";
 import { ConfirmOverlay } from "@/components/confirm-overlay";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ import {
   signOutAuth,
   watchAuth,
 } from "@/lib/auth";
-import { requestNotificationPermission } from "@/lib/notifications";
+import { enableRemindersWithPush } from "@/lib/notifications-push";
 import { completeAccountAccess } from "@/lib/access.functions";
 import { clearAccessSession } from "@/lib/access.functions";
 import { exportUserDataFn } from "@/lib/sync.functions";
@@ -35,7 +36,8 @@ import { productById } from "@/data/products";
 import { ACHIEVEMENTS, achievementById } from "@/data/achievements";
 import { brandLevel } from "@/lib/engine/brand-level";
 import { GOAL_LABEL, LEVEL_LABEL } from "@/lib/types";
-import { registerPushWorker, subscribePush } from "@/lib/push";
+import { registerPushWorker } from "@/lib/push";
+import { runUserAction } from "@/lib/ui/run-user-action";
 
 const ATALHOS = [
   { to: "/coach" as const, search: undefined, label: "Coach", hint: "Pergunte ao AI sobre treino e comida", icon: MessageSquare },
@@ -307,7 +309,7 @@ function ProfilePage() {
       <section className="surface-card mb-4 space-y-3 p-4">
         <div className="flex items-center gap-3">
           {state.avatarUrl ? (
-            <img src={state.avatarUrl} alt="" className="size-14 rounded-full object-cover" />
+            <AppImage src={state.avatarUrl} alt="" className="size-14 rounded-full object-cover" width={56} height={56} />
           ) : (
             <div className="flex size-14 items-center justify-center rounded-full bg-primary/15 text-lg font-bold text-primary">
               {p.name.slice(0, 1).toUpperCase()}
@@ -328,12 +330,18 @@ function ProfilePage() {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                void uploadCheckinImage(getDeviceId(), file).then((url) => {
-                  if (url) {
-                    setAvatarUrl(url);
-                    toast.success("Avatar atualizado");
-                  }
-                });
+                void runUserAction(
+                  async () => {
+                    const url = await uploadCheckinImage(getDeviceId(), file);
+                    if (url) {
+                      setAvatarUrl(url);
+                      toast.success("Avatar atualizado");
+                    } else {
+                      toast.error("Não foi possível enviar o avatar");
+                    }
+                  },
+                  { errorMessage: "Falha ao enviar avatar" },
+                );
               }}
             />
           </label>
@@ -352,11 +360,19 @@ function ProfilePage() {
             variant="secondary"
             className="w-full"
             onClick={() => {
-              void signOutAuth().then(async () => {
-                setAuthUserId(null);
-                await clearCookie();
-                toast.success("Sessão encerrada");
-              });
+              void runUserAction(
+                async () => {
+                  await signOutAuth();
+                  setAuthUserId(null);
+                  await clearCookie();
+                  const { revalidateAccessSession } = await import(
+                    "@/components/access-session-provider"
+                  );
+                  await revalidateAccessSession({ force: true });
+                  toast.success("Sessão encerrada");
+                },
+                { errorMessage: "Não foi possível sair da conta" },
+              );
             }}
           >
             Sair
@@ -374,12 +390,18 @@ function ProfilePage() {
           variant="outline"
           className="w-full"
           onClick={() => {
-            void getAuthUser().then(async (u) => {
-              if (u) {
-                await bindAuth(u.id);
-                toast.success("Conta sincronizada");
-              } else toast.message("Entre com e-mail e senha primeiro");
-            });
+            void runUserAction(
+              async () => {
+                const u = await getAuthUser();
+                if (u) {
+                  await bindAuth(u.id);
+                  toast.success("Conta sincronizada");
+                } else {
+                  toast.message("Entre com e-mail e senha primeiro");
+                }
+              },
+              { errorMessage: "Falha ao sincronizar conta" },
+            );
             void registerPushWorker();
           }}
         >
@@ -519,17 +541,7 @@ function ProfilePage() {
             checked={state.remindersEnabled === true}
             onCheckedChange={(checked) => {
               if (checked) {
-                void requestNotificationPermission().then((perm) => {
-                  if (perm === "granted") {
-                    setRemindersEnabled(true);
-                    void registerPushWorker().then(() => subscribePush());
-                    toast.success("Notificações ligadas");
-                  } else if (perm === "unsupported") {
-                    toast.error("Notificações não suportadas neste aparelho");
-                  } else {
-                    toast.error("Permissão de notificação negada");
-                  }
-                });
+                void enableRemindersWithPush({ setRemindersEnabled });
               } else {
                 setRemindersEnabled(false);
                 toast.success("Notificações desligadas");
@@ -683,14 +695,18 @@ function ProfilePage() {
         destructive
         onClose={() => setWipe(null)}
         onConfirm={() => {
-          void clearAccountData().then((r) => {
-            if (r.ok) {
-              toast.success("Dados da conta apagados");
-              navigate({ to: "/onboarding" });
-            } else {
-              toast.error(r.partial ? "Limpeza parcial — tente novamente" : "Falha ao apagar no servidor");
-            }
-          });
+          void runUserAction(
+            async () => {
+              const r = await clearAccountData();
+              if (r.ok) {
+                toast.success("Dados da conta apagados");
+                navigate({ to: "/onboarding" });
+              } else {
+                toast.error(r.partial ? "Limpeza parcial — tente novamente" : "Falha ao apagar no servidor");
+              }
+            },
+            { errorMessage: "Falha ao apagar no servidor" },
+          );
         }}
       />
     </AppShell>

@@ -160,17 +160,27 @@ function CorpoPage() {
   }
 
   async function onDelete(id: string, storagePath: string) {
-    await deleteProgressPhotoFile(storagePath);
-    await deleteProgressPhotoFn({ data: { deviceId: getDeviceId(), photoId: id } }).catch(() => undefined);
+    const remote = await deleteProgressPhotoFn({
+      data: { deviceId: getDeviceId(), photoId: id },
+    }).catch(() => ({ ok: false as const }));
+    if (!remote.ok) {
+      toast.error("Não foi possível apagar no servidor");
+      return;
+    }
+    await deleteProgressPhotoFile(storagePath).catch(() => undefined);
     removeProgressPhoto(id);
     toast.success("Foto apagada.");
   }
 
   async function onVisibility(id: string, visibility: PhotoVisibility) {
-    setProgressPhotoVisibility(id, visibility);
-    await updateProgressPhotoVisibilityFn({
+    const remote = await updateProgressPhotoVisibilityFn({
       data: { deviceId: getDeviceId(), photoId: id, visibility },
-    }).catch(() => undefined);
+    }).catch(() => ({ ok: false as const }));
+    if (!remote.ok) {
+      toast.error("Visibilidade não sincronizou");
+      return;
+    }
+    setProgressPhotoVisibility(id, visibility);
   }
 
   const history = [...measurements].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);

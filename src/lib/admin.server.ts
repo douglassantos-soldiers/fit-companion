@@ -2,7 +2,7 @@
  * Server-only Admin Console helpers (CMS, lookup, entitlement, Shopify ops).
  */
 import { requireAdminSession, readAdminSessionPayload } from "@/lib/access-session.server";
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asJson } from "@/lib/db-admin";
 import type { OrderSnapshot } from "@/lib/shopify.server";
 import { emptyCmsState, type CmsState } from "@/lib/cms";
 import { isSoldiersOwnedUrl } from "@/lib/soldiers-media-governance";
@@ -104,7 +104,7 @@ export async function writeAudit(
   const resolvedActor = actor ?? session?.email ?? ADMIN_ACTOR;
   const enriched = {
     action,
-    target,
+    target: asJson(target),
     actor: resolvedActor,
     actor_id: session?.email ?? resolvedActor,
     user_id: typeof target["userId"] === "string" ? target["userId"] : null,
@@ -120,14 +120,14 @@ export async function writeAudit(
         : typeof target["email"] === "string"
           ? target["email"]
           : null,
-    metadata: target as never,
+    metadata: asJson(target),
   };
   let { error } = await db.from("admin_audit_log").insert(enriched);
   if (error) {
     // Pre-migration fallback (no extended columns / action check)
     const retry = await db.from("admin_audit_log").insert({
       action,
-      target,
+      target: asJson(target),
       actor: resolvedActor,
     });
     error = retry.error;
@@ -138,21 +138,43 @@ export async function writeAudit(
 export async function readCmsOverrides(): Promise<CmsState> {
   const db = await adminDbLoose();
   if (!db) return emptyCms();
+  type CmsRow = {
+    entity_type: string;
+    entity_id: string;
+    media_url: string | null;
+    note: string | null;
+    authorized: boolean;
+  };
+  let rows: CmsRow[] | null = null;
   let { data, error } = await db
     .from("cms_overrides")
     .select("entity_type, entity_id, media_url, note, authorized");
   if (error) {
     console.warn("cms_overrides authorized column missing, falling back", error.message);
     const retry = await db.from("cms_overrides").select("entity_type, entity_id, media_url, note");
-    data = retry.data;
+    rows = (retry.data ?? []).map((r) => ({
+      entity_type: r.entity_type,
+      entity_id: r.entity_id,
+      media_url: r.media_url,
+      note: r.note,
+      authorized: false,
+    }));
     error = retry.error;
+  } else {
+    rows = (data ?? []).map((r) => ({
+      entity_type: r.entity_type,
+      entity_id: r.entity_id,
+      media_url: r.media_url,
+      note: r.note,
+      authorized: Boolean(r.authorized),
+    }));
   }
   if (error) {
     console.error("cms_overrides read failed", error);
     return emptyCms();
   }
   const state = emptyCms();
-  for (const row of data ?? []) {
+  for (const row of rows ?? []) {
     const type = String(row.entity_type);
     const id = String(row.entity_id);
     const media = row.media_url != null ? String(row.media_url) : "";
@@ -285,7 +307,7 @@ export async function lookupUserByEmail(email: string): Promise<AdminUserLookup>
     const { data: user } = await db
       .from("users")
       .select("id, email, status, status_until, status_reason")
-      .ilike("email", normalized)
+      .eq("email", normalized)
       .maybeSingle();
     userId = (user?.id as string | undefined) ?? null;
     if (user) {
@@ -492,7 +514,7 @@ export async function setEntitlementManual(opts: {
     const { data: user } = await db
       .from("users")
       .select("id")
-      .ilike("email", normalized)
+      .eq("email", normalized)
       .maybeSingle();
     const userId = (user?.id as string | undefined) ?? null;
     if (userId) {

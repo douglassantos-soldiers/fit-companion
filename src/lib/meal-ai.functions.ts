@@ -162,17 +162,13 @@ export const analyzeMealAi = createServerFn({ method: "POST" })
     if (!identity) return { error: "unauthorized" };
     const rlKey = identity.email ?? identity.userId;
     {
-      const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-      const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
-      if (!isAiRateLimitDisabled()) {
-        const store = await resolveAiRateLimitStore();
-        const burst = await store.consume({
-          key: `ai:meal-ai:${rlKey}`,
-          limit: 40,
-          windowMs: 60 * 60_000,
-        });
-        if (!burst.allowed) return { error: "rate_limited" };
-      }
+      const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
+      const burst = await consumeNamedBurst({
+        key: `ai:meal-ai:${rlKey}`,
+        limit: 40,
+        windowMs: 60 * 60_000,
+      });
+      if (!burst.ok) return { error: "rate_limited" };
     }
 
     const userId = identity.userId ?? identity.email;

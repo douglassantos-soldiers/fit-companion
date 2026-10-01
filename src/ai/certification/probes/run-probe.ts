@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Probe runner wrapper — always records execution timing.
  */
@@ -14,6 +13,17 @@ export type ProbeOutcome = {
   evidence?: Record<string, string | number | boolean | null | undefined>;
   error?: string | null;
 };
+
+function sanitizeProbeEvidence(
+  evidence: Record<string, string | number | boolean | null | undefined> | undefined,
+): Record<string, string | number | boolean | null> {
+  if (!evidence) return {};
+  const out: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(evidence)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
 
 export async function runProbe(
   meta: { check_id: string; name: string; critical: boolean },
@@ -31,7 +41,7 @@ export async function runProbe(
       critical: meta.critical,
       executed_at,
       duration_ms: Date.now() - started,
-      evidence: out.evidence ?? {},
+      evidence: sanitizeProbeEvidence(out.evidence),
       error: out.error ?? null,
       environment: ctx.environment,
     });

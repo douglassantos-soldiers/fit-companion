@@ -63,6 +63,9 @@ export async function signInWithGoogle() {
 
 export async function signOutAuth() {
   await supabase.auth.signOut();
+  // Dynamic import avoids circular deps with access-session-provider → auth.
+  const { invalidateAccessSession } = await import("@/components/access-session-provider");
+  invalidateAccessSession();
 }
 
 export async function getAuthUser() {

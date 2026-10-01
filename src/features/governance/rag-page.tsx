@@ -1,12 +1,12 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { listGovernanceRag } from "@/lib/governance-console.functions";
 import { GovernanceShell } from "@/features/governance/shell";
+import type { ConsoleAuditRow } from "@/ai/governance/console-helpers";
 
 export function GovernanceRagPage() {
   const load = useServerFn(listGovernanceRag);
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [rows, setRows] = useState<ConsoleAuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,15 +37,17 @@ export function GovernanceRagPage() {
           </thead>
           <tbody>
             {rows.map((r) => {
-              const meta = (r["metadata"] as Record<string, unknown> | null) ?? {};
+              const meta = r.metadata ?? {};
               return (
-                <tr key={String(r["audit_id"])} className="border-t border-zinc-800">
-                  <td className="py-2 pr-2 font-mono">{String(r["retrieval_id"] ?? r["subject_id"])}</td>
-                  <td className="py-2 pr-2">{String(r["status"] ?? "")}</td>
-                  <td className="py-2 pr-2 tabular-nums">{String(meta["hit_count"] ?? "—")}</td>
-                  <td className="py-2 pr-2 tabular-nums">{String(meta["top_score"] ?? "—")}</td>
-                  <td className="py-2 pr-2 font-mono">{String(meta["top_source_id"] ?? meta["top_document_id"] ?? "—")}</td>
-                  <td className="py-2 pr-2 tabular-nums">{String(r["latency_ms"] ?? "—")}</td>
+                <tr key={r.audit_id} className="border-t border-zinc-800">
+                  <td className="py-2 pr-2 font-mono">{r.retrieval_id ?? r.subject_id}</td>
+                  <td className="py-2 pr-2">{r.status ?? ""}</td>
+                  <td className="py-2 pr-2 tabular-nums">{meta["hit_count"] ?? "—"}</td>
+                  <td className="py-2 pr-2 tabular-nums">{meta["top_score"] ?? "—"}</td>
+                  <td className="py-2 pr-2 font-mono">
+                    {meta["top_source_id"] ?? meta["top_document_id"] ?? "—"}
+                  </td>
+                  <td className="py-2 pr-2 tabular-nums">{r.latency_ms ?? "—"}</td>
                 </tr>
               );
             })}

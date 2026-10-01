@@ -17,6 +17,7 @@ import { wheyMacrosFromDoses } from "@/lib/nutrition/whey";
 import { dayMealTotals, mealsOnDate } from "@/lib/nutrition/nutrition-context";
 import type { AppState, MealEntry, MealQuality, MealSlot, Profile } from "@/lib/types";
 import { todayKey } from "@/lib/types";
+import { formatDayMonth } from "@/lib/format/date-pt";
 
 export type { NutritionGoals, MealPlanSlot, DailyMealPlan, MealPlanEngineOpts };
 
@@ -113,7 +114,7 @@ export function weeklyNutritionSeries(meals: MealEntry[], days = 7) {
     const totals = dayNutritionTotals(meals, date);
     out.push({
       date,
-      label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      label: formatDayMonth(date),
       proteinG: totals.proteinG,
       carbG: totals.carbG,
       fatG: totals.fatG,

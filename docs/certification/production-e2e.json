@@ -1,21 +1,18 @@
 {
   "report_version": "fase22_12_v1",
-  "checked_at": "2026-09-29T22:16:52.634Z",
+  "checked_at": "2026-09-30T23:02:02.582Z",
   "environment": "test",
-  "verdict": "PASS",
+  "verdict": "BLOCKED",
+  "error_code": "PRODUCTION_E2E_BLOCKED",
   "path_label": "PRODUCTION_E2E",
   "stores": {
-    "db": "supabase",
-    "rag": "supabase_pgvector_v1",
-    "memory": "supabase",
-    "audit": "persist_on",
+    "db": "unavailable",
+    "rag": "unknown",
+    "memory": "unknown",
+    "audit": "persist_off",
     "gateway": "deterministic"
   },
-  "happy": {
-    "id": "happy",
-    "ok": true,
-    "detail": "decision=dec_32533c85;natural_path;proposal=sp_9f049ad4"
-  },
+  "happy": null,
   "failures": [
     {
       "id": "unauthorized_tool",
@@ -63,36 +60,39 @@
       "id": "database_failure",
       "ok": true,
       "expected_fail": true,
-      "detail": "service_role_present_negative_skipped"
+      "detail": "admin_db_unavailable_observed"
     },
     {
       "id": "rag_no_invented_citations",
       "ok": true,
       "expected_fail": false,
-      "detail": "ok"
+      "detail": "empty"
     }
   ],
   "correlation": {
-    "run_id": "prod_17yejue",
-    "decision_id": "dec_32533c85",
-    "outcome_id": "out_dec_32533c85_mun8l1ea",
-    "learning_event_id": "le_4b9c7004",
-    "proposal_id": "sp_9f049ad4"
+    "run_id": null,
+    "decision_id": null,
+    "outcome_id": null,
+    "learning_event_id": null,
+    "proposal_id": null
   },
   "idempotency": {
     "id": "idempotency",
     "ok": true,
-    "detail": "prod_qpbmcg"
+    "detail": "prod_11jtwv8"
   },
   "isolation": {
     "id": "isolation",
     "ok": true,
-    "detail": "user_b_empty"
+    "detail": "deferred_to_remote_or_failures"
   },
   "kill_switch": {
     "id": "kill_switch_rollback",
     "ok": true,
     "detail": "force_and_global_ok"
   },
-  "notes": []
+  "notes": [
+    "db_readiness:BLOCKED",
+    "admin_db_unavailable"
+  ]
 }

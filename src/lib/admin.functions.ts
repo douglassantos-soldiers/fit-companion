@@ -4,6 +4,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { publicCmsView, type CmsState } from "@/lib/cms";
 import type { AccessTier } from "@/data/shopify-product-map";
+import {
+  parseContentCollection,
+  parseContentProgram,
+  parseExpert,
+  parseTrainingRules,
+} from "@/lib/validation/admin-content";
+import { EmailSchema } from "@/lib/validation/common";
 
 function parseCmsState(input: unknown): CmsState {
   const raw = (input as { cms?: CmsState } | null)?.cms;
@@ -18,11 +25,9 @@ function parseCmsState(input: unknown): CmsState {
 }
 
 function parseEmail(input: unknown): { email: string } {
-  const email = String((input as { email?: string } | null)?.email ?? "")
-    .trim()
-    .toLowerCase();
-  if (!email.includes("@")) throw new Error("E-mail inválido");
-  return { email };
+  const parsed = EmailSchema.safeParse((input as { email?: string } | null)?.email ?? "");
+  if (!parsed.success) throw new Error("E-mail inválido");
+  return { email: parsed.data };
 }
 
 function parseEntitlementManual(input: unknown): {
@@ -32,10 +37,7 @@ function parseEntitlementManual(input: unknown): {
   reason: string | null;
 } {
   const raw = input as { email?: string; action?: string; tier?: string; reason?: string } | null;
-  const email = String(raw?.email ?? "")
-    .trim()
-    .toLowerCase();
-  if (!email.includes("@")) throw new Error("E-mail inválido");
+  const email = EmailSchema.parse(raw?.email ?? "");
   const action =
     raw?.action === "revoke" ? "revoke" : raw?.action === "grant_trial" ? "grant_trial" : "grant";
   const tier: AccessTier = raw?.tier === "performance" ? "performance" : "base";
@@ -142,10 +144,9 @@ function parseUserStatus(input: unknown): {
     statusUntil?: string | null;
     reason?: string | null;
   } | null;
-  const email = String(raw?.email ?? "")
-    .trim()
-    .toLowerCase();
-  if (!email.includes("@")) throw new Error("E-mail inválido");
+  const emailParsed = EmailSchema.safeParse(raw?.email ?? "");
+  if (!emailParsed.success) throw new Error("E-mail inválido");
+  const email = emailParsed.data;
   const status =
     raw?.status === "suspended" || raw?.status === "banned" || raw?.status === "active"
       ? raw.status
@@ -301,9 +302,7 @@ export const loadAdminTrainingRules = createServerFn({ method: "GET" }).handler(
 });
 
 export const saveAdminTrainingRules = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: unknown) => input as import("@/lib/training/training-rules").TrainingRules,
-  )
+  .inputValidator(parseTrainingRules)
   .handler(async ({ data }) => {
     const { assertAdmin } = await import("@/lib/admin.server");
     assertAdmin();
@@ -454,7 +453,7 @@ export const listAdminExperts = createServerFn({ method: "GET" }).handler(async 
 });
 
 export const saveAdminExpert = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => input as import("@/lib/content/types").Expert)
+  .inputValidator(parseExpert)
   .handler(async ({ data }) => {
     const { assertAdmin } = await import("@/lib/admin.server");
     assertAdmin();
@@ -470,7 +469,7 @@ export const listAdminTrails = createServerFn({ method: "GET" }).handler(async (
 });
 
 export const saveAdminTrail = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => input as import("@/lib/content/types").ContentProgram)
+  .inputValidator(parseContentProgram)
   .handler(async ({ data }) => {
     const { assertAdmin } = await import("@/lib/admin.server");
     assertAdmin();
@@ -486,7 +485,7 @@ export const listAdminCollections = createServerFn({ method: "GET" }).handler(as
 });
 
 export const saveAdminCollection = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => input as import("@/lib/content/types").ContentCollection)
+  .inputValidator(parseContentCollection)
   .handler(async ({ data }) => {
     const { assertAdmin } = await import("@/lib/admin.server");
     assertAdmin();

@@ -90,6 +90,14 @@ export type CustomMealPick = {
   nutrientSnapshot?: MealNutrientSnapshot;
 };
 
+export type MealPickerSheetProps = {
+  slot: MealSlot;
+  onClose: () => void;
+  onPick: (preset: MealPreset, servings: number) => void;
+  /** AI / custom / food meal (no presetId) */
+  onPickCustom?: (meal: CustomMealPick) => void;
+};
+
 async function fileToBase64(file: Blob): Promise<{ base64: string; mimeType: string }> {
   const buf = await file.arrayBuffer();
   const bytes = new Uint8Array(buf);
@@ -123,13 +131,7 @@ export function MealPickerSheet({
   onClose,
   onPick,
   onPickCustom,
-}: {
-  slot: MealSlot;
-  onClose: () => void;
-  onPick: (preset: MealPreset, servings: number) => void;
-  /** AI / custom / food meal (no presetId) */
-  onPickCustom?: (meal: CustomMealPick) => void;
-}) {
+}: MealPickerSheetProps) {
   const { state, toggleFavoriteMeal, toggleFavoriteFood, saveMealTemplate, upsertCustomFood, removeCustomFood } =
     useStore();
   const analyze = useServerFn(analyzeMealAi);
@@ -137,6 +139,7 @@ export function MealPickerSheet({
   const [tab, setTab] = useState<PickerTab>("recentes");
   const [query, setQuery] = useState("");
   const [foodQuery, setFoodQuery] = useState("");
+  const [debouncedFoodQuery, setDebouncedFoodQuery] = useState("");
   const [selected, setSelected] = useState<MealPreset | null>(null);
   const [foodHit, setFoodHit] = useState<FoodSearchHit | null>(null);
   const [foodServing, setFoodServing] = useState<FoodServing | null>(null);
@@ -173,6 +176,11 @@ export function MealPickerSheet({
   const recent = useMemo(() => recentMealPresets(state.meals ?? [], 8), [state.meals]);
   const customFoods = state.customFoods ?? [];
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedFoodQuery(foodQuery), 200);
+    return () => window.clearTimeout(t);
+  }, [foodQuery]);
+
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     const pool = MEAL_PRESETS.filter((p) => p.slot === slot || p.slot === "qualquer" || !slot);
@@ -181,8 +189,8 @@ export function MealPickerSheet({
   }, [query, slot]);
 
   const foodResults = useMemo(() => {
-    const q = foodQuery.trim();
-    const searchQ = deliveryOnly && !q ? "delivery" : foodQuery;
+    const q = debouncedFoodQuery.trim();
+    const searchQ = deliveryOnly && !q ? "delivery" : debouncedFoodQuery;
     const hits = searchFoods(searchQ, { limit: deliveryOnly ? 48 : 12 });
     const filtered = !deliveryOnly
       ? hits
@@ -203,7 +211,7 @@ export function MealPickerSheet({
       ...recentFoodsFromMeals(state.meals ?? [], 8).map((f) => f.id),
     ]);
     return filtered.filter((h) => !skip.has(h.food.id)).slice(0, 16);
-  }, [foodQuery, deliveryOnly, favoriteFoodIds, customFoods, state.meals]);
+  }, [debouncedFoodQuery, deliveryOnly, favoriteFoodIds, customFoods, state.meals]);
 
   const favoriteFoods = useMemo(() => {
     return favoriteFoodIds

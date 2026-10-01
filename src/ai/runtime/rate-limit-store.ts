@@ -96,18 +96,10 @@ export class SupabaseRateLimitStore implements RateLimitStore {
     peek?: boolean;
   }): Promise<RateLimitConsumeResult> {
     const db = await adminDbLoose();
-    if (!db || typeof (db as { rpc?: unknown }).rpc !== "function") {
+    if (!db) {
       return deniedStore(opts.limit, "admin_db_unavailable");
     }
-    const rpc = (
-      db as unknown as {
-        rpc: (
-          fn: string,
-          args?: Record<string, unknown>,
-        ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
-      }
-    ).rpc;
-    const { data, error } = await rpc("ai_rate_limit_consume", {
+    const { data, error } = await db.rpc("ai_rate_limit_consume", {
       p_key: opts.key,
       p_limit: opts.limit,
       p_window_ms: opts.windowMs,
@@ -118,7 +110,7 @@ export class SupabaseRateLimitStore implements RateLimitStore {
       const msg = String(error.message ?? error.code ?? "rpc_error");
       return deniedStore(opts.limit, msg);
     }
-    if (!data || typeof data !== "object") {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
       return deniedStore(opts.limit, "invalid_rpc_payload");
     }
     const row = data as Record<string, unknown>;

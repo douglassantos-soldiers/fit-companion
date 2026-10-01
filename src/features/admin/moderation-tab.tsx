@@ -1,3 +1,4 @@
+import { AdminErrorBanner } from "@/features/admin/ui";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +28,7 @@ export function ModerationTab({
       <Button variant="secondary" onClick={onReload} disabled={busy}>
         Recarregar fila
       </Button>
-      {loadError ? (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {loadError}
-        </p>
-      ) : null}
+      <AdminErrorBanner message={loadError} />
       <div className="flex gap-2">
         <Input
           value={eventId}

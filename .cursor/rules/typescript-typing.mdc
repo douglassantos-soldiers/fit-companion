@@ -1,0 +1,41 @@
+---
+description: Convenções TypeScript — interface vs type, props, any, e strictness
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript typing conventions
+
+## `interface` vs `type`
+
+- **Unions, mapped, conditional, intersections com primitivos** → sempre `type`.
+- **Object shapes em `src/lib/`**: preferir `interface` para entidades exportadas de domínio (`Profile`, `SetLog`); `type` para unions.
+- **Object shapes em `src/ai/contracts/`**: preferir `type` (já é o padrão da camada).
+- Props de componentes → `type XxxProps = { ... }` (sem declaration merging).
+- Não misturar estilos no mesmo arquivo sem o motivo “union=`type` + objeto=`interface`”.
+
+## Props de componentes
+
+- Extrair `type ComponentNameProps` quando há ≥ ~5–8 campos, reuso, ou testes.
+- Helpers internos de 1–2 props podem permanecer inline.
+- Evitar `React.FC`.
+
+## Proibições
+
+- Não usar `any` / `as any` / `eslint-disable @typescript-eslint/no-explicit-any`.
+- Não adicionar `// @ts-nocheck` em código de produção (exceto gerados).
+- Preferir `AdminDb` + `asJson` / `asDbRows` de `@/lib/db-admin` em vez de cliente loose.
+- Não furar unions com `| string` (ex.: `NutrientKey = MacroKey | MicroKey` sem `| string`).
+- Reutilizar unions de `@/lib/types` (`Goal`, `Level`, `TrafficLight`, `TimingSlot`, etc.) em vez de `string` genérico.
+
+## Organização
+
+- Tipos de domínio em `src/lib/<domain>/types.ts` ou `src/ai/contracts/`.
+- `src/types/` só para `.d.ts` ambient (ex.: web-push). Não criar barrel monolítico.
+
+## Strictness
+
+- `strict: true` está ligado.
+- Preferir `noUncheckedIndexedAccess` ao tocar em arrays/index signatures: tratar `arr[i]` como `T | undefined`.
+- Casts `as unknown as T` só em boundaries (JSON/DB); preferir parsers/mappers tipados.
+---

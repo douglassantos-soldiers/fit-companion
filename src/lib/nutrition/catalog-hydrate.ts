@@ -6,6 +6,7 @@ import type {
   FoodItem,
   FoodServing,
   FoodSource,
+  NutrientKey,
   NutrientValue,
 } from "@/lib/nutrition/types";
 
@@ -79,7 +80,7 @@ export function extrasFromNutrientRows(
     const value = num(row.value);
     if (value == null || value <= 0) continue;
     extras[key] = {
-      key,
+      key: key as NutrientKey,
       value,
       unit: String(row.unit ?? ""),
       source: asSource(row.source ?? foodSource),

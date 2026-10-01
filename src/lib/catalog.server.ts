@@ -1,7 +1,7 @@
 /**
  * Catalog / CMS / training-rules persistence (service_role).
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows } from "@/lib/db-admin";
 import { ADMIN_ACTOR, writeAudit } from "@/lib/admin.server";
 import type {
   ExerciseOverlay,
@@ -390,7 +390,7 @@ export async function upsertCatalogExercise(
   if (input.mediaId !== undefined) row["media_id"] = input.mediaId?.trim() || id;
   if (input.mediaStatus !== undefined) row["media_status"] = input.mediaStatus?.trim() || null;
 
-  const { error } = await db.from("catalog_exercises").upsert(row);
+  const { error } = await db.from("catalog_exercises").upsert(asDbRows(row));
   if (error) {
     console.error("catalog_exercises upsert failed", error);
     return { ok: false, reason: "upsert_failed" };
@@ -571,7 +571,7 @@ export async function upsertContentItem(
     updated_at: new Date().toISOString(),
   };
   if (input.id) row["id"] = input.id;
-  const { data, error } = await db.from("content_items").upsert(row).select("id").maybeSingle();
+  const { data, error } = await db.from("content_items").upsert(asDbRows(row)).select("id").maybeSingle();
   if (error) {
     console.error("content_items upsert failed", error);
     return { ok: false, reason: "upsert_failed" };

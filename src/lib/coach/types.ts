@@ -3,6 +3,17 @@
  * LLM explains; engines calculate. No AppState dump to the model.
  */
 
+import type {
+  DayEnergy,
+  Equipment,
+  Goal,
+  Level,
+  PrimaryBlocker,
+  SessionRpe,
+  TrafficLight,
+  TrainingMode,
+} from "@/lib/types";
+
 export type CoachMemoryKind =
   "facts" | "preferences" | "patterns" | "recent_decisions" | "coach_notes";
 
@@ -49,8 +60,8 @@ export interface CoachAction {
 export interface CoachEvidencePack {
   sleepHours?: number | null;
   hardRpeStreak?: number | null;
-  recoveryLevel?: string | null;
-  trainingMode?: string | null;
+  recoveryLevel?: TrafficLight | string | null;
+  trainingMode?: TrainingMode | null;
   volumeFactor?: number | null;
   proteinG?: number | null;
   proteinTarget?: number | null;
@@ -68,13 +79,17 @@ export interface CoachMemoryEntry {
 
 export interface CoachContextProfile {
   name: string;
-  goal: string;
-  level: string;
+  goal: Goal;
+  level: Level;
+  /** Localized label for LLM prompts (optional). */
+  goalLabel?: string;
+  /** Localized label for LLM prompts (optional). */
+  levelLabel?: string;
   weightKg: number;
   daysPerWeek: number;
-  equipment: string;
+  equipment: Equipment;
   restrictions: string[];
-  primaryBlocker?: string;
+  primaryBlocker?: PrimaryBlocker;
 }
 
 export interface CoachContext {
@@ -86,21 +101,21 @@ export interface CoachContext {
     streak: number;
     sessions7d: number;
     sessions28d: number;
-    todayMode: string | null;
+    todayMode: TrainingMode | null;
     todayTitle: string | null;
     volumeFactor: number | null;
     lastSessionDate: string | null;
-    lastSessionRpe: string | null;
+    lastSessionRpe: SessionRpe | null;
   };
   exercisePerformance: {
     recentPrs: Array<{ label: string; value: number; date: string }>;
     top1rm: Array<{ exerciseId: string; estimated1rm: number }>;
   };
   recovery: {
-    level: string | null;
+    level: TrafficLight | string | null;
     score: number | null;
     sleepHours: number | null;
-    energy: string | null;
+    energy: DayEnergy | string | null;
     hardRpeStreak: number;
     readiness?: string | null;
     sleepConfidence?: number;

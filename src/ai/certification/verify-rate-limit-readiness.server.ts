@@ -92,16 +92,8 @@ export async function verifyAiRateLimitReadiness(opts?: {
         actual: "available",
         status: "pass",
       });
-      const rpc = (
-        db as unknown as {
-          rpc: (
-            fn: string,
-            args?: Record<string, unknown>,
-          ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
-        }
-      ).rpc;
       const key = `ai:readiness:${Date.now()}`;
-      const { data, error } = await rpc("ai_rate_limit_consume", {
+      const { data, error } = await db.rpc("ai_rate_limit_consume", {
         p_key: key,
         p_limit: 2,
         p_window_ms: 60_000,

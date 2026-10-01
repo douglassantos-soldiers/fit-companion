@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "@tanstack/react-router";
 import { Check, ExternalLink, Trophy } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import {
 import { performanceUpgradeUrl } from "@/data/shopify-product-map";
 import { challengeProgress } from "@/lib/social";
 import { resolveChallengeMedia } from "@/lib/soldiers-media";
+import { requireDisplayName } from "@/lib/social/require-display-name";
 import type { AppState } from "@/lib/types";
 import { PERFORMANCE_LOCK_BENEFITS, PERFORMANCE_LOCK_TITLE } from "@/lib/ui/platform-copy";
 import { cn } from "@/lib/utils";
@@ -40,7 +42,7 @@ function modeLabel(c: Challenge) {
   return c.category;
 }
 
-export function ChallengeCard({
+export const ChallengeCard = memo(function ChallengeCard({
   c,
   state,
   joined,
@@ -125,10 +127,7 @@ export function ChallengeCard({
               variant={active ? "secondary" : "default"}
               className={cn(featured && "h-11 w-full font-bold uppercase tracking-wide")}
               onClick={() => {
-                if (!state.profile?.name?.trim()) {
-                  toast.error("Defina seu nome no Perfil para participar");
-                  return;
-                }
+                if (!requireDisplayName(state.profile?.name, "participar")) return;
                 toggleChallenge(c.id);
                 toast.success(active ? "Saiu do desafio" : "Entrou no desafio");
               }}
@@ -168,4 +167,4 @@ export function ChallengeCard({
       {why ? <p className="px-1 text-[0.65rem] text-muted-foreground">{why}</p> : null}
     </div>
   );
-}
+});

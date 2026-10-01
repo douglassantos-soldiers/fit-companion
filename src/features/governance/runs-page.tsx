@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -6,12 +5,12 @@ import {
   listGovernanceRuns,
 } from "@/lib/governance-console.functions";
 import { GovernanceShell } from "@/features/governance/shell";
-import type { TraceNode } from "@/ai/governance/console-helpers";
+import type { ConsoleAuditRow, TraceNode } from "@/ai/governance/console-helpers";
 
 export function GovernanceRunsPage() {
   const listRuns = useServerFn(listGovernanceRuns);
   const getTrace = useServerFn(getGovernanceRunTrace);
-  const [runs, setRuns] = useState<Record<string, unknown>[]>([]);
+  const [runs, setRuns] = useState<ConsoleAuditRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<TraceNode[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export function GovernanceRunsPage() {
         setTimeline([]);
         return;
       }
-      setTimeline((r.timeline as TraceNode[]) ?? []);
+      setTimeline(r.timeline ?? []);
     });
   };
 
@@ -60,9 +59,9 @@ export function GovernanceRunsPage() {
         <div>
           <ul className="divide-y divide-zinc-800 rounded border border-zinc-800">
             {runs.map((run) => {
-              const runId = String(run["run_id"] ?? run["subject_id"] ?? "");
+              const runId = run.run_id ?? run.subject_id ?? "";
               return (
-                <li key={String(run["audit_id"] ?? runId)}>
+                <li key={run.audit_id || runId}>
                   <button
                     type="button"
                     className={`w-full px-3 py-2 text-left text-xs hover:bg-zinc-900 ${
@@ -72,8 +71,7 @@ export function GovernanceRunsPage() {
                   >
                     <span className="font-mono text-zinc-200">{runId || "—"}</span>
                     <span className="mt-0.5 block text-zinc-500">
-                      {String(run["agent_id"] ?? "")} · {String(run["status"] ?? "")} ·{" "}
-                      {String(run["created_at"] ?? "")}
+                      {run.agent_id ?? ""} · {run.status ?? ""} · {run.created_at}
                     </span>
                   </button>
                 </li>

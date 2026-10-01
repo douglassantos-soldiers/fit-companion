@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { AdminErrorBanner, AdminReloadButton } from "@/features/admin/ui";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { ProductAnalytics } from "@/lib/analytics.server";
@@ -44,16 +44,10 @@ export function DashboardTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" className="gap-2" onClick={onRefresh} disabled={busy}>
-          <RefreshCw className="size-4" /> {busy ? "Carregando…" : "Atualizar métricas"}
-        </Button>
+        <AdminReloadButton busy={busy} onReload={onRefresh} label="Atualizar métricas" />
       </div>
 
-      {loadError ? (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {loadError}
-        </p>
-      ) : null}
+      <AdminErrorBanner message={loadError} />
 
       <div className="surface-glass space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

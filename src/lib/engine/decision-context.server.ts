@@ -71,7 +71,7 @@ export async function persistDecisionContextSnapshot(
 ): Promise<{ ok: boolean; snapshotVersion: number }> {
   const t0 = Date.now();
   try {
-    const { adminDbLoose } = await import("@/lib/db-admin");
+    const { adminDbLoose, asJson } = await import("@/lib/db-admin");
     const db = await adminDbLoose();
     if (!db || !snapshot.userId) return { ok: false, snapshotVersion: snapshot.snapshotVersion };
 
@@ -115,7 +115,7 @@ export async function persistDecisionContextSnapshot(
         customer360_version: snapshot.customer360Version,
         stale360: snapshot.stale360,
         input_fingerprint: snapshot.inputFingerprint,
-        payload: stored,
+        payload: asJson(stored),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id,date" },

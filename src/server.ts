@@ -49,9 +49,41 @@ function withSecurityHeaders(response: Response): Response {
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set(
+    "Permissions-Policy",
+    "camera=(self), microphone=(self), geolocation=(), payment=()",
+  );
+  // HSTS only on HTTPS responses (production / preview)
+  const proto = response.url
+    ? (() => {
+        try {
+          return new URL(response.url).protocol;
+        } catch {
+          return "";
+        }
+      })()
+    : "";
+  if (proto === "https:" || process.env["NODE_ENV"] === "production") {
+    headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  // Keep style-src unsafe-inline for CSS-in-JS; drop unsafe-eval; keep script unsafe-inline
+  // until nonce pipeline exists (Vite/TanStack). Restrict connect/script hosts vs open https:.
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' https: wss:; font-src 'self' https: data:; frame-ancestors 'none'",
+    [
+      "default-src 'self'",
+      "img-src 'self' https: data: blob:",
+      "media-src 'self' https: data: blob:",
+      "style-src 'self' 'unsafe-inline' https:",
+      "script-src 'self' 'unsafe-inline' https:",
+      "connect-src 'self' https: wss:",
+      "font-src 'self' https: data:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; "),
   );
   return new Response(response.body, {
     status: response.status,

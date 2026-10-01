@@ -1,18 +1,16 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
-import { SoldiersLogo } from "@/components/soldiers-logo";
+import { AuthAccessShell } from "@/components/auth/auth-access-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { completeAccountAccess } from "@/lib/access.functions";
+import { useCompleteAccessGrant } from "@/hooks/use-complete-access-grant";
 import { parseAccessEmail, parseAccessNext, peekAccessPrefillEmail } from "@/lib/access-funnel";
 import { resetPassword, signInWithPassword } from "@/lib/auth";
-import { getDeviceId } from "@/lib/sync";
-import { useStore } from "@/lib/store";
 import { MIN_PASSWORD_LENGTH } from "@/lib/ui/platform-copy";
+import { EmailSchema } from "@/lib/validation/common";
 
 export const Route = createFileRoute("/entrar")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -36,10 +34,8 @@ export const Route = createFileRoute("/entrar")({
 });
 
 function EntrarPage() {
-  const navigate = useNavigate();
   const { email: searchEmail, next } = Route.useSearch();
-  const { state, setAccessGranted, setAuthUserId } = useStore();
-  const complete = useServerFn(completeAccountAccess);
+  const { applyGrant, busy: grantBusy, state, setAuthUserId } = useCompleteAccessGrant();
   const lockedEmail = Boolean(searchEmail);
   const [email, setEmail] = useState(
     () => searchEmail ?? peekAccessPrefillEmail() ?? state.accessEmail ?? "",
@@ -47,22 +43,16 @@ function EntrarPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const postPath = () => next ?? (state.profile ? "/" : "/onboarding");
-  const acessoSearch = () => {
-    const out: { next?: "/" | "/onboarding" } = {};
-    const n = next ?? (state.profile ? ("/" as const) : ("/onboarding" as const));
-    out.next = n;
-    return out;
-  };
+  const loading = busy || grantBusy;
 
   const submit = async () => {
     setError(null);
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed.includes("@") || password.length < MIN_PASSWORD_LENGTH) {
+    const emailParsed = EmailSchema.safeParse(email);
+    if (!emailParsed.success || password.length < MIN_PASSWORD_LENGTH) {
       setError(`Informe e-mail e senha (mínimo ${MIN_PASSWORD_LENGTH} caracteres)`);
       return;
     }
+    const trimmed = emailParsed.data;
     setBusy(true);
     try {
       const auth = await signInWithPassword(trimmed, password);
@@ -72,46 +62,14 @@ function EntrarPage() {
         return;
       }
       setAuthUserId(user.id);
-      const deviceId = getDeviceId();
-      const result = await complete({
-        data: {
-          email: trimmed,
-          deviceId,
-          authUserId: user.id,
-          displayName: state.profile?.name || user.email || "Soldado",
-          isNewUser: false,
-        },
+      const result = await applyGrant({
+        email: trimmed,
+        authUserId: user.id,
+        displayName: state.profile?.name || user.email || "Soldado",
+        isNewUser: false,
+        ...(next ? { next } : {}),
       });
-      if (!result.ok) {
-        toast.error(
-          result.reason === "no_purchase"
-            ? "Não achamos compra neste e-mail. Use o endereço da loja."
-            : result.reason === "not_configured"
-              ? "Loja indisponível agora — tente de novo em instantes."
-              : "Acesso ainda bloqueado — confira a compra.",
-        );
-        navigate({ to: "/acesso", search: acessoSearch() });
-        return;
-      }
-      const grant = await setAccessGranted({
-        email: result.email,
-        shopifyCustomerId: result.shopifyCustomerId,
-        orderCount: result.orderCount,
-        productIds: result.productIds,
-        accessTier: result.tier,
-        restockEstimates: result.restockEstimates,
-        lastPaidAt: result.lastPaidAt,
-        accessExpiresAt: result.accessExpiresAt,
-        shopifyDisplayName: result.shopifyDisplayName,
-      });
-      if (!grant.ok) {
-        if (grant.reason === "rate_limited") {
-          toast.error("Muitas tentativas, aguarde alguns minutos");
-        }
-        return;
-      }
-      toast.success("Bem-vindo de volta");
-      navigate({ to: postPath() });
+      if (result.ok) toast.success("Bem-vindo de volta");
     } catch (e) {
       setError(e instanceof Error ? e.message : "E-mail ou senha inválidos");
     } finally {
@@ -120,14 +78,14 @@ function EntrarPage() {
   };
 
   const recover = async () => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed.includes("@")) {
+    const emailParsed = EmailSchema.safeParse(email);
+    if (!emailParsed.success) {
       setError("Informe o e-mail para recuperar a senha");
       return;
     }
     setBusy(true);
     try {
-      await resetPassword(trimmed);
+      await resetPassword(emailParsed.data);
       toast.success("Se existir conta, enviamos o link de recuperação");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível enviar o e-mail");
@@ -137,75 +95,67 @@ function EntrarPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/20 via-background to-background" />
-      <div className="relative mx-auto flex w-full max-w-md flex-col px-5 py-8">
-        <SoldiersLogo />
-        <p className="eyebrow mt-10">Entrar</p>
-        <h1 className="mt-3 text-display text-3xl leading-none">
-          Acesse com
-          <span className="mt-1 block text-primary text-glow">e-mail e senha</span>
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {lockedEmail
-            ? "Use a senha desta conta — o e-mail veio do link da compra."
-            : "A janela de 40 dias é conferida de novo no login. Compra antiga? Compre de novo no mesmo e-mail."}
-        </p>
-
-        <div className="mt-8 space-y-4">
-          <div>
-            <Label htmlFor="entrar-email">E-mail</Label>
-            <Input
-              id="entrar-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="voce@email.com"
-              autoComplete="email"
-              readOnly={lockedEmail}
-              className={lockedEmail ? "opacity-90" : undefined}
-            />
-          </div>
-          <div>
-            <Label htmlFor="entrar-senha">Senha</Label>
-            <Input
-              id="entrar-senha"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={`mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
-              autoComplete="current-password"
-            />
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button
-            size="lg"
-            className="h-14 w-full glow-primary font-bold uppercase tracking-wide"
-            disabled={busy}
-            onClick={() => void submit()}
+    <AuthAccessShell
+      title="Acesse com e-mail e senha"
+      subtitle={
+        lockedEmail
+          ? "Use a senha desta conta — o e-mail veio do link da compra."
+          : "A janela de 40 dias é conferida de novo no login. Compra antiga? Compre de novo no mesmo e-mail."
+      }
+      footer={
+        <>
+          Ainda não tem conta?{" "}
+          <Link
+            to="/cadastro"
+            {...(searchEmail || next ? { search: { email: searchEmail, next } } : {})}
+            className="font-semibold text-primary"
           >
-            {busy ? "Entrando…" : "Entrar"} <ArrowRight className="size-4" />
-          </Button>
-          <Button variant="ghost" className="w-full" disabled={busy} onClick={() => void recover()}>
-            Esqueci a senha
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            O link de recuperação vai para o e-mail da conta — use o mesmo da loja.
-          </p>
-          <p className="text-center text-sm text-muted-foreground">
-            Ainda não tem conta?{" "}
-            <Link
-              to="/cadastro"
-              {...(searchEmail || next
-                ? { search: { email: searchEmail, next } }
-                : {})}
-              className="font-semibold text-primary"
-            >
-              Criar conta
-            </Link>
-          </p>
+            Criar conta
+          </Link>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="entrar-email">E-mail</Label>
+          <Input
+            id="entrar-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@email.com"
+            autoComplete="email"
+            readOnly={lockedEmail}
+            className={lockedEmail ? "opacity-90" : undefined}
+          />
         </div>
+        <div>
+          <Label htmlFor="entrar-senha">Senha</Label>
+          <Input
+            id="entrar-senha"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={`mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
+            autoComplete="current-password"
+          />
+        </div>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <Button
+          size="lg"
+          className="h-14 w-full glow-primary font-bold uppercase tracking-wide"
+          disabled={loading}
+          onClick={() => void submit()}
+        >
+          {loading ? "Entrando…" : "Entrar"} <ArrowRight className="size-4" />
+        </Button>
+        <Button variant="ghost" className="w-full" disabled={loading} onClick={() => void recover()}>
+          Esqueci a senha
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          O link de recuperação vai para o e-mail da conta — use o mesmo da loja.
+        </p>
       </div>
-    </div>
+    </AuthAccessShell>
   );
 }

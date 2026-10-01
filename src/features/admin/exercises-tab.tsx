@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseCommaList, parsePipeList } from "@/features/admin/ui";
 import { toCanonicalExercise } from "@/lib/training/canonical-exercise";
 import type { ResolvedLibraryExercise } from "@/lib/training/resolve-catalog";
 
@@ -51,6 +53,15 @@ export function ExercisesTab({
     );
   }, [rows, q]);
 
+  const list = filtered.slice(0, 200);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: list.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 8,
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -94,10 +105,7 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                primaryMuscles: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean) as never,
+                primaryMuscles: parseCommaList(e.target.value) as never,
               })
             }
           />
@@ -107,10 +115,7 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                alternativeIds: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                alternativeIds: parseCommaList(e.target.value),
               })
             }
           />
@@ -120,10 +125,7 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                cues: e.target.value
-                  .split("|")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                cues: parsePipeList(e.target.value),
               })
             }
           />
@@ -133,10 +135,7 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                aliases: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                aliases: parseCommaList(e.target.value),
               })
             }
           />
@@ -146,10 +145,7 @@ export function ExercisesTab({
             onChange={(e) =>
               setDraft({
                 ...draft,
-                searchTerms: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                searchTerms: parseCommaList(e.target.value),
               })
             }
           />
@@ -184,23 +180,35 @@ export function ExercisesTab({
           </div>
         </div>
       ) : null}
-      <ul className="space-y-2">
-        {filtered.slice(0, 80).map((e) => (
-          <li key={e.id}>
-            <button
-              type="button"
-              className="surface-glass w-full p-3 text-left"
-              onClick={() => setDraft({ ...e })}
-            >
-              <p className="text-sm font-semibold">{e.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {e.id} · {e.group} · {e.active ? "ativo" : "desativado"}
-                {e.alternativeIds.length ? ` · alt ${e.alternativeIds.length}` : ""}
-              </p>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div ref={parentRef} className="max-h-[60vh] overflow-y-auto">
+        <ul className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+          {virtualizer.getVirtualItems().map((row) => {
+            const e = list[row.index]!;
+            return (
+              <li
+                key={e.id}
+                className="absolute left-0 top-0 w-full pb-2"
+                style={{
+                  height: `${row.size}px`,
+                  transform: `translateY(${row.start}px)`,
+                }}
+              >
+                <button
+                  type="button"
+                  className="surface-glass w-full p-3 text-left"
+                  onClick={() => setDraft({ ...e })}
+                >
+                  <p className="text-sm font-semibold">{e.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {e.id} · {e.group} · {e.active ? "ativo" : "desativado"}
+                    {e.alternativeIds.length ? ` · alt ${e.alternativeIds.length}` : ""}
+                  </p>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

@@ -10,9 +10,7 @@ import { expandDomainFilter } from "@/ai/contracts/knowledge-document";
 import { RAG_ERROR, RagError } from "@/ai/rag/core/errors";
 import type { StoredVectorHit, VectorQueryOpts, VectorStore } from "@/ai/rag/core/vector-store";
 import { cosineSimilarity } from "@/ai/rag/embeddings";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LooseDb = { from: (table: string) => any };
+import { asJson, type AdminDb } from "@/lib/db-admin";
 
 function toVectorLiteral(emb: number[]): string {
   return `[${emb.map((n) => (Number.isFinite(n) ? n : 0)).join(",")}]`;
@@ -81,9 +79,9 @@ function rowToHit(row: Record<string, unknown>): StoredVectorHit {
 export class SupabasePgvectorStore implements VectorStore {
   readonly id = "supabase_pgvector_v1";
 
-  constructor(private readonly getDb: () => Promise<LooseDb | null>) {}
+  constructor(private readonly getDb: () => Promise<AdminDb | null>) {}
 
-  private async db(): Promise<LooseDb> {
+  private async db(): Promise<AdminDb> {
     try {
       const db = await this.getDb();
       if (!db) {
@@ -147,7 +145,7 @@ export class SupabasePgvectorStore implements VectorStore {
       version: source.version ?? "1.0.0",
       trust_level,
       status: source.status ?? "active",
-      metadata: source.metadata ?? {},
+      metadata: asJson(source.metadata ?? {}),
       updated_at: now,
     });
     if (error) wrapDbError(error, "upsert_source");
@@ -189,12 +187,12 @@ export class SupabasePgvectorStore implements VectorStore {
       status: document.status ?? "active",
       effective_date: document.effective_date ?? null,
       expiration_date: document.expiration_date ?? null,
-      metadata: {
+      metadata: asJson({
         ...document.metadata,
         ...(sourceId ? { source_id: sourceId } : {}),
         domain: document.domain,
         version: document.version,
-      },
+      }),
       updated_at: now,
       created_at: document.created_at ?? now,
     });
@@ -212,7 +210,7 @@ export class SupabasePgvectorStore implements VectorStore {
         embedding_provider: "local_lexical_v1",
         embedding_ref: chunk.embedding_ref ?? null,
         document_version: document.version,
-        metadata: {
+        metadata: asJson({
           ...document.metadata,
           ...(chunk.metadata ?? {}),
           source_id: sourceId,
@@ -220,7 +218,7 @@ export class SupabasePgvectorStore implements VectorStore {
           chunk_id: chunk.chunk_id,
           domain: document.domain,
           version: document.version,
-        },
+        }),
         updated_at: now,
         created_at: now,
       });

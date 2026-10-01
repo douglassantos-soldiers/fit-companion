@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from "react";
 import {
   fetchClubFeed,
   fetchFollowingFeed,
@@ -9,9 +10,9 @@ import {
   type ClubSummary,
 } from "@/lib/social";
 import type { ReactionKind } from "@/lib/social/visibility";
-import { useEffect, useState } from "react";
 
 export type ClubSocialFeedMode = "club" | "foryou" | "following";
+export type ClubSocialFeedStatus = "loading" | "error" | "empty" | "ready";
 
 /** Shared club / for-you / following feed + kudos map for Hoje / Social. */
 export function useClubSocialFeed(opts: {
@@ -37,10 +38,15 @@ export function useClubSocialFeed(opts: {
   const [club, setClub] = useState<ClubSummary | null>(null);
   const [feed, setFeed] = useState<ActivityEvent[]>([]);
   const [kudosGiven, setKudosGiven] = useState<Record<string, boolean>>({});
+  const [status, setStatus] = useState<ClubSocialFeedStatus>("loading");
 
   useEffect(() => {
-    if (!enabled || !deviceId) return;
+    if (!enabled || !deviceId) {
+      setStatus("empty");
+      return;
+    }
     let cancelled = false;
+    setStatus("loading");
     void (async () => {
       try {
         const clubs = await listMyClubs(deviceId);
@@ -72,12 +78,14 @@ export function useClubSocialFeed(opts: {
           given[e.id] = Boolean(e.myReaction) || hasGivenKudos(deviceId, e.id);
         }
         setKudosGiven(given);
+        setStatus(events.length ? "ready" : "empty");
       } catch (err) {
         console.warn("useClubSocialFeed failed", err);
         if (!cancelled) {
           setClub(null);
           setFeed([]);
           setKudosGiven({});
+          setStatus("error");
         }
       }
     })();
@@ -86,7 +94,7 @@ export function useClubSocialFeed(opts: {
     };
   }, [enabled, deviceId, limit, globalFallback, refreshKey, mode, goal, level]);
 
-  const applyReaction = (id: string, kind?: ReactionKind) => {
+  const applyReaction = useCallback((id: string, kind?: ReactionKind) => {
     setFeed((prev) =>
       prev.map((x): ActivityEvent => {
         if (x.id !== id) return x;
@@ -102,7 +110,7 @@ export function useClubSocialFeed(opts: {
         };
       }),
     );
-  };
+  }, []);
 
-  return { club, feed, setFeed, kudosGiven, setKudosGiven, applyReaction };
+  return { club, feed, setFeed, kudosGiven, setKudosGiven, applyReaction, status };
 }

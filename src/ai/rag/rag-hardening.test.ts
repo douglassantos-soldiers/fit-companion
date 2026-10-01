@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 22.2 — Production RAG hardening tests.
  */
@@ -102,7 +101,6 @@ describe("FASE 22.2 production RAG hardening", () => {
     const { setEmbeddingProvider } = await import("@/ai/rag/embeddings");
     setEmbeddingProvider({
       id: "broken",
-      dim: 256,
       async embed() {
         throw new Error("embedding_boom");
       },

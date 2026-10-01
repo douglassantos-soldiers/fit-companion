@@ -5,10 +5,10 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { checkAdminSession, loginAdmin, logoutAdmin } from "@/lib/access.functions";
-import { GOVERNANCE_NAV } from "@/features/governance/nav";
+import { GOVERNANCE_NAV, type GovernanceNavId } from "@/features/governance/nav";
 
 export function GovernanceShell(props: {
-  active: string;
+  active: GovernanceNavId;
   children: React.ReactNode;
 }) {
   const [authed, setAuthed] = useState(false);

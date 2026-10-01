@@ -32,7 +32,7 @@ export interface MealItemEntry {
   foodId: string;
   foodName?: string;
   quantity: number;
-  unit: string;
+  unit: MealServingUnit;
   grams: number;
   nutrientSnapshot: MealNutrientSnapshot;
   confidence: number;
@@ -54,6 +54,17 @@ export type GymGear =
 export type TrainingMode = "full" | "express" | "deload" | "rest";
 export type TrafficLight = "green" | "yellow" | "red";
 export type DoseUnit = "g" | "ml" | "caps" | "scoop" | "serving";
+export type MealServingUnit =
+  | DoseUnit
+  | "un"
+  | "unidade"
+  | "100 g"
+  | "slice"
+  | "cup"
+  | "tbsp"
+  | "tsp"
+  | "piece"
+  | "bowl";
 export type DoseFrequency = "1x_day" | "2x_day" | "as_needed" | "custom";
 export type DoseSource = "manual" | "routine_toggle";
 export type EatingDifficulty = "baixa" | "media" | "alta";
@@ -166,7 +177,7 @@ export interface LivingPlanSnapshot {
     waterMl: number;
     skipBreakfast: boolean;
   };
-  supplements: Array<{ id: string; name: string; timing: string }>;
+  supplements: Array<{ id: string; name: string; timing: import("@/lib/engine/supplements").TimingSlot | string }>;
   sleepTargetHours: number;
   habits: { title: string; tip: string; contentId?: string };
   narrative: string;

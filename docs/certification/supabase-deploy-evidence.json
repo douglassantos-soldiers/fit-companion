@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-09-30T04:46:30.015Z",
+  "checked_at": "2026-10-01T12:00:30.000Z",
   "project_ref": "zphtvrsxlhfgltwgbreu",
   "project_name": "APP",
   "cli_linked": true,
@@ -21,12 +21,12 @@
   "database_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-09-30T04:45:26.763Z"
+    "checked_at": "2026-10-01T11:59:50.448Z"
   },
   "rate_limit_readiness": {
     "verdict": "PASS",
     "error_code": null,
-    "checked_at": "2026-09-30T04:46:30.015Z"
+    "checked_at": "2026-10-01T12:00:17.000Z"
   },
   "service_role_smoke": {
     "ai_schema_inventory_probe": {
@@ -35,7 +35,17 @@
     "ai_rate_limit_consume": {
       "allowed": true,
       "ok": true
-    }
+    },
+    "ai_tables_http_200": [
+      "ai_audit_events",
+      "ai_user_memory",
+      "ai_decision_memory",
+      "ai_outcome_memory",
+      "ai_learning_events",
+      "ai_knowledge_sources",
+      "ai_knowledge_documents",
+      "ai_knowledge_chunks"
+    ]
   },
   "advisors": {
     "blocking": false,

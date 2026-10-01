@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Phase 3 Adaptive Coach — unit tests (no LLM / no DB required).
  */
@@ -122,6 +121,9 @@ describe("proposals validation", () => {
       requireMedicalDisclaimer: true,
       escalateCare: true,
       date: todayKey(),
+      level: "EMERGENCY",
+      ruleIds: ["SAF-escalate"],
+      blockCommerce: true,
     };
     const proposal = makeProposal("FULL_WORKOUT", 1, [], { sleepHours: 5 }, 0.8);
     const result = validateProposalAgainstDecisionEngine(proposal, null, safety);
@@ -139,6 +141,9 @@ describe("proposals validation", () => {
       requireMedicalDisclaimer: true,
       escalateCare: false,
       date: todayKey(),
+      level: "YELLOW",
+      ruleIds: ["SAF-medical"],
+      blockCommerce: false,
     };
     const decisions = {
       decisions: [],

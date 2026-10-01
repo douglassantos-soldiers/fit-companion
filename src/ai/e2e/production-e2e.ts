@@ -442,7 +442,7 @@ async function runHappyPath(
     const db = await adminDbLoose();
     if (db && out.correlation.run_id) {
       try {
-        const q = db.from("ai_audit_events") as {
+        const q = db.from("ai_audit_events") as unknown as {
           select: (c: string) => {
             eq?: (col: string, val: string) => {
               limit: (

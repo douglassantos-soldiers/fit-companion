@@ -2,7 +2,7 @@
  * Social/engagement mutations via service_role after RLS harden.
  * Client must not INSERT/UPDATE/DELETE social tables with anon key.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asJson } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import { challengeById, isPersonalizedChallenge, isRelativeChallenge } from "@/data/challenges";
 import {
@@ -11,6 +11,7 @@ import {
   sanitizeCommentBody,
   shouldPublishEvent,
   stripSensitiveSocialPayload,
+  type ReactionKind,
 } from "@/lib/social/visibility";
 import {
   assertBothClubMembersByUser,
@@ -120,7 +121,7 @@ export type SocialWriteOp =
   | { op: "unblock"; deviceId: string; targetUserId: string }
   | { op: "mute"; deviceId: string; targetUserId: string }
   | { op: "unmute"; deviceId: string; targetUserId: string }
-  | { op: "react"; deviceId: string; eventId: string; kind: string }
+  | { op: "react"; deviceId: string; eventId: string; kind: ReactionKind }
   | { op: "comment"; deviceId: string; eventId: string; body: string }
   | { op: "dismissFeed"; deviceId: string; authorUserId?: string; kind: string; contentId?: string }
   | { op: "markSeen"; deviceId: string; eventId?: string; contentId?: string }
@@ -258,7 +259,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
               c!.metric === "steps" || c!.metric === "football_sessions"
                 ? "app_manual"
                 : "app_session",
-            fraud_flags: scored.flags,
+            fraud_flags: asJson(scored.flags),
             updated_at: new Date().toISOString(),
           },
           { onConflict: "device_id,challenge_id" },
@@ -407,7 +408,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
           personal_target: personalTarget ?? null,
           proof_status: "self_reported",
           proof_source: proofSource,
-          fraud_flags: scored.flags,
+          fraud_flags: asJson(scored.flags),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "device_id,challenge_id" },
@@ -543,6 +544,15 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
     case "publishEvent": {
       const identity = await assertDevice(op.deviceId);
       const payload = stripSensitiveSocialPayload(op.payload ?? {});
+      const imageUrl = typeof payload["imageUrl"] === "string" ? payload["imageUrl"] : null;
+      if (imageUrl) {
+        const supabaseHost = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "")
+          .replace(/^https?:\/\//, "")
+          .split("/")[0];
+        if (!isAllowedCheckinImageUrl(imageUrl, supabaseHost || undefined)) {
+          delete payload["imageUrl"];
+        }
+      }
       const { data: profileRow } = await db
         .from("social_profiles")
         .select(
@@ -559,7 +569,7 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         user_id: identity.userId,
         display_name: op.displayName || "Soldado",
         kind: op.kind,
-        payload,
+        payload: asJson(payload),
       });
       if (error) console.error("publishEvent failed", error);
       else if (op.kind === "session" || op.kind === "proof") {
@@ -687,13 +697,23 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         throw new Error("Ambos devem ser membros do clube");
       }
 
-      const { data: existing } = await db
-        .from("friend_quests")
-        .select("*")
-        .eq("club_id", op.clubId)
-        .eq("week_start", op.weekStart)
-        .or(`device_a.eq.${op.deviceId},device_b.eq.${op.deviceId}`)
-        .maybeSingle();
+      const [asA, asB] = await Promise.all([
+        db
+          .from("friend_quests")
+          .select("*")
+          .eq("club_id", op.clubId)
+          .eq("week_start", op.weekStart)
+          .eq("device_a", op.deviceId)
+          .maybeSingle(),
+        db
+          .from("friend_quests")
+          .select("*")
+          .eq("club_id", op.clubId)
+          .eq("week_start", op.weekStart)
+          .eq("device_b", op.deviceId)
+          .maybeSingle(),
+      ]);
+      const existing = asA.data ?? asB.data;
       if (existing) {
         return {
           ok: true,
@@ -762,12 +782,23 @@ export async function executeSocialWrite(op: SocialWriteOp): Promise<Record<stri
         .maybeSingle();
       if (already) return { ok: true, skipped: true, reason: "already_bumped" };
 
-      const { data: rows } = await db
-        .from("friend_quests")
-        .select("*")
-        .eq("week_start", op.weekStart)
-        .or(`device_a.eq.${op.deviceId},device_b.eq.${op.deviceId}`);
-      for (const row of rows ?? []) {
+      const [asA, asB] = await Promise.all([
+        db
+          .from("friend_quests")
+          .select("*")
+          .eq("week_start", op.weekStart)
+          .eq("device_a", op.deviceId),
+        db
+          .from("friend_quests")
+          .select("*")
+          .eq("week_start", op.weekStart)
+          .eq("device_b", op.deviceId),
+      ]);
+      const rows = [...(asA.data ?? []), ...(asB.data ?? [])];
+      const seen = new Set<string>();
+      for (const row of rows) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
         const isA = row.device_a === op.deviceId;
         const patch = isA
           ? { progress_a: (row.progress_a ?? 0) + 1 }

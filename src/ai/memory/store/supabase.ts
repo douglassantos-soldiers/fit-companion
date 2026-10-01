@@ -6,10 +6,7 @@
 import type { MemoryFamily, MemoryRecord } from "@/ai/contracts/memory-record";
 import { MEMORY_ERROR, MemoryError } from "@/ai/memory/core/errors";
 import type { MemoryStore, MemoryStoreListFilter } from "@/ai/memory/store/types";
-
-/** Minimal admin client surface (avoids generated-types lag). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LooseDb = { from: (table: string) => any };
+import { asDbRows, type AdminDb } from "@/lib/db-admin";
 
 const MEMORY_TABLES = [
   "ai_user_memory",
@@ -18,7 +15,9 @@ const MEMORY_TABLES = [
   "ai_learning_events",
 ] as const;
 
-function tableForFamily(family: MemoryFamily): string {
+type MemoryTable = (typeof MEMORY_TABLES)[number];
+
+function tableForFamily(family: MemoryFamily): MemoryTable {
   switch (family) {
     case "user":
       return "ai_user_memory";
@@ -70,7 +69,7 @@ function recordToRow(record: MemoryRecord): Record<string, unknown> {
 }
 
 export type SupabaseMemoryStoreOpts = {
-  getDb: () => Promise<LooseDb | null>;
+  getDb: () => Promise<AdminDb | null>;
 };
 
 export class SupabaseMemoryStore implements MemoryStore {
@@ -78,8 +77,8 @@ export class SupabaseMemoryStore implements MemoryStore {
 
   constructor(private readonly opts: SupabaseMemoryStoreOpts) {}
 
-  private async db(): Promise<LooseDb> {
-    let db: LooseDb | null;
+  private async db(): Promise<AdminDb> {
+    let db: AdminDb | null;
     try {
       db = await this.opts.getDb();
     } catch (e) {
@@ -109,7 +108,7 @@ export class SupabaseMemoryStore implements MemoryStore {
 
   async insert(record: MemoryRecord): Promise<MemoryRecord> {
     const db = await this.db();
-    const { error } = await db.from(tableForFamily(record.family)).insert(recordToRow(record));
+    const { error } = await db.from(tableForFamily(record.family)).insert(asDbRows(recordToRow(record)));
     if (error) {
       throw new MemoryError(MEMORY_ERROR.STORE_ERROR, `STORE_ERROR: ${String(error.message)}`);
     }
@@ -170,7 +169,7 @@ export class SupabaseMemoryStore implements MemoryStore {
     const db = await this.db();
     const { error } = await db
       .from(tableForFamily(record.family))
-      .update(recordToRow(record))
+      .update(asDbRows(recordToRow(record)))
       .eq("id", record.memory_id)
       .eq("user_id", record.user_id);
     if (error) {

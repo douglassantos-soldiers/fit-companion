@@ -179,12 +179,7 @@ async function deleteOrUserColumns(
   columns: readonly string[],
   userId: string,
 ): Promise<{ error: { code?: string; message?: string } | null }> {
-  const del = db.from(table).delete();
-  if (typeof del.or === "function") {
-    const filter = columns.map((c) => `${c}.eq.${userId}`).join(",");
-    return del.or(filter);
-  }
-  // Fallback: sequential deletes per column
+  // Prefer bound .eq per column — never interpolate userId into PostgREST .or() filters.
   let last: { error: { code?: string; message?: string } | null } = { error: null };
   for (const col of columns) {
     last = await deleteEq(db, table, col, userId);

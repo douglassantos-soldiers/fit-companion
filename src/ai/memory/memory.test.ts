@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Memory Layer — unit tests (InMemory store, no live DB).
  */
@@ -11,10 +10,18 @@ import {
   resetMemoryInfrastructure,
   retrieveMemory,
   updateMemory,
+  type MemoryRecord,
+  type MemoryWriteResult,
 } from "@/ai/memory";
 
 const USER_A = "user-memory-aaaa";
 const USER_B = "user-memory-bbbb";
+
+function recordOf(result: MemoryWriteResult): MemoryRecord {
+  expect(result.record).not.toBeNull();
+  if (result.record == null) throw new Error("expected memory record");
+  return result.record;
+}
 
 beforeEach(() => {
   resetMemoryInfrastructure();
@@ -68,7 +75,7 @@ describe("Memory Layer", () => {
     await expect(
       updateMemory({
         trustedUserId: USER_B,
-        memoryId: created.record.memory_id,
+        memoryId: recordOf(created).memory_id,
         patch: { data: { value: "hacked" } },
       }),
     ).rejects.toMatchObject({ code: MEMORY_ERROR.USER_MISMATCH });
@@ -76,7 +83,7 @@ describe("Memory Layer", () => {
     await expect(
       invalidateMemory({
         trustedUserId: USER_B,
-        memoryId: created.record.memory_id,
+        memoryId: recordOf(created).memory_id,
       }),
     ).rejects.toMatchObject({ code: MEMORY_ERROR.USER_MISMATCH });
   });
@@ -122,11 +129,11 @@ describe("Memory Layer", () => {
 
     const updated = await updateMemory({
       trustedUserId: USER_A,
-      memoryId: created.record.memory_id,
+      memoryId: recordOf(created).memory_id,
       patch: { data: { quality: "success" }, confidence: 0.8 },
     });
-    expect(updated.record.data["quality"]).toBe("success");
-    expect(updated.record.confidence).toBe(0.8);
+    expect(recordOf(updated).data["quality"]).toBe("success");
+    expect(recordOf(updated).confidence).toBe(0.8);
 
     const listed = await retrieveMemory({
       trustedUserId: USER_A,
@@ -149,7 +156,7 @@ describe("Memory Layer", () => {
 
     await invalidateMemory({
       trustedUserId: USER_A,
-      memoryId: created.record.memory_id,
+      memoryId: recordOf(created).memory_id,
       reason: "user_corrected",
     });
 
@@ -200,7 +207,7 @@ describe("Memory Layer", () => {
       confidence: 0.85,
       supersede: true,
     });
-    expect(superseded.record.data["goal"]).toBe("cutting");
+    expect(recordOf(superseded).data["goal"]).toBe("cutting");
 
     const listed = await retrieveMemory({
       trustedUserId: USER_A,
@@ -222,7 +229,7 @@ describe("Memory Layer", () => {
       confidence: 0.2,
     });
     expect(low.warnings).toContain("low_confidence");
-    expect(low.record.low_confidence).toBe(true);
+    expect(recordOf(low).low_confidence).toBe(true);
 
     await createMemory({
       trustedUserId: USER_A,

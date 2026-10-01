@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { actionsFromIds } from "@/lib/coach/actions";
-import { evidenceFromContext } from "@/lib/coach/evidence";
+import { evidenceFromContext, toProposalEvidence } from "@/lib/coach/evidence";
 import { makeProposal } from "@/lib/coach/proposals";
 import type { CoachContext, WorkflowResult } from "@/lib/coach/types";
 import type { SessionLog } from "@/lib/types";
@@ -44,14 +43,14 @@ export function postWorkoutWorkflow(
           "INCREASE_RECOVERY",
           true,
           ["rpe_high"],
-          { ...evidence, lastRpe: session?.rpe ?? null } as Record<string, string | number | boolean | null>,
+          toProposalEvidence(evidence, { lastRpe: session?.rpe ?? null }),
           0.8,
         )
       : makeProposal(
           "FULL_WORKOUT",
           ctx.training.volumeFactor ?? 1,
           [],
-          evidence as Record<string, string | number | boolean | null>,
+          toProposalEvidence(evidence),
           0.65,
         );
 

@@ -2,7 +2,7 @@
  * Persist normalized activities (service_role). Identity from trusted session only.
  */
 import type { Activity } from "@/lib/athlete/types";
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows } from "@/lib/db-admin";
 
 export async function upsertActivities(
   userId: string,
@@ -36,7 +36,7 @@ export async function upsertActivities(
 
   const { error, data } = await db
     .from("activities")
-    .upsert(payload, { onConflict: "id" })
+    .upsert(asDbRows(payload), { onConflict: "id" })
     .select("id");
   if (error) {
     console.info("activities_upsert failed", { reason: error.message, count: rows.length });

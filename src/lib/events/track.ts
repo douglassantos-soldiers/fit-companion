@@ -6,7 +6,7 @@
  * Callers must pass resolvedUserId from server identity resolution,
  * or deviceId so we resolve via device mapping.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows, asJson } from "@/lib/db-admin";
 import { normalizeEventType, resolveMetadata } from "@/lib/events/normalize";
 import type { TrackUserEventInput, UserEventType } from "@/lib/events/types";
 
@@ -64,7 +64,7 @@ export async function trackUserEvent(
     if (input.entityId) row["entity_id"] = input.entityId;
     if (input.idempotencyKey) row["idempotency_key"] = input.idempotencyKey;
 
-    const { error } = await db.from("user_events").insert(row);
+    const { error } = await db.from("user_events").insert(asDbRows(row));
 
     if (error) {
       if (String(error.message ?? "").includes("duplicate") || error.code === "23505") {
@@ -79,7 +79,7 @@ export async function trackUserEvent(
         device_id: input.deviceId,
         user_id: userId,
         name: eventType,
-        props: metadata,
+        props: asJson(metadata),
       });
       if (engErr && process.env["NODE_ENV"] !== "production") {
         console.warn("engagement_events insert failed (non-critical)", engErr.code);

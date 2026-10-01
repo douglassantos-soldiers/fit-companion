@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 22.3 — Production Memory Persistence hardening tests.
  */
@@ -21,10 +20,18 @@ import {
   updateMemory,
   InMemoryMemoryStore,
   SupabaseMemoryStore,
+  type MemoryRecord,
+  type MemoryWriteResult,
 } from "@/ai/memory";
 
 const USER_A = "user-mem-harden-aaaa";
 const USER_B = "user-mem-harden-bbbb";
+
+function recordOf(result: MemoryWriteResult): MemoryRecord {
+  expect(result.record).not.toBeNull();
+  if (result.record == null) throw new Error("expected memory record");
+  return result.record;
+}
 
 const PREV_ENV = { ...process.env };
 
@@ -63,7 +70,7 @@ describe("FASE 22.3 production Memory hardening", () => {
       confidence: 0.9,
     });
     expect(created.ok).toBe(true);
-    expect(created.record.version).toBe(1);
+    expect(recordOf(created).version).toBe(1);
 
     const listed = await retrieveMemory({
       trustedUserId: USER_A,
@@ -75,19 +82,19 @@ describe("FASE 22.3 production Memory hardening", () => {
 
     const updated = await updateMemory({
       trustedUserId: USER_A,
-      memoryId: created.record.memory_id,
+      memoryId: recordOf(created).memory_id,
       patch: { data: { value: "evening" } },
     });
-    expect(updated.record.version).toBe(2);
-    expect(updated.record.data["value"]).toBe("evening");
+    expect(recordOf(updated).version).toBe(2);
+    expect(recordOf(updated).data["value"]).toBe("evening");
 
     const inv = await invalidateMemory({
       trustedUserId: USER_A,
-      memoryId: created.record.memory_id,
+      memoryId: recordOf(created).memory_id,
       reason: "test",
     });
-    expect(inv.record.status).toBe("invalidated");
-    expect(inv.record.version).toBe(3);
+    expect(recordOf(inv).status).toBe("invalidated");
+    expect(recordOf(inv).version).toBe(3);
 
     const after = await retrieveMemory({
       trustedUserId: USER_A,
@@ -158,15 +165,15 @@ describe("FASE 22.3 production Memory hardening", () => {
     };
     const a = await createMemory(input);
     const b = await createMemory(input);
-    expect(b.record.memory_id).toBe(a.record.memory_id);
+    expect(recordOf(b).memory_id).toBe(recordOf(a).memory_id);
 
     await expect(
       createMemory({ ...input, data: { goal: "strength" } }),
     ).rejects.toMatchObject({ code: MEMORY_ERROR.CONFLICTING_MEMORY });
 
     const c = await createMemory({ ...input, data: { goal: "strength" }, supersede: true });
-    expect(c.record.memory_id).not.toBe(a.record.memory_id);
-    expect(c.record.version).toBe(1);
+    expect(recordOf(c).memory_id).not.toBe(recordOf(a).memory_id);
+    expect(recordOf(c).version).toBe(1);
   });
 
   it("concurrency parallel creates", async () => {
@@ -184,7 +191,7 @@ describe("FASE 22.3 production Memory hardening", () => {
       ),
     );
     expect(results.every((r) => r.ok)).toBe(true);
-    const ids = new Set(results.map((r) => r.record.memory_id));
+    const ids = new Set(results.map((r) => recordOf(r).memory_id));
     expect(ids.size).toBe(8);
   });
 
@@ -256,7 +263,7 @@ describe("FASE 22.3 production Memory hardening", () => {
       type: "coach_notes",
       key: "note-restart",
     });
-    expect(again.records.some((r) => r.memory_id === created.record.memory_id)).toBe(true);
+    expect(again.records.some((r) => r.memory_id === recordOf(created).memory_id)).toBe(true);
   });
 
   it("checkMemoryPersistence round-trip (InMemory)", async () => {
@@ -282,7 +289,7 @@ describe("FASE 22.3 production Memory hardening", () => {
   });
 
   it("SupabaseMemoryStore ping fails closed without db", async () => {
-    const bad = new SupabaseMemoryStore(async () => null);
+    const bad = new SupabaseMemoryStore({ getDb: async () => null });
     const ok = await bad.ping();
     expect(ok).toBe(false);
     await expect(

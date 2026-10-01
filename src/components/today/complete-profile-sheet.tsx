@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ToggleChip } from "@/components/ui/toggle-chip";
 import { SoldiersOverlay } from "@/components/soldiers-overlay";
 import {
   BLOCKER_LABEL,
@@ -164,18 +165,15 @@ export function CompleteProfileSheet({
               {FOOD_RESTRICTION_OPTIONS.map((r) => {
                 const on = foodRestrictions.includes(r);
                 return (
-                  <button
+                  <ToggleChip
                     key={r}
-                    type="button"
+                    active={on}
                     onClick={() =>
                       setFoodRestrictions((prev) => (on ? prev.filter((x) => x !== r) : [...prev, r]))
                     }
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      on ? "border-primary bg-primary/15 text-primary" : "border-white/10"
-                    }`}
                   >
                     {r}
-                  </button>
+                  </ToggleChip>
                 );
               })}
             </div>
@@ -195,16 +193,9 @@ export function CompleteProfileSheet({
             </p>
             <div className="flex flex-wrap gap-2">
               {BLOCKERS.map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBlocker(b)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    primaryBlocker === b ? "border-primary bg-primary/15 text-primary" : "border-white/10"
-                  }`}
-                >
+                <ToggleChip key={b} active={primaryBlocker === b} onClick={() => setBlocker(b)}>
                   {BLOCKER_LABEL[b]}
-                </button>
+                </ToggleChip>
               ))}
             </div>
           </>

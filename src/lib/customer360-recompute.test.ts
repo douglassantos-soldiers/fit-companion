@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Customer 360 recompute / commerce / lineage unit tests (pure helpers + build).
  */
@@ -177,7 +176,7 @@ describe("hydrate merge + aggregator scores", () => {
           label: "Frango",
           proteinG: 45,
           kcal: 500,
-          quality: "green",
+          quality: "verde",
         },
       ],
       dayCheckIns: {

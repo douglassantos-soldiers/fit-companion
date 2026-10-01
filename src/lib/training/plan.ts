@@ -21,6 +21,7 @@ import {
   progressionForExercise,
   roundLoad,
   weekModifier,
+  type ProgressionReasonCode,
   type WeekMode,
 } from "@/lib/training/progression";
 import { buildPrescriptions, type SetPrescription } from "@/lib/training/sets";
@@ -54,7 +55,7 @@ export interface PlannedExercise {
   prescriptions?: SetPrescription[];
   estimated1rm?: number;
   bestWeight?: number;
-  reasonCodes?: string[];
+  reasonCodes?: ProgressionReasonCode[];
   confidence?: number;
   supersetGroupId?: string;
 }

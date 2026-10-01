@@ -7,6 +7,7 @@ import {
   type RestockEstimate,
   type ShopifyLineItemLike,
 } from "@/data/shopify-product-map";
+import { EmailSchema } from "@/lib/validation/common";
 
 /**
  * Shopify purchase verification + companion (server-only).
@@ -71,23 +72,20 @@ function maskEmail(email: string): string {
 
 /** Distributed-capable rate limit (same store as access/AI — not process-local Map). */
 async function allowVerifyPurchaseAttempt(email: string): Promise<boolean> {
-  const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
-  if (isAiRateLimitDisabled()) return true;
-  const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-  const store = await resolveAiRateLimitStore();
-  const burst = await store.consume({
+  const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
+  const burst = await consumeNamedBurst({
     key: `shopify:verify:${email}`,
     limit: 8,
     windowMs: 15 * 60_000,
   });
-  return burst.allowed;
+  return burst.ok;
 }
 
 function parseEmailInput(input: unknown): { email: string } {
   const value = input as { email?: string } | null;
-  const email = normalizeEmail(String(value?.email ?? ""));
-  if (!isValidEmail(email)) throw new Error("E-mail inválido");
-  return { email };
+  const parsed = EmailSchema.safeParse(value?.email ?? "");
+  if (!parsed.success) throw new Error("E-mail inválido");
+  return { email: parsed.data };
 }
 
 /** Exported for contract / smoke tests. */

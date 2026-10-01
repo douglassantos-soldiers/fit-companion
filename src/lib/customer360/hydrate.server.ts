@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Hydrate AppState from domain tables (service_role) for Customer 360 recompute.
  * Aligns with sync.server pull mappings — DB is source of truth for server recompute.
@@ -258,9 +257,7 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     days[String(d["date"])] = {
       date: String(d["date"]),
       waterMl: Number(d["water_ml"] ?? 0),
-      sleepHours: Number(d["sleep_hours"] ?? 0),
-      energy: (d["energy"] as AppState["days"][string]["energy"]) ?? "ok",
-      notes: String(d["notes"] ?? ""),
+      meals: Number(d["meals"] ?? 0),
     };
   }
 
@@ -341,7 +338,7 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     sessions: mapSessions((sessionsRes.data ?? []) as Row[]),
     weights: ((weightsRes.data ?? []) as Row[]).map((w) => ({
       date: String(w["date"]),
-      kg: Number(w["kg"]),
+      weightKg: Number(w["kg"] ?? w["weight_kg"] ?? 0),
     })),
     days,
     meals: mapMeals((mealsRes.data ?? []) as Row[]),

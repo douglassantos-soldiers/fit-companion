@@ -173,11 +173,15 @@ export async function sendDailyPushes(now = new Date()): Promise<{ sent: number;
   let skipped = 0;
 
   for (const userId of userIds) {
-    const { data: stateRow } = await db.from("app_state").select("retention, reminder_hour").eq("user_id", userId).maybeSingle();
+    const { data: stateRow } = await db
+      .from("app_state")
+      .select("retention")
+      .eq("user_id", userId)
+      .maybeSingle();
     const retention = ((stateRow as { retention?: RetentionBlob } | null)?.retention ?? {}) as RetentionBlob;
     const reminderHour = Math.min(
       22,
-      Math.max(6, Math.round(retention.reminderHour ?? Number(stateRow?.reminder_hour ?? 18))),
+      Math.max(6, Math.round(retention.reminderHour ?? 18)),
     );
     const prefs = retention.pushPrefs ?? {};
     const enabled = retention.remindersEnabled !== false;

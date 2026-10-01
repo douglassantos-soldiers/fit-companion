@@ -29,10 +29,11 @@ describe("parseEstablishAccessInput", () => {
     expect(() => parseEstablishAccessInput({ email: "nope", deviceId: "x" })).toThrow(/E-mail/i);
   });
 
-  it("allows empty deviceId (trimmed string)", () => {
-    const parsed = parseEstablishAccessInput({ email: "a@b.com" });
-    expect(parsed.email).toBe("a@b.com");
-    expect(parsed.deviceId).toBe("");
+  it("rejects empty or short deviceId", () => {
+    expect(() => parseEstablishAccessInput({ email: "a@b.com" })).toThrow(/deviceId/i);
+    expect(() => parseEstablishAccessInput({ email: "a@b.com", deviceId: "short" })).toThrow(
+      /deviceId/i,
+    );
   });
 });
 

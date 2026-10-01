@@ -2,7 +2,7 @@
  * Persist attribution: expected actions, selective outcomes, delayed windows.
  * Trusted userId only. Failures log and do not block UI.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows } from "@/lib/db-admin";
 import {
   ATTRIBUTION_ENGINE,
   addDaysKey,
@@ -179,7 +179,7 @@ async function upsertActionForHit(opts: {
   }
   const { data, error } = await db
     .from("decision_actions")
-    .upsert(patch, { onConflict: "decision_id" })
+    .upsert(asDbRows(patch), { onConflict: "decision_id" })
     .select("id")
     .maybeSingle();
   if (error) {
@@ -221,7 +221,7 @@ async function upsertOutcomeForHit(opts: {
     },
   };
   if (opts.actionId) row["action_id"] = opts.actionId;
-  const { error } = await db.from("decision_outcomes").upsert(row, {
+  const { error } = await db.from("decision_outcomes").upsert(asDbRows(row), {
     onConflict: "decision_id,outcome_type,outcome_window",
     ignoreDuplicates: true,
   });
@@ -251,7 +251,7 @@ async function dualWriteLegacy(opts: {
   if (opts.metrics != null) patch["outcome_metrics"] = opts.metrics;
   let q = db
     .from("recommendation_decisions")
-    .update(patch)
+    .update(asDbRows(patch))
     .eq("id", opts.decisionId)
     .eq("user_id", opts.userId);
   if (opts.onlyUnset !== false) q = q.is("outcome", null);

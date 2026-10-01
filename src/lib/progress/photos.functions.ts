@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { isPhotoPose, isPhotoVisibility } from "@/lib/progress/body";
 import type { PhotoPose, PhotoVisibility } from "@/lib/types";
+import { normalizeImageUpload } from "@/lib/validation/common";
 
 function parseDevice(input: unknown) {
   const v = input as { deviceId?: string } | null;
@@ -79,13 +80,17 @@ function parseUpload(input: unknown) {
   if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(takenOn) || !isPhotoPose(pose) || bytesBase64.length < 32) {
     throw new Error("upload inválido");
   }
+  const { contentType } = normalizeImageUpload({
+    contentType: v?.contentType,
+    fileExt: "jpg",
+  });
   return {
     ...base,
     id,
     takenOn,
     pose: pose as PhotoPose,
     bytesBase64,
-    contentType: String(v?.contentType ?? "image/jpeg"),
+    contentType,
   };
 }
 

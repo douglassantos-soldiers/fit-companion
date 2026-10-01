@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Medal, Radio, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, EmptyState } from "@/components/app-shell";
+import { AppShell, EmptyState, LoadingPulse } from "@/components/app-shell";
 import { ActivityFeed } from "@/components/social/activity-feed";
 import { ChallengeCard } from "@/components/social/challenge-card";
 import { ClubStoriesRail } from "@/components/social/club-stories-rail";
@@ -87,6 +87,7 @@ function SocialHubPage() {
     kudosGiven,
     setKudosGiven,
     applyReaction,
+    status: feedStatus,
   } = useClubSocialFeed({
     enabled: hydrated && Boolean(deviceId),
     deviceId,
@@ -150,9 +151,13 @@ function SocialHubPage() {
         setFollowingIds(new Set(people.map((p) => p.userId)));
       })
       .catch(() => undefined);
-    void listHubs().then((rows) => {
-      if (!cancelled && rows.length) setHubs(rows);
-    });
+    void listHubs()
+      .then((rows) => {
+        if (!cancelled && rows.length) setHubs(rows);
+      })
+      .catch(() => {
+        /* hubs catalogue optional */
+      });
     return () => {
       cancelled = true;
     };
@@ -666,7 +671,15 @@ function SocialHubPage() {
               ))}
             </section>
           ) : null}
-          {feed.length ? (
+          {feedStatus === "loading" ? (
+            <LoadingPulse label="Carregando feed…" />
+          ) : feedStatus === "error" ? (
+            <EmptyState
+              variant="social"
+              title="Não foi possível carregar o feed"
+              description="Verifique a conexão e atualize a tela."
+            />
+          ) : feed.length ? (
             <ActivityFeed
               events={feed}
               deviceId={deviceId}

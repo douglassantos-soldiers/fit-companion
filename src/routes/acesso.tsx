@@ -150,6 +150,10 @@ function AccessPage() {
       const admin = await grantAdmin({ data: { accessToken: session.access_token } }).catch(() => null);
       if (admin?.ok) {
         toast.success("Acesso de admin liberado");
+        const { revalidateAccessSession } = await import(
+          "@/components/access-session-provider"
+        );
+        await revalidateAccessSession({ force: true });
         navigate({ to: postGrantPath() });
         return true;
       }

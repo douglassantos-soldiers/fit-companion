@@ -5,7 +5,7 @@
  * Kept for Coach UI prompt context until a future migration.
  * path_label: LEGACY
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asJson } from "@/lib/db-admin";
 import type { CoachMemoryEntry, CoachMemoryKind } from "@/lib/coach/types";
 
 const CAP_PER_KIND = 20;
@@ -50,7 +50,7 @@ export async function upsertCoachMemory(opts: {
         user_id: opts.userId,
         kind: opts.kind,
         key: opts.key.slice(0, 120),
-        value: opts.value,
+        value: asJson(opts.value),
         confidence: opts.confidence ?? 0.7,
         updated_at: new Date().toISOString(),
       },
@@ -130,9 +130,9 @@ export async function persistCoachProposal(opts: {
       date: opts.date,
       type: opts.type,
       action: opts.action,
-      value: { value: opts.value },
+      value: asJson({ value: opts.value }),
       reason_codes: opts.reasonCodes,
-      evidence: opts.evidence,
+      evidence: asJson(opts.evidence),
       confidence: opts.confidence,
       status: opts.status ?? "proposed",
     });

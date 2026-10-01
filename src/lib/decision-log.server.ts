@@ -6,7 +6,7 @@
  * Physical columns: decision_value (= value), input_snapshot (= context_snapshot).
  * SoT of outcomes = decision_outcomes; outcome/outcome_metrics on decision row = legacy.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows } from "@/lib/db-admin";
 import type { EngineDecision } from "@/lib/engine/decision";
 import { sanitizeSnapshotForLog } from "@/lib/engine/decision";
 import type { ContextSnapshot } from "@/lib/engine/context-snapshot";
@@ -146,7 +146,7 @@ export async function logRecommendationDecisions(opts: {
         outcome_metrics: prior?.outcome_metrics ?? null,
       };
 
-      const { error } = await db.from("recommendation_decisions").upsert(row, {
+      const { error } = await db.from("recommendation_decisions").upsert(asDbRows(row), {
         onConflict: "user_id,date,engine,decision_type",
       });
       if (error) {

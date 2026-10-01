@@ -1,5 +1,6 @@
 import type { SupplementProduct } from "@/data/products";
 import { PRODUCTS, productById } from "@/data/products";
+import { formatDayMonth } from "@/lib/format/date-pt";
 import { todayKey } from "@/lib/types";
 
 export type TimingSlot = "manha" | "pre" | "pos" | "noite" | "qualquer";
@@ -106,7 +107,7 @@ export function weeklySupplementAdherence(
     const expected = routineIds.length;
     const taken = dosesTakenToday(supplementLogs, routineIds, date);
     out.push({
-      label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      label: formatDayMonth(date),
       expected,
       taken,
       pct: expected ? Math.round((taken / expected) * 100) : 0,

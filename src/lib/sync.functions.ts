@@ -2,27 +2,22 @@
  * Server fns for sync — client must not write domain tables with anon key.
  */
 import { createServerFn } from "@tanstack/react-start";
-import type { AppState, DayCheckIn } from "@/lib/types";
+import type { DayCheckIn } from "@/lib/types";
+import { DeviceIdSchema } from "@/lib/validation/common";
+import { parseAppStatePush, sanitizeNotes } from "@/lib/validation/app-state-push";
 
 function parseDevice(input: unknown) {
   const v = input as { deviceId?: string } | null;
-  const deviceId = String(v?.deviceId ?? "").trim();
-  if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
-  return { deviceId };
+  return { deviceId: DeviceIdSchema.parse(String(v?.deviceId ?? "").trim() || "invalid") };
 }
 
 function parsePush(input: unknown) {
-  const v = input as { deviceId?: string; state?: AppState } | null;
-  const deviceId = String(v?.deviceId ?? "").trim();
-  if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
-  if (!v?.state || typeof v.state !== "object") throw new Error("state obrigatório");
-  return { deviceId, state: v.state };
+  return parseAppStatePush(input);
 }
 
 function parseDayCheckIn(input: unknown) {
   const v = input as { deviceId?: string; checkIn?: Record<string, unknown>; version?: number } | null;
-  const deviceId = String(v?.deviceId ?? "").trim();
-  if (!deviceId || deviceId.length < 8) throw new Error("deviceId inválido");
+  const deviceId = DeviceIdSchema.parse(String(v?.deviceId ?? "").trim() || "invalid");
   const raw = v?.checkIn;
   if (!raw || typeof raw !== "object") throw new Error("checkIn obrigatório");
   const date = String(raw["date"] ?? "").slice(0, 10);
@@ -40,7 +35,7 @@ function parseDayCheckIn(input: unknown) {
   if (Number.isFinite(soreness) && soreness >= 1) checkIn.soreness = Math.min(5, Math.round(soreness));
   const stress = Number(raw["stress"]);
   if (Number.isFinite(stress) && stress >= 1) checkIn.stress = Math.min(5, Math.round(stress));
-  if (typeof raw["notes"] === "string" && raw["notes"]) checkIn.notes = String(raw["notes"]).slice(0, 280);
+  if (typeof raw["notes"] === "string" && raw["notes"]) checkIn.notes = sanitizeNotes(raw["notes"]);
   return { deviceId, checkIn, version: checkIn.version ?? 1 };
 }
 

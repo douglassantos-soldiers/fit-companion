@@ -378,7 +378,17 @@ interface Store {
   clearAccountData: () => Promise<{ ok: boolean; partial?: boolean }>;
 }
 
-const StoreContext = createContext<Store | null>(null);
+interface StoreStateSlice {
+  state: AppState;
+  hydrated: boolean;
+  deviceId: string;
+  lastSessionXp: number;
+}
+
+type StoreActions = Omit<Store, keyof StoreStateSlice>;
+
+const StoreStateContext = createContext<StoreStateSlice | null>(null);
+const StoreActionsContext = createContext<StoreActions | null>(null);
 
 function load(): AppState {
   if (typeof window === "undefined") return emptyState;
@@ -804,15 +814,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(KEY, JSON.stringify(state));
+    const persistTimer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify(stateRef.current));
+      } catch (e) {
+        console.warn("localStorage persist failed", e);
+      }
+    }, 400);
     if (skipPush.current) {
       skipPush.current = false;
-      return;
+      return () => window.clearTimeout(persistTimer);
     }
     const timer = window.setTimeout(() => {
-      void pushState(deviceId.current, state);
+      void pushState(deviceId.current, stateRef.current);
     }, 700);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(persistTimer);
+      window.clearTimeout(timer);
+    };
   }, [state, hydrated]);
 
   // Customer 360 recompute — throttled (not every keystroke push)
@@ -884,12 +903,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return s.days[date] ?? { date, waterMl: 0, meals: 0 };
   };
 
-  const value = useMemo<Store>(
+  const actions = useMemo<StoreActions>(
     () => ({
-      state,
-      hydrated,
-      deviceId: deviceId.current,
-      lastSessionXp,
       setProfile: (profile) => {
         const wasFirst = !stateRef.current.profile;
         const prevProfile = stateRef.current.profile;
@@ -1697,11 +1712,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     : "app_session",
               }),
             )
-            .catch((e) => console.error("Falha ao entrar no desafio remoto", e));
+            .catch((e) => {
+              console.error("Falha ao entrar no desafio remoto", e);
+              toast.error("Entrou só neste aparelho · sync do desafio falhou");
+            });
         } else {
-          void leaveChallengeRemote(deviceId.current, id).catch((e) =>
-            console.error("Falha ao sair do desafio remoto", e),
-          );
+          void leaveChallengeRemote(deviceId.current, id).catch((e) => {
+            console.error("Falha ao sair do desafio remoto", e);
+            toast.error("Saiu só neste aparelho · sync do desafio falhou");
+          });
         }
       },
       bumpChallengeInvitesSent: () =>
@@ -1869,7 +1888,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   ).catch(() => undefined);
                 }
               })
-              .catch((e) => console.error("Falha ao entrar no hub remoto", e));
+              .catch((e) => {
+                console.error("Falha ao entrar no hub remoto", e);
+                toast.error("Entrou só neste aparelho · sync do hub falhou");
+              });
           }
         } else {
           update((s) => ({
@@ -1877,9 +1899,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             joinedHubIds: (s.joinedHubIds ?? []).filter((id) => id !== hubId),
           }));
           if (deviceId.current) {
-            void leaveHubRemote(deviceId.current, hubId).catch((e) =>
-              console.error("Falha ao sair do hub remoto", e),
-            );
+            void leaveHubRemote(deviceId.current, hubId).catch((e) => {
+              console.error("Falha ao sair do hub remoto", e);
+              toast.error("Saiu só neste aparelho · sync do hub falhou");
+            });
           }
         }
       },
@@ -2052,6 +2075,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   )
                 : enrichRestockConfidence(s.restockEstimates ?? {}, s.supplementLogs),
             }));
+            const { revalidateAccessSession } = await import(
+              "@/components/access-session-provider"
+            );
+            await revalidateAccessSession({ force: true });
             return { ok: true as const };
           }
           update((s) => ({ ...s, accessGranted: false }));
@@ -2220,16 +2247,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return remote;
       },
     }),
-    [state, hydrated, update, lastSessionXp],
+    [update],
   );
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+  const stateSlice = useMemo<StoreStateSlice>(
+    () => ({
+      state,
+      hydrated,
+      deviceId: deviceId.current,
+      lastSessionXp,
+    }),
+    [state, hydrated, lastSessionXp],
+  );
+
+  return (
+    <StoreActionsContext.Provider value={actions}>
+      <StoreStateContext.Provider value={stateSlice}>{children}</StoreStateContext.Provider>
+    </StoreActionsContext.Provider>
+  );
 }
 
-export function useStore() {
-  const ctx = useContext(StoreContext);
+export function useStoreState() {
+  const ctx = useContext(StoreStateContext);
   if (!ctx) throw new Error("useStore precisa estar dentro de StoreProvider");
   return ctx;
+}
+
+export function useStoreActions() {
+  const ctx = useContext(StoreActionsContext);
+  if (!ctx) throw new Error("useStore precisa estar dentro de StoreProvider");
+  return ctx;
+}
+
+export function useStore(): Store {
+  const stateSlice = useStoreState();
+  const actions = useStoreActions();
+  return useMemo(() => ({ ...stateSlice, ...actions }), [stateSlice, actions]);
 }
 
 export function todaySupplements(state: AppState) {

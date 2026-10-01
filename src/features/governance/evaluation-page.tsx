@@ -2,11 +2,17 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { runGovernanceEvaluation } from "@/lib/governance-console.functions";
 import { GovernanceShell, MetricCard } from "@/features/governance/shell";
+import type { ConsoleJson } from "@/ai/governance/console-helpers";
+
+function asRecord(value: ConsoleJson | null): { [key: string]: ConsoleJson } | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+}
 
 export function GovernanceEvaluationPage() {
   const run = useServerFn(runGovernanceEvaluation);
-  const [suite, setSuite] = useState<Record<string, unknown> | null>(null);
-  const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  const [suite, setSuite] = useState<{ [key: string]: ConsoleJson } | null>(null);
+  const [report, setReport] = useState<{ [key: string]: ConsoleJson } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,8 +35,8 @@ export function GovernanceEvaluationPage() {
                 setError(r.error);
                 return;
               }
-              setSuite(r.suite);
-              setReport(r.report ?? null);
+              setSuite(asRecord(r.suite));
+              setReport(asRecord(r.report ?? null));
             })
             .finally(() => setBusy(false));
         }}

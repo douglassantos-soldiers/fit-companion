@@ -94,28 +94,24 @@ export const clearAccessSession = createServerFn({ method: "POST" }).handler(asy
 export const establishAccessSession = createServerFn({ method: "POST" })
   .inputValidator(parseEstablishAccessInput)
   .handler(async ({ data }) => {
-    const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-    const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
+    const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
 
-    if (!isAiRateLimitDisabled()) {
-      const store = await resolveAiRateLimitStore();
-      const emailKey = data.email.trim().toLowerCase();
-      const emailBurst = await store.consume({
-        key: `ai:access:email:${emailKey}`,
-        limit: 5,
-        windowMs: 15 * 60_000,
-      });
-      if (!emailBurst.allowed) {
-        return { ok: false as const, reason: "rate_limited" as const };
-      }
-      const ipBurst = await store.consume({
-        key: `ai:access:ip:${resolveClientIpFingerprint()}`,
-        limit: 20,
-        windowMs: 15 * 60_000,
-      });
-      if (!ipBurst.allowed) {
-        return { ok: false as const, reason: "rate_limited" as const };
-      }
+    const emailKey = data.email.trim().toLowerCase();
+    const emailBurst = await consumeNamedBurst({
+      key: `ai:access:email:${emailKey}`,
+      limit: 5,
+      windowMs: 15 * 60_000,
+    });
+    if (!emailBurst.ok) {
+      return { ok: false as const, reason: "rate_limited" as const };
+    }
+    const ipBurst = await consumeNamedBurst({
+      key: `ai:access:ip:${resolveClientIpFingerprint()}`,
+      limit: 20,
+      windowMs: 15 * 60_000,
+    });
+    if (!ipBurst.ok) {
+      return { ok: false as const, reason: "rate_limited" as const };
     }
 
     const { inspectAccessForEmail, upsertDeviceEntitlementAdmin, findEntitlementByEmail } =
@@ -362,18 +358,14 @@ export const completeAccountAccess = createServerFn({ method: "POST" })
 export const loginAdmin = createServerFn({ method: "POST" })
   .inputValidator(parseAdminLogin)
   .handler(async ({ data }) => {
-    const { resolveAiRateLimitStore } = await import("@/ai/runtime/rate-limit-store");
-    const { isAiRateLimitDisabled } = await import("@/ai/runtime/rate-limit");
-    if (!isAiRateLimitDisabled()) {
-      const store = await resolveAiRateLimitStore();
-      const burst = await store.consume({
-        key: `ai:admin:${data.email.toLowerCase()}`,
-        limit: 8,
-        windowMs: 15 * 60_000,
-      });
-      if (!burst.allowed) {
-        return { ok: false as const, reason: "rate_limited" as const };
-      }
+    const { consumeNamedBurst } = await import("@/lib/security/burst-limit");
+    const burst = await consumeNamedBurst({
+      key: `ai:admin:${data.email.toLowerCase()}`,
+      limit: 8,
+      windowMs: 15 * 60_000,
+    });
+    if (!burst.ok) {
+      return { ok: false as const, reason: "rate_limited" as const };
     }
     const result = await authenticateAdminWithRole(data.email, data.password);
     if (result.ok) {

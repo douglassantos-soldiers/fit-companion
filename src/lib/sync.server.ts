@@ -1,7 +1,7 @@
 /**
  * Server-side sync via service_role. Resolves user_id from devices — never trusts client userId.
  */
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, asDbRows, asJson } from "@/lib/db-admin";
 import { resolveTrustedIdentity } from "@/lib/session-identity.server";
 import { nextVersion, shouldAcceptWrite } from "@/lib/sync/conflict";
 import { dayCheckInToRow, mergeDayCheckIns, rowToDayCheckIn } from "@/lib/sync/day-checkin";
@@ -706,7 +706,7 @@ export async function pushStateServer(
             equipment: profile.equipment,
             restrictions: profile.restrictions,
             timezone: profile.timezone ?? "America/Sao_Paulo",
-            prefs: {
+            prefs: asJson({
               skipBreakfast: profile.skipBreakfast === true,
               lunchOutOften: profile.lunchOutOften === true,
               typicalSleepHours: profile.typicalSleepHours,
@@ -718,7 +718,7 @@ export async function pushStateServer(
               typicalSessionMin: profile.typicalSessionMin,
               onboardingComplete: profile.onboardingComplete === true,
               timezone: profile.timezone ?? "America/Sao_Paulo",
-            },
+            }),
             version: nextVersion((remoteProfile as { version?: number } | null)?.version),
             updated_at: new Date().toISOString(),
           },
@@ -769,8 +769,8 @@ export async function pushStateServer(
           ...channel,
           supplement_routine: state.supplementRoutine,
           challenges: state.challenges,
-          chat: state.chat as unknown as never,
-          retention: { ...retentionPayload(state), userId },
+          chat: asJson(state.chat),
+          retention: asJson({ ...retentionPayload(state), userId }),
           version: nextVersion(remoteVer),
           updated_at: new Date().toISOString(),
         },
@@ -937,24 +937,26 @@ export async function pushStateServer(
       tasks.push({
         table: "meal_entries",
         run: () => db.from("meal_entries").upsert(
-          accepted.map((m) => {
-            const remote = remoteById.get(m.id);
-            return {
-              ...channel,
-              client_id: m.id,
-              date: m.date.slice(0, 10),
-              name: m.label,
-              meal_type: m.slot,
-              protein_g: m.proteinG,
-              carbs_g: m.carbG ?? null,
-              fat_g: m.fatG ?? null,
-              fiber_g: m.fiberG ?? null,
-              kcal: m.kcal,
-              payload: mealEntryToDbPayload(m),
-              version: nextVersion((remote as { version?: number } | undefined)?.version),
-              updated_at: new Date().toISOString(),
-            };
-          }),
+          asDbRows(
+            accepted.map((m) => {
+              const remote = remoteById.get(m.id);
+              return {
+                ...channel,
+                client_id: m.id,
+                date: m.date.slice(0, 10),
+                name: m.label,
+                meal_type: m.slot,
+                protein_g: m.proteinG,
+                carbs_g: m.carbG ?? null,
+                fat_g: m.fatG ?? null,
+                fiber_g: m.fiberG ?? null,
+                kcal: m.kcal,
+                payload: asJson(mealEntryToDbPayload(m)),
+                version: nextVersion((remote as { version?: number } | undefined)?.version),
+                updated_at: new Date().toISOString(),
+              };
+            }),
+          ),
           { onConflict: "user_id,client_id" },
         ),
       });
@@ -962,7 +964,7 @@ export async function pushStateServer(
       if (itemRows.length) {
         tasks.push({
           table: "meal_items",
-          run: () => db.from("meal_items").upsert(itemRows, { onConflict: "user_id,client_id" }),
+          run: () => db.from("meal_items").upsert(asDbRows(itemRows), { onConflict: "user_id,client_id" }),
         });
       }
     }
@@ -1043,14 +1045,16 @@ export async function pushStateServer(
       tasks.push({
         table: "day_checkins",
         run: () => db.from("day_checkins").upsert(
-          accepted.map((c) => {
-            const remote = remoteByDate.get(c.date.slice(0, 10));
-            return dayCheckInToRow(
-              c,
-              channel,
-              nextVersion((remote as { version?: number } | undefined)?.version),
-            );
-          }),
+          asDbRows(
+            accepted.map((c) => {
+              const remote = remoteByDate.get(c.date.slice(0, 10));
+              return dayCheckInToRow(
+                c,
+                channel,
+                nextVersion((remote as { version?: number } | undefined)?.version),
+              );
+            }),
+          ),
           { onConflict: "user_id,date" },
         ),
       });
@@ -1170,7 +1174,7 @@ export async function upsertDayCheckInServer(
 
   const version = nextVersion(remote ? Number(remote["version"] ?? 0) : 0);
   const row = dayCheckInToRow(checkIn, { user_id: userId, device_id: deviceId }, version);
-  const { error } = await db.from("day_checkins").upsert(row, { onConflict: "user_id,date" });
+  const { error } = await db.from("day_checkins").upsert(asDbRows(row), { onConflict: "user_id,date" });
   if (error) {
     console.error("upsertDayCheckInServer failed", error);
     return { ok: false, userId };
@@ -1243,7 +1247,7 @@ export async function clearUserDataServer(deviceId: string): Promise<{
     });
   }
 
-  const wipe = await executeAccountWipe(db, {
+  const wipe = await executeAccountWipe(db as unknown as import("@/lib/account-deletion").WipeDb, {
     userId: identity.userId,
     deviceIds,
     onError: (table, code) => {

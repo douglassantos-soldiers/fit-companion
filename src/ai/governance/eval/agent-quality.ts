@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Agent quality — deterministic checks on reasoning / evidence / proposal / tools.
  * Does not call or mutate Decision Engine.
@@ -112,7 +111,7 @@ export function evaluateAgentQuality(
   const passed = isNegative ? !allGood : allGood;
   if (isNegative && allGood) notes.push("negative_agent_unexpectedly_good");
 
-  const scoreParts = Object.values(dims).map((v) => (v ? 1 : 0));
+  const scoreParts: number[] = Object.values(dims).map((v) => (v ? 1 : 0));
   const score = Math.round((scoreParts.reduce((a, b) => a + b, 0) / scoreParts.length) * 1000) / 1000;
 
   return { passed, score, notes, dimensions: dims };

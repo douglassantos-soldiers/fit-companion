@@ -109,8 +109,10 @@ export function buildTypedCoachContextFromState(
     profile: p
       ? {
           name: p.name,
-          goal: GOAL_LABEL[p.goal],
-          level: LEVEL_LABEL[p.level],
+          goal: p.goal,
+          level: p.level,
+          goalLabel: GOAL_LABEL[p.goal],
+          levelLabel: LEVEL_LABEL[p.level],
           weightKg: p.weightKg,
           daysPerWeek: p.daysPerWeek,
           equipment: p.equipment,
@@ -216,7 +218,7 @@ export function formatCoachContextForPrompt(ctx: CoachContext): string {
 
   lines.push(
     `Nome: ${ctx.profile.name}`,
-    `Objetivo: ${ctx.profile.goal} | Nível: ${ctx.profile.level} | Local: ${ctx.profile.equipment}`,
+    `Objetivo: ${ctx.profile.goalLabel ?? ctx.profile.goal} | Nível: ${ctx.profile.levelLabel ?? ctx.profile.level} | Local: ${ctx.profile.equipment}`,
     `Peso ${ctx.profile.weightKg} kg | ${ctx.profile.daysPerWeek} treinos/semana`,
     ctx.profile.restrictions.length
       ? `Restrições: ${ctx.profile.restrictions.join(", ")}`

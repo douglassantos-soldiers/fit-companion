@@ -1,9 +1,9 @@
-// @ts-nocheck
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bot, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
+import { VirtualMessageList } from "@/components/virtual-message-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { askAiCoach, type CoachStructuredReply } from "@/lib/coach.functions";
@@ -32,6 +32,7 @@ import { getDeviceId } from "@/lib/sync";
 import type { AppState, ChatMessage } from "@/lib/types";
 import { todayKey } from "@/lib/types";
 import { useServerFn } from "@tanstack/react-start";
+import { createRouteErrorComponent } from "@/components/route-error-fallback";
 
 export const Route = createFileRoute("/coach")({
   validateSearch: (search: Record<string, unknown>): { q?: string } => {
@@ -55,6 +56,7 @@ export const Route = createFileRoute("/coach")({
     ],
   }),
   component: CoachPage,
+  errorComponent: createRouteErrorComponent("coach_error"),
 });
 
 const ENGINE_KEY = "soldiers-coach-engine";
@@ -227,16 +229,18 @@ function CoachPage() {
           messages,
         },
       });
-      if (result?.structured?.actions?.length) {
-        setLastActions(result.structured.actions);
+      const structured =
+        result && "structured" in result ? result.structured : undefined;
+      if (structured?.actions?.length) {
+        setLastActions(structured.actions);
       }
-      if (result?.structured?.proposals?.length) {
-        setLastProposals(result.structured.proposals);
+      if (structured?.proposals?.length) {
+        setLastProposals(structured.proposals);
       }
       if (result?.error) {
         outcomeOffline = true;
         return {
-          text: formatCoachReply(offlineReply, result.structured),
+          text: formatCoachReply(offlineReply, structured),
           offline: true,
           reason: result.error,
         };
@@ -244,7 +248,7 @@ function CoachPage() {
       if (result?.text?.trim()) {
         outcomeOffline = false;
         return {
-          text: formatCoachReply(result.text.trim(), result.structured),
+          text: formatCoachReply(result.text.trim(), structured),
           offline: false as const,
         };
       }
@@ -473,18 +477,20 @@ function CoachPage() {
       ) : null}
 
       <div className="space-y-3">
-        {state.chat.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
-              m.role === "coach"
-                ? "surface-glass text-foreground"
-                : "ml-auto bg-primary text-primary-foreground glow-primary"
-            }`}
-          >
-            {m.text}
-          </div>
-        ))}
+        <VirtualMessageList
+          items={state.chat}
+          renderItem={(m) => (
+            <div
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
+                m.role === "coach"
+                  ? "surface-glass text-foreground"
+                  : "ml-auto bg-primary text-primary-foreground glow-primary"
+              }`}
+            >
+              {m.text}
+            </div>
+          )}
+        />
         {busy ? (
           <div className="surface-glass max-w-[85%] animate-pulse px-4 py-3 text-sm text-muted-foreground">
             …

@@ -1,4 +1,4 @@
-import { NumberInput } from "@mantine/core";
+import { memo } from "react";
 import { ChevronLeft, ChevronRight, Minus, Plus, RefreshCw, SkipForward, ThumbsDown, ThumbsUp, Wrench } from "lucide-react";
 import type { Exercise } from "@/data/exercises";
 import type { PlannedExercise } from "@/lib/engine/plan";
@@ -6,6 +6,8 @@ import type { SetLog } from "@/lib/types";
 import { MuscleArt } from "@/components/session/muscle-art";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { exerciseWorkoutNote } from "@/lib/cms";
 import { exerciseInstructions, resolveExerciseMedia } from "@/lib/soldiers-media";
@@ -16,36 +18,7 @@ import { cn } from "@/lib/utils";
 
 export type SessionEffortScale = "rpe" | "rir";
 
-function reasonChips(codes: string[] | undefined) {
-  if (!codes?.length) return [];
-  return codes.map((code) => PROGRESSION_CODE_LABEL[code as ProgressionReasonCode] ?? code);
-}
-
-export function ExerciseStage({
-  planned,
-  exercise,
-  setLog,
-  setIndex,
-  totalSets,
-  exIndex,
-  totalExercises,
-  preference,
-  effortScale,
-  partnerName,
-  restAfterThisSet,
-  onChangeSet,
-  onCompleteSet,
-  onSkipSet,
-  onAddSet,
-  onRepeatLastSet,
-  onSwap,
-  onBusyMachine,
-  onPrevExercise,
-  onNextExercise,
-  onPreference,
-  onEffortScale,
-  homeBar,
-}: {
+export type ExerciseStageProps = {
   planned: PlannedExercise;
   exercise: Exercise | undefined;
   setLog: SetLog;
@@ -71,7 +44,38 @@ export function ExerciseStage({
   onEffortScale: (scale: SessionEffortScale) => void;
   /** Use 15 kg bar (casa / short bar) instead of 20 kg Olympic. */
   homeBar?: boolean;
-}) {
+};
+
+function reasonChips(codes: ProgressionReasonCode[] | undefined) {
+  if (!codes?.length) return [];
+  return codes.map((code) => PROGRESSION_CODE_LABEL[code] ?? code);
+}
+
+export const ExerciseStage = memo(function ExerciseStage({
+  planned,
+  exercise,
+  setLog,
+  setIndex,
+  totalSets,
+  exIndex,
+  totalExercises,
+  preference,
+  effortScale,
+  partnerName,
+  restAfterThisSet,
+  onChangeSet,
+  onCompleteSet,
+  onSkipSet,
+  onAddSet,
+  onRepeatLastSet,
+  onSwap,
+  onBusyMachine,
+  onPrevExercise,
+  onNextExercise,
+  onPreference,
+  onEffortScale,
+  homeBar,
+}: ExerciseStageProps) {
   const group = exercise?.group ?? "peito";
   const cueNote = exercise ? exerciseWorkoutNote(exercise.id) : undefined;
   const media = exercise ? resolveExerciseMedia(exercise.id, exercise.mediaUrl) : undefined;
@@ -259,15 +263,16 @@ export function ExerciseStage({
         </div>
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-1">
-            <NumberInput
+            <Label className="text-[0.65rem] text-muted-foreground">Reps</Label>
+            <Input
               key={`${planned.exerciseId}-${setIndex}-reps`}
-              label="Reps"
+              type="number"
+              inputMode="numeric"
               value={setLog.reps}
-              onChange={(v) => onChangeSet({ reps: typeof v === "number" ? v : 0 })}
+              onChange={(e) => onChangeSet({ reps: Number(e.target.value) || 0 })}
               min={0}
               step={1}
-              className="w-full"
-              styles={{ input: { textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: "1.25rem" } }}
+              className="text-center font-[Anton,sans-serif] text-xl"
             />
             <div className="flex gap-1">
               <Button type="button" variant="outline" className="h-8 flex-1" onClick={() => onChangeSet({ reps: Math.max(0, setLog.reps - 1) })}>
@@ -279,16 +284,16 @@ export function ExerciseStage({
             </div>
           </div>
           <div className="flex flex-1 flex-col gap-1">
-            <NumberInput
+            <Label className="text-[0.65rem] text-muted-foreground">Kg</Label>
+            <Input
               key={`${planned.exerciseId}-${setIndex}-kg`}
-              label="Kg"
+              type="number"
+              inputMode="decimal"
               value={setLog.weightKg}
-              onChange={(v) => onChangeSet({ weightKg: typeof v === "number" ? v : 0 })}
+              onChange={(e) => onChangeSet({ weightKg: Number(e.target.value) || 0 })}
               min={0}
               step={2.5}
-              decimalScale={1}
-              className="w-full"
-              styles={{ input: { textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: "1.25rem" } }}
+              className="text-center font-[Anton,sans-serif] text-xl"
             />
             <div className="flex gap-1">
               <Button type="button" variant="outline" className="h-8 flex-1" onClick={() => onChangeSet({ weightKg: Math.max(0, setLog.weightKg - 2.5) })}>
@@ -305,33 +310,41 @@ export function ExerciseStage({
             ) : null}
           </div>
           {effortScale === "rpe" ? (
-            <NumberInput
-              key={`${planned.exerciseId}-${setIndex}-rpe`}
-              label="RPE"
-              value={setLog.rpe ?? ""}
-              onChange={(v) => {
-                if (typeof v === "number") onChangeSet({ rpe: Math.min(10, Math.max(1, v)) });
-              }}
-              min={1}
-              max={10}
-              step={1}
-              className="w-20"
-              styles={{ input: { textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: "1.1rem" } }}
-            />
+            <div className="flex w-20 flex-col gap-1">
+              <Label className="text-[0.65rem] text-muted-foreground">RPE</Label>
+              <Input
+                key={`${planned.exerciseId}-${setIndex}-rpe`}
+                type="number"
+                inputMode="numeric"
+                value={setLog.rpe ?? ""}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) onChangeSet({ rpe: Math.min(10, Math.max(1, v)) });
+                }}
+                min={1}
+                max={10}
+                step={1}
+                className="text-center font-[Anton,sans-serif] text-lg"
+              />
+            </div>
           ) : (
-            <NumberInput
-              key={`${planned.exerciseId}-${setIndex}-rir`}
-              label="RIR"
-              value={setLog.rir ?? ""}
-              onChange={(v) => {
-                if (typeof v === "number") onChangeSet({ rir: Math.min(5, Math.max(0, v)) });
-              }}
-              min={0}
-              max={5}
-              step={1}
-              className="w-20"
-              styles={{ input: { textAlign: "center", fontFamily: "Anton, sans-serif", fontSize: "1.1rem" } }}
-            />
+            <div className="flex w-20 flex-col gap-1">
+              <Label className="text-[0.65rem] text-muted-foreground">RIR</Label>
+              <Input
+                key={`${planned.exerciseId}-${setIndex}-rir`}
+                type="number"
+                inputMode="numeric"
+                value={setLog.rir ?? ""}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) onChangeSet({ rir: Math.min(5, Math.max(0, v)) });
+                }}
+                min={0}
+                max={5}
+                step={1}
+                className="text-center font-[Anton,sans-serif] text-lg"
+              />
+            </div>
           )}
         </div>
 
@@ -383,4 +396,4 @@ export function ExerciseStage({
       </div>
     </div>
   );
-}
+});

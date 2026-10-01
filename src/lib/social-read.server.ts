@@ -364,14 +364,15 @@ export async function uploadCheckinImageServer(
   const identity = await assertAccess(deviceId);
   if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { normalizeImageUpload } = await import("@/lib/validation/common");
 
-  const ext = (fileExt || "jpg").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "jpg";
+  const { contentType: mime, fileExt: ext } = normalizeImageUpload({ contentType, fileExt });
   const path = `${identity.deviceId}/${Date.now()}.${ext}`;
   const buf = Buffer.from(bytesBase64, "base64");
   if (buf.length > 5 * 1024 * 1024) throw new Error("Arquivo muito grande");
 
   const { error } = await supabaseAdmin.storage.from("checkins").upload(path, buf, {
-    contentType: contentType || "image/jpeg",
+    contentType: mime,
     upsert: true,
   });
   if (error) {

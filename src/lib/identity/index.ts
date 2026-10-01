@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { adminDbLoose } from "@/lib/db-admin";
+import { adminDbLoose, type AdminDb } from "@/lib/db-admin";
 
 export type AppUser = {
   id: string;
@@ -7,9 +6,8 @@ export type AppUser = {
   authUserId: string | null;
 };
 
-async function adminDb(): Promise<SupabaseClient | null> {
-  const loose = await adminDbLoose();
-  return loose as unknown as SupabaseClient | null;
+async function adminDb(): Promise<AdminDb | null> {
+  return adminDbLoose();
 }
 
 function nowIso() {
@@ -25,7 +23,7 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
   const { data: existing } = await db
     .from("users")
     .select("id, email, auth_user_id")
-    .ilike("email", normalized)
+    .eq("email", normalized)
     .maybeSingle();
   if (!existing) return null;
   return {
@@ -56,7 +54,7 @@ export async function resolveOrCreateUserByEmail(email: string): Promise<AppUser
     const { data: again } = await db
       .from("users")
       .select("id, email, auth_user_id")
-      .ilike("email", normalized)
+      .eq("email", normalized)
       .maybeSingle();
     if (!again) {
       console.error("resolveOrCreateUserByEmail failed", error);

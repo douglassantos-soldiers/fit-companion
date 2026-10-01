@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * FASE 18 — decision pipeline unit tests.
  */
@@ -39,7 +38,7 @@ function baseProposal(
     user_id: partial.user_id ?? USER,
     proposed_type: partial.proposed_type,
     proposed_value: partial.proposed_value,
-    reason_codes: partial.reason_codes ?? ["test"],
+    reason_codes: partial.reason_codes ?? ["sleep_low"],
     confidence: partial.confidence ?? 0.7,
     source: "agent",
     created_at: partial.created_at ?? new Date().toISOString(),

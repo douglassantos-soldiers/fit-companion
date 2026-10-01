@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * RAG infrastructure — unit tests (fixtures + production corpus).
  */
@@ -121,7 +120,8 @@ describe("RAG Infrastructure", () => {
 
   it("seedProductionCorpus indexes curated knowledge", async () => {
     const results = await seedProductionCorpus();
-    expect(results.length).toBeGreaterThan(5);
+    const count = Array.isArray(results) ? results.length : results.documents;
+    expect(count).toBeGreaterThan(5);
     const { retrieval } = await retrieveKnowledge({
       query: "Decision Engine Living Plan Proposal",
       domains: ["performance"],

@@ -1,12 +1,12 @@
-// @ts-nocheck
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getGovernanceSafetyFeed } from "@/lib/governance-console.functions";
 import { GovernanceShell } from "@/features/governance/shell";
+import type { ConsoleAuditRow } from "@/ai/governance/console-helpers";
 
 export function GovernanceSafetyPage() {
   const load = useServerFn(getGovernanceSafetyFeed);
-  const [events, setEvents] = useState<Record<string, unknown>[]>([]);
+  const [events, setEvents] = useState<ConsoleAuditRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,14 +28,13 @@ export function GovernanceSafetyPage() {
       {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
       <ul className="mt-4 divide-y divide-zinc-800 rounded border border-zinc-800">
         {events.map((e) => (
-          <li key={String(e["audit_id"])} className="px-3 py-2 text-xs">
+          <li key={e.audit_id} className="px-3 py-2 text-xs">
             <p className="font-mono text-zinc-200">
-              {String(e["kind"])} · {String(e["status"] ?? "")}
+              {e.kind} · {e.status ?? ""}
             </p>
             <p className="text-zinc-500">
-              {String(e["agent_id"] ?? "")} · {String(e["user_id"] ?? "")} ·{" "}
-              {String((e["metadata"] as Record<string, unknown> | null)?.["error_code"] ?? "")} ·{" "}
-              {String(e["summary"] ?? "")}
+              {e.agent_id ?? ""} · {e.user_id} · {e.metadata?.["error_code"] ?? ""} ·{" "}
+              {e.summary ?? ""}
             </p>
           </li>
         ))}

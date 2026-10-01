@@ -36,6 +36,19 @@ export type ShareCardKind = "treino" | "pr" | "streak" | "desafio" | "evolucao" 
 
 export const KIND_LABEL: Record<ShareCardKind, string> = { ...SHARE_KIND_LABEL };
 
+export type ShareCardProps = {
+  athleteName: string;
+  title: string;
+  volumeKg: number;
+  durationMin: number;
+  streak: number;
+  score: number;
+  dateLabel: string;
+  xp?: number;
+  prCount?: number;
+  rankLabel?: string;
+};
+
 export function ShareCard({
   athleteName,
   title,
@@ -47,18 +60,7 @@ export function ShareCard({
   xp,
   prCount,
   rankLabel,
-}: {
-  athleteName: string;
-  title: string;
-  volumeKg: number;
-  durationMin: number;
-  streak: number;
-  score: number;
-  dateLabel: string;
-  xp?: number;
-  prCount?: number;
-  rankLabel?: string;
-}) {
+}: ShareCardProps) {
   return (
     <div className="relative overflow-hidden rounded-[1.6rem] bg-[#0A0A0A] p-5 text-white">
       <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-[#E10600]/25 blur-2xl" />
@@ -80,6 +82,15 @@ export function ShareCard({
   );
 }
 
+export type PeriodShareCardProps = {
+  athleteName: string;
+  title: string;
+  sessions: number;
+  volumeKg: number;
+  prCount: number;
+  consistencyPct: number;
+};
+
 export function PeriodShareCard({
   athleteName,
   title,
@@ -87,14 +98,7 @@ export function PeriodShareCard({
   volumeKg,
   prCount,
   consistencyPct,
-}: {
-  athleteName: string;
-  title: string;
-  sessions: number;
-  volumeKg: number;
-  prCount: number;
-  consistencyPct: number;
-}) {
+}: PeriodShareCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div>
