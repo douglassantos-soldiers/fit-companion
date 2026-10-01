@@ -15,6 +15,40 @@ function heatOpacity(freshness: number, empty?: boolean): number {
   return Math.max(0.25, Math.min(0.95, 1 - freshness / 140));
 }
 
+/** Shared silhouette geometry — viewBox 160×220, vertical axis x=80. */
+const NECK_BASE =
+  "M68 44c4-1 20-1 24 0 6 4 8 12 6 18H62c-2-6 0-14 6-18z";
+
+/** Shoulders / traps — symmetric cape under the neck. */
+const PATH_OMBROS =
+  "M46 52c2-6 10-10 18-10h32c8 0 16 4 18 10l6 18c1 4-1 6-5 6H45c-4 0-6-2-5-6l6-18z";
+
+/** Chest — centered under shoulders. */
+const PATH_PEITO =
+  "M56 74c8-5 40-5 48 0 5 6 6 18 3 28-8 5-38 5-46 0-3-10-2-22-5-28z";
+
+/** Arms (front) — mirrored biceps. */
+const PATH_BICEPS =
+  "M38 72c-5 1-7 8-6 18l2 20c1 4 5 5 8 3 2-2 3-5 2-9l-2-22c-1-5-1-10-4-10z" +
+  "M122 72c5 1 7 8 6 18l-2 20c-1 4-5 5-8 3-2-2-3-5-2-9l2-22c1-5 1-10 4-10z";
+
+/** Core / abs column. */
+const PATH_CORE = "M64 102c5-2 27-2 32 0v34c-5 4-27 4-32 0V102z";
+
+/** Legs — mirrored. */
+const PATH_PERNAS =
+  "M58 136c5 0 14 2 16 8v52c-3 5-14 5-18 0V144c0-4 1-8 2-8z" +
+  "M102 136c-5 0-14 2-16 8v52c3 5 14 5 18 0V144c0-4-1-8-2-8z";
+
+/** Back mass — centered diamond under shoulders. */
+const PATH_COSTAS =
+  "M54 72c10-8 42-8 52 0 6 12 6 36 0 50-8 5-36 5-44 0-6-14-6-38-8-50z";
+
+/** Arms (back) — mirrored triceps. */
+const PATH_TRICEPS =
+  "M38 76c-5 2-6 10-4 20l2 18c2 3 5 4 8 1 2-2 2-5 1-9l-2-20c-1-5-1-10-5-10z" +
+  "M122 76c5 2 6 10 4 20l-2 18c-2 3-5 4-8 1-2-2-2-5-1-9l2-20c1-5 1-10 5-10z";
+
 /**
  * Front/back body silhouette with muscle-group heat by recovery freshness.
  */
@@ -40,38 +74,18 @@ export function MuscleHeatmap({
   const interactive = Boolean(onSelectMuscle);
 
   const regions: Array<{ group: MuscleGroup; d: string }> = [
-    {
-      group: "ombros",
-      d: "M52 48c-10 2-18 12-20 22 8 4 16 6 28 6 12 0 20-2 28-6-2-10-10-20-20-22-5-1-11-1-16 0z",
-    },
-    {
-      group: "peito",
-      d: "M60 72c8-4 24-4 32 0 4 8 4 20 0 28-8 4-24 4-32 0-4-8-4-20 0-28z",
-    },
-    {
-      group: "biceps",
-      d: "M38 78c-6 2-10 14-8 28 4 4 10 4 14 0 0-12 0-24-2-28-1-2-3-2-4 0z M114 78c6 2 10 14 8 28-4 4-10 4-14 0 0-12 0-24 2-28 1-2 3-2 4 0z",
-    },
-    { group: "core", d: "M68 100c6-2 20-2 26 0v36c-6 4-20 4-26 0V100z" },
-    {
-      group: "pernas",
-      d: "M64 138c4 0 10 2 12 8v48c-4 4-12 4-16 0V146c0-4 2-8 4-8z M86 138c4 0 10 2 12 8v48c-4 4-12 4-16 0V146c0-4 2-8 4-8z",
-    },
+    { group: "ombros", d: PATH_OMBROS },
+    { group: "peito", d: PATH_PEITO },
+    { group: "biceps", d: PATH_BICEPS },
+    { group: "core", d: PATH_CORE },
+    { group: "pernas", d: PATH_PERNAS },
   ];
 
   const backRegions: Array<{ group: MuscleGroup; d: string }> = [
-    {
-      group: "costas",
-      d: "M58 70c10-8 26-8 36 0 6 14 4 40-4 52-8 4-24 4-32 0-8-12-10-38-0-52z",
-    },
-    {
-      group: "triceps",
-      d: "M40 82c-4 4-6 18-2 30 4 2 10 2 12-2-2-10-2-22-4-28-1-2-4-2-6 0z M112 82c4 4 6 18 2 30-4 2-10 2-12-2 2-10 2-22 4-28 1-2 4-2 6 0z",
-    },
-    {
-      group: "ombros",
-      d: "M52 48c-10 2-18 12-20 22 8 4 16 6 28 6 12 0 20-2 28-6-2-10-10-20-20-22-5-1-11-1-16 0z",
-    },
+    { group: "ombros", d: PATH_OMBROS },
+    { group: "costas", d: PATH_COSTAS },
+    { group: "triceps", d: PATH_TRICEPS },
+    { group: "pernas", d: PATH_PERNAS },
   ];
 
   const renderPath = (group: MuscleGroup, d: string) => {
@@ -123,11 +137,7 @@ export function MuscleHeatmap({
             aria-label="Mapa muscular frontal"
           >
             <ellipse cx="80" cy="28" rx="14" ry="16" fill="currentColor" className="text-muted/40" />
-            <path
-              d="M66 44c4-2 24-2 28 0 8 6 10 14 8 22H58c-2-8 0-16 8-22z"
-              fill="currentColor"
-              className="text-muted/30"
-            />
+            <path d={NECK_BASE} fill="currentColor" className="text-muted/30" />
             {regions.map(({ group, d }) => renderPath(group, d))}
           </svg>
         </figure>
@@ -143,16 +153,8 @@ export function MuscleHeatmap({
             aria-label="Mapa muscular costas"
           >
             <ellipse cx="80" cy="28" rx="14" ry="16" fill="currentColor" className="text-muted/40" />
-            <path
-              d="M66 44c4-2 24-2 28 0 8 6 10 14 8 22H58c-2-8 0-16 8-22z"
-              fill="currentColor"
-              className="text-muted/30"
-            />
+            <path d={NECK_BASE} fill="currentColor" className="text-muted/30" />
             {backRegions.map(({ group, d }) => renderPath(group, d))}
-            {renderPath(
-              "pernas",
-              "M64 138c4 0 10 2 12 8v48c-4 4-12 4-16 0V146c0-4 2-8 4-8z M86 138c4 0 10 2 12 8v48c-4 4-12 4-16 0V146c0-4 2-8 4-8z",
-            )}
           </svg>
         </figure>
       </div>
