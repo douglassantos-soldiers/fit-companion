@@ -1,8 +1,8 @@
 # AI Production Readiness Report
 
-Generated: 2026-10-01T16:09:05.577Z
+Generated: 2026-10-01T16:11:18.898Z
 Report version: fase23_10_v1
-Commit: `41e478fcd503de591b2e9285a61884328cee8fa8`
+Commit: `f30a3eceeedfbc2209cee2fdbecc9018a456d713`
 Environment: **production**
 **production_ready: true**
 
@@ -14,7 +14,7 @@ Environment: **production**
   "ok": true,
   "passed": 28,
   "failed": 0,
-  "duration_ms": 9429,
+  "duration_ms": 8647,
   "command": "node C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\node_modules\\vitest\\vitest.mjs run src/ai/certification/security-attack.test.ts src/ai/certification/data-integrity.test.ts src/ai/certification/failure-modes.test.ts src/ai/certification/runtime-controls.test.ts src/ai/certification/certification-integrity.test.ts --reporter=json --outputFile=C:\\Users\\Douglas - Performanc\\Downloads\\Fit Companion\\docs\\certification\\vitest-suite.json",
   "error": null
 }
