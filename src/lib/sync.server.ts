@@ -354,6 +354,24 @@ async function pullForUserId(
   const db = await adminDbLoose();
   if (!db || !userId) return null;
 
+  const {
+    PROFILE_PULL_COLS,
+    SESSION_PULL_COLS,
+    WEIGHT_PULL_COLS,
+    DAILY_METRICS_PULL_COLS,
+    SUPPLEMENT_LOG_PULL_COLS,
+    APP_STATE_PULL_COLS,
+    MEAL_ENTRY_PULL_COLS,
+    DAY_CHECKIN_PULL_COLS,
+    DOSE_LOG_PULL_COLS,
+    MEASUREMENT_PULL_COLS,
+    PHOTO_PULL_COLS,
+    PULL_PHOTOS_LIMIT,
+    PULL_DOSE_LOGS_LIMIT,
+    pullHistorySinceIso,
+  } = await import("@/lib/sync/pull-projections");
+  const since = pullHistorySinceIso();
+
   const [
     profileRes,
     sessionsRes,
@@ -367,29 +385,60 @@ async function pullForUserId(
     measurementsRes,
     photosRes,
   ] = await Promise.all([
-    db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-    db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
-    db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
-    db.from("daily_metrics").select("*").eq("user_id", userId),
-    db.from("supplement_logs").select("*").eq("user_id", userId),
-    db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
-    db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
-    db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db.from("profiles").select(PROFILE_PULL_COLS).eq("user_id", userId).maybeSingle(),
+    db
+      .from("sessions")
+      .select(SESSION_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: false }),
+    db
+      .from("weights")
+      .select(WEIGHT_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: true }),
+    db
+      .from("daily_metrics")
+      .select(DAILY_METRICS_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since),
+    db
+      .from("supplement_logs")
+      .select(SUPPLEMENT_LOG_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since),
+    db.from("app_state").select(APP_STATE_PULL_COLS).eq("user_id", userId).maybeSingle(),
+    db
+      .from("meal_entries")
+      .select(MEAL_ENTRY_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: true }),
+    db
+      .from("day_checkins")
+      .select(DAY_CHECKIN_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: false }),
     db
       .from("supplement_dose_logs")
-      .select("*")
+      .select(DOSE_LOG_PULL_COLS)
       .eq("user_id", userId)
-      .order("taken_at", { ascending: true }),
+      .order("taken_at", { ascending: false })
+      .limit(PULL_DOSE_LOGS_LIMIT),
     db
       .from("body_measurements")
-      .select("*")
+      .select(MEASUREMENT_PULL_COLS)
       .eq("user_id", userId)
+      .gte("date", since)
       .order("date", { ascending: true }),
     db
       .from("progress_photos")
-      .select("*")
+      .select(PHOTO_PULL_COLS)
       .eq("user_id", userId)
-      .order("taken_on", { ascending: true }),
+      .order("taken_on", { ascending: false })
+      .limit(PULL_PHOTOS_LIMIT),
   ]);
 
   // day_checkins / dose logs may be missing before migration — ignore table errors

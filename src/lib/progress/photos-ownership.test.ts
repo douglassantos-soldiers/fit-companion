@@ -24,9 +24,10 @@ describe("progress photo ownership (P1-13)", () => {
 });
 
 describe("verifyPurchase rate limit (P1-9)", () => {
-  it("uses distributed AI rate-limit store, not process Map", () => {
+  it("uses distributed burst limit (not process Map)", () => {
     const src = readFileSync("src/lib/shopify.functions.ts", "utf8");
-    expect(src).toContain("resolveAiRateLimitStore");
+    expect(src).toContain("consumeNamedBurst");
+    expect(src).toContain("@/lib/security/burst-limit");
     expect(src).toContain("shopify:verify:");
     expect(src).not.toMatch(/const rateHits = new Map/);
   });

@@ -631,18 +631,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ensureOutboxListeners();
         void flushOutbox().catch(() => undefined);
 
-        // Identity Engine: ensure device has a persistent user (server-side)
+        // Identity Engine: ensure device has a persistent user (server-side).
+        // When we already have a local userId, refresh identity in parallel with pull.
         let resolvedUserId: string | null = local.userId ?? null;
-        try {
-          const ident = await ensureIdentityForDevice({
-            data: { deviceId: id, platform: "web" },
-          });
-          if (ident.ok && ident.userId) resolvedUserId = ident.userId;
-        } catch (e) {
-          console.warn("ensureIdentityForDevice failed", e);
-        }
+        const identityTask = (async (): Promise<string | null> => {
+          try {
+            const ident = await ensureIdentityForDevice({
+              data: { deviceId: id, platform: "web" },
+            });
+            if (ident.ok && ident.userId) return ident.userId;
+          } catch (e) {
+            console.warn("ensureIdentityForDevice failed", e);
+          }
+          return local.userId ?? null;
+        })();
 
-        const remote = await pullState(id);
+        let remote: Awaited<ReturnType<typeof pullState>>;
+        if (local.userId) {
+          const [uid, pull] = await Promise.all([identityTask, pullState(id)]);
+          resolvedUserId = uid ?? local.userId;
+          remote = pull;
+        } else {
+          resolvedUserId = await identityTask;
+          remote = await pullState(id);
+        }
 
         if (remote) {
           skipPush.current = true;

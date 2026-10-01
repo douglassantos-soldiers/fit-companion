@@ -50,12 +50,5 @@ test.describe("coach deterministic path (gated)", () => {
   });
 });
 
-test.describe("authenticated flows", () => {
-  test.skip(!process.env["E2E_ACCESS_EMAIL"], "Requires E2E_ACCESS_EMAIL + entitlement (PENDING OPERATOR)");
-
-  test("login → home → training shell", async ({ page }) => {
-    test.fail(true, "Wire magic-link / access redeem when operator secrets available");
-    await page.goto("/acesso", { waitUntil: "domcontentloaded" });
-    await expect(page.locator("body")).toBeVisible();
-  });
-});
+// Authenticated flows live in e2e/authenticated.spec.ts
+// (E2E_ACCESS_EMAIL + E2E_ACCESS_PASSWORD). Do not duplicate stubs here.

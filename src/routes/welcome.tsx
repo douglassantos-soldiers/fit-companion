@@ -31,7 +31,13 @@ function WelcomePage() {
       <div className="pointer-events-none absolute -left-20 top-24 size-72 rounded-full bg-primary/25 blur-3xl" />
       {hero.posterUrl || hero.webmUrl || hero.mp4Url ? (
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[42vh] opacity-40">
-          <SoldiersMediaFrame media={hero} alt="" className="h-full w-full" imgClassName="object-cover" />
+          <SoldiersMediaFrame
+            media={hero}
+            alt=""
+            className="h-full w-full"
+            imgClassName="object-cover"
+            autoPlay
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         </div>
       ) : null}

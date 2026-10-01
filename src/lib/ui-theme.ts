@@ -5,18 +5,17 @@
  * - Kibo UI → Spinner
  * - HeroUI → AppShell bottom tabs / chips (CSS tokens only — no JS ThemeProvider in v3)
  * - Mantine → NumberInput + dense dialogs
- * - MUI → ToggleButtonGroup (RPE)
+ * - (MUI removed from root — no ToggleButtonGroup in product tree)
  * - Headless UI → SoldiersOverlay (meal / swap / summary)
  * - DaisyUI → badge/stats utilities (themes: false)
  *
  * Dual-source tokens:
  * - CSS oklch in styles.css → Shadcn / DaisyUI v5 / HeroUI
- * - Hex palette below → MUI / Mantine (Emotion & Mantine don't read Tailwind oklch)
+ * - Hex palette below → Mantine (Emotion/Mantine don't read Tailwind oklch)
  * Hex values are calibrated to the dark oklch tokens in styles.css.
  *
  * App is always dark (Soldiers). No light-mode runtime toggle.
  */
-import { createTheme } from "@mui/material/styles";
 import { createTheme as createMantineTheme } from "@mantine/core";
 
 /** oklch(0.86 0.18 96) */
@@ -41,84 +40,6 @@ export const SOLDIERS_BORDER = "#383838";
 export const SOLDIERS_SUCCESS = "#3FC168";
 /** oklch(0.6 0.22 25) */
 export const SOLDIERS_DESTRUCTIVE = "#E62B34";
-
-export const muiTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: SOLDIERS_YELLOW,
-      contrastText: SOLDIERS_PRIMARY_FG,
-    },
-    secondary: {
-      main: SOLDIERS_SECONDARY,
-      contrastText: SOLDIERS_FG,
-    },
-    background: {
-      default: SOLDIERS_BG,
-      paper: SOLDIERS_CARD,
-    },
-    text: {
-      primary: SOLDIERS_FG,
-      secondary: SOLDIERS_MUTED_FG,
-    },
-    divider: SOLDIERS_BORDER,
-    success: {
-      main: SOLDIERS_SUCCESS,
-      contrastText: SOLDIERS_PRIMARY_FG,
-    },
-    error: {
-      main: SOLDIERS_DESTRUCTIVE,
-      contrastText: SOLDIERS_FG,
-    },
-  },
-  typography: {
-    fontFamily: '"Barlow", system-ui, sans-serif',
-    h1: { fontFamily: '"Anton", "Barlow Condensed", sans-serif', textTransform: "uppercase" },
-    h2: { fontFamily: '"Anton", "Barlow Condensed", sans-serif', textTransform: "uppercase" },
-    h3: { fontFamily: '"Anton", "Barlow Condensed", sans-serif', textTransform: "uppercase" },
-    button: { textTransform: "none", fontWeight: 600 },
-  },
-  shape: { borderRadius: 12 },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        // Do not replace Soldiers body background/font from styles.css @layer base
-        body: {
-          backgroundColor: "transparent",
-          color: "inherit",
-          fontFamily: "inherit",
-        },
-      },
-    },
-    MuiButtonBase: {
-      defaultProps: { disableRipple: false },
-    },
-    MuiToggleButton: {
-      styleOverrides: {
-        root: {
-          borderColor: SOLDIERS_BORDER,
-          color: SOLDIERS_MUTED_FG,
-          textTransform: "none",
-          "&.Mui-selected": {
-            backgroundColor: SOLDIERS_YELLOW,
-            color: SOLDIERS_PRIMARY_FG,
-            "&:hover": {
-              backgroundColor: SOLDIERS_YELLOW,
-              filter: "brightness(0.95)",
-            },
-          },
-        },
-      },
-    },
-    MuiToggleButtonGroup: {
-      styleOverrides: {
-        grouped: {
-          borderColor: SOLDIERS_BORDER,
-        },
-      },
-    },
-  },
-});
 
 export const mantineTheme = createMantineTheme({
   primaryColor: "yellow",

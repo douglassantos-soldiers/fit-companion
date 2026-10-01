@@ -3,11 +3,9 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { AnimatePresence, motion } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
@@ -86,7 +84,6 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
@@ -100,17 +97,7 @@ function RootComponent() {
           <AccessSessionProvider>
             <AccessGate>
               <AppErrorBoundary boundary="authenticated_shell">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={pathname}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Outlet />
-                  </motion.div>
-                </AnimatePresence>
+                <Outlet />
               </AppErrorBoundary>
             </AccessGate>
           </AccessSessionProvider>

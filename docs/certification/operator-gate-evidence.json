@@ -1,6 +1,6 @@
 {
-  "at": "2026-09-30T22:40:07.203Z",
-  "head": "355852494db4903fcf57bbdb0a15affcdec02e55",
+  "at": "2026-10-01T12:37:57.042Z",
+  "head": "8f4ff34934f33882124d1f8a414eacf32f3f0cd4",
   "checks": [
     {
       "name": "local_vitest_operator_suite",
@@ -30,22 +30,32 @@
     {
       "name": "e2e_authenticated",
       "status": "pending_operator",
-      "detail": "E2E_ACCESS_EMAIL absent — authenticated flows skipped"
+      "detail": "Set E2E_ACCESS_EMAIL + E2E_ACCESS_PASSWORD (entitlement) or record pass in operator-live-proofs.json after manual Playwright run"
     },
     {
       "name": "account_deletion_live",
       "status": "pending_operator",
-      "detail": "Requires controlled test user + service_role; unit BEFORE/AFTER already PASS"
+      "detail": "Fill docs/certification/operator-live-proofs.json after controlled wipe BEFORE/AFTER (service_role)"
     },
     {
       "name": "backup_restore_drill",
       "status": "pending_operator",
-      "detail": "See docs/backup-dr.md — restore not executed in this environment"
+      "detail": "Fill operator-live-proofs.json after docs/backup-dr.md restore drill (dated)"
+    },
+    {
+      "name": "shopify_cron_staging",
+      "status": "pending_operator",
+      "detail": "Staging webhook HMAC + cron daily-pushes smoke — record in operator-live-proofs.json"
+    },
+    {
+      "name": "leaked_password_protection",
+      "status": "pending_operator",
+      "detail": "Enable leaked-password protection in Supabase Auth dashboard — record in operator-live-proofs.json"
     },
     {
       "name": "wearables_integration",
-      "status": "pending_operator",
-      "detail": "Credentials present check only — full OAuth still operator-owned"
+      "status": "deferred_beta",
+      "detail": "OAuth smoke deferred (acceptable for beta). Not a release-blocking check."
     }
   ]
 }

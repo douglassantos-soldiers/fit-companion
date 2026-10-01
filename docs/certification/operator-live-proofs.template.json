@@ -1,0 +1,39 @@
+{
+  "_comment": "Copy to operator-live-proofs.json (same folder). Set status to pass only after real dated evidence. Gate reads this file; never invent PASS.",
+  "head_note": "Before certifying, npm run gate:operator so operator-gate-evidence.json.head equals the published git SHA (not an old head like 3558524).",
+  "rls_remote_probe": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Optional override if probe cannot run in CI — prefer: node scripts/validate-rls-remote.mjs with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY"
+  },
+  "rag_remote_probe": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Optional override after npm run rag:seed against production"
+  },
+  "e2e_authenticated": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Optional override after: E2E_ACCESS_EMAIL=… E2E_ACCESS_PASSWORD=… npx playwright test e2e/authenticated.spec.ts"
+  },
+  "account_deletion_live": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Required: controlled test user wipe — paste BEFORE row counts and AFTER zero/absent rows (service_role)"
+  },
+  "backup_restore_drill": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Required: follow docs/backup-dr.md — staging restore + smoke checklist, dated"
+  },
+  "shopify_cron_staging": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Required: Shopify webhook HMAC accepted + /api/cron/daily-pushes with secret on staging"
+  },
+  "leaked_password_protection": {
+    "status": "pending_operator",
+    "at": "",
+    "detail": "Required: Supabase Auth → leaked password protection enabled"
+  }
+}

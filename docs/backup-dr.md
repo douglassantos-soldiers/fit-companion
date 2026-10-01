@@ -32,3 +32,15 @@
 ## Evidence
 
 A real restore was **not** executed in this audit environment → mark **PENDING OPERATOR**.
+
+After a successful staging restore drill, record it in `docs/certification/operator-live-proofs.json` (from the template):
+
+```json
+"backup_restore_drill": {
+  "status": "pass",
+  "at": "2026-10-01T12:00:00.000Z",
+  "detail": "PITR restore to staging project X; RLS smoke + access session + sync push OK"
+}
+```
+
+Then re-run `npm run gate:operator` so `operator-gate-evidence.json.head` equals the **published** git SHA (never reuse a stale head).

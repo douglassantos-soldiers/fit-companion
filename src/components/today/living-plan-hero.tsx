@@ -130,7 +130,7 @@ export function LivingPlanHero({
       <section className="surface-glass relative mb-4 overflow-hidden">
         {cover && (cover.posterUrl || cover.thumbnailUrl || cover.webmUrl || cover.mp4Url) ? (
           <div className="relative h-40">
-            <SoldiersMediaFrame media={cover} alt={plan.workout.title} className="h-full w-full" />
+            <SoldiersMediaFrame media={cover} alt={plan.workout.title} className="h-full w-full" autoPlay />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-4">
               <p className="eyebrow">Meta do dia</p>

@@ -116,6 +116,7 @@ function HubDetailPage() {
               media={cover}
               alt={hub.name}
               className="mb-4 h-36 w-full rounded-2xl"
+              autoPlay
             />
           );
         })()}

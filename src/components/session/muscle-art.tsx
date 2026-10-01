@@ -42,7 +42,7 @@ export function MuscleArt({
   if (pack && (pack.posterUrl || pack.webmUrl || pack.mp4Url || pack.gifUrl)) {
     return (
       <div className={cn("relative overflow-hidden bg-muted", className)}>
-        <SoldiersMediaFrame media={pack} alt={LABELS[group]} className="h-full w-full" />
+        <SoldiersMediaFrame media={pack} alt={LABELS[group]} className="h-full w-full" autoPlay />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-10">
           <p className="text-display text-sm tracking-[0.25em] text-primary">{LABELS[group]}</p>
         </div>

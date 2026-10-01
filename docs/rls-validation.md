@@ -18,11 +18,17 @@ npx vitest run src/lib/security/rls-validation.test.ts
 ## Remote probe (operator)
 
 ```bash
-# with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+# Required env: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+node scripts/validate-rls-remote.mjs
+# equivalent:
 node --experimental-strip-types scripts/validate-rls-remote.mjs
 ```
 
+Exit codes: `0` PASS · `1` FAIL · `2` migration blocker in repo · `3` PENDING OPERATOR.
+
 Without credentials or without RPC `soldiers_rls_audit`, status is **PENDING OPERATOR** — never invent PASS.
+
+Also invoked by `npm run gate:operator`. After PASS, confirm `docs/certification/operator-gate-evidence.json` `head` matches the published site SHA before certification.
 
 ### Manual SQL (operator)
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ResolvedMedia } from "@/lib/soldiers-media";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +8,8 @@ export function SoldiersMediaFrame({
   alt,
   className,
   imgClassName,
-  autoPlay = true,
+  /** When true, plays muted while in viewport (IntersectionObserver). Default off. */
+  autoPlay = false,
 }: {
   media: ResolvedMedia;
   alt: string;
@@ -17,17 +18,39 @@ export function SoldiersMediaFrame({
   autoPlay?: boolean;
 }) {
   const [videoFailed, setVideoFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoSrc = !videoFailed && (media.webmUrl || media.mp4Url);
   // Poster/thumb first; GIF is last-resort (never the primary format).
   const still = media.posterUrl || media.thumbnailUrl || media.gifUrl;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !autoPlay || !videoSrc) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries[0];
+        if (!hit) return;
+        if (hit.isIntersecting) {
+          void el.play().catch(() => undefined);
+        } else {
+          el.pause();
+        }
+      },
+      { rootMargin: "80px", threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [autoPlay, videoSrc, media.webmUrl, media.mp4Url]);
 
   if (videoSrc) {
     return (
       <div className={cn("relative overflow-hidden bg-[#080808]", className)}>
         <video
+          ref={videoRef}
           className={cn("h-full w-full object-cover", imgClassName)}
           poster={media.posterUrl}
-          autoPlay={autoPlay}
+          preload="none"
           muted
           loop
           playsInline

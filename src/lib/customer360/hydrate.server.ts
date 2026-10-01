@@ -217,6 +217,20 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
   const db = await adminDbLoose();
   if (!db) return base;
 
+  const {
+    PROFILE_PULL_COLS,
+    SESSION_PULL_COLS,
+    WEIGHT_PULL_COLS,
+    DAILY_METRICS_PULL_COLS,
+    SUPPLEMENT_LOG_PULL_COLS,
+    APP_STATE_PULL_COLS,
+    MEAL_ENTRY_PULL_COLS,
+    DAY_CHECKIN_PULL_COLS,
+    DECISION_SNAPSHOT_PULL_COLS,
+    pullHistorySinceIso,
+  } = await import("@/lib/sync/pull-projections");
+  const since = pullHistorySinceIso();
+
   const [
     profileRes,
     sessionsRes,
@@ -228,17 +242,45 @@ export async function hydrateAppStateFromDb(userId: string): Promise<AppState> {
     checkInsRes,
     snapshotsRes,
   ] = await Promise.all([
-    db.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-    db.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }),
-    db.from("weights").select("*").eq("user_id", userId).order("date", { ascending: true }),
-    db.from("daily_metrics").select("*").eq("user_id", userId),
-    db.from("supplement_logs").select("*").eq("user_id", userId),
-    db.from("app_state").select("*").eq("user_id", userId).maybeSingle(),
-    db.from("meal_entries").select("*").eq("user_id", userId).order("date", { ascending: true }),
-    db.from("day_checkins").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    db.from("profiles").select(PROFILE_PULL_COLS).eq("user_id", userId).maybeSingle(),
+    db
+      .from("sessions")
+      .select(SESSION_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: false }),
+    db
+      .from("weights")
+      .select(WEIGHT_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: true }),
+    db
+      .from("daily_metrics")
+      .select(DAILY_METRICS_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since),
+    db
+      .from("supplement_logs")
+      .select(SUPPLEMENT_LOG_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since),
+    db.from("app_state").select(APP_STATE_PULL_COLS).eq("user_id", userId).maybeSingle(),
+    db
+      .from("meal_entries")
+      .select(MEAL_ENTRY_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: true }),
+    db
+      .from("day_checkins")
+      .select(DAY_CHECKIN_PULL_COLS)
+      .eq("user_id", userId)
+      .gte("date", since)
+      .order("date", { ascending: false }),
     db
       .from("decision_context_snapshots")
-      .select("date, payload")
+      .select(DECISION_SNAPSHOT_PULL_COLS)
       .eq("user_id", userId)
       .order("date", { ascending: false })
       .limit(14),
