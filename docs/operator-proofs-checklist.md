@@ -58,3 +58,7 @@ Operator-filled proofs: copy `docs/certification/operator-live-proofs.template.j
 5. `docs/certification/latest.json` must show `production_ready: true` and `environment: production`
 
 Unit/code proofs already PASS in repo (wipe inventory, RLS migration scan, RAG allowlist, photo ownership, identity fail-closed, **users.status 60s cache**).
+
+## Performance backlog (não bloqueia soft launch)
+
+Ver `docs/certification/BETA_SOFT_LAUNCH.md` § Performance. P0 (AccessGate, pull projections, MUI root, sync/outbox) já tratado. Próximo: MUI órfão → bundle multi-UI → Query/loaders → store/localStorage delta.

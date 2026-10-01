@@ -1,6 +1,6 @@
 {
-  "at": "2026-10-01T14:17:40.144Z",
-  "head": "32bfb514c90a028b5fe9d2e53640bd67fa36ebeb",
+  "at": "2026-10-01T16:08:07.562Z",
+  "head": "41e478fcd503de591b2e9285a61884328cee8fa8",
   "checks": [
     {
       "name": "local_vitest_operator_suite",
@@ -25,12 +25,12 @@
     {
       "name": "rag_remote_probe",
       "status": "pass",
-      "detail": "docs=85 chunks=430"
+      "detail": "docs=485 chunks=886"
     },
     {
       "name": "e2e_authenticated",
       "status": "pass",
-      "detail": "playwright e2e/authenticated.spec.ts exit 0"
+      "detail": "2026-10-01T14:13:30.000Z — Playwright e2e/authenticated.spec.ts exit 0 against http://127.0.0.1:3000 (entrar→treino→nutricao→perfil) with entitlement account"
     },
     {
       "name": "account_deletion_live",

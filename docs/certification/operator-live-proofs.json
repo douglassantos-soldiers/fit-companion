@@ -8,8 +8,8 @@
   },
   "rag_remote_probe": {
     "status": "pass",
-    "at": "2026-10-01T14:04:30.000Z",
-    "detail": "AI_RAG_ENV=production npm run rag:seed → docs=85 chunks=430; probe-rag-remote.mjs exit 0"
+    "at": "2026-10-01T16:08:00.000Z",
+    "detail": "gate:operator remote probe docs=485 chunks=886 (store supabase_pgvector_v1); prior seed 430/486 idempotent"
   },
   "e2e_authenticated": {
     "status": "pass",

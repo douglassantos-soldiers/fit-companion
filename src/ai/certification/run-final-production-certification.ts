@@ -41,6 +41,7 @@ export type RunFinalProductionCertificationOpts = RunProductionCertificationOpts
 
 function resolveEnvironment(override?: CertEnvironment): CertEnvironment {
   if (override) return override;
+  if (process.env["AI_CERT_ENV"]?.trim()) return process.env["AI_CERT_ENV"].trim();
   if (process.env["CI"] === "true" || process.env["CI"] === "1") return "ci";
   return "local";
 }

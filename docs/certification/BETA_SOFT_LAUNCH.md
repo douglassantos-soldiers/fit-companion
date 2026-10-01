@@ -21,12 +21,21 @@ Controlled beta after `npm run gate:operator` exit **0**.
 - Wearables OAuth smoke.
 - Optional: PITR restore to a separate staging project (Docker/PITR).
 - Align published URL HMAC secrets (`SHOPIFY_WEBHOOK_SECRET`, `CRON_SECRET`) for live webhook/cron (local staging smoke already PASS).
+- Wipe live matrix além de users/profiles/devices/app_state (training, nutrition, social, photos, AI, push, storage) — inventário TS já amplo; falta prova BEFORE/AFTER por domínio. `auth.users` não é apagado (ver `docs/account-deletion.md`).
+- E2E além do smoke auth (sessão completa, meal CRUD, photo, social, coach, Shopify live).
+
+## Performance — P0 done / backlog pós-soft-launch
+
+**Done:** AccessGate cache, status cache, identity+pull paralelo, pull projections (sem `select *`), history limitado, vídeos lazy, MUI off root, meal AI via gateway, sync/outbox com backoff.
+
+**Next FASEs (não bloqueiam soft launch):** remover `@mui/*` órfão → auditar Mantine/HeroUI/Radix/Headless/Daisy + code-split → TanStack Query nos fetches → route loaders → secondary fetches idle → fatiar `store.tsx` → localStorage/push delta (não full state). Re-baseline TTFB/FCP no tip (baseline ainda em `docs/PERFORMANCE_FASE0_BASELINE.md`).
 
 ## Certification (same SHA)
 
 ```bash
 npm run cert:assert-ready
-npm run ai:certification:final
+# AI_CERT_ENV must be read by final runner (production label in latest/final)
+AI_CERT_ENV=production AI_RAG_ENV=production CERT_REQUIRE_READY=1 npm run ai:certification:final
 ```
 
 Expect `docs/certification/latest.json`: `production_ready: true`, `environment: production`, `commit_sha` = published SHA.
