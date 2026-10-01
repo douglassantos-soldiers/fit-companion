@@ -27,7 +27,8 @@ export function registerKnowledgeTools(): void {
   defineReadTool({
     id: "search_knowledge",
     name: "search_knowledge",
-    description: "Semantic search over curated product + Soldiers knowledge corpus",
+    description:
+      "Busca híbrida nos kb allowlist: kb:tkd.resistido, kb:nutrition.knowledge, kb:supplements.knowledge, kb:safety.knowledge. Não devolve evidence-policy nem spec.",
     permission: "knowledge.read",
     mcp_namespace: "knowledge",
     input_schema: {
@@ -96,7 +97,8 @@ export function registerKnowledgeTools(): void {
   defineReadTool({
     id: "get_knowledge_document",
     name: "get_knowledge_document",
-    description: "Fetch allowlisted knowledge document chunks by parent doc_id",
+    description:
+      "Lê chunks de um doc allowlist: tkd-resistido-adultos-001, nutrition-knowledge-001, supplements-knowledge-001, safety-knowledge-001.",
     permission: "knowledge.read",
     mcp_namespace: "knowledge",
     input_schema: {

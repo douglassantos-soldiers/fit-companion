@@ -18,6 +18,9 @@ const ADMIN_ROLES = ["admin", "editor", "support", "analyst"] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
+/** How long resolveTrustedIdentity may trust account status stamped on the access cookie. */
+export const ACCESS_STATUS_COOKIE_TTL_MS = 5 * 60_000;
+
 export type AccessSessionPayload = {
   email: string;
   tier: "base" | "performance";
@@ -27,8 +30,51 @@ export type AccessSessionPayload = {
   lastPaidAt?: string;
   /** Access window in days (7 for admin trial, 40 for purchase). Defaults to 40 when absent. */
   windowDays?: number;
+  /** Ban/suspend snapshot — avoids users.status on every identity resolve when fresh. */
+  accountBlocked?: boolean;
+  statusKnown?: boolean;
+  /** ISO timestamp when accountBlocked/statusKnown were last verified against DB. */
+  statusCheckedAt?: string;
   exp: number;
 };
+
+export type AccessAccountStatusStamp = {
+  accountBlocked: boolean;
+  statusKnown: boolean;
+  statusCheckedAt: string;
+};
+
+/** Pure helper — cookie stamp usable without DB when within TTL. */
+export function readFreshAccessAccountStatus(
+  session: Pick<AccessSessionPayload, "accountBlocked" | "statusKnown" | "statusCheckedAt">,
+  nowMs = Date.now(),
+  ttlMs = ACCESS_STATUS_COOKIE_TTL_MS,
+): AccessAccountStatusStamp | null {
+  if (typeof session.statusCheckedAt !== "string" || !session.statusCheckedAt) return null;
+  if (typeof session.statusKnown !== "boolean") return null;
+  if (typeof session.accountBlocked !== "boolean") return null;
+  const checked = Date.parse(session.statusCheckedAt);
+  if (!Number.isFinite(checked) || nowMs - checked > ttlMs || nowMs < checked - 60_000) {
+    return null;
+  }
+  return {
+    accountBlocked: session.accountBlocked,
+    statusKnown: session.statusKnown,
+    statusCheckedAt: session.statusCheckedAt,
+  };
+}
+
+export function accountStatusStampFromCheck(result: {
+  blocked: boolean;
+  statusKnown: boolean;
+  nowMs?: number;
+}): AccessAccountStatusStamp {
+  return {
+    accountBlocked: result.blocked,
+    statusKnown: result.statusKnown,
+    statusCheckedAt: new Date(result.nowMs ?? Date.now()).toISOString(),
+  };
+}
 
 export class SecurityConfigurationError extends Error {
   constructor(message: string) {
@@ -208,6 +254,11 @@ export function encodeAccessToken(
   if (payload.userId) body.userId = payload.userId;
   if (payload.lastPaidAt) body.lastPaidAt = payload.lastPaidAt;
   if (windowDays != null) body.windowDays = windowDays;
+  if (typeof payload.accountBlocked === "boolean") body.accountBlocked = payload.accountBlocked;
+  if (typeof payload.statusKnown === "boolean") body.statusKnown = payload.statusKnown;
+  if (typeof payload.statusCheckedAt === "string" && payload.statusCheckedAt.length >= 10) {
+    body.statusCheckedAt = payload.statusCheckedAt;
+  }
   const data = b64url(JSON.stringify(body));
   const sig = signAccessRaw(data);
   return `${data}.${sig}`;
@@ -247,6 +298,10 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
         ? Math.floor(json.windowDays)
         : ACCESS_PURCHASE_WINDOW_DAYS;
     if (lastPaidAt && !isPurchaseWithinWindow(lastPaidAt, Date.now(), windowDays)) return null;
+    const statusCheckedAt =
+      typeof json.statusCheckedAt === "string" && json.statusCheckedAt.length >= 10
+        ? json.statusCheckedAt
+        : undefined;
     return {
       email: String(json.email).toLowerCase(),
       tier: json.tier,
@@ -256,6 +311,9 @@ export function decodeAccessToken(token: string | undefined | null): AccessSessi
         : {}),
       ...(lastPaidAt ? { lastPaidAt } : {}),
       ...(windowDays !== ACCESS_PURCHASE_WINDOW_DAYS ? { windowDays } : {}),
+      ...(typeof json.accountBlocked === "boolean" ? { accountBlocked: json.accountBlocked } : {}),
+      ...(typeof json.statusKnown === "boolean" ? { statusKnown: json.statusKnown } : {}),
+      ...(statusCheckedAt ? { statusCheckedAt } : {}),
     };
   } catch {
     return null;

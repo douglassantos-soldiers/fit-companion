@@ -23,7 +23,9 @@ function isFresh(doc: KnowledgeDocument, asOf: string): boolean {
     const exp = Date.parse(doc.expiration_date);
     if (Number.isFinite(exp) && exp < t) return false;
   }
-  if (doc.status === "superseded" || doc.status === "draft") return false;
+  if (doc.status === "superseded") return false;
+  // Soldiers KB stays draft until CREF/CRN review, but it is retrievable.
+  if (doc.status === "draft") return doc.metadata["trust_level"] === "draft_internal";
   return true;
 }
 

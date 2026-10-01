@@ -39,6 +39,7 @@ Operator-filled proofs: copy `docs/certification/operator-live-proofs.template.j
 | Proof | Notes |
 |-------|--------|
 | Wearables | OAuth smoke — deferred_beta in gate |
+| Leaked-password | Dashboard HIBP toggle — deferred_beta OK for controlled beta; enable before `production_ready: true` |
 
 ## CI secrets (Product CI)
 

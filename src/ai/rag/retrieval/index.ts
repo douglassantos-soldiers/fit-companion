@@ -27,10 +27,25 @@ function keywordScore(queryTokens: string[], content: string): number {
   const contentTokens = new Set(tokenize(content));
   let hits = 0;
   for (const t of queryTokens) {
-    if (contentTokens.has(t)) hits += 1;
+    if (contentTokens.has(t)) {
+      hits += 1;
+      continue;
+    }
+    if (t.length < 6) continue;
+    for (const c of contentTokens) {
+      if (c.length < 6) continue;
+      const [short, long] = t.length <= c.length ? [t, c] : [c, t];
+      if (long.startsWith(short) && long.length - short.length <= 4) {
+        hits += 1;
+        break;
+      }
+    }
   }
   return hits / queryTokens.length;
 }
+
+/** Semantic hits below this cosine are dropped. Keyword overlap still qualifies in hybrid mode. */
+export const SEMANTIC_INCLUDE_MIN = 0.42;
 
 function excerpt(text: string, max = 160): string {
   const t = text.replace(/\s+/g, " ").trim();
@@ -68,6 +83,8 @@ function buildCitation(
   if (section) c.section = section;
   if (version) c.document_version = version;
   if (effective) c.effective_date = effective;
+  const kbRef = hit.metadata?.["kb_ref"];
+  if (typeof kbRef === "string" && kbRef.length > 0) c.kb_ref = kbRef;
   return c;
 }
 
@@ -177,9 +194,9 @@ async function retrieveKnowledgeInner(
     const keyword = keywordScore(queryTokens, `${document.title} ${chunk.content}`);
 
     let include = false;
-    if (mode === "semantic") include = semantic > 0.05;
+    if (mode === "semantic") include = semantic > SEMANTIC_INCLUDE_MIN;
     else if (mode === "keyword") include = keyword > 0;
-    else include = semantic > 0.05 || keyword > 0;
+    else include = semantic > SEMANTIC_INCLUDE_MIN || keyword > 0;
 
     if (!include) continue;
 

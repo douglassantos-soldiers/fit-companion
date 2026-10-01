@@ -87,12 +87,18 @@ describe("MCP Tool Layer", () => {
       "get_recent_outcomes",
       "get_orders",
       "get_products",
+      "search_knowledge",
+      "get_knowledge_document",
     ];
     const ids = new Set(listReadTools().map((t) => t.id));
     for (const id of requiredRead) {
       expect(ids.has(id)).toBe(true);
     }
-    expect(requiredRead).toHaveLength(13);
+    expect(requiredRead).toHaveLength(15);
+    const agentToolIds = new Set(ids);
+    for (const id of ["search_knowledge", "get_knowledge_document", "get_products"]) {
+      expect(agentToolIds.has(id)).toBe(true);
+    }
   });
 
   it("anonymous access is denied", async () => {

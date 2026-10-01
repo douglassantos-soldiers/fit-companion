@@ -27,8 +27,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "trainingMode full express deload rest Decision Engine volume",
     expected_sources: ["src_exercise_catalog_schema"],
     expected_topics: ["trainingMode", "load", "volume"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
   {
     question_id: "q_nutrition_macros",
@@ -36,8 +36,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "proteinG energyKcal meal macros nutrient snapshot",
     expected_sources: ["src_nutrition_labels"],
     expected_topics: ["protein", "macros"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
   {
     question_id: "q_recovery_fatigue",
@@ -45,8 +45,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "recovery fatigue readiness energy soreness stress",
     expected_sources: ["src_recovery_checkin"],
     expected_topics: ["fatigue", "recovery"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
   {
     question_id: "q_sleep_hours",
@@ -54,8 +54,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "sleepHours check-in typicalSleepHours sleep_low",
     expected_sources: ["src_sleep_checkin"],
     expected_topics: ["sleep"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
   {
     question_id: "q_behavior_adherence",
@@ -63,8 +63,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "adherence friction habit lessons weekend pattern",
     expected_sources: ["src_behavior_habits"],
     expected_topics: ["adherence", "habits"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
   {
     question_id: "q_performance_pipeline",
@@ -72,8 +72,8 @@ export const DOMAIN_EVAL_DATASET: DomainEvalQuestion[] = [
     query: "Context Safety Decision Engine Living Plan Proposal",
     expected_sources: ["src_performance_os"],
     expected_topics: ["Decision", "Living Plan"],
-    minimum_relevance: 0.05,
-    minimum_evidence_quality: 0.2,
+    minimum_relevance: 0.15,
+    minimum_evidence_quality: 0.35,
   },
 ];
 

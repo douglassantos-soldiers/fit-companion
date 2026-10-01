@@ -9,7 +9,7 @@ import type { KnowledgeDocument, KnowledgeDomain } from "@/ai/contracts/knowledg
 import { expandDomainFilter } from "@/ai/contracts/knowledge-document";
 import { RAG_ERROR, RagError } from "@/ai/rag/core/errors";
 import type { StoredVectorHit, VectorQueryOpts, VectorStore } from "@/ai/rag/core/vector-store";
-import { cosineSimilarity } from "@/ai/rag/embeddings";
+import { cosineSimilarity, getEmbeddingProvider } from "@/ai/rag/embeddings";
 import { asJson, type AdminDb } from "@/lib/db-admin";
 
 function toVectorLiteral(emb: number[]): string {
@@ -207,7 +207,7 @@ export class SupabasePgvectorStore implements VectorStore {
         ordinal: chunk.ordinal,
         content: chunk.content,
         embedding: emb.length ? toVectorLiteral(emb) : null,
-        embedding_provider: "local_lexical_v1",
+        embedding_provider: getEmbeddingProvider().id,
         embedding_ref: chunk.embedding_ref ?? null,
         document_version: document.version,
         metadata: asJson({
@@ -295,7 +295,13 @@ export class SupabasePgvectorStore implements VectorStore {
       ) {
         continue;
       }
-      if (hit.document.status === "superseded" || hit.document.status === "draft") continue;
+      if (hit.document.status === "superseded") continue;
+      if (
+        hit.document.status === "draft" &&
+        hit.document.metadata["trust_level"] !== "draft_internal"
+      ) {
+        continue;
+      }
       out.push(hit);
     }
     return out;

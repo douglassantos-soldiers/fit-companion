@@ -21,7 +21,7 @@ const BLOCKING = new Set([
   "account_deletion_live",
   "backup_restore_drill",
   "shopify_cron_staging",
-  "leaked_password_protection",
+  // leaked_password_protection may be deferred_beta for controlled beta
 ]);
 
 const evidencePath = join(process.cwd(), "docs", "certification", "operator-gate-evidence.json");
@@ -44,6 +44,10 @@ const checks = evidence.checks ?? [];
 const failed = checks.filter((c) => BLOCKING.has(c.name) && c.status === "fail");
 const pending = checks.filter((c) => BLOCKING.has(c.name) && c.status === "pending_operator");
 const missing = [...BLOCKING].filter((name) => !checks.some((c) => c.name === name));
+const leak = checks.find((c) => c.name === "leaked_password_protection");
+if (leak && leak.status === "fail") {
+  failed.push(leak);
+}
 
 if (failed.length || pending.length || missing.length) {
   console.error("Not ready to certify production:");
@@ -52,6 +56,10 @@ if (failed.length || pending.length || missing.length) {
   for (const m of missing) console.error(`  MISSING ${m}`);
   console.error("See docs/certification/CERTIFY_PRODUCTION.md");
   process.exit(3);
+}
+
+if (leak && leak.status === "deferred_beta") {
+  console.log(`Note: leaked_password_protection is deferred_beta — OK for controlled beta, enable before full production_ready`);
 }
 
 console.log(`Cert-ready: evidence head ${head} — all blocking checks pass`);

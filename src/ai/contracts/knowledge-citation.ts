@@ -20,4 +20,6 @@ export type KnowledgeCitation = {
   retrieval_id?: string;
   document_version?: string;
   effective_date?: string;
+  /** Soldiers / product kb ref when the chunk metadata carries one. */
+  kb_ref?: string;
 };

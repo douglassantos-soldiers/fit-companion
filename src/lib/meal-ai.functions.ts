@@ -111,7 +111,6 @@ async function estimateFromPhoto(
   const gw = await invokeMealOpenAiHttp({
     kind: "vision",
     ...(userId ? { userId } : {}),
-    url: "https://api.openai.com/v1/chat/completions",
     headers: { "Content-Type": "application/json" },
     body,
   });
@@ -137,7 +136,6 @@ async function transcribeVoice(
   const gw = await invokeMealOpenAiHttp({
     kind: "whisper",
     ...(userId ? { userId } : {}),
-    url: "https://api.openai.com/v1/audio/transcriptions",
     body: form,
   });
   if (!gw.ok) {

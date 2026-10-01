@@ -24,6 +24,18 @@ export type MealGatewayMediaResult =
 
 const MEAL_AGENT = "meal_ai";
 
+/** OpenAI API origin — override with AI_OPENAI_BASE_URL for proxies/Azure-compatible gateways. */
+export function resolveOpenAiApiBaseUrl(): string {
+  const raw = process.env["AI_OPENAI_BASE_URL"]?.trim() || process.env["OPENAI_BASE_URL"]?.trim();
+  if (raw) return raw.replace(/\/+$/, "");
+  return "https://api.openai.com/v1";
+}
+
+export function mealOpenAiEndpoint(kind: "vision" | "whisper"): string {
+  const base = resolveOpenAiApiBaseUrl();
+  return kind === "whisper" ? `${base}/audio/transcriptions` : `${base}/chat/completions`;
+}
+
 /**
  * Meal suggestions are non-Decision outputs (Gateway only — never Decision Engine).
  * Kill switches: AI_GLOBAL_ENABLED=false, AI_FORCE_DETERMINISTIC, LLM_ENABLED=false → no provider.
@@ -102,7 +114,8 @@ export async function invokeMealOpenAiHttp(opts: {
   userId?: string;
   body: BodyInit;
   headers?: Record<string, string>;
-  url: string;
+  /** @deprecated Prefer omitting — URL is resolved from AI_OPENAI_BASE_URL + kind. */
+  url?: string;
   timeoutMs?: number;
 }): Promise<MealGatewayMediaResult> {
   const started = Date.now();
@@ -143,9 +156,10 @@ export async function invokeMealOpenAiHttp(opts: {
   const timeoutMs = opts.timeoutMs ?? config.timeout_ms;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const url = opts.url?.trim() || mealOpenAiEndpoint(opts.kind);
 
   try {
-    const res = await fetch(opts.url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,

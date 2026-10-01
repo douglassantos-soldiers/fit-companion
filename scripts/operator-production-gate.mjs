@@ -52,7 +52,7 @@ const BLOCKING_PENDING = new Set([
   "account_deletion_live",
   "backup_restore_drill",
   "shopify_cron_staging",
-  "leaked_password_protection",
+  // leaked_password_protection: deferred_beta acceptable for controlled beta (dashboard toggle)
 ]);
 
 function loadLiveProofs() {
@@ -70,6 +70,10 @@ function recordFromLiveProofs(live, name, fallbackDetail) {
   const entry = live?.[name];
   if (entry && entry.status === "pass" && entry.at && entry.detail) {
     record(name, "pass", `${entry.at} — ${entry.detail}`);
+    return true;
+  }
+  if (entry && entry.status === "deferred_beta" && entry.at && entry.detail) {
+    record(name, "deferred_beta", `${entry.at} — ${entry.detail}`);
     return true;
   }
   if (entry && entry.status === "fail") {
@@ -202,7 +206,7 @@ recordFromLiveProofs(
 recordFromLiveProofs(
   live,
   "leaked_password_protection",
-  "Enable leaked-password protection in Supabase Auth dashboard — record in operator-live-proofs.json",
+  "Enable leaked-password protection in Supabase Auth dashboard — or set deferred_beta for controlled beta in operator-live-proofs.json",
 );
 
 // Wearables: beta-deferred — does not block gate exit

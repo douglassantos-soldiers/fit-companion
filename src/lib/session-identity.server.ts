@@ -6,11 +6,15 @@
  */
 import {
   assertSecurityConfiguration,
+  accountStatusStampFromCheck,
   deriveAccessSessionId,
   readAccessSession,
   readAccessSessionToken,
   readAdminSessionPayload,
+  readFreshAccessAccountStatus,
+  setAccessSessionCookie,
   type AdminRole,
+  type AccessSessionPayload,
 } from "@/lib/access-session.server";
 import { adminDbLoose } from "@/lib/db-admin";
 import {
@@ -91,6 +95,45 @@ function resolveAppRole(
 /** Branded helper for AI contracts — never invent from client body. */
 export function toTrustedUserId(identity: TrustedIdentity): string {
   return identity.userId;
+}
+
+async function enforceAccountNotBlocked(opts: {
+  userId: string;
+  email: string | null;
+  session: AccessSessionPayload | null;
+  refreshCookie: boolean;
+}): Promise<boolean> {
+  const fresh = opts.session ? readFreshAccessAccountStatus(opts.session) : null;
+  if (fresh) {
+    return fresh.statusKnown && !fresh.accountBlocked;
+  }
+
+  try {
+    const { checkUserBlocked } = await import("@/lib/account-status.server");
+    const status = await checkUserBlocked({
+      userId: opts.userId,
+      email: opts.email,
+    });
+    if (opts.refreshCookie && opts.session?.email && opts.session.userId) {
+      try {
+        const stamp = accountStatusStampFromCheck(status);
+        setAccessSessionCookie({
+          email: opts.session.email,
+          tier: opts.session.tier,
+          userId: opts.session.userId,
+          ...(opts.session.lastPaidAt ? { lastPaidAt: opts.session.lastPaidAt } : {}),
+          ...(opts.session.windowDays != null ? { windowDays: opts.session.windowDays } : {}),
+          ...stamp,
+        });
+      } catch (e) {
+        console.warn("access status cookie refresh failed", e);
+      }
+    }
+    return status.statusKnown && !status.blocked;
+  } catch (e) {
+    console.warn("trusted identity status check failed closed", e);
+    return false;
+  }
 }
 
 /**
@@ -186,14 +229,13 @@ export async function resolveTrustedIdentity(opts: {
       });
     }
 
-    try {
-      const { checkUserBlocked } = await import("@/lib/account-status.server");
-      const status = await checkUserBlocked({ userId, email });
-      if (!status.statusKnown || status.blocked) return null;
-    } catch (e) {
-      console.warn("trusted identity status check failed closed", e);
-      return null;
-    }
+    const allowed = await enforceAccountNotBlocked({
+      userId,
+      email,
+      session: { ...session, userId },
+      refreshCookie: true,
+    });
+    if (!allowed) return null;
 
     const { role, tier: resolvedTier } = resolveAppRole(true, email, tier);
     const identity: TrustedIdentity = {
@@ -220,14 +262,13 @@ export async function resolveTrustedIdentity(opts: {
 
   const user = await ensureUserForDevice(deviceId);
   if (!user) return null;
-  try {
-    const { checkUserBlocked } = await import("@/lib/account-status.server");
-    const status = await checkUserBlocked({ userId: user.id, email: user.email });
-    if (!status.statusKnown || status.blocked) return null;
-  } catch (e) {
-    console.warn("trusted identity status check failed closed", e);
-    return null;
-  }
+  const allowed = await enforceAccountNotBlocked({
+    userId: user.id,
+    email: user.email,
+    session: null,
+    refreshCookie: false,
+  });
+  if (!allowed) return null;
 
   const identity: TrustedIdentity = {
     userId: user.id,

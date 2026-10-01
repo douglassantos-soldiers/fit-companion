@@ -647,13 +647,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })();
 
         let remote: Awaited<ReturnType<typeof pullState>>;
-        if (local.userId) {
+        // Always start identity + pull together — pull tolerates anonymous/legacy device rows.
+        {
           const [uid, pull] = await Promise.all([identityTask, pullState(id)]);
-          resolvedUserId = uid ?? local.userId;
+          resolvedUserId = uid ?? local.userId ?? null;
           remote = pull;
-        } else {
-          resolvedUserId = await identityTask;
-          remote = await pullState(id);
         }
 
         if (remote) {

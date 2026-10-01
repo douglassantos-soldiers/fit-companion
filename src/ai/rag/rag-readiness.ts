@@ -68,12 +68,15 @@ export async function probeRemoteRagPopulation(): Promise<RemoteRagProbe> {
     const docs = await fetch(`${base}/rest/v1/ai_knowledge_documents?select=document_id`, {
       headers: { ...headers, Range: "0-0" },
     });
-    const chunks = await fetch(`${base}/rest/v1/ai_knowledge_chunks?select=id`, {
+    const chunks = await fetch(`${base}/rest/v1/ai_knowledge_chunks?select=chunk_id`, {
       headers: { ...headers, Range: "0-0" },
     });
     const docCount = Number(docs.headers.get("content-range")?.split("/")[1] ?? "0");
     const chunkCount = Number(chunks.headers.get("content-range")?.split("/")[1] ?? "0");
-    if (!docs.ok || !chunks.ok) {
+    // PostgREST returns 206 for ranged count=exact responses — treat as success.
+    const docsOk = docs.ok || docs.status === 206;
+    const chunksOk = chunks.ok || chunks.status === 206;
+    if (!docsOk || !chunksOk) {
       return {
         status: "pending_operator",
         evidence: [`REST status docs=${docs.status} chunks=${chunks.status}`],

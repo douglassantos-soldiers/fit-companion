@@ -14,6 +14,15 @@ export function registerSupplementSkills(): void {
     kind: "explanation",
     required_tool_ids: ["search_knowledge"],
     required_knowledge: ["kb:supplements.knowledge", "kb:supplementation.timing"],
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        date: { type: "string" },
+        query: { type: "string" },
+        ingredient: { type: "string" },
+      },
+    },
     safety_requirements: {
       requires_decision_authority: false,
       proposal_only_for_side_effects: true,

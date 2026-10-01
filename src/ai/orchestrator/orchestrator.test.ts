@@ -6,9 +6,11 @@ import {
   ORCH_ERROR,
   clearAgentRegistry,
   createExecutionPlan,
+  listAgents,
   registerDefaultAgents,
 } from "@/ai/orchestrator";
 import { registerAllSkills } from "@/ai/skills/register";
+import { listTools } from "@/ai/mcp/core/registry";
 import { registerAllMcpTools } from "@/ai/mcp/register";
 
 const USER = "user-orch-aaaa";
@@ -21,6 +23,17 @@ beforeEach(() => {
 });
 
 describe("Agent Orchestrator", () => {
+  it("agent tool allowlists are MCP read tools", () => {
+    const mcp = new Set(
+      listTools("read").map((t) => t.id),
+    );
+    for (const agent of listAgents()) {
+      for (const toolId of agent.allowed_tool_ids) {
+        expect(mcp.has(toolId), `${agent.id} → ${toolId}`).toBe(true);
+      }
+    }
+  });
+
   it("simple query → coach plan", () => {
     const { ok, plan } = createExecutionPlan({
       trustedUserId: USER,
@@ -44,6 +57,33 @@ describe("Agent Orchestrator", () => {
     expect(plan.knowledgeDomains).toEqual(expect.arrayContaining(["exercise", "performance"]));
     const handoffs = plan.sequence.filter((s) => s.kind === "handoff").map((s) => s.ref);
     expect(handoffs).toEqual(["context_engine", "safety_engine", "decision_engine"]);
+  });
+
+  it("supplementation query keeps explain_supplement and knowledge tools", () => {
+    const { ok, plan } = createExecutionPlan({
+      trustedUserId: USER,
+      intent: "posso tomar creatina com café?",
+    });
+    expect(ok).toBe(true);
+    expect(plan.agents).toContain("specialist_nutrition");
+    expect(plan.skills).toContain("explain_supplement");
+    expect(plan.tools).toEqual(
+      expect.arrayContaining(["search_knowledge", "get_knowledge_document", "get_products"]),
+    );
+    const warnings = plan.warnings ?? [];
+    expect(warnings.some((w) => w.includes("explain_supplement"))).toBe(false);
+    expect(warnings.some((w) => w.includes("search_knowledge"))).toBe(false);
+  });
+
+  it("training query keeps search_knowledge", () => {
+    const { ok, plan } = createExecutionPlan({
+      trustedUserId: USER,
+      intent: "como progressão de carga no treino?",
+    });
+    expect(ok).toBe(true);
+    expect(plan.agents).toContain("specialist_training");
+    expect(plan.tools).toContain("search_knowledge");
+    expect((plan.warnings ?? []).some((w) => w.includes("search_knowledge"))).toBe(false);
   });
 
   it("nutrition query → nutrition specialist", () => {

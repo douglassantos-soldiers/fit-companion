@@ -16,17 +16,21 @@ function splitParagraphs(content: string): string[] {
     .filter(Boolean);
 }
 
-export function chunkDocument(
-  doc: KnowledgeDocument,
+export const DEFAULT_CHUNK_SIZE = 480;
+export const DEFAULT_CHUNK_OVERLAP = 40;
+
+/** Paragraph pack + hard split. Shared by product chunks and long Markdown sections. */
+export function splitTextPieces(
+  content: string,
   opts?: { chunkSize?: number; chunkOverlap?: number },
-): KnowledgeChunk[] {
-  const chunkSize = opts?.chunkSize ?? 480;
-  const overlap = opts?.chunkOverlap ?? 40;
-  const paragraphs = splitParagraphs(doc.content);
+): string[] {
+  const chunkSize = opts?.chunkSize ?? DEFAULT_CHUNK_SIZE;
+  const overlap = opts?.chunkOverlap ?? DEFAULT_CHUNK_OVERLAP;
+  const paragraphs = splitParagraphs(content);
   const pieces: string[] = [];
 
   if (paragraphs.length === 0) {
-    const trimmed = doc.content.trim();
+    const trimmed = content.trim();
     if (trimmed) pieces.push(trimmed);
   } else {
     let buf = "";
@@ -46,7 +50,6 @@ export function chunkDocument(
     if (buf) pieces.push(buf);
   }
 
-  // Hard-split oversized pieces
   const finalPieces: string[] = [];
   for (const piece of pieces) {
     if (piece.length <= chunkSize * 2) {
@@ -57,6 +60,14 @@ export function chunkDocument(
       finalPieces.push(piece.slice(i, i + chunkSize));
     }
   }
+  return finalPieces.filter((p) => p.trim().length > 0);
+}
+
+export function chunkDocument(
+  doc: KnowledgeDocument,
+  opts?: { chunkSize?: number; chunkOverlap?: number },
+): KnowledgeChunk[] {
+  const finalPieces = splitTextPieces(doc.content, opts);
 
   return finalPieces.map((content, ordinal) => {
     const chunk: KnowledgeChunk = {

@@ -34,15 +34,23 @@ const PERFORMANCE_SKILLS = [
   "generate_daily_context",
 ] as const;
 
+const KNOWLEDGE_TOOLS = ["search_knowledge", "get_knowledge_document"] as const;
+
 const TRAINING_TOOLS = [
   "get_training_history",
   "get_current_plan",
   "get_training_session",
   "get_recent_decisions",
   "get_recovery",
+  "search_knowledge",
 ] as const;
 
-const NUTRITION_TOOLS = ["get_nutrition", "get_user_goal"] as const;
+const NUTRITION_TOOLS = [
+  "get_nutrition",
+  "get_user_goal",
+  "get_products",
+  ...KNOWLEDGE_TOOLS,
+] as const;
 
 const RECOVERY_TOOLS = ["get_sleep", "get_recovery", "get_wearable_data"] as const;
 
@@ -68,6 +76,7 @@ const COACH_TOOLS = [
   "get_recovery",
   "get_recent_decisions",
   "get_recent_outcomes",
+  "search_knowledge",
 ] as const;
 
 const agents = new Map<string, Agent>();
@@ -139,7 +148,7 @@ export function registerDefaultAgents(opts?: { force?: boolean }): void {
     version: "1.0.0",
     kind: "specialist_nutrition",
     capabilities: ["propose", "call_tools", "run_skills"],
-    allowed_skill_ids: [...NUTRITION_SKILLS, "analyze_adherence"],
+    allowed_skill_ids: [...NUTRITION_SKILLS, "analyze_adherence", "explain_supplement"],
     allowed_tool_ids: [...NUTRITION_TOOLS, "get_user_profile"],
   });
 

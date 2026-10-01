@@ -7,6 +7,7 @@ import type {
   KnowledgeDocument,
   KnowledgeDomain,
 } from "@/ai/contracts/knowledge-document";
+import { DEFAULT_CHUNK_SIZE, splitTextPieces } from "@/ai/rag/chunking";
 
 export type SoldiersKnowledgeMeta = {
   doc_id: string;
@@ -124,7 +125,8 @@ export function markdownToKnowledgeDocuments(
     ];
   }
 
-  return sections.map((sec, i) => {
+  const docs: KnowledgeDocument[] = [];
+  sections.forEach((sec, i) => {
     const slug = sec.section
       .toLowerCase()
       .normalize("NFD")
@@ -132,31 +134,41 @@ export function markdownToKnowledgeDocuments(
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, "")
       .slice(0, 48) || `sec_${i}`;
-    return {
-      document_id: `${docId}__${slug}`,
-      title: `${title} — ${sec.section}`,
-      domain: spec.domain,
-      source: "internal_docs" as const,
-      source_type: "markdown" as const,
-      version,
-      language: "pt-BR",
-      content: sec.content,
-      source_id: spec.source_id,
-      status: "draft" as const,
-      effective_date: "2026-09-29",
-      expiration_date: null,
-      created_at: now,
-      updated_at: now,
-      metadata: {
+    const pieces =
+      sec.content.length > DEFAULT_CHUNK_SIZE
+        ? splitTextPieces(sec.content)
+        : [sec.content];
+    pieces.forEach((content, ordinal) => {
+      const document_id =
+        pieces.length === 1 ? `${docId}__${slug}` : `${docId}__${slug}_${ordinal}`;
+      docs.push({
+        document_id,
+        title: `${title} — ${sec.section}`,
+        domain: spec.domain,
+        source: "internal_docs",
+        source_type: "markdown",
+        version,
+        language: "pt-BR",
+        content,
         source_id: spec.source_id,
-        kb_ref: spec.kb_ref,
-        section: sec.section,
-        document_version: version,
-        trust_level: "draft_internal",
-        parent_doc_id: docId,
+        status: "draft",
         effective_date: "2026-09-29",
-      },
-      tags: [spec.kb_ref, spec.domain, docId, "soldiers_kb", slug],
-    };
+        expiration_date: null,
+        created_at: now,
+        updated_at: now,
+        metadata: {
+          source_id: spec.source_id,
+          kb_ref: spec.kb_ref,
+          section: sec.section,
+          document_version: version,
+          trust_level: "draft_internal",
+          parent_doc_id: docId,
+          effective_date: "2026-09-29",
+          ...(pieces.length > 1 ? { section_part: ordinal } : {}),
+        },
+        tags: [spec.kb_ref, spec.domain, docId, "soldiers_kb", slug],
+      });
+    });
   });
+  return docs;
 }

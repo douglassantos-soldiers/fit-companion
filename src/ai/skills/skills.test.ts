@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearSkillRegistry,
   clearSkillRunLog,
+  getSkill,
   listSkills,
   registerAllSkills,
   runSkill,
@@ -35,6 +36,7 @@ const REQUIRED = [
   "explain_decision",
   "analyze_outcome",
   "generate_daily_context",
+  "explain_supplement",
 ] as const;
 
 const mockCallTool: SkillCallTool = async (toolId) => {
@@ -131,11 +133,29 @@ beforeEach(() => {
 });
 
 describe("Skills Framework", () => {
-  it("registers all 19 required skills", () => {
-    expect(listSkills().length).toBe(19);
+  it("registers all 20 required skills", () => {
+    expect(listSkills().length).toBe(20);
     const ids = new Set(listSkills().map((s) => s.id));
     for (const id of REQUIRED) {
       expect(ids.has(id)).toBe(true);
+    }
+  });
+
+  it("Soldiers skills declare the allowlisted kb refs", () => {
+    const expected: Record<string, string> = {
+      analyze_training: "kb:tkd.resistido",
+      select_exercise: "kb:tkd.resistido",
+      substitute_exercise: "kb:tkd.resistido",
+      adjust_training_load: "kb:tkd.resistido",
+      progression: "kb:tkd.resistido",
+      regression: "kb:tkd.resistido",
+      analyze_nutrition: "kb:nutrition.knowledge",
+      adjust_macros: "kb:nutrition.knowledge",
+      meal_substitution: "kb:nutrition.knowledge",
+      explain_supplement: "kb:supplements.knowledge",
+    };
+    for (const [id, ref] of Object.entries(expected)) {
+      expect(getSkill(id)?.required_knowledge ?? []).toContain(ref);
     }
   });
 

@@ -398,7 +398,12 @@ export async function runSpecialistAgent(
         runId: run_id,
         callTool,
         ...(input.loader ? { loader: input.loader } : {}),
-        input: skillId === "substitute_exercise" ? { sessionId: "s1" } : {},
+        input:
+          skillId === "substitute_exercise"
+            ? { sessionId: "s1" }
+            : skillId === "explain_supplement"
+              ? { query: intent || "suplementos treino evidência" }
+              : {},
       });
       if (!skillRes.ok || !skillRes.data) {
         warnings.push(`skill_failed:${skillId}:${skillRes.error_code ?? "unknown"}`);

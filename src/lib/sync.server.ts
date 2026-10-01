@@ -643,27 +643,54 @@ async function pullForDeviceIds(deviceIds: string[]): Promise<AppState | null> {
   const db = await adminDbLoose();
   if (!db || !deviceIds.length) return null;
 
+  const {
+    PROFILE_PULL_COLS,
+    SESSION_PULL_COLS,
+    WEIGHT_PULL_COLS,
+    DAILY_METRICS_PULL_COLS,
+    SUPPLEMENT_LOG_PULL_COLS,
+    APP_STATE_PULL_COLS,
+    MEAL_ENTRY_PULL_COLS,
+    pullHistorySinceIso,
+  } = await import("@/lib/sync/pull-projections");
+  const since = pullHistorySinceIso();
+
   const [profileRes, sessionsRes, weightsRes, daysRes, supplementsRes, stateRes, mealsRes] =
     await Promise.all([
       db
         .from("profiles")
-        .select("*")
+        .select(PROFILE_PULL_COLS)
         .in("device_id", deviceIds)
         .order("updated_at", { ascending: false })
         .limit(1),
       db
         .from("sessions")
-        .select("*")
+        .select(SESSION_PULL_COLS)
         .in("device_id", deviceIds)
+        .gte("date", since)
         .order("date", { ascending: false }),
-      db.from("weights").select("*").in("device_id", deviceIds).order("date", { ascending: true }),
-      db.from("daily_metrics").select("*").in("device_id", deviceIds),
-      db.from("supplement_logs").select("*").in("device_id", deviceIds),
-      db.from("app_state").select("*").in("device_id", deviceIds),
+      db
+        .from("weights")
+        .select(WEIGHT_PULL_COLS)
+        .in("device_id", deviceIds)
+        .gte("date", since)
+        .order("date", { ascending: true }),
+      db
+        .from("daily_metrics")
+        .select(DAILY_METRICS_PULL_COLS)
+        .in("device_id", deviceIds)
+        .gte("date", since),
+      db
+        .from("supplement_logs")
+        .select(SUPPLEMENT_LOG_PULL_COLS)
+        .in("device_id", deviceIds)
+        .gte("date", since),
+      db.from("app_state").select(APP_STATE_PULL_COLS).in("device_id", deviceIds),
       db
         .from("meal_entries")
-        .select("*")
+        .select(MEAL_ENTRY_PULL_COLS)
         .in("device_id", deviceIds)
+        .gte("date", since)
         .order("date", { ascending: true }),
     ]);
 

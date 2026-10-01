@@ -59,6 +59,8 @@ export { chunkDocument } from "@/ai/rag/chunking";
 export {
   LocalLexicalEmbeddingProvider,
   LOCAL_LEXICAL_EMBEDDING_DIM,
+  MultilingualNeuralEmbeddingProvider,
+  NEURAL_EMBEDDING_DIM,
   cosineSimilarity,
   generateEmbedding,
   generateEmbeddings,

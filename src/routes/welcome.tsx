@@ -36,7 +36,6 @@ function WelcomePage() {
             alt=""
             className="h-full w-full"
             imgClassName="object-cover"
-            autoPlay
           />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />
         </div>

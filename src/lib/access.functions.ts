@@ -4,15 +4,18 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import {
+  accountStatusStampFromCheck,
   clearAccessSessionCookie,
   clearAdminSessionCookie,
   readAccessSession,
+  readFreshAccessAccountStatus,
   setAccessSessionCookie,
   setAdminSessionCookie,
   readAdminSession,
   readAppAccessSession,
   authenticateAdminWithRole,
   resolveClientIpFingerprint,
+  type AccessAccountStatusStamp,
 } from "@/lib/access-session.server";
 import { parseEstablishAccessInput,
   parseAdminLogin,
@@ -24,6 +27,23 @@ export {
   parseAdminLogin,
   parseCompleteAccountInput,
 } from "@/lib/access-parse";
+
+async function loadAccountStatusStamp(opts: {
+  userId: string | null | undefined;
+  email: string;
+}): Promise<AccessAccountStatusStamp | null> {
+  try {
+    const { checkUserBlocked } = await import("@/lib/account-status.server");
+    const status = await checkUserBlocked({
+      userId: opts.userId ?? null,
+      email: opts.email,
+    });
+    return accountStatusStampFromCheck(status);
+  } catch (e) {
+    console.warn("account status stamp failed closed", e);
+    return accountStatusStampFromCheck({ blocked: true, statusKnown: false });
+  }
+}
 
 export const checkAccessSession = createServerFn({ method: "GET" }).handler(async () => {
   let session = readAccessSession();
@@ -38,16 +58,19 @@ export const checkAccessSession = createServerFn({ method: "GET" }).handler(asyn
           const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
           const user = await resolveOrCreateUserByEmail(admin.email);
           if (user) {
+            const stamp = await loadAccountStatusStamp({ userId: user.id, email: admin.email });
             setAccessSessionCookie({
               email: admin.email,
               tier: "performance",
               userId: user.id,
+              ...(stamp ?? {}),
             });
             session = {
               email: admin.email,
               tier: "performance",
               exp: admin.exp,
               userId: user.id,
+              ...(stamp ?? {}),
             };
           }
         }
@@ -65,13 +88,29 @@ export const checkAccessSession = createServerFn({ method: "GET" }).handler(asyn
     }
   }
   try {
-    const { checkUserBlocked } = await import("@/lib/account-status.server");
-    const status = await checkUserBlocked({
-      userId: session.userId ?? null,
-      email: session.email,
-    });
-    if (!status.statusKnown || status.blocked) {
-      return { ok: false as const, reason: "account_blocked" as const };
+    const fresh = readFreshAccessAccountStatus(session);
+    if (fresh) {
+      if (!fresh.statusKnown || fresh.accountBlocked) {
+        return { ok: false as const, reason: "account_blocked" as const };
+      }
+    } else {
+      const stamp = await loadAccountStatusStamp({
+        userId: session.userId ?? null,
+        email: session.email,
+      });
+      if (!stamp || !stamp.statusKnown || stamp.accountBlocked) {
+        return { ok: false as const, reason: "account_blocked" as const };
+      }
+      if (session.userId) {
+        setAccessSessionCookie({
+          email: session.email,
+          tier: session.tier,
+          userId: session.userId,
+          ...(session.lastPaidAt ? { lastPaidAt: session.lastPaidAt } : {}),
+          ...(session.windowDays != null ? { windowDays: session.windowDays } : {}),
+          ...stamp,
+        });
+      }
     }
   } catch (e) {
     console.warn("account status check failed closed", e);
@@ -210,12 +249,18 @@ export const establishAccessSession = createServerFn({ method: "POST" })
       lastName: profile.customerLastName,
     });
 
+    const stamp = await loadAccountStatusStamp({ userId, email: data.email });
+    if (!stamp || !stamp.statusKnown || stamp.accountBlocked) {
+      return { ok: false as const, reason: "account_blocked" as const };
+    }
+
     setAccessSessionCookie({
       email: data.email,
       tier: profile.accessTier,
       userId,
       lastPaidAt: profile.lastPaidAt,
       windowDays,
+      ...stamp,
     });
 
     try {
@@ -378,10 +423,12 @@ export const loginAdmin = createServerFn({ method: "POST" })
           const { resolveOrCreateUserByEmail } = await import("@/lib/identity");
           const user = await resolveOrCreateUserByEmail(data.email);
           if (user) {
+            const stamp = await loadAccountStatusStamp({ userId: user.id, email: data.email });
             setAccessSessionCookie({
               email: data.email,
               tier: "performance",
               userId: user.id,
+              ...(stamp ?? {}),
             });
           }
         }

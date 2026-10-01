@@ -1,7 +1,10 @@
 /**
- * Embedding providers — local lexical (deterministic); swappable later.
+ * Embedding providers.
+ * Default: multilingual neural (dim 256, offline). Lexical remains for fallback.
  * FASE 16: generateEmbedding / generateEmbeddings / similarity aliases.
  */
+
+import { MultilingualNeuralEmbeddingProvider } from "@/ai/rag/embeddings/neural";
 
 export type EmbeddingProvider = {
   readonly id: string;
@@ -63,7 +66,7 @@ export class LocalLexicalEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-let activeProvider: EmbeddingProvider = new LocalLexicalEmbeddingProvider();
+let activeProvider: EmbeddingProvider = new MultilingualNeuralEmbeddingProvider();
 
 export function getEmbeddingProvider(): EmbeddingProvider {
   return activeProvider;
@@ -74,7 +77,7 @@ export function setEmbeddingProvider(provider: EmbeddingProvider): void {
 }
 
 export function resetEmbeddingProvider(): void {
-  activeProvider = new LocalLexicalEmbeddingProvider();
+  activeProvider = new MultilingualNeuralEmbeddingProvider();
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
@@ -115,3 +118,4 @@ export function similarity(a: number[], b: number[]): number {
 }
 
 export { tokenize };
+export { MultilingualNeuralEmbeddingProvider, NEURAL_EMBEDDING_DIM } from "@/ai/rag/embeddings/neural";

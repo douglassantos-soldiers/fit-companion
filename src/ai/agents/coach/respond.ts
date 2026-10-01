@@ -48,6 +48,26 @@ function linesFromWhy(pack: CoachFactPack): string[] {
   return out;
 }
 
+function citedExcerptLines(pack: CoachFactPack): string[] {
+  const lines: string[] = [];
+  for (const r of pack.specialistResults) {
+    for (const c of r.citations ?? []) {
+      const excerpt = c.excerpt?.trim();
+      if (!excerpt) continue;
+      const label = c.kb_ref ?? c.document_id;
+      lines.push(`Trecho citado (${label}): ${excerpt.slice(0, 180)}`);
+      if (lines.length >= 3) return lines;
+    }
+  }
+  if (lines.length > 0) return lines;
+  for (const e of pack.evidence) {
+    if (!e.signal.startsWith("kb:") || e.value == null || e.value === "") continue;
+    lines.push(`Trecho citado (${e.signal}): ${String(e.value).slice(0, 180)}`);
+    if (lines.length >= 3) break;
+  }
+  return lines;
+}
+
 function specialistSummaries(pack: CoachFactPack): string[] {
   const out: string[] = [];
   for (const r of pack.specialistResults) {
@@ -119,6 +139,7 @@ export function buildCoachResponse(pack: CoachFactPack): BuiltCoachResponse {
     if (pack.why.outcome_summary) {
       parts.push(`• Outcomes recentes: ${JSON.stringify(pack.why.outcome_summary).slice(0, 200)}`);
     }
+    for (const line of citedExcerptLines(pack)) parts.push(`• ${line}`);
     if (pack.proposalStatus === "rejected" || pack.proposalStatus === "safety_blocked") {
       parts.push(
         `• Proposta de ajuste não aplicada: ${pack.proposalRejectReason ?? pack.proposalStatus}`,
@@ -153,6 +174,11 @@ export function buildCoachResponse(pack: CoachFactPack): BuiltCoachResponse {
   if (whyLines.length) {
     parts.push("Decisões / contexto:");
     parts.push(...whyLines.slice(0, 4).map((l) => `• ${l}`));
+  }
+  const excerpts = citedExcerptLines(pack);
+  if (excerpts.length) {
+    parts.push("Trechos da base (citados, sem decisão nova):");
+    parts.push(...excerpts.map((l) => `• ${l}`));
   }
   if (pack.warnings.some((w) => w.includes("tool_failed") || w.includes("skill_failed"))) {
     parts.push("• Algumas tools/skills falharam; omiti valores em vez de inventá-los.");
